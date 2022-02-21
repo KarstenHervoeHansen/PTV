@@ -1,0 +1,115 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 1995-2007 Xilinx, Inc.
+// All Right Reserved.
+////////////////////////////////////////////////////////////////////////////////
+//   ____  ____ 
+//  /   /\/   / 
+// /___/  \  /    Vendor: Xilinx 
+// \   \   \/     Version : 9.2.03i
+//  \   \         Application : ISE
+//  /   /         Filename : test_clock_gen.ant
+// /___/   /\     Timestamp : Tue Nov 13 14:12:13 2007
+// \   \  /  \ 
+//  \___\/\___\ 
+//
+//Command: 
+//Design Name: test_clock_gen
+//Device: Xilinx
+//
+`timescale 1ns/1ps
+
+module test_clock_gen;
+    reg clk_i = 1'b0;
+    reg sync_i = 1'b0;
+    reg [1:0] format_i = 2'b00;
+    wire ltc_clock_tick_o;
+    wire ltc_frame_tick_o;
+    wire [7:0] ltc_bitcount_o;
+
+    parameter PERIOD = 200;
+    parameter real DUTY_CYCLE = 0.5;
+    parameter OFFSET = 100;
+
+    initial    // Clock process for clk_i
+    begin
+        #OFFSET;
+        forever
+        begin
+            clk_i = 1'b0;
+            #(PERIOD-(PERIOD*DUTY_CYCLE)) clk_i = 1'b1;
+            #(PERIOD*DUTY_CYCLE);
+        end
+    end
+
+    LTC_clockgen UUT (
+        .clk_i(clk_i),
+        .sync_i(sync_i),
+        .format_i(format_i),
+        .ltc_clock_tick_o(ltc_clock_tick_o),
+        .ltc_frame_tick_o(ltc_frame_tick_o),
+        .ltc_bitcount_o(ltc_bitcount_o));
+
+    integer TX_FILE = 0;
+    integer TX_ERROR = 0;
+    
+    initial begin    // Annotation process for clock clk_i
+        #0;
+        ANNOTATE_ltc_clock_tick_o;
+        ANNOTATE_ltc_frame_tick_o;
+        ANNOTATE_ltc_bitcount_o;
+        #OFFSET;
+        forever begin
+            #115;
+            ANNOTATE_ltc_clock_tick_o;
+            ANNOTATE_ltc_frame_tick_o;
+            ANNOTATE_ltc_bitcount_o;
+            #85;
+        end
+    end
+
+    initial begin  // Open the annotations file...
+        TX_FILE = $fopen("\\\\wts\\data1\\PT8616\\final_source\\FPGA\\test_clock_gen.ano");
+        #1200 // Final time:  1200 ns
+        $display("Success! Annotation Simulation Complete.");
+        $fdisplay(TX_FILE, "Total[%d]", TX_ERROR);
+        $fclose(TX_FILE);
+        $finish;
+    end
+
+    initial begin
+        // -------------  Current Time:  585ns
+        #585;
+        sync_i = 1'b1;
+        // -------------------------------------
+        // -------------  Current Time:  785ns
+        #200;
+        sync_i = 1'b0;
+        // -------------------------------------
+    end
+
+    task ANNOTATE_ltc_clock_tick_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,ltc_clock_tick_o,%b]", $time, ltc_clock_tick_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_ltc_frame_tick_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,ltc_frame_tick_o,%b]", $time, ltc_frame_tick_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_ltc_bitcount_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,ltc_bitcount_o,%b]", $time, ltc_bitcount_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+endmodule
+

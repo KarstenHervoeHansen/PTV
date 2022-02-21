@@ -1,0 +1,73 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 1995-2007 Xilinx, Inc.
+// All Right Reserved.
+////////////////////////////////////////////////////////////////////////////////
+//   ____  ____ 
+//  /   /\/   / 
+// /___/  \  /    Vendor: Xilinx 
+// \   \   \/     Version : 9.2.03i
+//  \   \         Application : ISE
+//  /   /         Filename : test_digital_loop.tfw
+// /___/   /\     Timestamp : Thu Jan 17 13:30:03 2008
+// \   \  /  \ 
+//  \___\/\___\ 
+//
+//Command: 
+//Design Name: test_digital_loop
+//Device: Xilinx
+//
+`timescale 1ns/1ps
+
+module test_digital_loop;
+    reg clk_i = 1'b0;
+    reg [10:0] phase_diff_i = 11'b00000000000;
+    reg update_tick_i = 1'b0;
+    wire [15:0] dac_word_o;
+
+    parameter PERIOD_clk_i = 200;
+    parameter real DUTY_CYCLE_clk_i = 0.5;
+    parameter OFFSET_clk_i = 100;
+    parameter PERIOD_update_tick_i = 1000;
+    parameter real DUTY_CYCLE_update_tick_i = 0.2;
+    parameter OFFSET_update_tick_i = 100;
+
+    initial    // Clock process for clk_i
+    begin
+        #OFFSET_clk_i;
+        forever
+        begin
+            clk_i = 1'b0;
+            #(PERIOD_clk_i-(PERIOD_clk_i*DUTY_CYCLE_clk_i)) clk_i = 1'b1;
+            #(PERIOD_clk_i*DUTY_CYCLE_clk_i);
+        end
+    end
+
+    initial    // Clock process for update_tick_i
+    begin
+        #OFFSET_update_tick_i;
+        forever
+        begin
+            update_tick_i = 1'b0;
+            #(PERIOD_update_tick_i-(PERIOD_update_tick_i*DUTY_CYCLE_update_tick_i)) update_tick_i = 1'b1;
+            #(PERIOD_update_tick_i*DUTY_CYCLE_update_tick_i);
+        end
+    end
+
+    digital_phase_loop UUT (
+        .clk_i(clk_i),
+        .phase_diff_i(phase_diff_i),
+        .update_tick_i(update_tick_i),
+        .dac_word_o(dac_word_o));
+
+    initial begin // Process for clk_i
+        // -------------  Current Time:  185ns
+        #185;
+        phase_diff_i = 11'b11011010111;
+        // -------------------------------------
+    end
+
+    initial begin // Process for update_tick_i
+    end
+
+endmodule
+

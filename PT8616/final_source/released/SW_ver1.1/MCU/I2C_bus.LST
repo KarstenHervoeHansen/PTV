@@ -1,0 +1,204 @@
+C51 COMPILER V7.10   I2C_BUS                                                               06/15/2012 10:12:05 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE I2C_BUS
+OBJECT MODULE PLACED IN I2C_bus.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe I2C_bus.c DB OE
+
+line level    source
+
+   1          #include <C8051F320.h>
+   2          #include "i2c_bus.h"
+   3          
+   4          sbit sda_int_io = P1^1;
+   5          sbit scl_int_io = P1^2;
+   6          
+   7          
+   8          //variable delay
+   9          void delay(char hi, char lo)
+  10          {
+  11   1              TCON &= 0xCF;   //stop timer, clear OF flag
+  12   1              TL0 = lo;               //0xE8
+  13   1              TH0 = hi;
+  14   1              TCON |= 0x10;   //start timer
+  15   1              while(! (TCON&0x20))
+  16   1              ;
+  17   1      }
+  18          
+  19          //short delay
+  20          void sdelay()
+  21          {
+  22   1              TCON &= 0xCF;   //stop timer, clear OF flag
+  23   1              TL0 = 0xE8;             //0xE8
+  24   1              TH0 = 0xFF;
+  25   1              TCON |= 0x10;   //start timer
+  26   1              while(! (TCON&0x20))
+  27   1              ;
+  28   1      }
+  29          
+  30          void i2c_start()
+  31          {
+  32   1              scl_int_io = 1;
+  33   1              sdelay();
+  34   1              sda_int_io = 0;
+  35   1              sdelay();
+  36   1              scl_int_io = 0;
+  37   1              sdelay();
+  38   1              sda_int_io = 1;
+  39   1              sdelay();
+  40   1      }
+  41          
+  42          void i2c_stop()
+  43          {
+  44   1              sda_int_io = 0;
+  45   1              scl_int_io = 1;
+  46   1              sdelay();
+  47   1              sda_int_io = 1;
+  48   1              sdelay();
+  49   1      }
+  50          
+  51          void i2c_sendbyte(char byte)
+  52          {
+  53   1              char count=0;
+  54   1      
+  55   1              for(count; count<8; count++)
+C51 COMPILER V7.10   I2C_BUS                                                               06/15/2012 10:12:05 PAGE 2   
+
+  56   1              {
+  57   2                      sda_int_io=byte&128;
+  58   2                      sdelay();
+  59   2                      scl_int_io=1;
+  60   2                      sdelay();
+  61   2                      scl_int_io=0;
+  62   2                      byte= byte << 1;
+  63   2                      sdelay();
+  64   2              }
+  65   1      
+  66   1              //end transmission
+  67   1              sda_int_io=1;
+  68   1      
+  69   1              sdelay();
+  70   1      }
+  71          
+  72          unsigned char i2c_readbyte()
+  73          {
+  74   1              unsigned char inbyte=0;
+  75   1              char count=0;
+  76   1      
+  77   1              for(count; count<8; count++)
+  78   1              {
+  79   2                      inbyte=inbyte<<1;
+  80   2                      scl_int_io=1;
+  81   2                      sdelay();
+  82   2                      inbyte|=sda_int_io;
+  83   2                      scl_int_io=0;
+  84   2                      sdelay();
+  85   2              }
+  86   1      
+  87   1              sda_int_io=1;
+  88   1              sdelay();
+  89   1      
+  90   1              return inbyte;
+  91   1      }
+  92          
+  93          char i2c_getack()
+  94          {
+  95   1              //get acknowledge
+  96   1              unsigned char count=0;
+  97   1              char sda_temp=1;
+  98   1              sda_int_io=1;
+  99   1              while(sda_temp!=0)      //while sda != low
+ 100   1              {
+ 101   2                      sda_temp=sda_int_io;
+ 102   2      
+ 103   2                      count++;
+ 104   2                      if(count==255)  //if timeout
+ 105   2                              return 0;
+ 106   2              }
+ 107   1      
+ 108   1              scl_int_io=1;
+ 109   1              sdelay();
+ 110   1              scl_int_io=0;
+ 111   1              sdelay();
+ 112   1      
+ 113   1              return 1;
+ 114   1      }
+ 115          
+ 116          void i2c_giveack()
+ 117          {
+C51 COMPILER V7.10   I2C_BUS                                                               06/15/2012 10:12:05 PAGE 3   
+
+ 118   1              scl_int_io=0;
+ 119   1              sda_int_io=0;
+ 120   1              sdelay();
+ 121   1              scl_int_io=1;
+ 122   1              sdelay();
+ 123   1              scl_int_io=0;
+ 124   1              sdelay();
+ 125   1      }
+ 126          
+ 127          unsigned char FPGA_read_byte(unsigned char subaddress)
+ 128          {
+ 129   1              unsigned char in_byte=0;
+ 130   1      
+ 131   1              i2c_start();
+ 132   1              i2c_sendbyte(0xF0);
+ 133   1              i2c_getack();
+ 134   1              i2c_sendbyte(subaddress);
+ 135   1              i2c_getack();
+ 136   1              i2c_start();
+ 137   1              i2c_sendbyte(0xF1);
+ 138   1              i2c_getack();
+ 139   1              in_byte=i2c_readbyte();
+ 140   1              i2c_getack();
+ 141   1              i2c_stop();
+ 142   1      
+ 143   1              return in_byte;
+ 144   1      }
+ 145          
+ 146          void FPGA_write_byte(unsigned char subaddress, unsigned char byte)
+ 147          {
+ 148   1              i2c_start();
+ 149   1              i2c_sendbyte(0xF0);
+ 150   1              i2c_getack();
+ 151   1              i2c_sendbyte(subaddress);
+ 152   1              i2c_getack();
+ 153   1              i2c_sendbyte(byte);
+ 154   1              i2c_getack();
+ 155   1              i2c_stop();
+ 156   1      }
+ 157          
+ 158          void FPGA_write_array(unsigned char subaddress, unsigned char *array, unsigned char num_of_bytes)
+ 159          {
+ 160   1              unsigned char byte_count=0;
+ 161   1      
+ 162   1              i2c_start();
+ 163   1              i2c_sendbyte(0xF0);
+ 164   1              i2c_getack();
+ 165   1              i2c_sendbyte(subaddress);
+ 166   1              i2c_getack();
+ 167   1      
+ 168   1              for(byte_count=0; byte_count<num_of_bytes; byte_count++)
+ 169   1              {
+ 170   2                      i2c_sendbyte(array[byte_count]);
+ 171   2                      i2c_getack();
+ 172   2              }
+ 173   1      
+ 174   1              i2c_stop();
+ 175   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    293    ----
+C51 COMPILER V7.10   I2C_BUS                                                               06/15/2012 10:12:05 PAGE 4   
+
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       5
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

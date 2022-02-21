@@ -1,0 +1,193 @@
+#Makefile for compilation without RTXC
+#You must use Borland C makefile.exe
+
+.SUFFIXES: .c .asm .src .obj .hex
+
+PROJ=PT5201
+INCDIR=.\
+
+default: all
+
+#--------------- Target1 -------- front.c -----------------------
+Target1=PT5202
+
+XACC=c:\cxa\bin\CXA
+XAAS=c:\cxa\bin\ASXA
+#XALINK=c:\cxa\bin\CCXA
+XALINK=c:\cxa\bin\LKXA
+XALOC=c:\cxa\bin\LCXA
+
+# -O1 means optimize for size
+# -O2 means optimize for speed.
+# -O0 means no optimizations
+
+XACFLAGS=-A1 -Cxag3 -e -g -Ic:\cxa\include -I$(INCDIR) -err -Ml -O0 -s
+XAAFLAGS= -l -Cxag3 -e -gs -OHjs
+XALFLAGS=-e
+XALCFLAGS=-f3 -dxa.dsc
+
+OUTPUTDIR1=.\temp\xa
+TARGETDIR1=.\temp
+
+
+.c{$(OUTPUTDIR1)}.obj:
+        @ECHO Compiling for XA : $** - $(@R).obj
+        @$(XACC) -f &&|
+        $** $(XACFLAGS) -o $(@R).src
+|
+        @$(XAAS) -f &&|
+        $(@R).src $(XAAFLAGS) -o $@
+|
+
+
+# Target1Dependencies:
+
+$(TARGETDIR1)\$(Target1).hex: \
+ $(OUTPUTDIR1)\ptvmain.obj \
+ $(OUTPUTDIR1)\main.obj \
+#channel drivers
+ $(OUTPUTDIR1)\rs232.obj \
+ $(OUTPUTDIR1)\sio0drv.obj \
+ $(OUTPUTDIR1)\iniic.obj \
+#device drivers
+ $(OUTPUTDIR1)\nv_drv.obj \
+ $(OUTPUTDIR1)\tim0drv.obj \
+ $(OUTPUTDIR1)\led_hw.obj \
+ $(OUTPUTDIR1)\key_hw.obj \
+ $(OUTPUTDIR1)\plddrv.obj \
+ $(OUTPUTDIR1)\tvp6kdrv.obj \
+ $(OUTPUTDIR1)\unitprg.obj \
+ $(OUTPUTDIR1)\disp_02.obj \
+ $(OUTPUTDIR1)\keyb_drv.obj \
+#other files
+ $(OUTPUTDIR1)\cbar.obj \
+ $(OUTPUTDIR1)\audio.obj \
+ $(OUTPUTDIR1)\genlock.obj \
+ $(OUTPUTDIR1)\bb.obj \
+ $(OUTPUTDIR1)\instru.obj \
+ $(OUTPUTDIR1)\keyscan.obj \
+ $(OUTPUTDIR1)\front.obj \
+ $(OUTPUTDIR1)\interp.obj \
+ $(OUTPUTDIR1)\rs232cmd.obj \
+ $(OUTPUTDIR1)\rs232par.obj \
+ $(OUTPUTDIR1)\rs232err.obj \
+ $(OUTPUTDIR1)\util.obj \
+ $(OUTPUTDIR1)\menutree.obj \
+ $(OUTPUTDIR1)\mnuinter.obj
+
+        @ECHO ***** Linking for XA :  - $@
+        @$(XALINK) -f &&|
+         $(XALFLAGS) -o$(@B).out $** -lcl -lfpl
+|
+        @$(XALOC) -o$@ $(@B).out -emEDE=\"$(Target1).i\" -f &&|
+        $(XALCFLAGS)
+|
+
+
+$(OUTPUTDIR1)\main.obj: \
+        main.c
+
+$(OUTPUTDIR1)\ptvmain.obj: \
+        ptvmain.c
+
+$(OUTPUTDIR1)\rs232.obj: \
+        rs232.c \
+        $(INCDIR)\priori.h \
+
+$(OUTPUTDIR1)\sio0drv.obj: \
+        sio0drv.c \
+        $(INCDIR)\priori.h \
+
+$(OUTPUTDIR1)\nv_drv.obj: \
+        nv_drv.c \
+        $(INCDIR)\nv_drv.h
+
+$(OUTPUTDIR1)\iniic.obj: \
+        iniic.c 
+
+$(OUTPUTDIR1)\tim0drv.obj: \
+        tim0drv.c \
+        $(INCDIR)\tim0drv.h
+
+$(OUTPUTDIR1)\led_hw.obj: \
+        led_hw.c \
+        $(INCDIR)\led_hw.h \
+
+$(OUTPUTDIR1)\key_hw.obj: \
+        key_hw.c \
+        $(INCDIR)\key_hw.h \
+
+$(OUTPUTDIR1)\plddrv.obj: \
+        plddrv.c \
+        $(INCDIR)\plddrv.h \
+
+$(OUTPUTDIR1)\tvp6kdrv.obj: \
+        tvp6kdrv.c \
+        $(INCDIR)\tvp6kdrv.h \
+
+$(OUTPUTDIR1)\unitprg.obj: \
+        unitprg.c \
+        $(INCDIR)\unitprg.h \
+
+$(OUTPUTDIR1)\cbar.obj: \
+        cbar.c \
+        $(INCDIR)\priori.h \
+
+$(OUTPUTDIR1)\audio.obj: \
+        audio.c \
+        $(INCDIR)\audio.h \
+
+$(OUTPUTDIR1)\genlock.obj: \
+        genlock.c \
+        $(INCDIR)\genlock.h \
+
+$(OUTPUTDIR1)\bb.obj: \
+        bb.c \
+        $(INCDIR)\bb.h \
+
+$(OUTPUTDIR1)\instru.obj: \
+        instru.c
+
+$(OUTPUTDIR1)\keyscan.obj: \
+        keyscan.c
+
+$(OUTPUTDIR1)\front.obj: \
+        front.c
+
+$(OUTPUTDIR1)\interp.obj: \
+        interp.c \
+
+$(OUTPUTDIR1)\rs232cmd.obj: \
+        rs232cmd.c \
+        $(INCDIR)\rs232cmd.h
+
+$(OUTPUTDIR1)\rs232par.obj: \
+        rs232par.c \
+        $(INCDIR)\rs232par.h
+
+$(OUTPUTDIR1)\rs232err.obj: \
+        rs232err.c \
+        $(INCDIR)\rs232err.h
+
+$(OUTPUTDIR1)\util.obj: \
+        util.c \
+        $(INCDIR)\util.h
+
+$(OUTPUTDIR1)\menutree.obj: \
+        menutree.c \
+        $(INCDIR)\menutree.h
+
+$(OUTPUTDIR1)\mnuinter.obj: \
+        mnuinter.c \
+        $(INCDIR)\mnuinter.h
+
+$(OUTPUTDIR1)\keyb_drv.obj: \
+        keyb_drv.c \
+        $(INCDIR)\keyb_drv.h
+
+$(OUTPUTDIR1)\disp_02.obj: \
+        disp_02.c \
+        $(INCDIR)\disp_02.h
+
+all: \
+ $(TARGETDIR1)\$(Target1).hex

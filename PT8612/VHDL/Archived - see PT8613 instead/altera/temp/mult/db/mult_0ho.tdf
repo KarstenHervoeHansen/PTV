@@ -1,0 +1,64 @@
+--lpm_mult CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEVICE_FAMILY="Cyclone II" DSP_BLOCK_BALANCING="Auto" LPM_REPRESENTATION="UNSIGNED" LPM_WIDTHA=10 LPM_WIDTHB=10 LPM_WIDTHP=20 LPM_WIDTHS=1 MAXIMIZE_SPEED=5 dataa datab result CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=48
+--VERSION_BEGIN 4.1 cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_lpm_add_sub 2004:06:23:12:24:04:SJ cbx_lpm_mult 2004:06:23:16:45:16:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_padd 2004:06:16:20:36:44:SJ cbx_stratix 2004:04:28:15:20:14:SJ cbx_stratixii 2004:05:18:11:28:28:SJ cbx_util 2004:03:29:17:03:30:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION cycloneii_mac_mult (aclr, clk, dataa[17..0], datab[17..0], ena, signa, signb)
+WITH ( 	dataa_clock,	dataa_width,	datab_clock,	datab_width,	signa_clock,	signb_clock) 
+RETURNS ( dataout[35..0]);
+FUNCTION cycloneii_mac_out (aclr, clk, dataa[35..0], ena)
+WITH ( 	dataa_width,	output_clock) 
+RETURNS ( dataout[35..0]);
+
+--synthesis_resources = dsp_9bit 2 
+SUBDESIGN mult_0ho
+( 
+	dataa[9..0]	:	input;
+	datab[9..0]	:	input;
+	result[19..0]	:	output;
+) 
+VARIABLE 
+	mac_mult1 : cycloneii_mac_mult
+		WITH (
+			dataa_clock = "none",
+			dataa_width = 10,
+			datab_clock = "none",
+			datab_width = 10,
+			signa_clock = "none",
+			signb_clock = "none"
+		);
+	mac_out2 : cycloneii_mac_out
+		WITH (
+			dataa_width = 20,
+			output_clock = "none"
+		);
+
+BEGIN 
+	mac_mult1.dataa[] = ( B"11111111", dataa[]);
+	mac_mult1.datab[] = ( B"11111111", datab[]);
+	mac_mult1.signa = B"0";
+	mac_mult1.signb = B"0";
+	mac_out2.dataa[] = mac_mult1.dataout[];
+	result[19..0] = mac_out2.dataout[19..0];
+END;
+--VALID FILE

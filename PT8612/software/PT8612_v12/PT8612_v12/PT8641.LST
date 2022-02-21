@@ -1,0 +1,115 @@
+C51 COMPILER V7.10   PT8641                                                                10/11/2010 13:21:58 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE PT8641
+OBJECT MODULE PLACED IN PT8641.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe PT8641.c DB OE LARGE
+
+line level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2005                                           */
+   3          /*  Project:  PT8641 HDTPG, using 8051F320 Cygnal                          */
+   4          /*            processor.                                                   */
+   5          /*  Module:   PT8641.C                                                     */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     23.02.2006                                                   */
+   8          /*  Status:   Version 2.0                                                  */
+   9          /*  Purpose:  Main program for PT8641 unit.                                */
+  10          /*  Note:                                                                  */
+  11          /*  Note:    F320 has 16K Flash and                                        */
+  12          /*           Internal RAM  255 bytes                                       */
+  13          /*           XARM         1024 bytes                                       */
+  14          /*           XRAM         1024 dedicated as USB buffer.                    */
+  15          /*                                                                         */
+  16          /*  Changes:  19.04.2006: new signal   LEVOK = 1; to master introduced.    */
+  17          /***************************************************************************/
+  18          /* #pragma WARNINGLEVEL (1) Lists only those warnings which may generate   */
+  19                                   /* incorrect code. Default is 2.                  */
+  20          /***************************************************************************/
+  21          
+  22          
+  23          #include <C8051F320.h>
+  24          #include "define.h"
+  25          #include <string.h>
+  26          #include "cmd.h"
+  27          #include "eeprom.h"
+  28          #include "serial.h"
+  29          
+  30          /*
+  31          //-------------------
+  32          // Global CONSTANTS
+  33          //-------------------
+  34          */
+  35          #include "io.c"
+  36          
+  37          bit jtag_flag; /* used to switch serial interface to operate in 'transparent' */
+  38                         /* mode for FPGA programming.                                  */
+  39          
+  40          /*************************/
+  41          /*  Function PROTOTYPES  */
+  42          /*************************/
+  43          void init_all(void);
+  44          void config(void);
+  45          
+  46          
+  47          void main (void)
+  48            {
+  49   1        config();
+  50   1      
+  51   1        RS232Init();
+  52   1      
+  53   1        I2cInit(); /* program will hang here if no eeprom mounted! */
+  54   1      
+  55   1        LED   = 0;
+C51 COMPILER V7.10   PT8641                                                                10/11/2010 13:21:58 PAGE 2   
+
+  56   1        LEVOK = 1;
+  57   1      
+  58   1      
+  59   1        while (1)
+  60   1          {
+  61   2          if (TestInputBuffer())
+  62   2            CharHandler();
+  63   2          }
+  64   1        }
+  65          
+  66          #if 0
+              /********************************************************/
+              /* erase_flash_page                                     */
+              /* This routine erases the FLASH page located at 0x1000 */
+              /********************************************************/
+              void erase_flash_page(void) 
+                { 
+                bit EA_state; 
+                char xdata* data pagePointer = 0x1000; /* pointer to xdata space located        */
+                                                       /* in data space                         */
+                EA_state = EA;                         /* holds interrupt state                 */
+                EA = 0;                                /* disable interrupts                    */
+                FLSCL |= 0x01;                         /* enable FLASH write/erase              */
+                PSCTL  = 0x03;                         /* MOVX erases FLASH                     */
+                                                                                                
+                /* Erase the FLASH page at 0x1000 */  
+                *pagePointer = 0;                      /* initiate the erase                    */
+              
+                PSCTL   = 0x00;                        /* MOVX writes target XRAM               */
+                FLSCL  &= ~0x01;                       /* disable FLASH write/erase             */
+                EA      = EA_state;                    /* restore interrupt state               */
+                f_valid = FALSE;                       /* indicate that code is no longer valid */
+                code_erased = TRUE;                    /* indicate that FLASH has been erased   */
+                }
+              #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     23    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

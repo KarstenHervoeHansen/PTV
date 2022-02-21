@@ -1,0 +1,951 @@
+// Famille  : Stand-Alone.
+// Produit  : MSG-5300.
+// Séquence : Timming Errors Monitoring 01.
+//
+// Création : 2013-04-23 par Robert Tremblay.
+// Modification : 2013-04-26 par Robert Tremblay.
+// Copyright © 2013 - Miranda Technologies Partnership, tous droits réservés.
+// 
+// Test de fonctionalité en QA/R&D du MSG-5300.
+// MSG-5300 Timming Errors Monitoring.
+// Script principal.
+// Version v00H.
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+// Directives.
+; SetScriptCompLevel(1)
+ExpandCommentLine(1)
+IgnoreUndefinedTestBlocs(0)
+
+
+// Fixation des conditions d'exécution.
+RequestQuotedStrings(1)
+EnableHexBinNumbers(3)
+DenSetSlotFilterFlag(1)
+CStyleEndCommentEnable()
+CStyleCommentExpEnable()
+CStyleCommentExpSetString("// ***** ")
+UseFastArrayHandling(1)
+UseSwitchModeParsing(1)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+// Modules.
+Include("Library\Subs-Functions01.txt")
+Include("Library\Subs-MiscTools01.txt")
+Include("Library\Subs-Densité06.txt")
+
+
+// Constantes.
+Const(K_IPCH_MAIN=0,K_IPCH_XVPA=1,K_IPCH_XVPB=2)
+
+
+// Variables globales.
+Strings(strCRLF,strAppVersion,strAppBuildDate,strVersionAppBuildDate,strApplDir,strDesigPanelParent="Form")
+Strings(strDate,strTime,strStartDate,strStopDate,strStartTime,strStopTime,strDevIDCardNameA,strDevIDCardNameB)
+Strings(strIPAddressXVPXX01A,strIPAddressXVPXX01B)
+Strings(strRegexFoundString,strRegexErrorDesc)
+Shorts(sOpMode=0,sLoopInterval=100,sReturnTag,sReturnMod,sResult)
+Shorts(sSlotXVPXX01A,sSlotXVPXX01B)
+Shorts(sRegexErrorCode)
+Longs(lDesignPanelLeft=10,lDesignPanelTop=10)
+Longs(lRegexFoundPosition,lRegexFoundLength,lTickCount,lStartTickCount,lStopTickCount,lSaveTickCount,lLogIndexA,lLogIndexB)
+Doubles(dVerCode)
+
+
+// Initialisations.
+Assign(Fct@StrCRLF(1),strCRLF)
+GetApplDir(strApplDir)
+
+
+// Contrôles de la fenêtre.
+Shorts(sUFID=1):::Indexes(0,iFrmTag_Form)
+  Strings(strBtn_Close="Button01"):::Indexes(-,-,iBtnTag_Close)
+  Strings(strGbx_Boards="GroupBox01",strGbxRef_Boards="GBX01"):::Indexes(-,-,iGbxTag_Boards)
+    Strings(strGbx_XVPXX01A="GroupBox02",strGbxRef_XVPXX01A="GBX02"):::Indexes(-,-,iGbxTag_XVPXX01A)
+      Strings(strGbx_XVPXX01A_IP="GroupBox03",strGbxRef_XVPXX01A_IP="GBX03"):::Indexes(-,-,iGbxTag_XVPXX01A_IP)
+        Strings(strEdt_XVPXX01A_IP="Edit01"):::Indexes(-,-,iEdtTag_XVPXX01A_IP)
+      Strings(strGbx_XVPXX01A_Slot="GroupBox04",strGbxRef_XVPXX01A_Slot="GBX04"):::Indexes(-,-,iGbxTag_XVPXX01A_Slot)
+        Strings(strCbo_XVPXX01A_Slot="ComboBox01"):::Indexes(-,-,iCboTag_XVPXX01A_Slot)
+    Strings(strGbx_XVPXX01B="GroupBox05",strGbxRef_XVPXX01B="GBX05"):::Indexes(-,-,iGbxTag_XVPXX01B)
+      Strings(strGbx_XVPXX01B_IP="GroupBox06",strGbxRef_XVPXX01B_IP="GBX06"):::Indexes(-,-,iGbxTag_XVPXX01B_IP)
+        Strings(strEdt_XVPXX01B_IP="Edit02"):::Indexes(-,-,iEdtTag_XVPXX01B_IP)
+      Strings(strGbx_XVPXX01B_Slot="GroupBox07",strGbxRef_XVPXX01B_Slot="GBX07"):::Indexes(-,-,iGbxTag_XVPXX01B_Slot)
+        Strings(strCbo_XVPXX01B_Slot="ComboBox02"):::Indexes(-,-,iCboTag_XVPXX01B_Slot)
+    Strings(strBtn_Save="Button02"):::Indexes(-,-,iBtnTag_Save)
+    Strings(strBtn_Load="Button03"):::Indexes(-,-,iBtnTag_Load)
+  Strings(strGbx_Log="GroupBox08",strGbxRef_Log="GBX08"):::Indexes(-,-,iGbxTag_Log)
+    Strings(strRtf_Log="RichEdit01"):::Indexes(-,-,iRtfTag_Log)
+  Strings(strBtn_Run="Button04"):::Indexes(-,-,iBtnTag_Run)
+  Strings(strChk_Pause="CheckBox01"):::Indexes(-,-,iChkTag_Pause)
+  Strings(strBtn_ClearLog="Button05"):::Indexes(-,-,iBtnTag_ClearLog)
+
+
+// Vérification de la version de MATEB2 utilisée.
+AddMonitorText("")
+GetApplVer(strAppVersion,strAppBuildDate,strVersionAppBuildDate,dVerCode)
+If(dVerCode<101197613041701)
+  AddMonitorText(">>> MATEB2 version : ",strAppVersion,"/",strAppBuildDate,"/",strVersionAppBuildDate,"/",dVerCode,"...Version not adequate <<<")
+  MsgBoxOK(Fct@StrAdd("ATTENTION !",Fct@StrCRLF(2),"The current MATEB2 version is not adequate to run this sequence !",Fct@StrCRLF(2),"Minimum version required : <101197613041701>"),"Exécution stopped",500,230,14)
+  AddMonitorText("")
+  AddMonitorDateTime(">>> Test sequence stopped - %s/%s <<<")
+  AddMonitorText("")
+  Abort()
+EndIf()
+AddMonitorText("MATEB2 version : ",strAppVersion,"/",strAppBuildDate,"/",strVersionAppBuildDate,"/",dVerCode,"...OK")
+AddMonitorText("")
+
+
+// Construction de la fenêtre.
+{
+  // Fenêtre.
+  UFInit(sUFID)
+  UFConfigForm(sUFID,iFrmTag_Form,"",800,600,0,0,"0x009F9F9F",sOpMode,lDesignPanelLeft,lDesignPanelTop,strDesigPanelParent)
+  UFConfigFormEx(sUFID,"Parent=None","Caption=MSG-5300 Timming Errors Monitoring","ShowHint=false","Hint=","FormStyle=Normal","Sizeable=true","BorderIcons=SMMinMax",/+
+                 "Width=800","Height=600","LeftOffset=0","TopOffset=0","Left=0","Top=0","WindowState=Normal","Anchors=LTRB","MinHeight=0","MaxHeight=0","MinWidth=0","MaxWidth=0",/+
+                 "Color=0x009F9F9F","BorderWidth=0","HorScrollBar=false","VertScrollBar=false","AlphaBlend=false","AlphaBlendValue=255","Cursor=Default","MainMenu=-1","PopupMenu=-1")
+
+  // Bouton 'Close'.
+  UFConfigControl(sUFID,strBtn_Close,iBtnTag_Close,"Parent=Form","Caption=Close","Visible=true","Enabled=true","Default=false","Cancel=false",/+
+                  "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=710","Top=570","Width=80","Height=20",/+
+                  "FontName=MS Sans Serif","FontSize=8","FontStyle=None","FontColor=clWindowText","Anchors=RB","Cursor=Default","Focus=false")
+
+  // Boîte 'Boards'.
+  UFConfigControl(sUFID,strGbx_Boards,iGbxTag_Boards,"Parent=Form","Caption= Boards ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                  "ShowHint=false","Hint=","Left=10","Top=10","Width=210","Height=580","FontName=Geneva","FontSize=12","FontStyle=BI","FontColor=clWindowText",/+
+                  "Color=0x009F9F9F","Anchors=LTB","Align=None","Cursor=Default","PopupMenu=-1")
+  {
+    // Boîte 'XVP-XX01A'.
+    UFConfigControl(sUFID,strGbx_XVPXX01A,iGbxTag_XVPXX01A,Fct@StrAdd("Parent=",strGbxRef_Boards),"Caption= XVP-XX01A ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                    "ShowHint=false","Hint=","Left=10","Top=20","Width=190","Height=160","FontName=Geneva","FontSize=10","FontStyle=BI","FontColor=clWindowText",/+
+                    "Color=0x009F9F9F","Anchors=LT","Align=None","Cursor=Default","PopupMenu=-1")
+    {
+      // Boîte 'Frame IP Address'.
+      UFConfigControl(sUFID,strGbx_XVPXX01A_IP,iGbxTag_XVPXX01A_IP,Fct@StrAdd("Parent=",strGbxRef_XVPXX01A),"Caption= Frame IP Address ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                      "ShowHint=false","Hint=","Left=10","Top=20","Width=170","Height=60","FontName=Geneva","FontSize=8","FontStyle=BI","FontColor=clWindowText",/+
+                      "Color=0x009F9F9F","Anchors=LT","Align=None","Cursor=Default","PopupMenu=-1")
+      {
+        // Texte éditable 'Frame IP Address'.
+        UFConfigControl(sUFID,strEdt_XVPXX01A_IP,iEdtTag_XVPXX01A_IP,Fct@StrAdd("Parent=",strGbxRef_XVPXX01A_IP),"Text=000.000.000.000","Visible=true","Enabled=true",/+
+                        "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=10","Top=20","Width=150","Height=30","AutoSelect=false","AutoSize=false","MaxLength=0","ReadOnly=false","HideSelection=true",/+
+                        "BorderStyle=Single","BevelKind=None","BevelInner=None","BevelOuter=None","BevelEdges=None",/+
+                        "CharCase=Normal","PasswordCharASCII=0","FontName=MS Sans Serif","FontSize=12","FontStyle=B","FontColor=clWindowText","Color=clWindow","Anchors=LT","Cursor=Default","Focus=false","PopupMenu=-1")
+      }
+      // Boîte 'Board slot'.
+      UFConfigControl(sUFID,strGbx_XVPXX01A_Slot,iGbxTag_XVPXX01A_Slot,Fct@StrAdd("Parent=",strGbxRef_XVPXX01A),"Caption= Board slot ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                      "ShowHint=false","Hint=","Left=10","Top=90","Width=170","Height=55","FontName=Geneva","FontSize=8","FontStyle=BI","FontColor=clWindowText",/+
+                      "Color=0x009F9F9F","Anchors=LT","Align=None","Cursor=Default","PopupMenu=-1")
+      {
+        // Menu déroulant 'Board slot'.
+        UFConfigControl(sUFID,strCbo_XVPXX01A_Slot,iCboTag_XVPXX01A_Slot,Fct@StrAdd("Parent=",strGbxRef_XVPXX01A_Slot),"Clear=true","AddItems=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",/+
+                        "Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                        "ShowHint=false","Hint=","Left=10","Top=20","Width=150","Height=25",/+
+                        "Style=DropDownList","AutoComplete=false","AutoDropDown=false","DropDownCount=10","Sorted=false",/+
+                        "BevelKind=None","BevelInner=None","BevelOuter=None","BevelEdges=None",/+
+                        "FontName=MS Sans Serif","FontSize=10","FontStyle=B","FontColor=clWindowText","Color=0x009F9F9F",/+
+                        "Anchors=LT","Align=None","Cursor=Default","Focus=false","PopupMenu=-1","Selected=0")
+      }
+    }
+
+    // Boîte 'XVP-XX01B'.
+    UFConfigControl(sUFID,strGbx_XVPXX01B,iGbxTag_XVPXX01B,Fct@StrAdd("Parent=",strGbxRef_Boards),"Caption= XVP-XX01B ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                    "ShowHint=false","Hint=","Left=10","Top=190","Width=190","Height=160","FontName=Geneva","FontSize=10","FontStyle=BI","FontColor=clWindowText",/+
+                    "Color=0x009F9F9F","Anchors=LT","Align=None","Cursor=Default","PopupMenu=-1")
+    {
+      // Boîte 'Frame IP Address'.
+      UFConfigControl(sUFID,strGbx_XVPXX01B_IP,iGbxTag_XVPXX01B_IP,Fct@StrAdd("Parent=",strGbxRef_XVPXX01B),"Caption= Frame IP Address ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                      "ShowHint=false","Hint=","Left=10","Top=20","Width=170","Height=60","FontName=Geneva","FontSize=8","FontStyle=BI","FontColor=clWindowText",/+
+                      "Color=0x009F9F9F","Anchors=LT","Align=None","Cursor=Default","PopupMenu=-1")
+      {
+        // Texte éditable 'Frame IP Address'.
+        UFConfigControl(sUFID,strEdt_XVPXX01B_IP,iEdtTag_XVPXX01B_IP,Fct@StrAdd("Parent=",strGbxRef_XVPXX01B_IP),"Text=000.000.000.000","Visible=true","Enabled=true",/+
+                        "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=10","Top=20","Width=150","Height=30","AutoSelect=false","AutoSize=false","MaxLength=0","ReadOnly=false","HideSelection=true",/+
+                        "BorderStyle=Single","BevelKind=None","BevelInner=None","BevelOuter=None","BevelEdges=None",/+
+                        "CharCase=Normal","PasswordCharASCII=0","FontName=MS Sans Serif","FontSize=12","FontStyle=B","FontColor=clWindowText","Color=clWindow","Anchors=LT","Cursor=Default","Focus=false","PopupMenu=-1")
+      }
+      // Boîte 'Board slot'.
+      UFConfigControl(sUFID,strGbx_XVPXX01B_Slot,iGbxTag_XVPXX01B_Slot,Fct@StrAdd("Parent=",strGbxRef_XVPXX01B),"Caption= Board slot ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                      "ShowHint=false","Hint=","Left=10","Top=90","Width=170","Height=55","FontName=Geneva","FontSize=8","FontStyle=BI","FontColor=clWindowText",/+
+                      "Color=0x009F9F9F","Anchors=LT","Align=None","Cursor=Default","PopupMenu=-1")
+      {
+        // Menu déroulant 'Board slot'.
+        UFConfigControl(sUFID,strCbo_XVPXX01B_Slot,iCboTag_XVPXX01B_Slot,Fct@StrAdd("Parent=",strGbxRef_XVPXX01B_Slot),"Clear=true","AddItems=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",/+
+                        "Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                        "ShowHint=false","Hint=","Left=10","Top=20","Width=150","Height=25",/+
+                        "Style=DropDownList","AutoComplete=false","AutoDropDown=false","DropDownCount=10","Sorted=false",/+
+                        "BevelKind=None","BevelInner=None","BevelOuter=None","BevelEdges=None",/+
+                        "FontName=MS Sans Serif","FontSize=10","FontStyle=B","FontColor=clWindowText","Color=0x009F9F9F",/+
+                        "Anchors=LT","Align=None","Cursor=Default","Focus=false","PopupMenu=-1","Selected=0")
+      }
+    }
+
+    // Bouton 'Save'.
+    UFConfigControl(sUFID,strBtn_Save,iBtnTag_Save,Fct@StrAdd("Parent=",strGbxRef_Boards),"Caption=Save","Visible=true","Enabled=true","Default=false","Cancel=false",/+
+                    "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=10","Top=550","Width=80","Height=20",/+
+                    "FontName=MS Sans Serif","FontSize=8","FontStyle=None","FontColor=clWindowText","Anchors=LB","Cursor=Default","Focus=false")
+
+    // Bouton 'Load'.
+    UFConfigControl(sUFID,strBtn_Load,iBtnTag_Load,Fct@StrAdd("Parent=",strGbxRef_Boards),"Caption=Load","Visible=true","Enabled=true","Default=false","Cancel=false",/+
+                    "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=120","Top=550","Width=80","Height=20",/+
+                    "FontName=MS Sans Serif","FontSize=8","FontStyle=None","FontColor=clWindowText","Anchors=LB","Cursor=Default","Focus=false")
+  }
+
+  // Boîte 'Log'.
+  UFConfigControl(sUFID,strGbx_Log,iGbxTag_Log,"Parent=Form","Caption= Log ","Visible=true","Enabled=true","TabStop=false","TabOrder=0",/+
+                  "ShowHint=false","Hint=","Left=230","Top=10","Width=560","Height=550","FontName=Geneva","FontSize=12","FontStyle=BI","FontColor=clWindowText",/+
+                  "Color=0x009F9F9F","Anchors=LTRB","Align=None","Cursor=Default","PopupMenu=-1")
+  {
+    // Texte 'Log'.
+    UFConfigControl(sUFID,strRtf_Log,iRtfTag_Log,Fct@StrAdd("Parent=",strGbxRef_Log),/+
+                    "PlainText=true","Alignment=Left","Clear=true","Color=0x00BFBFBF",/+
+                    "FontName=Courier New","FontSize=10","FontStyle=None","FontColor=clWindowText",/+
+                    "ClearText=true","Text=",/+
+                    "Visible=true","Enabled=true","TabStop=false","TabOrder=0","ShowHint=false","Hint=",/+
+                    "Left=10","Top=20","Width=540","Height=520",/+
+                    "MaxLength=0","ReadOnly=true","HideSelection=true","WordWrap=false","WantReturns=true","WantTabs=false",/+
+                    "ScrollBars=Both","HideScrollBars=false",/+
+                    "BorderStyle=Single","BorderWidth=0","BevelKind=None","BevelInner=None","BevelOuter=None","BevelEdges=None","BevelWidth=1",/+
+                    "Anchors=LTRB","Align=None","Cursor=Default","Focus=false","PopupMenu=-1")
+  }
+
+  // Bouton 'Run'.
+  UFConfigControl(sUFID,strBtn_Run,iBtnTag_Run,"Parent=Form","Caption=Run","Visible=true","Enabled=true","Default=false","Cancel=false",/+
+                  "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=230","Top=570","Width=80","Height=20",/+
+                  "FontName=MS Sans Serif","FontSize=8","FontStyle=None","FontColor=clWindowText","Anchors=LB","Cursor=Default","Focus=false")
+
+  // Checkbox 'Pause'.
+  UFConfigControl(sUFID,strChk_Pause,iChkTag_Pause,"Parent=Form","Caption=Pause","Visible=true","Enabled=false",/+
+                  "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=320","Top=570","Width=50","Height=20",/+
+                  "Alignment=Right","AllowGrayed=false","State=UnChecked",/+
+                  "FontName=MS Sans Serif","FontSize=8","FontStyle=None","FontColor=clWindowText","Color=0x009F9F9F",/+
+                  "Anchors=LB","Cursor=Default","Focus=false")
+
+  // Bouton 'Clear Log'.
+  UFConfigControl(sUFID,strBtn_ClearLog,iBtnTag_ClearLog,"Parent=Form","Caption=Clear Log","Visible=true","Enabled=true","Default=false","Cancel=false",/+
+                  "TabStop=false","TabOrder=0","ShowHint=false","Hint=","Left=380","Top=570","Width=80","Height=20",/+
+                  "FontName=MS Sans Serif","FontSize=8","FontStyle=None","FontColor=clWindowText","Anchors=LB","Cursor=Default","Focus=false")
+}
+
+
+// Affichage de la fenêtre et boucle d'exécution primaire.
+UFConfigFormEx(sUFID,"Parent=ParentTab","WindowState=Maximized","Sizeable=false","BorderIcons=None","BorderStyle=None")
+SetFocus(ParentTab)
+UFShow(sUFID)
+UFResetReturnTag()
+GoSubArg(ILoad,0)
+SetStatusMsg("Ready...")
+BeginLoop()
+  BeginLoop()
+    UFGetReturnTagMod(sReturnTag,sReturnMod)
+    UFResetReturnTag()
+    ExitLoopIf(sReturnTag!=-1)
+    msecSleep(sLoopInterval,1)
+  EndLoop()
+  If(sReturnTag=iBtnTag_Close)
+    SetStatusMsg("About to terminate execution...")
+    MsgBoxYesNo("Sequence termination","Sure to terminate the execution ?",sResult,600,120,14)
+    ExitLoopIf(sResult=1)
+    SetStatusMsg("Ready...")
+  ElseIf(sReturnTag=iBtnTag_Save):::GoSub(ISave)
+  ElseIf(sReturnTag=iBtnTag_Load):::GoSubArg(ILoad,1)
+  ElseIf(sReturnTag=iBtnTag_ClearLog):::GoSub(IClear)
+  ElseIf(sReturnTag=iBtnTag_Run):::GoSub(IRun)
+  EndIf()
+EndLoop()
+SetStatusMsg("Terminating execution...")
+msecWait(500)
+UFHide(sUFID)
+SetFocus(TestSequencesTab)
+
+
+
+// ----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
+// Sous-routines d'interface.
+// ----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(ISave)
+// Sauvegarde des données des cartes.
+
+  LStrings(lstrData)
+  LShorts(lsIPValidFlag,lsErrorFlag)
+
+  SetStatusMsg("Reading boards data...")
+
+  MsgBoxYesNo("Saving boards data","Sure to save boards data ?",sResult,600,120,14)
+  ExitSubIf(ISave,sResult=2)
+
+  GoSubArg(GetBoardData,lsIPValidFlag)
+
+  If(lsIPValidFlag=1)
+    SetStatusMsg("Saving boards data...")
+    Addn(strIPAddressXVPXX01A,strCRLF,sSlotXVPXX01A,strCRLF,strIPAddressXVPXX01B,strCRLF,sSlotXVPXX01B,strCRLF,lstrData)
+    GoSubArg(MTFileTextSave,Fct@StrAdd(strApplDir,"UserData\"),"Boards Data.txt",lstrData,lsErrorFlag)
+    If(lsErrorFlag=0)
+      MsgBoxOK("Boards data saved...","Message",600,120,14)
+    Else()
+      MsgBoxOK("ATTENTION - Boards data could not be saved !","ATTENTION !",600,120,14)
+    EndIf()
+  Else()
+    MsgBoxOK("ATTENTION - Boards data not saved !","ATTENTION !",600,120,14)
+  EndIf()
+
+  SetStatusMsg("Ready...")
+
+EndSub(ISave)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(ILoad)
+// Chargement des données des cartes.
+
+  LStrings(lstrData,lstrLine,lstrMsg)
+  LShorts(lsMode,lsIPValidFlag,lsErrorFlag)
+
+  GetSubArgs(lsMode)
+
+  SetStatusMsg("Loading boards data...")
+
+  If(lsMode=1)
+    MsgBoxYesNo("Loading boards data","Sure to load boards data ?",sResult,600,120,14)
+    ExitSubIf(ILoad,sResult=2)
+  EndIf()
+
+  Assign(1,lsIPValidFlag)
+
+  GoSubArg(MTFileTextLoad,Fct@StrAdd(strApplDir,"UserData\"),"Boards Data.txt",lstrData,lsErrorFlag)
+
+  Ifn(lsErrorFlag=0,lstrData!="",AND)
+
+    StringTools(GetLine,lstrData,0,strIPAddressXVPXX01A)
+    RegexFind("PCRE","^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",strIPAddressXVPXX01A,1,0,strRegexFoundString,lRegexFoundPosition,lRegexFoundLength,sRegexErrorCode,strRegexErrorDesc)
+    If(sRegexErrorCode!=0)
+      Addn("ATTENTION - The IP address <",strIPAddressXVPXX01A,"> of the XVP-XX01A is not valid !",lstrMsg)
+      MsgBoxOK(lstrMsg,"ATTENTION !",800,120,14)
+      Assign(0,lsIPValidFlag,"",strIPAddressXVPXX01A)
+    EndIf()
+
+    StringTools(GetLine,lstrData,1,lstrLine):::Assign(lstrLine,sSlotXVPXX01A)
+    Ifn(sSlotXVPXX01A<1,sSlotXVPXX01A>20,OR)
+      Addn("ATTENTION - The slot <",sSlotXVPXX01A,"> of the XVP-XX01A is not valid !",lstrMsg)
+      MsgBoxOK(lstrMsg,"ATTENTION !",800,120,14)
+      Assign(0,lsIPValidFlag,0,sSlotXVPXX01A)
+    EndIf()
+
+    StringTools(GetLine,lstrData,2,strIPAddressXVPXX01B)
+    RegexFind("PCRE","^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",strIPAddressXVPXX01B,1,0,strRegexFoundString,lRegexFoundPosition,lRegexFoundLength,sRegexErrorCode,strRegexErrorDesc)
+    If(sRegexErrorCode!=0)
+      Addn("ATTENTION - The IP address <",strIPAddressXVPXX01B,"> of the XVP-XX01B is not valid !",lstrMsg)
+      MsgBoxOK(lstrMsg,"ATTENTION !",800,120,14)
+      Assign(0,lsIPValidFlag,"",strIPAddressXVPXX01B)
+    EndIf()
+
+    StringTools(GetLine,lstrData,3,lstrLine):::Assign(lstrLine,sSlotXVPXX01B)
+    Ifn(sSlotXVPXX01B<1,sSlotXVPXX01B>20,OR)
+      Addn("ATTENTION - The slot <",sSlotXVPXX01B,"> of the XVP-XX01B is not valid !",lstrMsg)
+      MsgBoxOK(lstrMsg,"ATTENTION !",800,120,14)
+      Assign(0,lsIPValidFlag,0,sSlotXVPXX01B)
+    EndIf()
+
+    If(lsIPValidFlag=1)
+      UFConfigControl(sUFID,strEdt_XVPXX01A_IP,-1,Fct@StrAdd("Text=",strIPAddressXVPXX01A))
+      UFConfigControl(sUFID,strCbo_XVPXX01A_Slot,-1,Fct@StrAdd("Selected=",Fct!Sub(sSlotXVPXX01A,1)))
+      UFConfigControl(sUFID,strEdt_XVPXX01B_IP,-1,Fct@StrAdd("Text=",strIPAddressXVPXX01B))
+      UFConfigControl(sUFID,strCbo_XVPXX01B_Slot,-1,Fct@StrAdd("Selected=",Fct!Sub(sSlotXVPXX01B,1)))
+      If(lsMode=1)
+        MsgBoxOK("Boards data loaded...","Message",600,120,14)
+      EndIf()
+    Else()
+      If(lsMode=1)
+        MsgBoxOK("ATTENTION - Boards data not loaded...","ATTENTION !",600,120,14)
+      EndIf()
+    EndIf()
+  Else()
+    If(lsMode=1)
+      MsgBoxOK("ATTENTION - Boards data could not be loaded !","ATTENTION !",600,120,14)
+    EndIf()
+  EndIf()
+
+  SetStatusMsg("Ready...")
+
+EndSub(ILoad)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(IClear)
+// Effaçage du log.
+
+  SetStatusMsg("Clearing the log...")
+
+  MsgBoxYesNo("Clearing the log","Sure to clear the log ?",sResult,600,120,14)
+  ExitSubIf(IClear,sResult=2)
+
+  UFConfigControl(sUFID,strRtf_Log,-1,"Clear=true")
+
+  SetStatusMsg("Ready...")
+
+EndSub(IClear)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(IRun)
+// Exécution de la boucle de test.
+
+  LShorts(lsInnerLoopInterval=10,lsPauseFlag,lsOKFlag,lsSaveErrorFlag)
+
+  // État des contrôles en entrée.
+  SetStatusMsg("Executing...Setting entering controls state")
+  UFConfigControl(sUFID,strBtn_Close,-1,"Enabled=false")
+  UFConfigControl(sUFID,strEdt_XVPXX01A_IP,-1,"Enabled=false")
+  UFConfigControl(sUFID,strCbo_XVPXX01A_Slot,-1,"Enabled=false")
+  UFConfigControl(sUFID,strEdt_XVPXX01B_IP,-1,"Enabled=false")
+  UFConfigControl(sUFID,strCbo_XVPXX01B_Slot,-1,"Enabled=false")
+  UFConfigControl(sUFID,strBtn_Save,-1,"Enabled=false")
+  UFConfigControl(sUFID,strBtn_Load,-1,"Enabled=false")
+  UFConfigControl(sUFID,strChk_Pause,-1,"Enabled=true")
+  UFConfigControl(sUFID,strBtn_ClearLog,-1,"Enabled=false")
+  UFConfigControl(sUFID,strBtn_Run,-1,"Caption=Stop")
+
+  // Début de l'exécution.
+  GetDateTime(strStartDate,strStartTime,lStartTickCount)
+  UFConfigControl(sUFID,strRtf_Log,-1,"Clear=true","Focus=true")
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strCRLF,strStartDate,"/",strStartTime," : Start of execution...",strCRLF))
+
+  // Vérification du setup.
+  GoSubArg(Check,lsOKFlag)
+  GoToIf(IRun_Bypass,lsOKFlag!=1)
+
+  // Préparation du setup.
+  GoSubArg(Prep,lsOKFlag)
+  GoToIf(IRun_Bypass,lsOKFlag!=1)
+
+  // Ouverture de scannaux de communication.
+  GoSubArg(OpenChannels,lsOKFlag)
+  GoToIf(IRun_Bypass,lsOKFlag!=1)
+
+  // Sauvegarde initiale du Log.
+  SetStatusMsg("Executing...Saving initial Log")
+  GoSubArg(Save,lsSaveErrorFlag)
+  If(lsSaveErrorFlag!=0)
+    MsgBoxOK("ATTENTION - Initial log could not be saved !","ATTENTION !",600,120,14)
+  EndIf()
+
+  // Boucle d'exécution secondaire.
+  SetStatusMsg("Executing...Core loop")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Start of core loop...",strCRLF))
+  Assign(0,lsPauseFlag,0,lLogIndexA,0,lLogIndexB,lStartTickCount,lSaveTickCount)
+  UFResetReturnTag()
+  BeginLoop()
+    BeginLoop()
+      UFGetReturnTagMod(sReturnTag,sReturnMod)
+      UFResetReturnTag()
+      ExitLoopIf(sReturnTag!=-1)
+      msecSleep(lsInnerLoopInterval,1)
+      If(lsPauseFlag=0):::GoSub(Core):::EndIf()
+    EndLoop()
+    If(sReturnTag=iBtnTag_Run):::ExitLoop()
+    ElseIf(sReturnTag=iChkTag_Pause)
+      UFGetCheckBoxState(sUFID,strChk_Pause,lsPauseFlag)
+      If(lsPauseFlag=1):::GoSub(PauseIn)
+      ElseIf(lsPauseFlag=0):::GoSub(PauseOut)
+      EndIf()
+    EndIf()
+  EndLoop()
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strCRLF,strDate,"/",strTime," : End of core loop...",strCRLF))
+
+  // Fermeture de scannaux de communication.
+  GoSub(CloseChannels)
+
+  // Fin de l'exécution.
+  GetDateTime(strStopDate,strStopTime,lStopTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strStopDate,"/",strStopTime," : End of execution..."))
+
+  // Sauvegarde du Log.
+  SetStatusMsg("Executing...Saving final log")
+  GoSubArg(Save,lsSaveErrorFlag)
+  If(lsSaveErrorFlag=0)
+    MsgBoxOK("Final log saved...","Message",600,120,14)
+  Else()
+    MsgBoxOK("ATTENTION - Final log could not be saved !","ATTENTION !",600,120,14)
+  EndIf()
+
+  // État des contrôles en sortie.
+  Label(IRun_Bypass)
+  SetStatusMsg("Executing...Setting exiting controls state")
+  UFConfigControl(sUFID,strBtn_Run,-1,"Caption=Run")
+  UFConfigControl(sUFID,strBtn_ClearLog,-1,"Enabled=true")
+  UFConfigControl(sUFID,strChk_Pause,-1,"Enabled=false")
+  UFConfigControl(sUFID,strBtn_Load,-1,"Enabled=true")
+  UFConfigControl(sUFID,strBtn_Save,-1,"Enabled=true")
+  UFConfigControl(sUFID,strCbo_XVPXX01B_Slot,-1,"Enabled=true")
+  UFConfigControl(sUFID,strEdt_XVPXX01B_IP,-1,"Enabled=true")
+  UFConfigControl(sUFID,strCbo_XVPXX01A_Slot,-1,"Enabled=true")
+  UFConfigControl(sUFID,strEdt_XVPXX01A_IP,-1,"Enabled=true")
+  UFConfigControl(sUFID,strBtn_Close,-1,"Enabled=true")
+
+  SetStatusMsg("Ready...")
+
+EndSub(IRun)
+
+
+// ----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
+// Sous-routines secondaires.
+// ----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(GetBoardData)
+// Lecture des données des cartes.
+
+  LStrings(lstrMsg,lstrUFComboBoxSelectedString,lstrUFComboBoxText)
+  LShorts(lsIPValidFlag,lsConvError)
+  LLongs(llUFComboBoxCount,llUFComboBoxSelectedNum)
+
+  Assign(1,lsIPValidFlag)
+
+  // Adresse IP de la XVPXX01A.
+  UFGetEditText(sUFID,strEdt_XVPXX01A_IP,strIPAddressXVPXX01A)
+  RegexFind("PCRE","^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",strIPAddressXVPXX01A,1,0,strRegexFoundString,lRegexFoundPosition,lRegexFoundLength,sRegexErrorCode,strRegexErrorDesc)
+  If(sRegexErrorCode!=0)
+    Addn("ATTENTION - The IP address <",strIPAddressXVPXX01A,"> of the XVP-XX01A is not valid !",lstrMsg)
+    MsgBoxOK(lstrMsg,"ATTENTION !",800,120,14)
+    Assign(0,lsIPValidFlag,"",strIPAddressXVPXX01A)
+  EndIf()
+
+  // Adresse IP de la XVPXX01B.
+  UFGetEditText(sUFID,strEdt_XVPXX01B_IP,strIPAddressXVPXX01B)
+  RegexFind("PCRE","^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",strIPAddressXVPXX01B,1,0,strRegexFoundString,lRegexFoundPosition,lRegexFoundLength,sRegexErrorCode,strRegexErrorDesc)
+  If(sRegexErrorCode!=0)
+    Addn("ATTENTION - The IP address <",strIPAddressXVPXX01B,"> of the XVP-XX01B is not valid !",lstrMsg)
+    MsgBoxOK(lstrMsg,"ATTENTION !",800,120,14)
+    Assign(0,lsIPValidFlag,"",strIPAddressXVPXX01B)
+  EndIf()
+
+  // Fente de la XVPXX01A.
+  UFGetComboBoxData(sUFID,strCbo_XVPXX01A_Slot,llUFComboBoxCount,llUFComboBoxSelectedNum,lstrUFComboBoxSelectedString,lstrUFComboBoxText)
+  StringToNum(lstrUFComboBoxSelectedString,sSlotXVPXX01A,lsConvError)
+
+  // Fente de la XVPXX01B.
+  UFGetComboBoxData(sUFID,strCbo_XVPXX01B_Slot,llUFComboBoxCount,llUFComboBoxSelectedNum,lstrUFComboBoxSelectedString,lstrUFComboBoxText)
+  StringToNum(lstrUFComboBoxSelectedString,sSlotXVPXX01B,lsConvError)
+
+  SetSubArgs(lsIPValidFlag)
+
+EndSub(GetBoardData)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(Check)
+// Vérification du setup.
+
+  LShorts(lsCheckValidFlag)
+
+  SetStatusMsg("Executing...Checking setup")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Checking setup..."))
+
+  GoSubArg(GetBoardData,lsCheckValidFlag)
+
+  If(lsCheckValidFlag=1)
+
+    // XVP-XX01A (GET_DEV_ID).
+    Assign("",strDevIDCardNameA)
+    GoSubArg(DENInitOpenSendMsgReceiveRespClose,K_IPCH_MAIN,strIPAddressXVPXX01A,5100,25,sSlotXVPXX01A,"0012",50,10,500,sSlotXVPXX01A,-1,-1,0x00,0x13,0,"",0)
+    If(sDENErrorCode=0)
+      CommTools(ByteArrayToString,bDENRespByteArray,12,8,strDevIDCardNameA,32)
+      Ifn(strDevIDCardNameA="XVP-1801",strDevIDCardNameA="XVP-3901",OR)
+        GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A presence check succeeded (",strDevIDCardNameA,")..."))
+      Else()
+        GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A presence check failed on board name ! (",strDevIDCardNameA,")...",strCRLF))
+        MsgBoxOK("ATTENTION - XVP-XX01A presence check failed. Core loop won't be started !","ATTENTION !",800,120,14)
+        GetDateTime(strDate,strTime,lTickCount)
+        GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Checking setup failed. End of execution..."))
+        Assign(0,lsCheckValidFlag)
+      EndIf()
+    Else()
+      GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A presence check failed on board communication error !...",strCRLF))
+      MsgBoxOK("ATTENTION - XVP-XX01A presence check failed. Core loop won't be started !","ATTENTION !",800,120,14)
+      GetDateTime(strDate,strTime,lTickCount)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Checking setup failed. End of execution..."))
+      Assign(0,lsCheckValidFlag)
+    EndIf()
+
+  EndIf()
+
+  If(lsCheckValidFlag=1)
+
+    // XVP-XX01B (GET_DEV_ID).
+    Assign("",strDevIDCardNameB)
+    GoSubArg(DENInitOpenSendMsgReceiveRespClose,K_IPCH_MAIN,strIPAddressXVPXX01B,5100,25,sSlotXVPXX01B,"0012",50,10,500,sSlotXVPXX01B,-1,-1,0x00,0x13,0,"",0)
+    If(sDENErrorCode=0)
+      CommTools(ByteArrayToString,bDENRespByteArray,12,8,strDevIDCardNameB,32)
+      Ifn(strDevIDCardNameB="XVP-1801",strDevIDCardNameB="XVP-3901",OR)
+        GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B presence check succeeded (",strDevIDCardNameB,")..."))
+      Else()
+        GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B presence check failed on board name ! (",strDevIDCardNameB,")...",strCRLF))
+        MsgBoxOK("ATTENTION - XVP-XX01B presence check failed. Core loop won't be started !","ATTENTION !",800,120,14)
+        GetDateTime(strDate,strTime,lTickCount)
+        GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Checking setup failed. End of execution..."))
+        Assign(0,lsCheckValidFlag)
+      EndIf()
+    Else()
+      GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B presence check failed on board communication error !...",strCRLF))
+      MsgBoxOK("ATTENTION - XVP-XX01B presence check failed. Core loop won't be started !","ATTENTION !",800,120,14)
+      GetDateTime(strDate,strTime,lTickCount)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Checking setup failed. End of execution..."))
+      Assign(0,lsCheckValidFlag)
+    EndIf()
+
+  EndIf()
+
+  If(lsCheckValidFlag=1)
+    GoSubArg(AddLogTextLine,"")
+  EndIf()
+
+  SetSubArgs(lsCheckValidFlag)
+
+EndSub(Check)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(Prep)
+// Préparation du setup.
+
+  LShorts(lsPrepValidFlag)
+
+  SetStatusMsg("Executing...Preparing setup")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Preparing setup..."))
+
+  Assign(1,lsPrepValidFlag)
+
+  // XVP-XX01A (LOAD_USER_PRESET).
+  GoSubArg(DENInitOpenSendMsgReceiveRespClose,K_IPCH_MAIN,strIPAddressXVPXX01A,5100,25,sSlotXVPXX01A,"113300",50,10,500,sSlotXVPXX01A,-1,-1,0x00,0x00,0,"",0)
+  If(sDENErrorCode=0)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A loading user preset #0 succeeded..."))
+  Else()
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A loading user preset #0 failed...",strCRLF))
+    MsgBoxOK("ATTENTION - XVP-XX01A preparation failed. Core loop won't be started !","ATTENTION !",800,120,14)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Preparing setup failed. End of execution..."))
+    Assign(0,lsPrepValidFlag)
+  EndIf()
+
+  If(lsPrepValidFlag=1)
+
+    // XVP-XX01B (LOAD_USER_PRESET).
+    GoSubArg(DENInitOpenSendMsgReceiveRespClose,K_IPCH_MAIN,strIPAddressXVPXX01B,5100,25,sSlotXVPXX01B,"113300",50,10,500,sSlotXVPXX01B,-1,-1,0x00,0x00,0,"",0)
+    If(sDENErrorCode=0)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B loading user preset #0 succeeded..."))
+    Else()
+      GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B loading user preset #0 failed...",strCRLF))
+      MsgBoxOK("ATTENTION - XVP-XX01B preparation failed. Core loop won't be started !","ATTENTION !",800,120,14)
+      GetDateTime(strDate,strTime,lTickCount)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Preparing setup failed. End of execution..."))
+      Assign(0,lsPrepValidFlag)
+    EndIf()
+
+  EndIf()
+
+  If(lsPrepValidFlag=1)
+    GoSubArg(AddLogTextLine,"")
+  EndIf()
+
+  SetSubArgs(lsPrepValidFlag)
+
+EndSub(Prep)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(OpenChannels)
+// Ouverture des cannaux de communication avec les XVP.
+
+  LShorts(lsChannelsValidFlag)
+
+  SetStatusMsg("Executing...Opening channels")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Opening channels..."))
+
+  Assign(1,lsChannelsValidFlag)
+
+  // XVP-XX01A (Canal 1).
+  GoSubArg(DENInit,K_IPCH_XVPA,0,"",0)
+  If(sDENErrorCode=0):::GoSubArg(DENOpen,K_IPCH_XVPA,strIPAddressXVPXX01A,5100,0,"",0):::EndIf()
+  If(sDENErrorCode=0)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A communication channel opening succeeded..."))
+  Else()
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A communication channel opening failed...",strCRLF))
+    MsgBoxOK("ATTENTION - XVP-XX01A communication channel opening failed. Core loop won't be started !","ATTENTION !",600,140,14)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Opening communication channels failed. End of execution..."))
+    Assign(0,lsChannelsValidFlag)
+  EndIf()
+
+  If(lsChannelsValidFlag=1)
+
+    // XVP-XX01B (Canal 2).
+    GoSubArg(DENInit,K_IPCH_XVPB,0,"",0)
+    If(sDENErrorCode=0):::GoSubArg(DENOpen,K_IPCH_XVPB,strIPAddressXVPXX01B,5100,0,"",0):::EndIf()
+    If(sDENErrorCode=0)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B communication channel opening succeeded..."))
+    Else()
+      GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B communication channel opening failed...",strCRLF))
+      MsgBoxOK("ATTENTION - XVP-XX01B communication channel opening failed. Core loop won't be started !","ATTENTION !",600,140,14)
+      GetDateTime(strDate,strTime,lTickCount)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Opening communication channels failed. End of execution..."))
+      Assign(0,lsChannelsValidFlag)
+      GoSubArg(DENClean,K_IPCH_XVPA,0,"",0)
+    EndIf()
+
+  EndIf()
+
+  If(lsChannelsValidFlag=1)
+    GoSubArg(AddLogTextLine,"")
+  EndIf()
+
+  SetSubArgs(lsChannelsValidFlag)
+
+EndSub(OpenChannels)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(CloseChannels)
+// Fermeture des cannaux de communication avec les XVP.
+
+  SetStatusMsg("Executing...Closing channels")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Closing channels..."))
+
+  // XVP-XX01A (Canal 0).
+  GoSubArg(DENClean,K_IPCH_XVPA,0,"",0)
+  If(sDENErrorCode=0)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A communication channel closing succeeded..."))
+  Else()
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01A communication channel closing failed..."))
+    MsgBoxOK("ATTENTION - XVP-XX01A communication channel closing failed !","ATTENTION !",800,120,14)
+  EndIf()
+
+  // XVP-XX01B (Canal 1).
+  GoSubArg(DENClean,K_IPCH_XVPB,0,"",0)
+  If(sDENErrorCode=0)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B communication channel closing succeeded..."))
+  Else()
+    GoSubArg(AddLogTextLine,Fct@StrAdd(Fct@StrChars(" ",22),"XVP-XX01B communication channel closing failed..."))
+    MsgBoxOK("ATTENTION - XVP-XX01B communication channel closing failed !","ATTENTION !",800,120,14)
+  EndIf()
+
+  GoSubArg(AddLogTextLine,"")
+
+EndSub(CloseChannels)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(Core)
+// Exécution principale.
+
+  LStrings(lstrDelayLineA,lstrDelayuSecA,lstrDelayLineB,lstrDelayuSecB,lstrECA,lstrECB,lstrLogIndexA,lstrLogIndexB)
+  LBytes(lbCarrierLossA,lbCarrierLossB,lbVideoErrorA,lbVideoErrorB)
+  LShorts(lsECA,lsECB,lsSaveErrorFlag)
+  LLongs(llDelayLineA,llDelayLineB,llSavePeriod=300000)
+  LFloats(lfDelayuSecA,lfDelayuSecB)
+
+  // llSavePeriod :
+  //   15 secondes :  15000.
+  //   30 secondes :  30000.
+  //    1 minute   :  60000.
+  //    5 minutes  : 300000.
+  //   10 minutes  : 600000.
+
+  // XVP-XX01A.
+  GoSubArg(DENReceiveResp,K_IPCH_XVPA,0,10,5,sSlotXVPXX01A,-1,-1,-1,-1,0,"",0)
+  Assign(sDENErrorCode,lsECA,strDENErrorDesc,lstrECA)
+  Ifn(sDENErrorCode=0,bDENRespByteArray[4]=0x11,AND,bDENRespByteArray[5]=0x2E,AND)
+    MathTools(BytesToInteger,bDENRespByteArray[6],bDENRespByteArray[7],bDENRespByteArray[8],bDENRespByteArray[9],llDelayLineA)
+    MathTools(Cast4BytesToFloat,bDENRespByteArray[10],bDENRespByteArray[11],bDENRespByteArray[12],bDENRespByteArray[13],lfDelayuSecA)
+    StringTools(FormatStringCStyle,lLogIndexA,"A,%010d",lstrLogIndexA)
+    StringTools(FormatStringCStyle,llDelayLineA,"%5d",lstrDelayLineA)
+    StringTools(FormatStringCStyle,lfDelayuSecA,"%6.2f",lstrDelayuSecA)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Delay A,",lstrDelayLineA,",",lstrDelayuSecA))
+    Incr(lLogIndexA)
+  ElseIfn(sDENErrorCode=0,bDENRespByteArray[4]=0x10,AND,bDENRespByteArray[5]=0x31,AND)
+    BWAnd(bDENRespByteArray[7],4,lbCarrierLossA)
+    BWAnd(bDENRespByteArray[7],1,lbVideoErrorA)
+    StringTools(FormatStringCStyle,lLogIndexA,"A,%010d",lstrLogIndexA)
+    GetDateTime(strDate,strTime,lTickCount)
+    Ifn(lbCarrierLossA=0,lbVideoErrorA=0,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Video Status A : Carrier loss"))
+    ElseIfn(lbCarrierLossA=4,lbVideoErrorA=1,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Video Status A : Video error"))
+    ElseIfn(lbCarrierLossA=0,lbVideoErrorA=1,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Video Status A : Carrier loss & Video error"))
+    ElseIfn(lbCarrierLossA=4,lbVideoErrorA=0,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Video Status A : OK"))
+    EndIf()
+    Incr(lLogIndexA)
+  ElseIf(sDENErrorCode>0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Delay A,","Communication Error (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    GoSubArg(DENClean,K_IPCH_XVPA,0,"",0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Delay A,","Channel closed (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    msecWait(2000)
+    GoSubArg(DENInit,K_IPCH_XVPA,0,"",0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Delay A,","Channel re-initialized (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    GoSubArg(DENOpen,K_IPCH_XVPA,strIPAddressXVPXX01A,5100,0,"",0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexA,",",strDate,",",strTime,",Delay A,","Channel re-opened (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    Incr(lLogIndexA)
+  EndIf()
+
+  // XVP-XX01B.
+  GoSubArg(DENReceiveResp,K_IPCH_XVPB,0,10,5,sSlotXVPXX01B,-1,-1,-1,-1,0,"",0)
+  Assign(sDENErrorCode,lsECB,strDENErrorDesc,lstrECB)
+  Ifn(sDENErrorCode=0,bDENRespByteArray[4]=0x11,AND,bDENRespByteArray[5]=0x2E,AND)
+    MathTools(BytesToInteger,bDENRespByteArray[6],bDENRespByteArray[7],bDENRespByteArray[8],bDENRespByteArray[9],llDelayLineB)
+    MathTools(Cast4BytesToFloat,bDENRespByteArray[10],bDENRespByteArray[11],bDENRespByteArray[12],bDENRespByteArray[13],lfDelayuSecB)
+    StringTools(FormatStringCStyle,lLogIndexB,"B,%010d",lstrLogIndexB)
+    StringTools(FormatStringCStyle,llDelayLineB,"%5d",lstrDelayLineB)
+    StringTools(FormatStringCStyle,lfDelayuSecB,"%6.2f",lstrDelayuSecB)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Delay B,",lstrDelayLineB,",",lstrDelayuSecB))
+    Incr(lLogIndexB)
+  ElseIfn(sDENErrorCode=0,bDENRespByteArray[4]=0x10,AND,bDENRespByteArray[5]=0x31,AND)
+    BWAnd(bDENRespByteArray[7],4,lbCarrierLossB)
+    BWAnd(bDENRespByteArray[7],1,lbVideoErrorB)
+    StringTools(FormatStringCStyle,lLogIndexB,"B,%010d",lstrLogIndexB)
+    GetDateTime(strDate,strTime,lTickCount)
+    Ifn(lbCarrierLossB=0,lbVideoErrorB=0,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Video Status B : Carrier loss"))
+    ElseIfn(lbCarrierLossB=4,lbVideoErrorB=1,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Video Status B : Video error"))
+    ElseIfn(lbCarrierLossB=0,lbVideoErrorB=1,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Video Status B : Carrier loss & Video error"))
+    ElseIfn(lbCarrierLossB=4,lbVideoErrorB=0,AND)
+      GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Video Status B : OK"))
+    EndIf()
+    Incr(lLogIndexB)
+  ElseIf(sDENErrorCode>0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Delay B,","Communication Error (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    GoSubArg(DENClean,K_IPCH_XVPB,0,"",0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Delay B,","Channel closed (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    msecWait(1000)
+    GoSubArg(DENInit,K_IPCH_XVPB,0,"",0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Delay B,","Channel re-initialized (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    GoSubArg(DENOpen,K_IPCH_XVPB,strIPAddressXVPXX01B,5100,0,"",0)
+    GetDateTime(strDate,strTime,lTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(lstrLogIndexB,",",strDate,",",strTime,",Delay B,","Channel re-opened (",sDENErrorCode,"/<",strDENErrorDesc,">)"))
+    Incr(lLogIndexB)
+  EndIf()
+
+  // Sauvegarde automatique du log.
+  GetDateTime(strDate,strTime,lTickCount)
+  If(lTickCount>Fct!Add(lSaveTickCount,llSavePeriod))
+    Assign(lTickCount,lSaveTickCount)
+    GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Saving log..."))
+    GoSubArg(Save,lsSaveErrorFlag)
+  EndIf()
+
+EndSub(Core)
+
+
+// ----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
+// Sous-routines tertiaires.
+// ----------------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(AddLogTextLine)
+// Ajout d'une ligne de texte dans le log.
+
+  LStrings(lstrNewLine)
+
+  GetSubArgs(lstrNewLine)
+
+  ; UFConfigControl(sUFID,strRtf_Log,-1,Fct@StrAdd("AddTextLine=",lstrNewLine))
+  UFConfigControl(sUFID,strRtf_Log,-1,Fct@StrAdd("AddTextLineFast=",lstrNewLine))
+
+EndSub(AddLogTextLine)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(Save)
+// Sauvegarde du log.
+
+  LStrings(lstrShortDateTime,lstrLogText)
+  LShorts(lsErrorFlag)
+
+  UFGetRichEditText(sUFID,strRtf_Log,lstrLogText)
+
+  GoSubArg(MTGetShortDateTimeString,strStartDate,strStartTime,lstrShortDateTime)
+  GoSubArg(MTFileTextSave,Fct@StrAdd(strApplDir,"Logs\"),Fct@StrAdd("Log ",lstrShortDateTime,".txt"),lstrLogText,lsErrorFlag)
+
+  SetSubArgs(lsErrorFlag)
+
+EndSub(Save)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(PauseIn)
+// Début de pause.
+
+  SetStatusMsg("Executing...Pause")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : Start of pause..."))
+
+EndSub(PauseIn)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+BeginSub(PauseOut)
+// Fin de pause.
+
+  SetStatusMsg("Executing...Core loop")
+  GetDateTime(strDate,strTime,lTickCount)
+  GoSubArg(AddLogTextLine,Fct@StrAdd(strDate,"/",strTime," : End of pause..."))
+
+EndSub(PauseOut)
+
+
+// ----------------------------------------------------------------------------------------------------
+
+
+// Fin de l'exécution.
+End()

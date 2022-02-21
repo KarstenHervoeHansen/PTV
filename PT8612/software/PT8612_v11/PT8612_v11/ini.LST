@@ -1,0 +1,149 @@
+C51 COMPILER V7.10   INI                                                                   01/28/2010 09:18:56 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE INI
+OBJECT MODULE PLACED IN ini.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe ini.c DB OE LARGE
+
+line level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2005                                           */
+   3          /*  Project:  PT8641 HDTPG (PT8612), using 8051F320 Cygnal                 */
+   4          /*            processor.                                                   */
+   5          /*  Module:   ini.C                                                        */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     01.03.2006                                                   */
+   8          /*  Status:   Version 1.0                                                  */
+   9          /*  Purpose:  This is initialization routine obtained from Cygnal config   */
+  10          /*            wizard version 2.04 for F320 processor.                      */
+  11          /*  Change:   19.04.2006: P0.7 used as LEVEL OK SIGNAL TO MASTER           */
+  12          /***************************************************************************/
+  13          #include <C8051F320.h>  // Register definition file.
+  14          
+  15          void config (void)
+  16            {
+  17   1        int n = 0;
+  18   1      
+  19   1        PCA0MD &= ~0x40;     //disable watchdog timer
+  20   1      
+  21   1      //----------------------------------------------------------------
+  22   1      // CROSSBAR REGISTER CONFIGURATION
+  23   1      //
+  24   1      // NOTE: The crossbar register should be configured before any  
+  25   1      // of the digital peripherals are enabled. The pinout of the 
+  26   1      // device is dependent on the crossbar configuration so caution 
+  27   1      // must be exercised when modifying the contents of the XBR0, 
+  28   1      // XBR1 registers. For detailed information on 
+  29   1      // Crossbar Decoder Configuration, refer to Application Note 
+  30   1      // AN001, "Configuring the Port I/O Crossbar Decoder". 
+  31   1      //----------------------------------------------------------------
+  32   1      
+  33   1      // Configure the XBRn Registers
+  34   1      
+  35   1        XBR0 = 0x01;    // Crossbar Register 1
+  36   1        //XBR1 = 0xC0;  // Weak puillup disabled
+  37   1        XBR1 = 0x40;    // Weak puillup enabled: needed for JTAG programmer
+  38   1      // Select Pin I/0
+  39   1      
+  40   1      // NOTE: Some peripheral I/O pins can function as either inputs or 
+  41   1      // outputs, depending on the configuration of the peripheral. By default,
+  42   1      // the configuration utility will configure these I/O pins as push-pull 
+  43   1      // outputs.
+  44   1                            // Port configuration (1 = Push Pull Output)
+  45   1          P0MDOUT = 0xC3; // Output configuration for P0 (bit 7 as LEVOK)
+  46   1          P1MDOUT = 0x87; // Output configuration for P1 
+  47   1          P3MDOUT = 0x00; // Output configuration for P3 
+  48   1      
+  49   1          P0MDIN = 0xF3;  // Input configuration for P0
+  50   1          P1MDIN = 0xFF;  // Input configuration for P1
+  51   1          P3MDIN = 0xFF;  // Input configuration for P3
+  52   1      
+  53   1          P0SKIP = 0x0C;  //  Port 0 Crossbar Skip Register
+  54   1          P1SKIP = 0x00;  //  Port 1 Crossbar Skip Register
+  55   1      
+C51 COMPILER V7.10   INI                                                                   01/28/2010 09:18:56 PAGE 2   
+
+  56   1          P2MDOUT = 0x00; // Output configuration for P2 
+  57   1          P2MDIN  = 0xFF;  // Input configuration for P2
+  58   1          P2SKIP  = 0x00;  //  Port 2 Crossbar Skip Register
+  59   1      //----------------------------------------------------------------
+  60   1      // Oscillator Configuration
+  61   1      //----------------------------------------------------------------
+  62   1      
+  63   1        OSCXCN = 0x67;  // EXTERNAL Oscillator Control Register 
+  64   1      #if 1
+  65   1        for (n = 0; n < 255; n++)
+  66   1          ;
+  67   1      #endif                              // wait for osc to start
+  68   1        while ( (OSCXCN & 0x80) == 0 )
+  69   1          ;                              // wait for xtal to stabilize
+  70   1      
+  71   1        CLKSEL = 0x01;                   // Oscillator Clock Select Register
+  72   1        OSCICN = 0x03;                   // Internal Oscillator Control Register
+  73   1      
+  74   1      //----------------------------------------------------------------
+  75   1      // UART0 Configuration
+  76   1      //----------------------------------------------------------------
+  77   1          SCON0 = 0xF0;        // Serial Port Control Register
+  78   1      
+  79   1          PCON   = 0x00;       // Power Control Register
+  80   1      
+  81   1      //----------------------------------------------------------------
+  82   1      // Timers Configuration
+  83   1      //----------------------------------------------------------------
+  84   1      
+  85   1          CKCON = 0x0C;     // Clock Control Register    
+  86   1          TL0   = 0x00;     // Timer 0 Low Byte
+  87   1          TH0   = 0x00;     // Timer 0 High Byte
+  88   1          TL1   = 0xB8;     // Timer 1 Low Byte
+  89   1          TH1   = 0xB8;     // Timer 1 High Byte    
+  90   1          TMOD  = 0x20;     // Timer Mode Register
+  91   1          TCON  = 0x40;     // Timer Control Register 
+  92   1          
+  93   1          TMR2RLL = 0x00;   // Timer 2 Reload Register Low Byte
+  94   1          TMR2RLH = 0x00;   // Timer 2 Reload Register High Byte
+  95   1          TMR2L   = 0x00;   // Timer 2 Low Byte
+  96   1          TMR2H   = 0x00;   // Timer 2 High Byte    
+  97   1          TMR2CN  = 0x00;   // Timer 2 Control Register
+  98   1      
+  99   1          TMR3RLL = 0x00;   // Timer 3 Reload Register Low Byte
+ 100   1          TMR3RLH = 0x00;   // Timer 3 Reload Register High Byte
+ 101   1          TMR3L   = 0x00;   // Timer 3 Low Byte
+ 102   1          TMR3H   = 0x40;   // Timer 3 High Byte    
+ 103   1          TMR3CN  = 0x00;   // Timer 3 Control Register
+ 104   1      
+ 105   1      
+ 106   1      /* Enable VDD Monitor */
+ 107   1          VDM0CN  |= 0x80;
+ 108   1      
+ 109   1      //----------------------------------------------------------------
+ 110   1      // Reset Source Configuration
+ 111   1      // NOTE! : Comparator 0 must be enabled before it is enabled as a 
+ 112   1      // reset source.
+ 113   1      //------------------------------------------------------------------
+ 114   1        RSTSRC = 0x00;  // Reset Source Register
+ 115   1      
+ 116   1        TR1 = 1;       //start timer1
+ 117   1        RI0 = 0;       //clear receive interrupt bit
+C51 COMPILER V7.10   INI                                                                   01/28/2010 09:18:56 PAGE 3   
+
+ 118   1        TI0 = 0;       //clear transmit interrupt bit
+ 119   1      
+ 120   1        ES0 = 1;       /* Enable serial interrupt   */
+ 121   1        EA  = 1;
+ 122   1        }              //End of config
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    127    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

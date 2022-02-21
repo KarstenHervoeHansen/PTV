@@ -1,0 +1,628 @@
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE SERIAL
+OBJECT MODULE PLACED IN serial.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe serial.c DB OE LARGE
+
+line level    source
+
+   1          #pragma code symbols debug objectextend
+   2           /*
+   3           ; DK-Technologies A/S
+   4           ;
+   5           ; FILE NAME        serial.c
+   6           ; PURPOSE          Module containing serial port 0 interrupt routine and
+   7           ;                  character output routine for 8051F320 Cygnal
+   8           ;                  processor.
+   9           ; SPEC             Janusz Kuzminski
+  10           ; DESIGN           Janusz Kuzminski
+  11           ; CODING           Janusz Kuzminski
+  12           ; CODE INSP.
+  13           ; TEST
+  14           ; LAST UPDT:       28.06.2006.
+  15           ;
+  16           ; NOTES:           This module contains serial comms routines
+  17           ;                  for 8051F320 Cygnal processor.
+  18           ;
+  19           ;                  This module contains alternative serial routines used 
+  20           ;                  only during downloading file for FPGA programming via
+  21           ;                  JTAG.
+  22           ;                  Timer2 is used as receive timeout provider.
+  23          */
+  24          
+  25          
+  26          
+  27          #include <C8051F320.h>
+  28          #include "define.h"
+  29          #include "serial.h"
+  30          #include "io.c"
+  31          
+  32          #define RX_SERBUFLEN  50 //64
+  33          
+  34          #define DEFDEL        50
+  35          #define T2START  Timer2_Init(0x7fff)
+  36          
+  37          UC idata rx_serbuf[60];
+  38          UC rx_inptr;
+  39          UC rx_outptr;
+  40          
+  41          UC bdata serflags;
+  42          sbit  T2timeout = serflags^1;
+  43          
+  44          sfr16 TMR2RL    = 0xca;                    // Timer2 reload value
+  45          sfr16 TMR2      = 0xcc;                    // Timer2 counter
+  46          
+  47          UC    t2del;
+  48          UC    csum = 0;
+  49          
+  50          void serinit(void)
+  51            {
+  52   1      
+  53   1        rx_inptr  = 0;
+  54   1        rx_outptr = 0;
+  55   1        }
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 2   
+
+  56          
+  57          /**********************************************************************
+  58           * NAME       void flush(void)
+  59           * PURPOSE    
+  60           *            To initialize buffers for reception
+  61           * ARGUMENTS  None
+  62           *
+  63           * RETURNS    Nothing
+  64           *
+  65           * EXTERNS    None.
+  66           *
+  67          /*  Notes:    
+  68           **********************************************************************/
+  69          void flush(void)
+  70            {
+  71   1        UC i;
+  72   1        ES0       = 0;
+  73   1        rx_inptr  = 0;
+  74   1        rx_outptr = 0;
+  75   1      
+  76   1        for (i = 0; i < 60; i++)
+  77   1          {
+  78   2          rx_serbuf[i] = 0;
+  79   2          }
+  80   1        ES0       = 1;
+  81   1        }
+  82          
+  83          /**********************************************************************
+  84           * NAME       char putch (char c)
+  85           * PURPOSE    To place character in transmiter buffer and, if transmiter
+  86           *            is empty, commence transmission (TI0 = 1)
+  87           *
+  88           * ARGUMENTS  Character to output
+  89           *
+  90           * RETURNS    Character to output.
+  91           *
+  92           * EXTERNS    None.
+  93           *
+  94           * NOTES:     
+  95           **********************************************************************/
+  96          void putch(UC c)
+  97            {
+  98   1        SBUF0 = c;
+  99   1        while (!TI0)
+ 100   1          ;
+ 101   1        TI0   = 0;
+ 102   1        }
+ 103          
+ 104          /**********************************************************************
+ 105           * NAME       void serint0(void) interrupt 4 using 1
+ 106           * PURPOSE    This is serial reception/transmission interrut routine.
+ 107           *
+ 108           * ARGUMENTS  None
+ 109           *
+ 110           * RETURNS    Nothing
+ 111           *
+ 112           * EXTERNS    None.
+ 113           *
+ 114           * NOTES:     When receiving character interrupt occurs, it is read 
+ 115           *            from UART and placed into rx_serbuf[].  Input pointer
+ 116           *            to this buffer (rx_serbuf) is incremented and on reaching
+ 117           *            RX_SERBUFLEN zeroed, i.e. no buffer overflow check is 
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 3   
+
+ 118           *            implemented.
+ 119           * 
+ 120           *  interrupt 4 using 1
+ 121           **********************************************************************/
+ 122          void serint0(void)
+ 123            {
+ 124   1        
+ 125   1        if (RI0)
+ 126   1          {
+ 127   2          rx_serbuf[rx_inptr] = SBUF0;
+ 128   2          RI0 = 0;
+ 129   2          rx_inptr++;
+ 130   2          if (rx_inptr == RX_SERBUFLEN)
+ 131   2            rx_inptr = 0;
+ 132   2          }
+ 133   1        }
+ 134          
+ 135          #if 0
+              bit serhit(void)
+                {
+                if (rx_inptr != rx_outptr)
+                  return 1;
+                else
+                  return 0;
+                }
+              #endif
+ 144          /**********************************************************************
+ 145           * NAME       UC getch(UC * c)
+ 146           * PURPOSE    To fetch a character from serial buffer.
+ 147           *
+ 148           * ARGUMENTS  None
+ 149           *
+ 150           * RETURNS    0 - if there is no character to fetch after timeout
+ 151           *            1 - otherwise
+ 152           *
+ 153           * EXTERNS    None.
+ 154           *
+ 155           * NOTES:     
+ 156           **********************************************************************/
+ 157          UC getch(UC * c)
+ 158            {
+ 159   1      
+ 160   1        ES0 = 0;
+ 161   1        if (rx_outptr == 0)
+ 162   1          {
+ 163   2      #if 0
+                  LED = ~LED;
+              #endif
+ 166   2          putch(START);
+ 167   2          }
+ 168   1        ES0 = 1;
+ 169   1      
+ 170   1        T2START;
+ 171   1      
+ 172   1        while (rx_inptr == rx_outptr)
+ 173   1          {
+ 174   2          if (T2timeout)
+ 175   2            {
+ 176   3            TR2 = 0;   // stop Timer2
+ 177   3            return (0);
+ 178   3            }
+ 179   2          }
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 4   
+
+ 180   1      
+ 181   1        TR2 = 0;       // stop Timer2
+ 182   1        ES0 = 0;
+ 183   1        *c = rx_serbuf[rx_outptr];
+ 184   1        rx_outptr++;
+ 185   1        if (rx_outptr == RX_SERBUFLEN)
+ 186   1          rx_outptr = 0;
+ 187   1        ES0 = 1;
+ 188   1        return (1);
+ 189   1        }
+ 190          
+ 191          
+ 192          /**********************************************************************
+ 193           * NAME       void Timer2_Init (int counts)
+ 194           * PURPOSE    To initialize Timer2 for delay function.
+ 195           *
+ 196           * ARGUMENTS  int counts - 
+ 197           *
+ 198           * RETURNS    Nothing
+ 199           *
+ 200           * EXTERNS    None.
+ 201           *
+ 202           * NOTES:     
+ 203           **********************************************************************/
+ 204          void Timer2_Init (int counts)
+ 205            {
+ 206   1        TMR2CN    = 0x00;        // Stop Timer2; Clear TF2;
+ 207   1                                 // use SYSCLK/12 as timebase
+ 208   1        TMR2RL    = -counts;     // Init reload values
+ 209   1        TMR2      = 0xffff;      // set to reload immediately
+ 210   1        ET2       = 1;           // enable Timer2 interrupts
+ 211   1        TR2       = 1;           // start Timer2
+ 212   1        t2del     = DEFDEL;
+ 213   1        T2timeout = 0;
+ 214   1        }
+ 215          
+ 216          void delay(void)
+ 217            {
+ 218   1        T2START;
+ 219   1      
+ 220   1        while (1)
+ 221   1          {
+ 222   2          if (T2timeout)
+ 223   2            {
+ 224   3            TR2 = 0;   // stop Timer2
+ 225   3            return;
+ 226   3            }
+ 227   2          }
+ 228   1        }
+ 229          //-----------------------------------------------------------------------------
+ 230          // Timer2_ISR
+ 231          //-----------------------------------------------------------------------------
+ 232          void Timer2_ISR (void) interrupt 5
+ 233            {
+ 234   1        TF2H = 0;               // clear Timer2 interrupt flag
+ 235   1      
+ 236   1        t2del--;
+ 237   1        if (!t2del)
+ 238   1          {
+ 239   2          T2timeout = 1;
+ 240   2          t2del = DEFDEL;
+ 241   2          }
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 5   
+
+ 242   1        }
+ 243          /*
+ 244          UC crc8(UC* buff, UC buffLen)
+ 245            {
+ 246            UC i;
+ 247            UC chk;
+ 248            UC *ptr_stop;
+ 249          
+ 250            ptr_stop = buff + buffLen;
+ 251            chk = STARTCRCVALUE;
+ 252          
+ 253            while(buff < ptr_stop)
+ 254              {
+ 255              chk ^= *buff;
+ 256              for(i = 0 ; i < 8; i++)
+ 257                chk = (UC)((chk & 1) ? (chk >> 1) ^ CRC8CONST : (chk >> 1));
+ 258              buff++;
+ 259              }
+ 260            return chk;
+ 261            }
+ 262          */
+ 263          /* end of serial.c */
+ 264          
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 6   
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION serinit (BEGIN)
+                                           ; SOURCE LINE # 50
+                                           ; SOURCE LINE # 51
+                                           ; SOURCE LINE # 53
+0000 E4                CLR     A
+0001 900000      R     MOV     DPTR,#rx_inptr
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 54
+0005 A3                INC     DPTR
+0006 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 55
+0007 22                RET     
+             ; FUNCTION serinit (END)
+
+             ; FUNCTION flush (BEGIN)
+                                           ; SOURCE LINE # 69
+                                           ; SOURCE LINE # 70
+                                           ; SOURCE LINE # 72
+0000 C2AC              CLR     ES0
+                                           ; SOURCE LINE # 73
+0002 E4                CLR     A
+0003 900000      R     MOV     DPTR,#rx_inptr
+0006 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 74
+0007 A3                INC     DPTR
+0008 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 76
+;---- Variable 'i' assigned to Register 'R7' ----
+0009         ?C0002:
+                                           ; SOURCE LINE # 77
+                                           ; SOURCE LINE # 78
+0009 7F3C              MOV     R7,#03CH
+000B 7800        R     MOV     R0,#LOW rx_serbuf
+000D E4                CLR     A
+000E         ?C0025:
+000E F6                MOV     @R0,A
+000F 08                INC     R0
+0010 DFFC              DJNZ    R7,?C0025
+                                           ; SOURCE LINE # 79
+0012         ?C0003:
+                                           ; SOURCE LINE # 80
+0012 D2AC              SETB    ES0
+                                           ; SOURCE LINE # 81
+0014 22                RET     
+             ; FUNCTION flush (END)
+
+             ; FUNCTION _putch (BEGIN)
+                                           ; SOURCE LINE # 96
+;---- Variable 'c' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 97
+                                           ; SOURCE LINE # 98
+0000 8F99              MOV     SBUF0,R7
+0002         ?C0006:
+                                           ; SOURCE LINE # 99
+0002 3099FD            JNB     TI0,?C0006
+0005         ?C0007:
+                                           ; SOURCE LINE # 101
+0005 C299              CLR     TI0
+                                           ; SOURCE LINE # 102
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 7   
+
+0007 22                RET     
+             ; FUNCTION _putch (END)
+
+             ; FUNCTION serint0 (BEGIN)
+                                           ; SOURCE LINE # 122
+                                           ; SOURCE LINE # 123
+                                           ; SOURCE LINE # 125
+0000 309814            JNB     RI0,?C0011
+                                           ; SOURCE LINE # 126
+                                           ; SOURCE LINE # 127
+0003 900000      R     MOV     DPTR,#rx_inptr
+0006 E0                MOVX    A,@DPTR
+0007 2400        R     ADD     A,#LOW rx_serbuf
+0009 F8                MOV     R0,A
+000A A699              MOV     @R0,SBUF0
+                                           ; SOURCE LINE # 128
+000C C298              CLR     RI0
+                                           ; SOURCE LINE # 129
+000E E0                MOVX    A,@DPTR
+000F 04                INC     A
+0010 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 130
+0011 E0                MOVX    A,@DPTR
+0012 B43202            CJNE    A,#032H,?C0011
+                                           ; SOURCE LINE # 131
+0015 E4                CLR     A
+0016 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 132
+                                           ; SOURCE LINE # 133
+0017         ?C0011:
+0017 22                RET     
+             ; FUNCTION serint0 (END)
+
+             ; FUNCTION _getch (BEGIN)
+                                           ; SOURCE LINE # 157
+0000 900000      R     MOV     DPTR,#c
+0003 EB                MOV     A,R3
+0004 F0                MOVX    @DPTR,A
+0005 A3                INC     DPTR
+0006 EA                MOV     A,R2
+0007 F0                MOVX    @DPTR,A
+0008 A3                INC     DPTR
+0009 E9                MOV     A,R1
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 158
+                                           ; SOURCE LINE # 160
+000B C2AC              CLR     ES0
+                                           ; SOURCE LINE # 161
+000D 900000      R     MOV     DPTR,#rx_outptr
+0010 E0                MOVX    A,@DPTR
+0011 7005              JNZ     ?C0012
+                                           ; SOURCE LINE # 162
+                                           ; SOURCE LINE # 166
+0013 7F31              MOV     R7,#031H
+0015 120000      R     LCALL   _putch
+                                           ; SOURCE LINE # 167
+0018         ?C0012:
+                                           ; SOURCE LINE # 168
+0018 D2AC              SETB    ES0
+                                           ; SOURCE LINE # 170
+001A 7FFF              MOV     R7,#0FFH
+001C 7E7F              MOV     R6,#07FH
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 8   
+
+001E 120000      R     LCALL   _Timer2_Init
+0021         ?C0013:
+                                           ; SOURCE LINE # 172
+0021 900000      R     MOV     DPTR,#rx_outptr
+0024 E0                MOVX    A,@DPTR
+0025 FE                MOV     R6,A
+0026 900000      R     MOV     DPTR,#rx_inptr
+0029 E0                MOVX    A,@DPTR
+002A B50608            CJNE    A,AR6,?C0014
+                                           ; SOURCE LINE # 173
+                                           ; SOURCE LINE # 174
+002D 3000F1      R     JNB     T2timeout,?C0013
+                                           ; SOURCE LINE # 175
+                                           ; SOURCE LINE # 176
+0030 C2CA              CLR     TR2
+                                           ; SOURCE LINE # 177
+0032 7F00              MOV     R7,#00H
+0034 22                RET     
+                                           ; SOURCE LINE # 178
+                                           ; SOURCE LINE # 179
+0035         ?C0014:
+                                           ; SOURCE LINE # 181
+0035 C2CA              CLR     TR2
+                                           ; SOURCE LINE # 182
+0037 C2AC              CLR     ES0
+                                           ; SOURCE LINE # 183
+0039 7400        R     MOV     A,#LOW rx_serbuf
+003B 2E                ADD     A,R6
+003C F8                MOV     R0,A
+003D E6                MOV     A,@R0
+003E FF                MOV     R7,A
+003F 900000      R     MOV     DPTR,#c
+0042 E0                MOVX    A,@DPTR
+0043 FB                MOV     R3,A
+0044 A3                INC     DPTR
+0045 E0                MOVX    A,@DPTR
+0046 FA                MOV     R2,A
+0047 A3                INC     DPTR
+0048 E0                MOVX    A,@DPTR
+0049 F9                MOV     R1,A
+004A EF                MOV     A,R7
+004B 120000      E     LCALL   ?C?CSTPTR
+                                           ; SOURCE LINE # 184
+004E 900000      R     MOV     DPTR,#rx_outptr
+0051 E0                MOVX    A,@DPTR
+0052 04                INC     A
+0053 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 185
+0054 E0                MOVX    A,@DPTR
+0055 B43202            CJNE    A,#032H,?C0017
+                                           ; SOURCE LINE # 186
+0058 E4                CLR     A
+0059 F0                MOVX    @DPTR,A
+005A         ?C0017:
+                                           ; SOURCE LINE # 187
+005A D2AC              SETB    ES0
+                                           ; SOURCE LINE # 188
+005C 7F01              MOV     R7,#01H
+                                           ; SOURCE LINE # 189
+005E         ?C0016:
+005E 22                RET     
+             ; FUNCTION _getch (END)
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 9   
+
+
+             ; FUNCTION _Timer2_Init (BEGIN)
+                                           ; SOURCE LINE # 204
+;---- Variable 'counts' assigned to Register 'R6/R7' ----
+                                           ; SOURCE LINE # 205
+                                           ; SOURCE LINE # 206
+0000 E4                CLR     A
+0001 F5C8              MOV     TMR2CN,A
+                                           ; SOURCE LINE # 208
+0003 C3                CLR     C
+0004 9F                SUBB    A,R7
+0005 FF                MOV     R7,A
+0006 E4                CLR     A
+0007 9E                SUBB    A,R6
+0008 F5CB              MOV     TMR2RL+01H,A
+000A 8FCA              MOV     TMR2RL,R7
+                                           ; SOURCE LINE # 209
+000C 74FF              MOV     A,#0FFH
+000E F5CD              MOV     TMR2+01H,A
+0010 F5CC              MOV     TMR2,A
+                                           ; SOURCE LINE # 210
+0012 D2AD              SETB    ET2
+                                           ; SOURCE LINE # 211
+0014 D2CA              SETB    TR2
+                                           ; SOURCE LINE # 212
+0016 900000      R     MOV     DPTR,#t2del
+0019 7432              MOV     A,#032H
+001B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 213
+001C C200        R     CLR     T2timeout
+                                           ; SOURCE LINE # 214
+001E 22                RET     
+             ; FUNCTION _Timer2_Init (END)
+
+             ; FUNCTION delay (BEGIN)
+                                           ; SOURCE LINE # 216
+                                           ; SOURCE LINE # 217
+                                           ; SOURCE LINE # 218
+0000 7FFF              MOV     R7,#0FFH
+0002 7E7F              MOV     R6,#07FH
+0004 120000      R     LCALL   _Timer2_Init
+0007         ?C0019:
+                                           ; SOURCE LINE # 220
+                                           ; SOURCE LINE # 221
+                                           ; SOURCE LINE # 222
+0007 3000FD      R     JNB     T2timeout,?C0019
+                                           ; SOURCE LINE # 223
+                                           ; SOURCE LINE # 224
+000A C2CA              CLR     TR2
+                                           ; SOURCE LINE # 226
+                                           ; SOURCE LINE # 227
+                                           ; SOURCE LINE # 228
+000C         ?C0022:
+000C 22                RET     
+             ; FUNCTION delay (END)
+
+             ; FUNCTION Timer2_ISR (BEGIN)
+0000 C0E0              PUSH    ACC
+0002 C083              PUSH    DPH
+0004 C082              PUSH    DPL
+                                           ; SOURCE LINE # 232
+                                           ; SOURCE LINE # 234
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 10  
+
+0006 C2CF              CLR     TF2H
+                                           ; SOURCE LINE # 236
+0008 900000      R     MOV     DPTR,#t2del
+000B E0                MOVX    A,@DPTR
+000C 14                DEC     A
+000D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 237
+000E E0                MOVX    A,@DPTR
+000F 7005              JNZ     ?C0024
+                                           ; SOURCE LINE # 238
+                                           ; SOURCE LINE # 239
+0011 D200        R     SETB    T2timeout
+                                           ; SOURCE LINE # 240
+0013 7432              MOV     A,#032H
+0015 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 241
+                                           ; SOURCE LINE # 242
+0016         ?C0024:
+0016 D082              POP     DPL
+0018 D083              POP     DPH
+001A D0E0              POP     ACC
+001C 32                RETI    
+             ; FUNCTION Timer2_ISR (END)
+
+C51 COMPILER V7.10   SERIAL                                                                02/22/2013 13:25:14 PAGE 11  
+
+NAME                                    CLASS   MSPACE  TYPE    OFFSET  SIZE
+====                                    =====   ======  ====    ======  ====
+
+
+P0 . . . . . . . . . . . . . . . . . .  SFR      DATA   U_CHAR   0080H  1
+P1 . . . . . . . . . . . . . . . . . .  SFR      DATA   U_CHAR   0090H  1
+serinit. . . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+Timer2_ISR . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+_putch . . . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+  c. . . . . . . . . . . . . . . . . .  * REG *  DATA   U_CHAR   0007H  1
+_Timer2_Init . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+  counts . . . . . . . . . . . . . . .  * REG *  DATA   INT      0006H  2
+delay. . . . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+T2timeout. . . . . . . . . . . . . . .  ABSBIT   -----  BIT      0001H  1
+TF2H . . . . . . . . . . . . . . . . .  ABSBIT   -----  BIT      00CFH  1
+flush. . . . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+  i. . . . . . . . . . . . . . . . . .  * REG *  DATA   U_CHAR   0007H  1
+TMR2 . . . . . . . . . . . . . . . . .  SFR      DATA   U_INT    00CCH  2
+TMR2CN . . . . . . . . . . . . . . . .  SFR      DATA   U_CHAR   00C8H  1
+csum . . . . . . . . . . . . . . . . .  PUBLIC   XDATA  U_CHAR   0000H  1
+TMR2RL . . . . . . . . . . . . . . . .  SFR      DATA   U_INT    00CAH  2
+ES0. . . . . . . . . . . . . . . . . .  ABSBIT   -----  BIT      00ACH  1
+serint0. . . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+ET2. . . . . . . . . . . . . . . . . .  ABSBIT   -----  BIT      00ADH  1
+RI0. . . . . . . . . . . . . . . . . .  ABSBIT   -----  BIT      0098H  1
+TI0. . . . . . . . . . . . . . . . . .  ABSBIT   -----  BIT      0099H  1
+rx_serbuf. . . . . . . . . . . . . . .  PUBLIC   IDATA  ARRAY    0000H  60
+TR2. . . . . . . . . . . . . . . . . .  ABSBIT   -----  BIT      00CAH  1
+serflags . . . . . . . . . . . . . . .  PUBLIC   DATA   U_CHAR   0000H  1
+t2del. . . . . . . . . . . . . . . . .  PUBLIC   XDATA  U_CHAR   0001H  1
+ui . . . . . . . . . . . . . . . . . .  TYPEDEF  -----  UNION    -----  2
+  intval . . . . . . . . . . . . . . .  MEMBER   -----  INT      0000H  2
+  bytes. . . . . . . . . . . . . . . .  MEMBER   -----  ARRAY    0000H  2
+ul . . . . . . . . . . . . . . . . . .  TYPEDEF  -----  UNION    -----  4
+  longval. . . . . . . . . . . . . . .  MEMBER   -----  LONG     0000H  4
+  intgval. . . . . . . . . . . . . . .  MEMBER   -----  ARRAY    0000H  4
+  charval. . . . . . . . . . . . . . .  MEMBER   -----  ARRAY    0000H  4
+SBUF0. . . . . . . . . . . . . . . . .  SFR      DATA   U_CHAR   0099H  1
+_getch . . . . . . . . . . . . . . . .  PUBLIC   CODE   PROC     0000H  -----
+  c. . . . . . . . . . . . . . . . . .  AUTO     XDATA  PTR      0000H  3
+xx . . . . . . . . . . . . . . . . . .  * TAG *  -----  UNION    -----  4
+  longval. . . . . . . . . . . . . . .  MEMBER   -----  LONG     0000H  4
+  intgval. . . . . . . . . . . . . . .  MEMBER   -----  ARRAY    0000H  4
+  charval. . . . . . . . . . . . . . .  MEMBER   -----  ARRAY    0000H  4
+yy . . . . . . . . . . . . . . . . . .  * TAG *  -----  UNION    -----  2
+  intval . . . . . . . . . . . . . . .  MEMBER   -----  INT      0000H  2
+  bytes. . . . . . . . . . . . . . . .  MEMBER   -----  ARRAY    0000H  2
+rx_inptr . . . . . . . . . . . . . . .  PUBLIC   XDATA  U_CHAR   0002H  1
+rx_outptr. . . . . . . . . . . . . . .  PUBLIC   XDATA  U_CHAR   0003H  1
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    229    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      4       3
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1    ----
+   IDATA SIZE       =     60    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

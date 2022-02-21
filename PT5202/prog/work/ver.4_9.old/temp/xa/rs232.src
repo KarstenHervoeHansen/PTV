@@ -1,0 +1,2424 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\LT428\rtxc\xa\include -I. -Ml
+;          -O2 -s
+$CASE
+$NOZPAGE
+	NAME	RS232
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "rs232.c"
+; rs232.c     1	/****************************************************************************/
+; rs232.c     2	/* MODULE:                                                                  */
+; rs232.c     3	/*   rs232.c - RS232 channel driver using UART1 and Timer1                  */
+; rs232.c     4	/****************************************************************************/
+; rs232.c     5	/* FUNCTIONS:                                                               */
+; rs232.c     6	/*                                                                          */
+; rs232.c     7	/*                                                                          */
+; rs232.c     8	/* TASKS:                                                                   */
+; rs232.c     9	    void rs232i(void);
+; rs232.c    10	    void rs232o(void);
+; rs232.c    11	/*                                                                          */
+; rs232.c    12	/* NOTES:                                                                   */
+; rs232.c    13	/*  000405: Increased input stream from 128 to 512									 */
+; rs232.c    14	/*  000403: Error in rs232printf(): buf was NOT deleted return with error.	 */
+; rs232.c    15	/*                                                                          */
+; rs232.c    16	/****************************************************************************/
+; rs232.c    17	/*
+; rs232.c    18	 *   PTV software for PT5201    
+; rs232.c    19	 *   Copyright (c) 
+; rs232.c    20	 *   ProTeleVision Technologies A/S.
+; rs232.c    21	 *   ALL RIGHTS RESERVED
+; rs232.c    22	*/
+; rs232.c    23	/****************************************************************************/
+; rs232.c    24	
+; rs232.c    25	#include "reg8051.h"
+	SYMB	FILE, "reg8051.h"
+	SYMB	ENDF
+; rs232.c    26	#include <stdarg.h>
+	SYMB	FILE, "c:\\LT428\\include\\stdarg.h"
+	SYMB	ENDF
+; rs232.c    27	#include <stdio.h>
+	SYMB	FILE, "c:\\LT428\\include\\stdio.h"
+	SYMB	FILE, "c:\\LT428\\include\\stdarg.h"
+	SYMB	ENDF
+	SYMB	TYPE, 257, 'n', #2, 130
+	SYMB	TYPE, 258, 'P', #257
+	SYMB	TYPE, 259, "_iobuf", 'S', 14,\
+		 "_ptr", #258, 0,\
+		 "_cnt", #16, 4,\
+		 "_base", #258, 6,\
+		 "_flag", #2, 10,\
+		 "_file", #2, 11,\
+		 "_bufsiz", #16, 12
+	SYMB	TYPE, 260, "FILE", 'T', #259
+	SYMB	TYPE, 261, 'n', #1, 130
+	SYMB	TYPE, 262, 'P', #261
+	SYMB	TYPE, 263, 'Z', #262, 0
+	SYMB	TYPE, 265, "va_list", 'T', #263
+	SYMB	TYPE, 266, "size_t", 'T', #18
+	SYMB	TYPE, 267, "fpos_t", 'T', #7
+	SYMB	ENDF
+; rs232.c    28	#include <periphal.h>
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\periphal.h"
+	SYMB	ENDF
+; rs232.c    29	#include "crystal.h"
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\crystal.h"
+	SYMB	ENDF
+; rs232.c    30	#include "rs232.h"
+	SYMB	FILE, "rs232.h"
+	SYMB	FILE, "define.h"
+	SYMB	ENDF
+	SYMB	FILE, "rtxcobj.h"
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\rtxcapi.h"
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\typedef.h"
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\rtxcopts.h"
+	SYMB	ENDF
+	SYMB	TYPE, 268, "KOBJNUM", 'T', #3
+	SYMB	TYPE, 269, "TASK", 'T', #2
+	SYMB	ENDF
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\rtxstruc.h"
+	SYMB	FILE, "c:\\LT428\\rtxc\\xa\\include\\rtxcopts.h"
+	SYMB	ENDF
+	SYMB	TYPE, 270, "KSNUM", 'T', #3
+	SYMB	TYPE, 271, "PRIORITY", 'T', #269
+	SYMB	TYPE, 272, "TSTATE", 'T', #5
+	SYMB	TYPE, 273, "TSLICE", 'T', #3
+	SYMB	TYPE, 275, 'n', #274, 130
+	SYMB	TYPE, 276, 'P', #275
+	SYMB	TYPE, 278, 'n', #277, 130
+	SYMB	TYPE, 279, 'P', #278
+	SYMB	TYPE, 280, 'n', #270, 130
+	SYMB	TYPE, 281, 'P', #280
+	SYMB	TYPE, 282, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 283, 'n', #282, 129
+	SYMB	TYPE, 284, 'P', #283
+	SYMB	TYPE, 285, "frame", 'S', 24,\
+		 "es", #3, 0,\
+		 "cs", #3, 1,\
+		 "ssel", #3, 2,\
+		 "ds", #3, 3,\
+		 "pksnum", #281, 4,\
+		 "R2", #18, 8,\
+		 "R3", #18, 10,\
+		 "R4", #18, 12,\
+		 "R5", #18, 14,\
+		 "R6", #18, 16,\
+		 "psw", #18, 18,\
+		 "pc", #284, 20
+	SYMB	TYPE, 286, 'n', #285, 130
+	SYMB	TYPE, 287, 'P', #286
+	SYMB	TYPE, 288, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 289, 'n', #288, 129
+	SYMB	TYPE, 290, 'P', #289
+	SYMB	TYPE, 274, "tcb", 'S', 36,\
+		 "flink", #276, 0,\
+		 "blink", #276, 4,\
+		 "pclkblk", #279, 8,\
+		 "task", #269, 12,\
+		 "priority", #271, 13,\
+		 "sp", #287, 14,\
+		 "status", #272, 18,\
+		 "pc_t0", #290, 20,\
+		 "stackbase", #258, 24,\
+		 "stacksize", #266, 28,\
+		 "tslice", #273, 30,\
+		 "newslice", #273, 31,\
+		 "arg", #262, 32
+	SYMB	TYPE, 291, "TCB", 'T', #274
+	SYMB	TYPE, 292, "SEMA", 'T', #268
+	SYMB	TYPE, 293, "MAP", 'T', #268
+	SYMB	TYPE, 295, 'n', #294, 130
+	SYMB	TYPE, 296, 'P', #295
+	SYMB	TYPE, 294, "rtxcmsg", 'S', 8,\
+		 "link", #296, 0,\
+		 "task", #269, 4,\
+		 "priority", #271, 5,\
+		 "sema", #292, 6
+	SYMB	TYPE, 297, "RTXCMSG", 'T', #294
+	SYMB	TYPE, 298, "TICKS", 'T', #16
+	SYMB	TYPE, 299, 'N',\
+		 "DELAY_OBJ", 0,\
+		 "SEMAPHORE_OBJ", 1,\
+		 "PARTITION_OBJ", 2,\
+		 "QUEUE_OBJ", 3,\
+		 "RESOURCE_OBJ", 4,\
+		 "MAILBOX_OBJ", 5,\
+		 "TIMER_OBJ", 6
+	SYMB	TYPE, 300, "OBJTYPE", 'T', #299
+	SYMB	TYPE, 277, "clkblk", 'S', 18,\
+		 "flink", #279, 0,\
+		 "blink", #279, 4,\
+		 "remain", #298, 8,\
+		 "recycle", #298, 10,\
+		 "task", #269, 12,\
+		 "state", #2, 13,\
+		 "objtype", #300, 14,\
+		 "objid", #268, 16
+	SYMB	TYPE, 301, 'N',\
+		 "PRIORITY_INVERSION_OFF", 0,\
+		 "PRIORITY_INVERSION_ON", 1
+	SYMB	TYPE, 302, "RESATTR", 'T', #301
+	SYMB	ENDF
+	SYMB	TYPE, 303, 'N',\
+		 "RC_GOOD", 0,\
+		 "RC_WAIT_CONFLICT", 1,\
+		 "RC_NO_TIMERS", 2,\
+		 "RC_TIMER_INACTIVE", 3,\
+		 "RC_TIMER_ILLEGAL", 4,\
+		 "RC_TIMEOUT", 5,\
+		 "RC_QUEUE_FULL", 6,\
+		 "RC_QUEUE_EMPTY", 7,\
+		 "RC_ILLEGAL_QUEUE_SIZE", 8,\
+		 "RC_BUSY", 9,\
+		 "RC_NESTED", 10,\
+		 "RC_ILLEGAL_TASK", 11,\
+		 "RC_ACTIVE_TASK", 12,\
+		 "RC_NO_YIELD", 13,\
+		 "RC_MISSED_EVENT", 14
+	SYMB	TYPE, 304, "KSRC", 'T', #303
+	SYMB	TYPE, 305, "SSTATE", 'T', #269
+	SYMB	TYPE, 306, "MBOX", 'T', #268
+	SYMB	TYPE, 307, "QUEUE", 'T', #268
+	SYMB	TYPE, 308, 'N',\
+		 "QNE", 0,\
+		 "QNF", 1,\
+		 "QF", 2,\
+		 "QE", 3
+	SYMB	TYPE, 309, "QCOND", 'T', #308
+	SYMB	TYPE, 310, "RESOURCE", 'T', #268
+	SYMB	TYPE, 311, "CLKBLK", 'T', #277
+	SYMB	TYPE, 312, "time_t", 'T', #6
+	SYMB	TYPE, 313, "FRAME", 'T', #285
+	SYMB	ENDF
+	SYMB	FILE, "ctask.h"
+	SYMB	ENDF
+	SYMB	FILE, "csema.h"
+	SYMB	ENDF
+	SYMB	FILE, "cres.h"
+	SYMB	ENDF
+	SYMB	FILE, "cqueue.h"
+	SYMB	ENDF
+	SYMB	FILE, "cpart.h"
+	SYMB	ENDF
+	SYMB	FILE, "cmbox.h"
+	SYMB	ENDF
+	SYMB	FILE, "cclock.h"
+	SYMB	ENDF
+	SYMB	TYPE, 315, 'n', #314, 130
+	SYMB	TYPE, 316, 'P', #315
+	SYMB	TYPE, 314, 'X', 12, #1, 30, 2, #316, #258
+	SYMB	TYPE, 318, 'n', #317, 129
+	SYMB	TYPE, 319, 'P', #318
+	SYMB	TYPE, 320, 'X', 12, #1, 30, 1, #316
+	SYMB	TYPE, 321, 'n', #320, 129
+	SYMB	TYPE, 322, 'P', #321
+	SYMB	TYPE, 323, 'n', #6, 130
+	SYMB	TYPE, 324, 'P', #323
+	SYMB	TYPE, 323, 'X', 12, #16, 30, 2, #316, #324
+	SYMB	TYPE, 326, 'n', #325, 129
+	SYMB	TYPE, 327, 'P', #326
+	SYMB	TYPE, 328, 'X', 12, #1, 30, 1, #316
+	SYMB	TYPE, 329, 'n', #328, 129
+	SYMB	TYPE, 330, 'P', #329
+	SYMB	TYPE, 331, 'X', 12, #1, 30, 1, #316
+	SYMB	TYPE, 332, 'n', #331, 129
+	SYMB	TYPE, 333, 'P', #332
+	SYMB	TYPE, 334, 'X', 12, #16, 30, 1, #316
+	SYMB	TYPE, 335, 'n', #334, 129
+	SYMB	TYPE, 336, 'P', #335
+	SYMB	TYPE, 314, "TEvent", 'S', 32,\
+		 "ObjectID", #16, 0,\
+		 "TEvent", #319, 2,\
+		 "_TEvent", #322, 6,\
+		 "Wait", #327, 10,\
+		 "Set", #330, 14,\
+		 "Clear", #333, 18,\
+		 "IsSet", #336, 22,\
+		 "ID", #292, 26,\
+		 "Name", #258, 28
+	SYMB	TYPE, 337, "TEvent", 'T', #314
+	SYMB	TYPE, 339, 'n', #338, 130
+	SYMB	TYPE, 340, 'P', #339
+	SYMB	TYPE, 338, 'X', 12, #1, 30, 1, #340
+	SYMB	TYPE, 342, 'n', #341, 129
+	SYMB	TYPE, 343, 'P', #342
+	SYMB	TYPE, 344, 'X', 12, #1, 30, 1, #340
+	SYMB	TYPE, 345, 'n', #344, 129
+	SYMB	TYPE, 346, 'P', #345
+	SYMB	TYPE, 347, 'n', #337, 130
+	SYMB	TYPE, 348, 'P', #347
+	SYMB	TYPE, 347, 'X', 12, #16, 30, 2, #340, #348
+	SYMB	TYPE, 350, 'n', #349, 129
+	SYMB	TYPE, 351, 'P', #350
+	SYMB	TYPE, 352, 'X', 12, #1, 30, 2, #340, #348
+	SYMB	TYPE, 353, 'n', #352, 129
+	SYMB	TYPE, 354, 'P', #353
+	SYMB	TYPE, 355, 'X', 12, #16, 30, 2, #340, #348
+	SYMB	TYPE, 356, 'n', #355, 129
+	SYMB	TYPE, 357, 'P', #356
+	SYMB	TYPE, 358, 'X', 12, #348, 30, 2, #340, #324
+	SYMB	TYPE, 359, 'n', #358, 129
+	SYMB	TYPE, 360, 'P', #359
+	SYMB	TYPE, 361, 'Z', #2, 95
+	SYMB	TYPE, 338, "TEventList", 'S', 122,\
+		 "ObjectID", #16, 0,\
+		 "TEventList", #343, 2,\
+		 "_TEventList", #346, 6,\
+		 "Append", #351, 10,\
+		 "Clear", #354, 14,\
+		 "InList", #357, 18,\
+		 "Wait", #360, 22,\
+		 "Align", #361, 26
+	SYMB	TYPE, 363, "TEventList", 'T', #338
+	SYMB	TYPE, 365, 'n', #364, 130
+	SYMB	TYPE, 366, 'P', #365
+	SYMB	TYPE, 364, 'X', 12, #1, 30, 2, #366, #258
+	SYMB	TYPE, 368, 'n', #367, 129
+	SYMB	TYPE, 369, 'P', #368
+	SYMB	TYPE, 370, 'X', 12, #1, 30, 1, #366
+	SYMB	TYPE, 371, 'n', #370, 129
+	SYMB	TYPE, 372, 'P', #371
+	SYMB	TYPE, 373, 'X', 12, #1, 30, 1, #366
+	SYMB	TYPE, 374, 'n', #373, 129
+	SYMB	TYPE, 375, 'P', #374
+	SYMB	TYPE, 376, 'X', 12, #1, 30, 1, #366
+	SYMB	TYPE, 377, 'n', #376, 129
+	SYMB	TYPE, 378, 'P', #377
+	SYMB	TYPE, 379, 'X', 12, #16, 30, 1, #366
+	SYMB	TYPE, 380, 'n', #379, 129
+	SYMB	TYPE, 381, 'P', #380
+	SYMB	TYPE, 364, "TResource", 'S', 28,\
+		 "ObjectID", #16, 0,\
+		 "TResource", #369, 2,\
+		 "_TResource", #372, 6,\
+		 "Lock", #375, 10,\
+		 "Unlock", #378, 14,\
+		 "Owner", #381, 18,\
+		 "ID", #310, 22,\
+		 "Name", #258, 24
+	SYMB	TYPE, 382, "TResource", 'T', #364
+	SYMB	TYPE, 383, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 384, 'n', #383, 129
+	SYMB	TYPE, 385, 'P', #384
+	SYMB	TYPE, 387, 'n', #386, 130
+	SYMB	TYPE, 388, 'P', #387
+	SYMB	TYPE, 383, 'X', 12, #1, 30, 3, #388, #16, #385
+	SYMB	TYPE, 390, 'n', #389, 129
+	SYMB	TYPE, 391, 'P', #390
+	SYMB	TYPE, 392, 'X', 12, #1, 30, 1, #388
+	SYMB	TYPE, 393, 'n', #392, 129
+	SYMB	TYPE, 394, 'P', #393
+	SYMB	TYPE, 395, 'X', 12, #1, 30, 1, #388
+	SYMB	TYPE, 396, 'n', #395, 129
+	SYMB	TYPE, 397, 'P', #396
+	SYMB	TYPE, 398, 'X', 12, #1, 30, 2, #388, #16
+	SYMB	TYPE, 399, 'n', #398, 129
+	SYMB	TYPE, 400, 'P', #399
+	SYMB	TYPE, 401, 'X', 12, #1, 30, 1, #388
+	SYMB	TYPE, 402, 'n', #401, 129
+	SYMB	TYPE, 403, 'P', #402
+	SYMB	TYPE, 404, 'X', 12, #16, 30, 1, #388
+	SYMB	TYPE, 405, 'n', #404, 129
+	SYMB	TYPE, 406, 'P', #405
+	SYMB	TYPE, 407, 'X', 12, #1, 30, 2, #388, #16
+	SYMB	TYPE, 408, 'n', #407, 129
+	SYMB	TYPE, 409, 'P', #408
+	SYMB	TYPE, 386, "TThread", 'S', 36,\
+		 "ObjectID", #16, 0,\
+		 "TThread", #391, 2,\
+		 "Execute", #394, 6,\
+		 "Terminate", #397, 10,\
+		 "Suspend", #400, 14,\
+		 "Resume", #403, 18,\
+		 "GetPriority", #406, 22,\
+		 "SetPriority", #409, 26,\
+		 "ID", #269, 30,\
+		 "Status", #2, 31,\
+		 "Stack", #258, 32
+	SYMB	TYPE, 410, "TThread", 'T', #386
+	SYMB	TYPE, 412, 'n', #411, 130
+	SYMB	TYPE, 413, 'P', #412
+	SYMB	TYPE, 411, 'X', 12, #1, 30, 1, #413
+	SYMB	TYPE, 415, 'n', #414, 129
+	SYMB	TYPE, 416, 'P', #415
+	SYMB	TYPE, 417, 'X', 12, #1, 30, 1, #413
+	SYMB	TYPE, 418, 'n', #417, 129
+	SYMB	TYPE, 419, 'P', #418
+	SYMB	TYPE, 420, 'X', 12, #1, 30, 2, #413, #16
+	SYMB	TYPE, 421, 'n', #420, 129
+	SYMB	TYPE, 422, 'P', #421
+	SYMB	TYPE, 423, 'X', 12, #16, 30, 1, #413
+	SYMB	TYPE, 424, 'n', #423, 129
+	SYMB	TYPE, 425, 'P', #424
+	SYMB	TYPE, 426, 'X', 12, #1, 30, 2, #413, #16
+	SYMB	TYPE, 427, 'n', #426, 129
+	SYMB	TYPE, 428, 'P', #427
+	SYMB	TYPE, 429, 'n', #311, 130
+	SYMB	TYPE, 430, 'P', #429
+	SYMB	TYPE, 411, "TTimer", 'S', 32,\
+		 "ObjectID", #16, 0,\
+		 "TTimer", #416, 2,\
+		 "_TTimer", #419, 6,\
+		 "SetPeriod", #422, 10,\
+		 "GetPeriod", #425, 14,\
+		 "Tick", #428, 18,\
+		 "TimeOut", #348, 22,\
+		 "Period", #4, 26,\
+		 "Handle", #430, 28
+	SYMB	TYPE, 431, "TTimer", 'T', #411
+	SYMB	TYPE, 433, 'n', #432, 130
+	SYMB	TYPE, 434, 'P', #433
+	SYMB	TYPE, 432, 'X', 12, #1, 30, 3, #434, #16, #16
+	SYMB	TYPE, 436, 'n', #435, 129
+	SYMB	TYPE, 437, 'P', #436
+	SYMB	TYPE, 438, 'X', 12, #1, 30, 1, #434
+	SYMB	TYPE, 439, 'n', #438, 129
+	SYMB	TYPE, 440, 'P', #439
+	SYMB	TYPE, 441, 'X', 12, #258, 30, 2, #434, #262
+	SYMB	TYPE, 442, 'n', #441, 129
+	SYMB	TYPE, 443, 'P', #442
+	SYMB	TYPE, 444, 'X', 12, #1, 30, 2, #434, #262
+	SYMB	TYPE, 445, 'n', #444, 129
+	SYMB	TYPE, 446, 'P', #445
+	SYMB	TYPE, 432, "TStream", 'S', 28,\
+		 "ObjectID", #16, 0,\
+		 "TStream", #437, 2,\
+		 "_TStream", #440, 6,\
+		 "Get", #443, 10,\
+		 "Put", #446, 14,\
+		 "ID", #307, 18,\
+		 "Width", #16, 20,\
+		 "Depth", #16, 22,\
+		 "Handle", #258, 24
+	SYMB	TYPE, 447, "TStream", 'T', #432
+	SYMB	ENDF
+	SYMB	ENDF
+; rs232.c    31	
+; rs232.c    32	
+; rs232.c    33	#define TIMER1_RANGE  (unsigned long)65536     /* UART mode 2 using Timer 1 */
+; rs232.c    34	
+; rs232.c    35	#define PRESCALER       (unsigned long)4     /* selected also in SCR */
+; rs232.c    36	
+; rs232.c    37	#define BAUDRATE     (unsigned long)9600     /* select  9600 baud */
+; rs232.c    38	
+; rs232.c    39	#define RELOAD1 (unsigned short)(TIMER1_RANGE-(CRYSTAL/(BAUDRATE*PRESCALER*(unsigned long)16)))
+; rs232.c    40	#define THI1_RESET (RELOAD1 >> 8) & 0xFF
+; rs232.c    41	#define TLOW1_RESET (RELOAD1 & 0xFF)
+; rs232.c    42	
+; rs232.c    43	/* =================== */
+; rs232.c    44	/* S1CON - bit settings */
+; rs232.c    45	/* ------------------- */
+; rs232.c    46	/* TIMER 0             */
+; rs232.c    47	/* ------------------- */
+; rs232.c    48	#define U1_SM0   (0 << 7)    /* allow for 8-bit UART */
+; rs232.c    49	#define U1_SM1   (1 << 6)    /* allow for 8-bit UART */
+; rs232.c    50	#define U1_SM2   (0 << 5)    /* allow for 8-bit UART */
+; rs232.c    51	#define U1_REN_0 (0 << 4)    /* enable serial reception */
+; rs232.c    52	     
+; rs232.c    53	#define U1_TB8_0 (0 << 3)    /* clear to disallow 9 bit data */
+; rs232.c    54	#define U1_RB8_0 (0 << 2)    /* clear to disallow 9 bit data */
+; rs232.c    55	     
+; rs232.c    56	#define U1_TI_0  (0 << 1)   /* the transmit interrupt flag */
+; rs232.c    57	#define U1_RI_0  (0 << 0)   /* the receive interrupt flag */ 
+; rs232.c    58	
+; rs232.c    59	#define xS1CON (U1_SM0 | U1_SM1 | U1_SM2 | U1_REN_0 | U1_TB8_0 | U1_RB8_0 | U1_TI_0 | U1_RI_0 )
+; rs232.c    60	/* =================== */
+; rs232.c    61	
+; rs232.c    62	/* =================== */
+; rs232.c    63	/* TMOD - bit settings */
+; rs232.c    64	/* ------------------- */
+; rs232.c    65	/* TIMER 0             */
+; rs232.c    66	/* ------------------- */
+; rs232.c    67	#define T0_GATE (0 << 3)   /* not applicable - OR in a zero (0) */
+; rs232.c    68	#define T0_CT   (0 << 2)   /* not applicable - OR in a zero (0) */
+; rs232.c    69	#define T0_M1   (0 << 1)   /* not applicable - OR in a zero (0) */
+; rs232.c    70	#define T0_M0   (0 << 0)   /* not applicable - OR in a zero (0) */
+; rs232.c    71	
+; rs232.c    72	#define T0_TMOD  (T0_GATE | T0_CT | T0_M1 | T0_M0)
+; rs232.c    73	
+; rs232.c    74	/* ------------------- */
+; rs232.c    75	/* TIMER 1             */
+; rs232.c    76	/* ------------------- */
+; rs232.c    77	#define T1_GATE (0 << 7)   /* disable gate control */
+; rs232.c    78	#define T1_CT   (0 << 6)   /* cleared for timer operation */
+; rs232.c    79	#define T1_M1   (0 << 5)   /* 16-bit auto-reload */
+; rs232.c    80	#define T1_M0   (0 << 4)   /* 16-bit auto-reload */
+; rs232.c    81	
+; rs232.c    82	#define T1_TMOD  (T1_GATE | T1_CT | T1_M1 | T1_M0)
+; rs232.c    83	
+; rs232.c    84	#define xTMOD  (T0_TMOD | T1_TMOD)
+; rs232.c    85	/* =================== */
+; rs232.c    86	
+; rs232.c    87	/* =================== */
+; rs232.c    88	/* TCON - bit settings */
+; rs232.c    89	/* ------------------- */
+; rs232.c    90	/* TIMER 0             */
+; rs232.c    91	/* ------------------- */
+; rs232.c    92	#define T0_TF0  (0 << 5)   /* not applicable - OR in a zero (0) */
+; rs232.c    93	#define T0_TR0  (0 << 4)   /* not applicable - OR in a zero (0) */
+; rs232.c    94	#define T0_IE0  (0 << 1)   /* not applicable - OR in a zero (0) */
+; rs232.c    95	#define T0_IT0  (0 << 0)   /* not applicable - OR in a zero (0) */
+; rs232.c    96	
+; rs232.c    97	#define T0_CON (T0_TF0 | T0_TR0 | T0_IE0 | T0_IT0)
+; rs232.c    98	
+; rs232.c    99	/* ------------------- */
+; rs232.c   100	/* TIMER 1             */
+; rs232.c   101	/* ------------------- */
+; rs232.c   102	#define T1_TF1  (0 << 7)   /* overflow flag - manipulated by hardware */
+; rs232.c   103	#define T1_TR1  (1 << 6)   /* run control bit - enabled */
+; rs232.c   104	#define T1_IE1  (0 << 3)   /* interrupt edge flag - enabled */
+; rs232.c   105	#define T1_IT1  (0 << 2)   /* interrupt type control bit - disabled */
+; rs232.c   106	
+; rs232.c   107	#define T1_CON (T1_TF1 | T1_TR1 | T1_IE1 | T1_IT1)
+; rs232.c   108	
+; rs232.c   109	#define xTCON (T0_CON | T1_CON)
+; rs232.c   110	/* =================== */
+; rs232.c   111	
+; rs232.c   112	
+; rs232.c   113	static union
+; rs232.c   114	{
+; rs232.c   115		struct
+; rs232.c   116		{
+; rs232.c   117		unsigned RI:1;
+; rs232.c   118		unsigned TI:1;
+; rs232.c   119		unsigned RB8:1;
+; rs232.c   120		unsigned TB8:1;
+; rs232.c   121		signed Enable:1;
+; rs232.c   122		unsigned Multi:1;
+; rs232.c   123		unsigned Mode:2;
+; rs232.c   124		}Bits;
+; rs232.c   125		unsigned char Byte;
+; rs232.c   126	}_S1CON;
+; rs232.c   127	
+; rs232.c   128	
+; rs232.c   129	static union
+; rs232.c   130	{
+; rs232.c   131		struct
+; rs232.c   132		{
+; rs232.c   133		unsigned EnableInt:1;
+; rs232.c   134		unsigned OverFlowErr:1;
+; rs232.c   135		unsigned BreakInt:1;
+; rs232.c   136		unsigned FramingErr:1;
+; rs232.c   137		unsigned :4;
+; rs232.c   138		}Bits;
+; rs232.c   139		char Byte;
+; rs232.c   140	}_S1STAT;
+; rs232.c   141	
+; rs232.c   142	
+; rs232.c   143	static union
+; rs232.c   144	{
+; rs232.c   145		struct
+; rs232.c   146		{
+; rs232.c   147		unsigned DataBits:2;
+; rs232.c   148		unsigned StopBits:1;
+; rs232.c   149		unsigned Parity:2;
+; rs232.c   150		unsigned HandShk:2;
+; rs232.c   151		}Bits;
+; rs232.c   152		char Byte;
+; rs232.c   153	}LCR;
+; rs232.c   154	
+; rs232.c   155	
+; rs232.c   156	
+; rs232.c   157	static unsigned char ichar[2]; /* input char */
+; rs232.c   158	
+; rs232.c   159	static TEvent			*rs232iEvent, *rs232oEvent;
+; rs232.c   160	static TThread		*rs232iThread, *rs232oThread;
+; rs232.c   161	static TResource	*rs232oRes;
+; rs232.c   162	static TStream		*rs232iStream, *rs232oStream;
+; rs232.c   163	
+; rs232.c   164	/*#define CalcParity \ 
+; rs232.c   165		#pragma asm \ 
+; rs232.c   166		PUSH	R4L \ 
+; rs232.c   167		MOV.B	R4L,_par \ 
+; rs232.c   168		MOV.B	_par,PSW51 \ 
+; rs232.c   169		AND.B	_par,#0FH \ 
+; rs232.c   170		POP	R4L \ 
+; rs232.c   171		#pragma endasm
+; rs232.c   172	  */
+; rs232.c   173	//#define EvenParity(Bte) par=(Bte); CalcParity par==1 ? 1 : 0	
+; rs232.c   174	
+; rs232.c   175	//#define OddParity(Byte) par=(Byte); CalcParity (par)==0 ? 1 : 0	
+; rs232.c   176	
+; rs232.c   177	
+; rs232.c   178	//static unsigned char par;
+; rs232.c   179	
+; rs232.c   180	char CheckParity(unsigned char Byte)
+; rs232.c   181	{
+RS232_PR	SEGMENT	HCODE
+	RSEG	RS232_PR
+	ALIGN	1
+	SYMB	LINE, 181
+	PUBLIC	_CheckParity
+_CheckParity:
+	SYMB	TYPE, 448, 'X', 12, #2, 30, 1, #3
+	SYMB	GFUN, "CheckParity", _CheckParity, #448, 0, 0, 0
+	SYMB	ALAB, _CheckParity, #448
+	SYMB	LTIM, "Byte", 0, 0, 2253
+	SYMB	IDEN, "Byte", 0, #3, 0, 2061
+	PUSH	R4L
+	MOV.B	R4L,R0L
+	MOV.B	R0L,PSW51
+	AND.B	R0L,#01H
+	POP	R4L
+; rs232.c   182		#pragma asm_noflush
+; rs232.c   183	#ifndef __BORLANDC__
+; rs232.c   184		PUSH	R4L
+; rs232.c   185		MOV.B	R4L,R0L
+; rs232.c   186		MOV.B	R0L,PSW51
+; rs232.c   187		AND.B	R0L,#01H
+; rs232.c   188		POP	R4L
+; rs232.c   189	#endif	
+; rs232.c   190		#pragma endasm
+; rs232.c   191		return(Byte);
+; rs232.c   192	}
+	SYMB	LINE, 192
+	RET
+	SYMB	LTIM, "Byte", 0, 0, 2125
+	SYMB	EFUN
+; rs232.c   193	
+; rs232.c   194	
+; rs232.c   195	_inline void SetOutputChar(char Ch)
+; rs232.c   196	{
+; rs232.c   197	 if(LCR.Bits.Parity)	          // if parity
+; rs232.c   198	 {
+; rs232.c   199	  TB8_1=CheckParity(Ch);          // TB8_1 = parity
+; rs232.c   200	  if(LCR.Bits.Parity==1)	  // if odd parity
+; rs232.c   201	   TB8_1=~TB8_1;	          // invert parity bit
+; rs232.c   202	  if (LCR.Bits.DataBits==2)       // if 7 data-bits
+; rs232.c   203	   if (TB8_1)		          // if parity bit
+; rs232.c   204	    Ch|=0x80;                     //  set parity bit
+; rs232.c   205	   else		         	  // else
+; rs232.c   206	    Ch&=0x7F;                     //  clear parity bit
+; rs232.c   207	 }
+; rs232.c   208	 else
+; rs232.c   209	 {
+; rs232.c   210	  if (LCR.Bits.DataBits==2)       // if 7 data-bits
+; rs232.c   211	   Ch|=0x80;                      //  set extra stop bit
+; rs232.c   212	 }
+; rs232.c   213	}	
+; rs232.c   214	
+; rs232.c   215	
+; rs232.c   216	_inline void SetInputChar(register unsigned char* Ch0,register unsigned char* Ch1)
+; rs232.c   217	{
+; rs232.c   218	 if (LCR.Bits.DataBits==3)	  // if 8 databits
+; rs232.c   219	  *Ch1=RB8_1;	                  //  get parity bit
+; rs232.c   220	 else			          // else
+; rs232.c   221	 {
+; rs232.c   222	  *((int*)Ch0) <<= 1;             //  shift parity bit to Ch+1
+; rs232.c   223	  *Ch0 >>= 1;			  //  shift back
+; rs232.c   224	//  *Ch &= 0x7F;
+; rs232.c   225	 }
+; rs232.c   226	 if(LCR.Bits.Parity==3)	          // if even parity
+; rs232.c   227	 {
+; rs232.c   228	  *Ch1 ^= CheckParity(*Ch0);	  //  Ch+1 = Ch+1 XOR Parity
+; rs232.c   229	 }
+; rs232.c   230	 else if(LCR.Bits.Parity==1)      // else if odd parity
+; rs232.c   231	  *Ch1 ^= (~CheckParity(*Ch0)) & 0x01;	//  Ch+1 = Ch+1 XOR NOT(Parity)
+; rs232.c   232	 else				  // else
+; rs232.c   233	  *Ch1 = 0; 	                  //  Ch+1 = 0  
+; rs232.c   234	}
+; rs232.c   235	
+; rs232.c   236	
+; rs232.c   237	
+; rs232.c   238	/*
+; rs232.c   239	 *
+; rs232.c   240	 * interrupt service for transmit 0
+; rs232.c   241	 *
+; rs232.c   242	*/
+; rs232.c   243	FRAME ks_stk *int232o(FRAME ks_stk * frame)
+; rs232.c   244	{
+	ALIGN	1
+	SYMB	LINE, 244
+	PUBLIC	_int232o
+_int232o:
+	SYMB	TYPE, 449, 'n', #313, 130
+	SYMB	TYPE, 450, 'P', #449
+	SYMB	TYPE, 451, 'X', 12, #450, 30, 1, #450
+	SYMB	GFUN, "int232o", _int232o, #451, 0, 0, 0
+	SYMB	ALAB, _int232o, #451
+	SYMB	LTIM, "frame", 3, 0, 2253
+	SYMB	IDEN, "frame", 3, #450, 0, 2061
+; rs232.c   245	   TI_1 = 0;
+	SYMB	LINE, 245
+	CLR	0321H
+; rs232.c   246	   return(KS_ISRexit(frame, rs232oEvent->ID)); /* wake out output task */
+	SYMB	LINE, 246
+	MOV.B	ES,#SEG( _rs232oEvent )
+	MOV.W	R3,#SOF( _rs232oEvent )
+	MOV.W	R2,[R3+]
+	MOV.W	R3,[R3]
+	MOV.B	ES,R3L
+	MOV.B	R2L,[R2+26]
+	CALL	_KS_ISRexit
+	SYMB	LTIM, "frame", 3, 0, 2125
+; rs232.c   247	}
+	SYMB	LINE, 247
+	RET
+	SYMB	EFUN
+; rs232.c   248	
+; rs232.c   249	
+; rs232.c   250	/*
+; rs232.c   251	 *
+; rs232.c   252	 * interrupt service for receive 0
+; rs232.c   253	 *
+; rs232.c   254	*/
+; rs232.c   255	FRAME ks_stk *int232i(FRAME ks_stk * frame)
+; rs232.c   256	{
+	ALIGN	1
+	SYMB	LINE, 256
+	PUBLIC	_int232i
+_int232i:
+	SYMB	TYPE, 452, 'X', 12, #450, 30, 1, #450
+	SYMB	GFUN, "int232i", _int232i, #452, 0, 0, 16
+	SYMB	ALAB, _int232i, #452
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	ADDS.W	R7,#0CH
+	SYMB	SOFF, 6
+	SYMB	LTIM, "frame", 3, 0, 2253
+	MOV.W	[R7+2],R1
+	MOV.W	[R7],R0
+	SYMB	LTIM, "frame", 3, 0, 2125
+	SYMB	LTIM, "frame", -6, 130, 2245
+	SYMB	IDEN, "frame", -3, #450, 130, 2053
+	SYMB	TYPE, 453, 'n', #3, 130
+	SYMB	TYPE, 454, 'P', #453
+	SYMB	IDEN, "Ch0", -1, #454, 130, 5
+	SYMB	LTIM, "Ch0", -1, 0, 69
+	SYMB	IDEN, "Ch1", -1, #454, 130, 5
+	SYMB	LTIM, "Ch1", -1, 0, 69
+; rs232.c   257	
+; rs232.c   258	   register unsigned char* Ch0=&ichar[0];
+; rs232.c   259	   register unsigned char* Ch1=&ichar[1];
+; rs232.c   260	
+; rs232.c   261	   RI_1 = 0;
+	SYMB	LINE, 261
+	CLR	0320H
+; rs232.c   262	
+; rs232.c   263	   *Ch0 = S1BUF;
+	SYMB	LINE, 263
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	[R0],0464H
+; rs232.c   264	
+; rs232.c   265	   if (*Ch1=(S1STAT & 0x0E) <ERR_OVERFLOW)	 // if no errors
+	SYMB	LINE, 265
+	MOV.B	R0L,0425H
+	AND.B	R0L,#0EH
+	CMP.B	R0L,#02H
+	BCC	_28
+	MOVS.B	R0L,#01H
+	BR	_30
+_28:
+	MOVS.B	R0L,#00H
+_30:
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R1,#SOF( _ichar+1 )
+	MOV.B	[R1],R0L
+	OR.B	R0L,R0L
+	BEQ	_27
+; rs232.c   266	   {
+; rs232.c   267	    SetInputChar(Ch0,Ch1);
+	SYMB	LINE, 267
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	AND.W	R0,#03H
+	CMP.W	R0,#03H
+	BNE	_21
+	JNB	0322H,_32
+	MOVS.B	R0L,#01H
+	BR	_33
+_32:
+	MOVS.B	R0L,#00H
+_33:
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R1,#SOF( _ichar+1 )
+	MOV.B	[R1],R0L
+	BR	_22
+_21:
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.W	R0,[R0]
+	ASL.W	R0,#01H
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R1,#SOF( _ichar )
+	MOV.W	[R1],R0
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	R0L,[R0]
+	LSR.B	R0L,#01H
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R1,#SOF( _ichar )
+	MOV.B	[R1],R0L
+_22:
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	LSR.W	R0,#03H
+	AND.W	R0,#03H
+	CMP.W	R0,#03H
+	BNE	_23
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R0,#SOF( _ichar+1 )
+	MOV.B	R4L,[R0]
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	R0L,[R0]
+	CALL	_CheckParity
+	XOR.B	R0L,R4L
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R1,#SOF( _ichar+1 )
+	MOV.B	[R1],R0L
+	BR	_27
+_23:
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	LSR.W	R0,#03H
+	AND.W	R0,#03H
+	CMP.W	R0,#01H
+	BNE	_24
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R0,#SOF( _ichar+1 )
+	MOV.B	R4L,[R0]
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	R0L,[R0]
+	CALL	_CheckParity
+	CPL.B	R0L
+	AND.B	R0L,#01H
+	XOR.B	R4L,R0L
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R0,#SOF( _ichar+1 )
+	MOV.B	[R0],R4L
+	BR	_27
+_24:
+	MOV.B	ES,#SEG( _ichar+1 )
+	MOV.W	R0,#SOF( _ichar+1 )
+	MOV.B	[R0],#00H
+; rs232.c   268	   }
+	SYMB	LINE, 268
+_27:
+; rs232.c   269	   S1STAT = _S1STAT.Byte;         // clear status byte
+	SYMB	LINE, 269
+	MOV.B	ES,#SEG( __S1STAT )
+	MOV.W	R0,#SOF( __S1STAT )
+	MOV.B	R0L,[R0]
+	MOV.B	0425H,R0L
+; rs232.c   270	   return(KS_ISRexit(frame, rs232iEvent->ID)); /* wake out input task */
+	SYMB	LINE, 270
+	MOV.B	ES,#SEG( _rs232iEvent )
+	MOV.W	R3,#SOF( _rs232iEvent )
+	MOV.W	R2,[R3+]
+	MOV.W	R3,[R3]
+	MOV.B	ES,R3L
+	MOV.B	R2L,[R2+26]
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	CALL	_KS_ISRexit
+	SYMB	LTIM, "frame", -6, 130, 2117
+	SYMB	LTIM, "frame", 3, 0, 2253
+	SYMB	LTIM, "frame", 3, 0, 2125
+; rs232.c   271	}
+	SYMB	LINE, 271
+	ADDS.W	R7,#04H
+	SYMB	SOFF, 2
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   272	
+; rs232.c   273	
+; rs232.c   274	static unsigned char junk;
+; rs232.c   275	
+; rs232.c   276	void rs232_init(void)
+; rs232.c   277	{
+	ALIGN	1
+	SYMB	LINE, 277
+	PUBLIC	_rs232_init
+_rs232_init:
+	SYMB	TYPE, 455, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "rs232_init", _rs232_init, #455, 0, 0, 48
+	SYMB	ALAB, _rs232_init, #455
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+; rs232.c   278	
+; rs232.c   279	  rs232iEvent=newTEvent(0);
+	SYMB	LINE, 279
+	MOV.W	R1,#00H
+	MOV.W	R0,#00H
+	CALL	_newTEvent
+	MOV.B	ES,#SEG( _rs232iEvent )
+	MOV.W	R2,#SOF( _rs232iEvent )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+	MOV.W	R1,#00H
+	MOV.W	R0,#00H
+; rs232.c   280	  rs232oEvent=newTEvent(0);
+	SYMB	LINE, 280
+	CALL	_newTEvent
+	MOV.B	ES,#SEG( _rs232oEvent )
+	MOV.W	R2,#SOF( _rs232oEvent )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; rs232.c   281	
+; rs232.c   282	  rs232oRes=newTResource(0);
+	SYMB	LINE, 282
+	MOV.W	R1,#00H
+	MOV.W	R0,#00H
+	CALL	_newTResource
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R2,#SOF( _rs232oRes )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; rs232.c   283	
+; rs232.c   284	  rs232iStream=newTStream(2,512);
+	SYMB	LINE, 284
+	MOV.W	R0,#02H
+	MOV.W	R1,#0200H
+	CALL	_newTStream
+	MOV.B	ES,#SEG( _rs232iStream )
+	MOV.W	R2,#SOF( _rs232iStream )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; rs232.c   285	  rs232oStream=newTStream(1,64);
+	SYMB	LINE, 285
+	MOV.W	R1,#040H
+	MOV.W	R0,#01H
+	CALL	_newTStream
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R2,#SOF( _rs232oStream )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; rs232.c   286	
+; rs232.c   287	  rs232iThread=newTThread(1,rs232i); 
+	SYMB	LINE, 287
+	MOV.W	R3,#SEG( _rs232i )
+	MOV.W	R2,#SOF( _rs232i )
+	MOV.W	R0,#01H
+	CALL	_newTThread
+	MOV.B	ES,#SEG( _rs232iThread )
+	MOV.W	R2,#SOF( _rs232iThread )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; rs232.c   288	  rs232oThread=newTThread(3,rs232o);          // CHG. 2 to 3 KEN 270100
+	SYMB	LINE, 288
+	MOV.W	R0,#03H
+	MOV.W	R3,#SEG( _rs232o )
+	MOV.W	R2,#SOF( _rs232o )
+	CALL	_newTThread
+	MOV.B	ES,#SEG( _rs232oThread )
+	MOV.W	R2,#SOF( _rs232oThread )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; rs232.c   289	
+; rs232.c   290	  rs232iThread->Execute(rs232iThread);
+	SYMB	LINE, 290
+	MOV.B	ES,#SEG( _rs232iThread )
+	MOV.W	R1,#SOF( _rs232iThread )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+6]
+	MOV.W	R5,[R0+8]
+	FCALL	__ICALL
+; rs232.c   291	  rs232oThread->Execute(rs232oThread);
+	SYMB	LINE, 291
+	MOV.B	ES,#SEG( _rs232oThread )
+	MOV.W	R1,#SOF( _rs232oThread )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+6]
+	MOV.W	R5,[R0+8]
+	FCALL	__ICALL
+; rs232.c   292	
+; rs232.c   293	
+; rs232.c   294	  /* IEL - Interrupt Enable Register */
+; rs232.c   295	  ET1 = 0;    /* Timer 1 enable bit  - disnabled */
+	SYMB	LINE, 295
+	CLR	0333H
+; rs232.c   296	
+; rs232.c   297	  /* S1CON - serial port 1 control register */
+; rs232.c   298	  S1CON = _S1CON.Byte = xS1CON;
+	SYMB	LINE, 298
+	MOV.B	ES,#SEG( __S1CON )
+	MOV.W	R0,#SOF( __S1CON )
+	MOV.B	[R0],#040H
+	MOV.B	0424H,#040H
+; rs232.c   299	
+; rs232.c   300	  /* S1STAT - serial port 1 control/status register */
+; rs232.c   301	  _S1STAT.Byte=0x01;
+	SYMB	LINE, 301
+	MOV.B	ES,#SEG( __S1STAT )
+	MOV.W	R0,#SOF( __S1STAT )
+	MOV.B	[R0],#01H
+; rs232.c   302	  S1STAT = _S1STAT.Byte;
+	SYMB	LINE, 302
+	MOV.B	0425H,#01H
+; rs232.c   303	  
+; rs232.c   304	  /* Timer/Counter Mode Control Register */
+; rs232.c   305	  TMOD &= 0x0F;   /* clear timer1 settings */
+	SYMB	LINE, 305
+	AND.B	045CH,#0FH
+; rs232.c   306	  TMOD |= xTMOD;
+; rs232.c   307	  
+; rs232.c   308	  /* Timer/Counter Control Register */
+; rs232.c   309	  TCON &= 0x3F;   /* clear timer1 settings */
+	SYMB	LINE, 309
+	AND.B	0410H,#03FH
+; rs232.c   310	  TCON |= xTCON;
+	SYMB	LINE, 310
+	OR.B	0410H,#040H
+; rs232.c   311	
+; rs232.c   312	  /* Interrupt priority 5 */
+; rs232.c   313	  IPA5 = (TX1INTLVL<<4) + RX1INTLVL;
+	SYMB	LINE, 313
+	MOV.B	04A5H,#09AH
+; rs232.c   314	
+; rs232.c   315	  rs232Setup(9600,8,'N','N');	
+	SYMB	LINE, 315
+	MOV.W	R1,#00H
+	MOV.W	R0,#02580H
+	MOV.B	R2L,#08H
+	MOV.B	R3L,#04EH
+	MOV.B	R2H,R3L
+	CALL	_rs232Setup
+; rs232.c   316	
+; rs232.c   317	
+; rs232.c   318	  junk = S1BUF; /* read input to clear */
+	SYMB	LINE, 318
+	MOV.B	ES,#SEG( _junk )
+	MOV.W	R0,#SOF( _junk )
+	MOV.B	[R0],0464H
+; rs232.c   319	  junk = S1BUF; /* read input to clear */
+	SYMB	LINE, 319
+	MOV.B	ES,#SEG( _junk )
+	MOV.W	R0,#SOF( _junk )
+	MOV.B	[R0],0464H
+; rs232.c   320	
+; rs232.c   321	}
+	SYMB	LINE, 321
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   322	
+; rs232.c   323	
+; rs232.c   324	void rs232_stop(void)
+; rs232.c   325	{
+	ALIGN	1
+	SYMB	LINE, 325
+	PUBLIC	_rs232_stop
+_rs232_stop:
+	SYMB	TYPE, 456, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "rs232_stop", _rs232_stop, #456, 0, 0, 0
+	SYMB	ALAB, _rs232_stop, #456
+; rs232.c   326	}
+	SYMB	LINE, 326
+	RET
+	SYMB	EFUN
+	SYMB	TYPE, 457, 'N',\
+		 "true", -1,\
+		 "false", 0
+	SYMB	TYPE, 458, "bool", 'T', #457
+; rs232.c   327	
+; rs232.c   328	
+; rs232.c   329	
+; rs232.c   330	 static bool echo=false;
+RS232_INI_FA	SEGMENT	HDATA INSEGMENT INIT
+	RSEG	RS232_INI_FA
+	SYMB	IDEN, "echo", _echo, #458, 130, 4
+	ALIGN	1
+; rs232.c   331	
+; rs232.c   332	
+; rs232.c   333	/* TASK */
+; rs232.c   334	void rs232i(void)
+; rs232.c   335	{
+_echo:	DW	00000H
+	RSEG	RS232_PR
+	ALIGN	1
+	SYMB	LINE, 335
+	PUBLIC	_rs232i
+_rs232i:
+	SYMB	TYPE, 459, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "rs232i", _rs232i, #459, 0, 0, 48
+	SYMB	ALAB, _rs232i, #459
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+; rs232.c   336	  for (;;)
+	SYMB	LINE, 336
+_38:
+_39:
+_40:
+; rs232.c   337	  {
+; rs232.c   338	    rs232iEvent->Wait(rs232iEvent,0);
+	SYMB	LINE, 338
+	MOV.B	ES,#SEG( _rs232iEvent )
+	MOV.W	R1,#SOF( _rs232iEvent )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	MOV.W	R3,#00H
+	MOV.W	R2,#00H
+	FCALL	__ICALL
+; rs232.c   339	
+; rs232.c   340	    if (ichar[0]=='\r')
+	SYMB	LINE, 340
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#0DH
+	BNE	_41
+; rs232.c   341		   ichar[0]='\n';
+	SYMB	LINE, 341
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	[R0],#0AH
+_41:
+; rs232.c   342	
+; rs232.c   343	    if (ichar[0]=='@')
+	SYMB	LINE, 343
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#040H
+	BNE	_43
+; rs232.c   344	    {
+; rs232.c   345	      if (echo)
+	SYMB	LINE, 345
+	MOV.B	ES,#SEG( _echo )
+	MOV.W	R0,#SOF( _echo )
+	MOV.W	R0,[R0]
+	BEQ	_42
+; rs232.c   346	      {
+; rs232.c   347	        echo=false;
+	SYMB	LINE, 347
+	MOV.B	ES,#SEG( _echo )
+	MOV.W	R0,#SOF( _echo )
+	MOV.W	[R0],#00H
+; rs232.c   348	        rs232puts("Echo OFF.\r\n");
+	SYMB	LINE, 348
+	MOV.W	R1,#SEG( _36 )
+	MOV.W	R0,#SOF( _36 )
+	CALL	_rs232puts
+; rs232.c   349	      }
+	SYMB	LINE, 349
+	BR	_40
+_42:
+; rs232.c   350	      else
+; rs232.c   351	      {
+; rs232.c   352	       echo=true;
+	SYMB	LINE, 352
+	MOV.B	ES,#SEG( _echo )
+	MOV.W	R0,#SOF( _echo )
+	MOV.W	[R0],#0FFFFH
+; rs232.c   353	        rs232puts("Echo ON.\n");
+	SYMB	LINE, 353
+	MOV.W	R1,#SEG( _37 )
+	MOV.W	R0,#SOF( _37 )
+	CALL	_rs232puts
+; rs232.c   354	      }
+; rs232.c   355	    }
+	SYMB	LINE, 355
+	BR	_39
+_43:
+; rs232.c   356	    else
+; rs232.c   357	    {
+; rs232.c   358	      if (echo)
+	SYMB	LINE, 358
+	MOV.B	ES,#SEG( _echo )
+	MOV.W	R0,#SOF( _echo )
+	MOV.W	R0,[R0]
+	BEQ	_44
+; rs232.c   359	      {
+; rs232.c   360	        rs232putchar(ichar[0]);
+	SYMB	LINE, 360
+	MOV.B	ES,#SEG( _ichar )
+	MOV.W	R0,#SOF( _ichar )
+	MOV.B	R0L,[R0]
+	CALL	_rs232putchar
+; rs232.c   361	      }
+	SYMB	LINE, 361
+_44:
+; rs232.c   362	
+; rs232.c   363	      rs232iStream->Put(rs232iStream,&ichar);
+	SYMB	LINE, 363
+	MOV.B	ES,#SEG( _rs232iStream )
+	MOV.W	R1,#SOF( _rs232iStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	MOV.W	R3,#SEG( _ichar )
+	MOV.W	R2,#SOF( _ichar )
+	FCALL	__ICALL
+	SYMB	LINE, 336
+	BR	_38
+; rs232.c   364	    }
+; rs232.c   365	  }
+; rs232.c   366	}
+	SYMB	LINE, 366
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   367	
+; rs232.c   368	
+; rs232.c   369	
+; rs232.c   370	/* TASK */
+; rs232.c   371	void rs232o(void)
+; rs232.c   372	{
+	ALIGN	1
+	SYMB	LINE, 372
+	PUBLIC	_rs232o
+_rs232o:
+	SYMB	TYPE, 460, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "rs232o", _rs232o, #460, 0, 0, 48
+	SYMB	ALAB, _rs232o, #460
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#0EH
+	SYMB	SOFF, 6
+	SYMB	IDEN, "ochar", -6, #2, 130, 5
+; rs232.c   373	  char ochar; /* output char */
+; rs232.c   374	
+; rs232.c   375	  for (;;)
+	SYMB	LINE, 375
+_56:
+; rs232.c   376	  {
+; rs232.c   377	    rs232oStream->Get(rs232oStream,&ochar);
+	SYMB	LINE, 377
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R1,#SOF( _rs232oStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	MOV.W	R2,R7
+	FCALL	__ICALL
+; rs232.c   378	
+; rs232.c   379	    if ((ochar == '\n') && (echo))
+	SYMB	LINE, 379
+	CMP.B	[R7],#0AH
+	BNE	_61
+	MOV.B	ES,#SEG( _echo )
+	MOV.W	R0,#SOF( _echo )
+	MOV.W	R0,[R0]
+	BEQ	_61
+; rs232.c   380	    {
+; rs232.c   381	      SetOutputChar('\r');
+	SYMB	LINE, 381
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	LSR.W	R0,#03H
+	AND.W	R0,#03H
+	BEQ	_59
+	MOV.B	R0L,#0DH
+	CALL	_CheckParity
+	OR.B	R0L,R0L
+	CLR	R0.0
+	BEQ	_66
+	SETB	R0.0
+_66:
+	MOV	C,R0.0
+	MOV	0323H,C
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	LSR.W	R0,#03H
+	AND.W	R0,#03H
+	CMP.W	R0,#01H
+	BNE	_57
+	MOV	C,0323H
+	XOR.B	PSWL,#080H
+	MOV	R0.0,C
+	MOV	C,R0.0
+	MOV	0323H,C
+_57:
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	AND.W	R0,#03H
+	CMP.W	R0,#02H
+	BNE	_59
+_59:
+; rs232.c   382	      S1BUF = '\r'; 
+	SYMB	LINE, 382
+	MOV.B	0464H,#0DH
+; rs232.c   383	   TI_1 = 0;
+	SYMB	LINE, 383
+	CLR	0321H
+; rs232.c   384		   rs232oEvent->Wait(rs232oEvent,0);
+	SYMB	LINE, 384
+	MOV.B	ES,#SEG( _rs232oEvent )
+	MOV.W	R1,#SOF( _rs232oEvent )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	MOV.W	R3,#00H
+	MOV.W	R2,#00H
+	FCALL	__ICALL
+; rs232.c   385	    }
+	SYMB	LINE, 385
+_61:
+; rs232.c   386	
+; rs232.c   387	    SetOutputChar(ochar);
+	SYMB	LINE, 387
+	MOV.B	R0L,[R7]
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	R1,[R1]
+	LSR.W	R1,#03H
+	AND.W	R1,#03H
+	BEQ	_64
+	CALL	_CheckParity
+	OR.B	R0L,R0L
+	CLR	R0.0
+	BEQ	_69
+	SETB	R0.0
+_69:
+	MOV	C,R0.0
+	MOV	0323H,C
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	LSR.W	R0,#03H
+	AND.W	R0,#03H
+	CMP.W	R0,#01H
+	BNE	_62
+	MOV	C,0323H
+	XOR.B	PSWL,#080H
+	MOV	R0.0,C
+	MOV	C,R0.0
+	MOV	0323H,C
+_62:
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	AND.W	R0,#03H
+	CMP.W	R0,#02H
+	BNE	_64
+_64:
+; rs232.c   388	
+; rs232.c   389	    S1BUF = ochar; /* write char to port */
+	SYMB	LINE, 389
+	MOV.B	R0L,[R7]
+	MOV.B	0464H,R0L
+; rs232.c   390	   TI_1 = 0;
+	SYMB	LINE, 390
+	CLR	0321H
+; rs232.c   391	
+; rs232.c   392	    rs232oEvent->Wait(rs232oEvent,0);
+	SYMB	LINE, 392
+	MOV.B	ES,#SEG( _rs232oEvent )
+	MOV.W	R1,#SOF( _rs232oEvent )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	MOV.W	R3,#00H
+	MOV.W	R2,#00H
+	FCALL	__ICALL
+	SYMB	LINE, 375
+	BR	_56
+; rs232.c   393	  }
+; rs232.c   394	}
+	SYMB	LINE, 394
+	ADDS.W	R7,#02H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   395	
+; rs232.c   396	
+; rs232.c   397	int rs232Setup(unsigned long Baud, unsigned char Data, unsigned char Parity, unsigned char Hndshk)
+; rs232.c   398	{
+	ALIGN	1
+	SYMB	LINE, 398
+	PUBLIC	_rs232Setup
+_rs232Setup:
+	SYMB	TYPE, 461, 'X', 12, #16, 30, 4, #7, #3, #3, #3
+	SYMB	GFUN, "rs232Setup", _rs232Setup, #461, 0, 0, 112
+	SYMB	ALAB, _rs232Setup, #461
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#018H
+	SYMB	SOFF, 30
+	SYMB	LTIM, "Baud", 3, 0, 2253
+	SYMB	LTIM, "Data", 8, 0, 2253
+	SYMB	LTIM, "Parity", 9, 0, 2253
+	SYMB	LTIM, "Hndshk", 12, 0, 2253
+	MOV.B	[R7+16],R3L
+	SYMB	LTIM, "Hndshk", 12, 0, 2125
+	SYMB	LTIM, "Hndshk", -14, 130, 2245
+	MOV.B	[R7+18],R2H
+	SYMB	LTIM, "Parity", 9, 0, 2125
+	SYMB	LTIM, "Parity", -12, 130, 2245
+	MOV.B	[R7+20],R2L
+	SYMB	LTIM, "Data", 8, 0, 2125
+	SYMB	LTIM, "Data", -10, 130, 2245
+	SYMB	IDEN, "Baud", 3, #7, 0, 2061
+	SYMB	IDEN, "Data", -7, #3, 130, 2053
+	SYMB	IDEN, "Parity", -7, #3, 130, 2053
+	SYMB	IDEN, "Hndshk", -7, #3, 130, 2053
+	SYMB	TYPE, 462, 'Z', #3, 1
+	SYMB	TYPE, 464, 'U', 2,\
+		 "Int", #18, 0,\
+		 "Byte", #462, 0
+	SYMB	IDEN, "BaudRate", -8, #464, 130, 5
+; rs232.c   399	  union
+; rs232.c   400	  {
+; rs232.c   401	    unsigned int  Int;
+; rs232.c   402		 unsigned char Byte[2];
+; rs232.c   403	  }BaudRate;
+; rs232.c   404	
+; rs232.c   405	  BaudRate.Int=(unsigned short)(TIMER1_RANGE-(CRYSTAL/(Baud*PRESCALER*(unsigned long)16)));
+	SYMB	LINE, 405
+	MOV.W	[R7+14],#040F0H
+	MOV.W	[R7+12],#00H
+	MOV.W	[R7+10],#00H
+	MOV.W	[R7+8],#00H
+	MOV.W	[R7+6],#0417CH
+	MOV.W	[R7+4],#02000H
+	MOV.W	[R7+2],#00H
+	MOV.W	[R7],#00H
+	ASL.D	R0,#06H
+	SYMB	LTIM, "Baud", 3, 0, 2125
+	FCALL	__UL2DPF
+	MOV.W	R6,R7
+	FCALL	__DIVR_DPF
+	LEA	R6,R7+8
+	FCALL	__SUBR_DPF
+	FCALL	__DPF2US
+	MOV.W	[R7+22],R0
+; rs232.c   406	
+; rs232.c   407	  switch ( Parity)
+	SYMB	LINE, 407
+	MOV.B	R0L,[R7+18]
+	CMP.B	R0L,#04EH
+	BEQ	_98
+	CMP.B	R0L,#04FH
+	BEQ	_98
+	CMP.B	R0L,#045H
+	BEQ	_98
+	BR	_95
+	SYMB	LTIM, "Parity", -12, 130, 2117
+	SYMB	LTIM, "Parity", 0, 0, 2253
+; rs232.c   408	  {
+; rs232.c   409	    case 'N':
+; rs232.c   410		   Parity = 0;
+; rs232.c   411		   break;
+; rs232.c   412	
+; rs232.c   413		 case 'O':
+; rs232.c   414		   Parity = 1;
+; rs232.c   415		   break;
+; rs232.c   416	
+; rs232.c   417		 case 'E':
+; rs232.c   418		   Parity = 3;
+; rs232.c   419		   break;
+; rs232.c   420	
+; rs232.c   421		 default:
+	SYMB	LINE, 421
+_95:
+; rs232.c   422	      return( 0);
+	SYMB	LINE, 422
+	MOV.W	R0,#00H
+	SYMB	LTIM, "Parity", 0, 0, 2125
+	BR	_113
+; rs232.c   423	  }
+	SYMB	LINE, 423
+_98:
+	SYMB	LTIM, "Data", -10, 130, 2117
+	SYMB	LTIM, "Data", -10, 130, 2245
+	SYMB	LTIM, "Hndshk", -14, 130, 2117
+	SYMB	LTIM, "Hndshk", -14, 130, 2245
+; rs232.c   424	
+; rs232.c   425	  switch ( Hndshk)
+	SYMB	LINE, 425
+	CMP.B	[R7+16],#04EH
+	BEQ	_102
+	CMP.B	[R7+16],#058H
+	BEQ	_99
+	CMP.B	[R7+16],#048H
+	BEQ	_100
+	BR	_101
+; rs232.c   426	  {
+; rs232.c   427	    case 'N':
+; rs232.c   428		   Parity = 0;
+; rs232.c   429		   break;
+; rs232.c   430	
+; rs232.c   431		 case 'X':
+	SYMB	LINE, 431
+_99:
+; rs232.c   432		   Parity = 1;
+	SYMB	LINE, 432
+	MOV.B	R2H,#01H
+	SYMB	LTIM, "Parity", 9, 0, 2253
+; rs232.c   433		   break;
+	SYMB	LINE, 433
+	BR	_104
+; rs232.c   434	
+; rs232.c   435		 case 'H':
+	SYMB	LINE, 435
+_100:
+; rs232.c   436		   Parity = 2;
+	SYMB	LINE, 436
+	MOV.B	R2H,#02H
+	SYMB	LTIM, "Parity", 9, 0, 2125
+	SYMB	LTIM, "Parity", 9, 0, 2253
+; rs232.c   437		   break;
+	SYMB	LINE, 437
+	BR	_104
+; rs232.c   438	
+; rs232.c   439		 default:
+	SYMB	LINE, 439
+_101:
+; rs232.c   440	      return( 0);
+	SYMB	LINE, 440
+	MOV.W	R0,#00H
+	BR	_113
+	SYMB	LINE, 427
+_102:
+	SYMB	LTIM, "Data", -10, 130, 2117
+	SYMB	LTIM, "Data", -10, 130, 2245
+	SYMB	LTIM, "Hndshk", -14, 130, 2117
+	SYMB	LTIM, "Hndshk", -14, 130, 2245
+	SYMB	LINE, 428
+	MOV.B	R2H,#00H
+	SYMB	LTIM, "Parity", 9, 0, 2125
+	SYMB	LTIM, "Parity", 9, 0, 2253
+; rs232.c   441	  }
+	SYMB	LINE, 441
+_104:
+; rs232.c   442	
+; rs232.c   443	  if ( Data == 7)
+	SYMB	LINE, 443
+	CMP.B	[R7+20],#07H
+	BNE	_105
+; rs232.c   444	    LCR.Bits.DataBits = 2;
+	SYMB	LINE, 444
+	MOV.W	R0,#02H
+	AND.W	R0,#03H
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	R1,[R1]
+	AND.W	R1,#0FFFCH
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	[R1],R0
+	BR	_107
+_105:
+	SYMB	LTIM, "Data", -10, 130, 2117
+	SYMB	LTIM, "Data", -10, 130, 2245
+; rs232.c   445	  else if ( Data == 8)
+	SYMB	LINE, 445
+	MOV.B	R0L,[R7+20]
+	CMP.B	R0L,#08H
+	SYMB	LTIM, "Data", -10, 130, 2117
+	SYMB	LTIM, "Data", 0, 0, 2253
+	BEQ	_106
+; rs232.c   446	    LCR.Bits.DataBits = 3;
+; rs232.c   447	  else
+; rs232.c   448	    return( 0);
+	SYMB	LINE, 448
+	MOV.W	R0,#00H
+	SYMB	LTIM, "Data", 0, 0, 2125
+	BR	_113
+	SYMB	LINE, 446
+_106:
+	SYMB	LTIM, "Parity", 9, 0, 2125
+	SYMB	LTIM, "Parity", 9, 0, 2253
+	SYMB	LTIM, "Hndshk", -14, 130, 2117
+	SYMB	LTIM, "Hndshk", -14, 130, 2245
+	MOV.W	R0,#03H
+	AND.W	R0,#03H
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	R1,[R1]
+	AND.W	R1,#0FFFCH
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	[R1],R0
+	SYMB	LINE, 448
+_107:
+; rs232.c   449	
+; rs232.c   450	  LCR.Bits.Parity = Parity;
+	SYMB	LINE, 450
+	MOV.B	R2L,R2H
+	MOVS.B	R2H,#00H
+	SYMB	LTIM, "Parity", 9, 0, 2125
+	AND.W	R2,#03H
+	ASL.W	R2,#03H
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFE7H
+	OR.W	R2,R0
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	[R0],R2
+; rs232.c   451	  LCR.Bits.HandShk = Hndshk;
+	SYMB	LINE, 451
+	MOV.B	R0L,[R7+16]
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "Hndshk", -14, 130, 2117
+	SYMB	LTIM, "Hndshk", 0, 0, 2253
+	SYMB	LTIM, "Hndshk", 0, 0, 2125
+	AND.W	R0,#03H
+	ASL.W	R0,#05H
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	R1,[R1]
+	AND.W	R1,#0FF9FH
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R1,#SOF( _LCR )
+	MOV.W	[R1],R0
+; rs232.c   452	
+; rs232.c   453	  ETI1 = 0;   // transmit port 1 - disabled
+	SYMB	LINE, 453
+	CLR	033BH
+; rs232.c   454	  ERI1 = 0;   // receive port 1 - disabled
+	SYMB	LINE, 454
+	CLR	033AH
+; rs232.c   455	  REN_1= 0;
+	SYMB	LINE, 455
+	CLR	0324H
+; rs232.c   456	  TR1  = 0;
+	SYMB	LINE, 456
+	CLR	0286H
+; rs232.c   457	
+; rs232.c   458	  TL1 = RTL1 = BaudRate.Byte[0];  // Timer/Counter 1
+	SYMB	LINE, 458
+	MOV.B	R0L,[R7+22]
+	MOV.B	0456H,R0L
+	MOV.B	0452H,0456H
+; rs232.c   459	  TH1 = RTH1 = BaudRate.Byte[1];
+	SYMB	LINE, 459
+	MOV.B	R0L,[R7+23]
+	MOV.B	0457H,R0L
+	MOV.B	0453H,0457H
+; rs232.c   460	
+; rs232.c   461		if (( LCR.Bits.DataBits == 2) || ( LCR.Bits.Parity == 0))     // if databits==7 || parity==None
+	SYMB	LINE, 461
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	AND.W	R0,#03H
+	CMP.W	R0,#02H
+	BEQ	_108
+	MOV.B	ES,#SEG( _LCR )
+	MOV.W	R0,#SOF( _LCR )
+	MOV.W	R0,[R0]
+	LSR.W	R0,#03H
+	AND.W	R0,#03H
+	BNE	_109
+_108:
+; rs232.c   462			_S1CON.Bits.Mode = 1;	    //  8 bit serial mode
+	SYMB	LINE, 462
+	MOV.W	R0,#01H
+	AND.W	R0,#03H
+	ASL.W	R0,#06H
+	MOV.B	ES,#SEG( __S1CON )
+	MOV.W	R1,#SOF( __S1CON )
+	MOV.W	R1,[R1]
+	AND.W	R1,#0FF3FH
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( __S1CON )
+	MOV.W	R1,#SOF( __S1CON )
+	MOV.W	[R1],R0
+	BR	_110
+_109:
+; rs232.c   463		else					             // else
+; rs232.c   464			_S1CON.Bits.Mode = 3;	    //  9 bit serial mode
+	SYMB	LINE, 464
+	MOV.W	R0,#03H
+	AND.W	R0,#03H
+	ASL.W	R0,#06H
+	MOV.B	ES,#SEG( __S1CON )
+	MOV.W	R1,#SOF( __S1CON )
+	MOV.W	R1,[R1]
+	AND.W	R1,#0FF3FH
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( __S1CON )
+	MOV.W	R1,#SOF( __S1CON )
+	MOV.W	[R1],R0
+_110:
+; rs232.c   465		S1CON = _S1CON.Byte;	          // write S1CON register
+	SYMB	LINE, 465
+	MOV.B	ES,#SEG( __S1CON )
+	MOV.W	R0,#SOF( __S1CON )
+	MOV.B	R0L,[R0]
+	MOV.B	0424H,R0L
+; rs232.c   466	
+; rs232.c   467		KS_purgequeue(rs232oStream->ID);
+	SYMB	LINE, 467
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R1,#SOF( _rs232oStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.B	R0L,[R0+18]
+	CALL	_KS_purgequeue
+; rs232.c   468		KS_purgequeue(rs232iStream->ID);
+	SYMB	LINE, 468
+	MOV.B	ES,#SEG( _rs232iStream )
+	MOV.W	R1,#SOF( _rs232iStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.B	R0L,[R0+18]
+	CALL	_KS_purgequeue
+; rs232.c   469	
+; rs232.c   470		TR1  = 1;
+	SYMB	LINE, 470
+	SETB	0286H
+; rs232.c   471		REN_1= 1;
+	SYMB	LINE, 471
+	SETB	0324H
+; rs232.c   472		ERI1 = 1;   // receive port 1 - enabled
+	SYMB	LINE, 472
+	SETB	033AH
+; rs232.c   473		ETI1 = 1;   // transmit port 1 - enabled
+	SYMB	LINE, 473
+	SETB	033BH
+; rs232.c   474	
+; rs232.c   475		return(-1);
+	SYMB	LINE, 475
+	MOV.W	R0,#0FFFFH
+; rs232.c   476	}
+	SYMB	LINE, 476
+_113:
+	ADD.W	R7,#018H
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   477	
+; rs232.c   478	
+; rs232.c   479	
+; rs232.c   480	int rs232putchar(unsigned char ch)
+; rs232.c   481	{
+	ALIGN	1
+	SYMB	LINE, 481
+	PUBLIC	_rs232putchar
+_rs232putchar:
+	SYMB	TYPE, 465, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "rs232putchar", _rs232putchar, #465, 0, 0, 48
+	SYMB	ALAB, _rs232putchar, #465
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#0EH
+	SYMB	SOFF, 6
+	SYMB	IDEN, "ch", -1, #3, 130, 2053
+	SYMB	LTIM, "ch", -1, 0, 2117
+	MOV.B	[R7],R0L
+; rs232.c   482		rs232oRes->Lock( rs232oRes);
+	SYMB	LINE, 482
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R1,#SOF( _rs232oRes )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	FCALL	__ICALL
+; rs232.c   483		rs232oStream->Put( rs232oStream, &ch);
+	SYMB	LINE, 483
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R1,#SOF( _rs232oStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	MOV.W	R2,R7
+	FCALL	__ICALL
+; rs232.c   484		rs232oRes->Unlock( rs232oRes);
+	SYMB	LINE, 484
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R1,#SOF( _rs232oRes )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	FCALL	__ICALL
+	SYMB	LTIM, "ch", -6, 130, 2245
+; rs232.c   485	
+; rs232.c   486		return( ch);
+	SYMB	LINE, 486
+	MOV.B	R0L,[R7]
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "ch", -6, 130, 2117
+	SYMB	LTIM, "ch", 0, 0, 2253
+	SYMB	LTIM, "ch", 0, 0, 2125
+; rs232.c   487	}	 
+	SYMB	LINE, 487
+	ADDS.W	R7,#02H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   488	
+; rs232.c   489	
+; rs232.c   490	
+; rs232.c   491	int rs232puts( char* str)
+; rs232.c   492	{
+	ALIGN	1
+	SYMB	LINE, 492
+	PUBLIC	_rs232puts
+_rs232puts:
+	SYMB	TYPE, 466, 'X', 12, #16, 30, 1, #258
+	SYMB	GFUN, "rs232puts", _rs232puts, #466, 0, 0, 48
+	SYMB	ALAB, _rs232puts, #466
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#08H
+	SYMB	SOFF, 12
+	SYMB	IDEN, "str", -1, #258, 130, 2053
+	SYMB	LTIM, "str", -1, 0, 2117
+	SYMB	IDEN, "s", -1, #258, 130, 5
+	SYMB	LTIM, "s", -1, 0, 69
+; rs232.c   493	  char* s = str;
+	SYMB	LINE, 493
+	MOV.W	[R7+6],R1
+	MOV.W	[R7+4],R0
+	MOV.W	[R7+2],R1
+	MOV.W	[R7],R0
+; rs232.c   494	 
+; rs232.c   495	  rs232oRes->Lock( rs232oRes);
+	SYMB	LINE, 495
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R1,#SOF( _rs232oRes )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	FCALL	__ICALL
+; rs232.c   496	
+; rs232.c   497	  while( *str)
+	SYMB	LINE, 497
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	MOV.B	ES,R1L
+	MOV.B	R0L,[R0]
+	BEQ	_118
+_117:
+; rs232.c   498	  {
+; rs232.c   499	    rs232oStream->Put( rs232oStream, str);
+	SYMB	LINE, 499
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R1,#SOF( _rs232oStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	MOV.W	R3,[R7+6]
+	MOV.W	R2,[R7+4]
+	FCALL	__ICALL
+; rs232.c   500	    str++;
+	SYMB	LINE, 500
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	ADD.W	R0,#01H
+	SYMB	LINE, 497
+	MOV.W	[R7+6],R1
+	MOV.W	[R7+4],R0
+	MOV.B	ES,R1L
+	MOV.B	R0L,[R0]
+	BNE	_117
+; rs232.c   501	  }
+	SYMB	LINE, 501
+_118:
+; rs232.c   502	
+; rs232.c   503	  rs232oRes->Unlock( rs232oRes);
+	SYMB	LINE, 503
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R1,#SOF( _rs232oRes )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	FCALL	__ICALL
+; rs232.c   504	
+; rs232.c   505	  return( str-s);
+	SYMB	LINE, 505
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	MOV.W	R3,[R7+2]
+	MOV.W	R2,[R7]
+	SUB.W	R0,R2
+	SUBB.W	R1,R3
+; rs232.c   506	}	
+	SYMB	LINE, 506
+	ADD.W	R7,#08H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   507	
+; rs232.c   508	int rs232printf( int cnt, const char* format, ...)
+; rs232.c   509	{
+	ALIGN	1
+	SYMB	LINE, 509
+	PUBLIC	_rs232printf
+_rs232printf:
+	SYMB	TYPE, 467, 'X', 12, #16, 30, 3, #16, #258, #1
+	SYMB	GFUN, "rs232printf", _rs232printf, #467, 0, 0, 112
+	SYMB	ALAB, _rs232printf, #467
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#0CH
+	SYMB	SOFF, 18
+	SYMB	LTIM, "cnt", 2, 0, 2253
+	MOV.W	R6,R0
+	SYMB	LTIM, "cnt", 2, 0, 2125
+	SYMB	LTIM, "cnt", 26, 0, 2253
+	SYMB	IDEN, "cnt", 26, #16, 0, 2061
+	SYMB	IDEN, "format", 4, #258, 130, 2053
+	SYMB	IDEN, "ptr", -10, #265, 130, 5
+	SYMB	IDEN, "buf", -1, #258, 130, 5
+	SYMB	LTIM, "buf", -1, 0, 69
+	SYMB	IDEN, "tmpbuf", -1, #258, 130, 5
+	SYMB	LTIM, "tmpbuf", -1, 0, 69
+	SYMB	IDEN, "ret", -1, #16, 130, 5
+	SYMB	LTIM, "ret", -1, 0, 69
+; rs232.c   510	  va_list ptr;
+; rs232.c   511	  char *buf, *tmpbuf;
+; rs232.c   512	  int ret;
+; rs232.c   513	
+; rs232.c   514		if ( rs232oRes && rs232oStream)
+	SYMB	LINE, 514
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R3,#SOF( _rs232oRes )
+	MOV.W	R2,[R3+]
+	MOV.W	R3,[R3]
+	MOV.W	R1,R3
+	MOV.W	R0,R2
+	OR.W	R3,R2
+	BEQ	_124
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R3,#SOF( _rs232oStream )
+	MOV.W	R2,[R3+]
+	MOV.W	R3,[R3]
+	OR.W	R3,R2
+	BEQ	_124
+; rs232.c   515		{
+; rs232.c   516	  		rs232oRes->Lock( rs232oRes);
+	SYMB	LINE, 516
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	FCALL	__ICALL
+; rs232.c   517	
+; rs232.c   518	    	tmpbuf = buf = new( cnt+16);	
+	SYMB	LINE, 518
+	ADD.W	R6,#010H
+	SYMB	LTIM, "cnt", 26, 0, 2125
+	MOV.W	R0,R6
+	SEXT.W	R1
+	CALL	_new
+	SYMB	LTIM, "buf", 3, 0, 205
+	MOV.W	[R7+2],R1
+	MOV.W	[R7],R0
+; rs232.c   519	
+; rs232.c   520	    	va_start( ptr, format);
+	SYMB	LINE, 520
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	LEA	R2,R7+26
+	MOV.W	[R7+10],R3
+	MOV.W	[R7+8],R2
+; rs232.c   521	    	ret = vsprintf( buf, format, ptr);
+	SYMB	LINE, 521
+	MOV.W	R3,[R7+24]
+	MOV.W	R2,[R7+22]
+	MOV.B	R5L,#SEG( __lc_bs )
+	XOR.B	R5H,R5H
+	LEA	R4,R7+8
+	PUSH.W	R4, R5
+	SYMB	SOFF, 22
+	MOV.W	[R7+10],R1
+	MOV.W	[R7+8],R0
+	SYMB	LTIM, "buf", 3, 0, 77
+	SYMB	LTIM, "buf", -14, 130, 197
+	SYMB	LTIM, "buf", -14, 130, 69
+	SYMB	LTIM, "buf", 3, 0, 205
+	CALL	_vsprintf
+	ADDS.W	R7,#04H
+	SYMB	SOFF, 18
+	SYMB	LTIM, "buf", 3, 0, 77
+	SYMB	LTIM, "buf", -14, 130, 197
+	SYMB	LTIM, "ret", 2, 0, 205
+; rs232.c   522	    	va_end( ptr);
+	SYMB	LINE, 522
+	MOV.W	[R7+10],#00H
+	MOV.W	[R7+8],#00H
+; rs232.c   523	
+; rs232.c   524	   	if (( ret == EOF) || ( ret > cnt+16))	// KEn 000403
+	SYMB	LINE, 524
+	CMP.W	R0,#0FFFFH
+	BEQ	_119
+	CMP.W	R0,R6
+	BLE	_120
+_119:
+; rs232.c   525			{
+; rs232.c   526				delete( tmpbuf);
+	SYMB	LINE, 526
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	CALL	_delete
+	SYMB	LTIM, "ret", 2, 0, 77
+	SYMB	LTIM, "buf", -14, 130, 69
+	SYMB	LTIM, "buf", 3, 0, 205
+	SYMB	LTIM, "buf", 3, 0, 77
+; rs232.c   527	
+; rs232.c   528				rs232oRes->Unlock( rs232oRes);
+	SYMB	LINE, 528
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R1,#SOF( _rs232oRes )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	FCALL	__ICALL
+; rs232.c   529	
+; rs232.c   530				return( EOF);
+	SYMB	LINE, 530
+	MOV.W	R0,#0FFFFH
+	BR	_126
+; rs232.c   531			}												  	// End KEn 000403
+	SYMB	LINE, 531
+_120:
+	SYMB	LTIM, "buf", -14, 130, 197
+; rs232.c   532	
+; rs232.c   533	    	for ( ret = 0 ; ret <= cnt, *buf > 0; ret++, buf++)
+	SYMB	LINE, 533
+	MOV.W	R6,#00H
+	SYMB	LTIM, "ret", 26, 0, 205
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	MOV.B	ES,R1L
+	CMP.B	[R0],#00H
+	BLE	_122
+_121:
+; rs232.c   534	      	rs232oStream->Put( rs232oStream, buf);
+	SYMB	LINE, 534
+	MOV.B	ES,#SEG( _rs232oStream )
+	MOV.W	R1,#SOF( _rs232oStream )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	MOV.W	R3,[R7+6]
+	MOV.W	R2,[R7+4]
+	SYMB	LTIM, "buf", -14, 130, 69
+	SYMB	LTIM, "buf", 11, 0, 205
+	FCALL	__ICALL
+	SYMB	LTIM, "buf", 11, 0, 77
+	SYMB	LTIM, "buf", -14, 130, 197
+	SYMB	LINE, 533
+	ADDS.W	R6,#01H
+	SYMB	LTIM, "ret", 26, 0, 77
+	SYMB	LTIM, "ret", 26, 0, 205
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	ADD.W	R0,#01H
+	SYMB	LTIM, "buf", -14, 130, 69
+	SYMB	LTIM, "buf", 3, 0, 205
+	SYMB	LTIM, "buf", 3, 0, 77
+	SYMB	LTIM, "buf", 3, 0, 205
+	MOV.W	[R7+6],R1
+	MOV.W	[R7+4],R0
+	MOV.B	ES,R1L
+	CMP.B	[R0],#00H
+	SYMB	LTIM, "buf", 3, 0, 77
+	SYMB	LTIM, "buf", -14, 130, 197
+	BGT	_121
+	SYMB	LINE, 534
+_122:
+; rs232.c   535	
+; rs232.c   536			delete( tmpbuf);
+	SYMB	LINE, 536
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	CALL	_delete
+; rs232.c   537	    	rs232oRes->Unlock( rs232oRes);
+	SYMB	LINE, 537
+	MOV.B	ES,#SEG( _rs232oRes )
+	MOV.W	R1,#SOF( _rs232oRes )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	FCALL	__ICALL
+; rs232.c   538	
+; rs232.c   539	    	return( ret);
+	SYMB	LINE, 539
+	MOV.W	R0,R6
+	SYMB	LTIM, "ret", 26, 0, 77
+	SYMB	LTIM, "ret", 2, 0, 205
+	BR	_126
+; rs232.c   540		}
+	SYMB	LINE, 540
+_124:
+	SYMB	LTIM, "cnt", 26, 0, 2253
+; rs232.c   541	  	else
+; rs232.c   542	  	{
+; rs232.c   543	   	buf = new( cnt+16);	
+	SYMB	LINE, 543
+	ADD.W	R6,#010H
+	SYMB	LTIM, "cnt", 26, 0, 2125
+	MOV.W	R0,R6
+	SEXT.W	R1
+	SYMB	LTIM, "ret", 2, 0, 77
+	CALL	_new
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	SYMB	LTIM, "buf", -14, 130, 69
+	SYMB	LTIM, "buf", 19, 0, 205
+; rs232.c   544	
+; rs232.c   545	    	va_start( ptr, format);
+	SYMB	LINE, 545
+	MOV.B	R1L,#SEG( __lc_bs )
+	XOR.B	R1H,R1H
+	LEA	R0,R7+26
+	MOV.W	[R7+10],R1
+	MOV.W	[R7+8],R0
+; rs232.c   546	    	ret = vsprintf( buf, format, ptr);
+	SYMB	LINE, 546
+	MOV.W	R3,[R7+24]
+	MOV.W	R2,[R7+22]
+	MOV.B	R1L,#SEG( __lc_bs )
+	XOR.B	R1H,R1H
+	LEA	R0,R7+8
+	PUSH.W	R0, R1
+	SYMB	SOFF, 22
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	SYMB	LTIM, "buf", 19, 0, 77
+	SYMB	LTIM, "buf", 3, 0, 205
+	CALL	_vsprintf
+	ADDS.W	R7,#04H
+	SYMB	SOFF, 18
+	SYMB	LTIM, "buf", 3, 0, 77
+	SYMB	LTIM, "buf", 19, 0, 205
+; rs232.c   547	    	va_end( ptr);
+	SYMB	LINE, 547
+	MOV.W	[R7+10],#00H
+	MOV.W	[R7+8],#00H
+; rs232.c   548	
+; rs232.c   549	    	delete( buf);
+	SYMB	LINE, 549
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	CALL	_delete
+	SYMB	LTIM, "buf", 19, 0, 77
+	SYMB	LTIM, "buf", 3, 0, 205
+	SYMB	LTIM, "buf", 3, 0, 77
+; rs232.c   550	
+; rs232.c   551	    	return( EOF);
+	SYMB	LINE, 551
+	MOV.W	R0,#0FFFFH
+; rs232.c   552	 	}
+; rs232.c   553	}	 
+	SYMB	LINE, 553
+_126:
+	ADD.W	R7,#0CH
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   554	
+; rs232.c   555	
+; rs232.c   556	
+; rs232.c   557	static char LastError;
+; rs232.c   558	
+; rs232.c   559	
+; rs232.c   560	int rs232getchar(void)
+; rs232.c   561	{
+	ALIGN	1
+	SYMB	LINE, 561
+	PUBLIC	_rs232getchar
+_rs232getchar:
+	SYMB	TYPE, 468, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "rs232getchar", _rs232getchar, #468, 0, 0, 48
+	SYMB	ALAB, _rs232getchar, #468
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#0EH
+	SYMB	SOFF, 6
+	SYMB	TYPE, 469, 'Z', #2, 1
+	SYMB	IDEN, "dummy", -6, #469, 130, 5
+; rs232.c   562	  char dummy[2];
+; rs232.c   563	
+; rs232.c   564	  if ( rs232iStream)
+	SYMB	LINE, 564
+	MOV.B	ES,#SEG( _rs232iStream )
+	MOV.W	R3,#SOF( _rs232iStream )
+	MOV.W	R2,[R3+]
+	MOV.W	R3,[R3]
+	MOV.W	R1,R3
+	MOV.W	R0,R2
+	OR.W	R3,R2
+	BEQ	_132
+; rs232.c   565	  {
+; rs232.c   566	    rs232iStream->Get( rs232iStream, &dummy);
+	SYMB	LINE, 566
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	MOV.W	R2,R7
+	FCALL	__ICALL
+; rs232.c   567	
+; rs232.c   568	    if ( dummy[1])
+	SYMB	LINE, 568
+	MOV.B	R0L,[R7+1]
+	BEQ	_131
+; rs232.c   569		   LastError = dummy[1];
+	SYMB	LINE, 569
+	MOV.B	ES,#SEG( _LastError )
+	MOV.W	R1,#SOF( _LastError )
+	MOV.B	[R1],R0L
+_131:
+; rs232.c   570	
+; rs232.c   571	    return( dummy[0]);
+	SYMB	LINE, 571
+	MOV.B	R0L,[R7]
+	SEXT.B	R0H
+	BR	_133
+; rs232.c   572	  }
+	SYMB	LINE, 572
+_132:
+; rs232.c   573	  else
+; rs232.c   574	  {
+; rs232.c   575	    return( -1);
+	SYMB	LINE, 575
+	MOV.W	R0,#0FFFFH
+; rs232.c   576	  }
+; rs232.c   577	}
+	SYMB	LINE, 577
+_133:
+	ADDS.W	R7,#02H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232.c   578	
+; rs232.c   579	
+; rs232.c   580	
+; rs232.c   581	
+; rs232.c   582	int rs232GetLastError( void)
+; rs232.c   583	{
+	ALIGN	1
+	SYMB	LINE, 583
+	PUBLIC	_rs232GetLastError
+_rs232GetLastError:
+	SYMB	TYPE, 471, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "rs232GetLastError", _rs232GetLastError, #471, 0, 0, 0
+	SYMB	ALAB, _rs232GetLastError, #471
+	SYMB	IDEN, "LE", -1, #2, 130, 5
+	SYMB	LTIM, "LE", -1, 0, 69
+; rs232.c   584	  char LE = LastError;
+	SYMB	LINE, 584
+	MOV.B	ES,#SEG( _LastError )
+	MOV.W	R0,#SOF( _LastError )
+	MOV.B	R0L,[R0]
+	SYMB	LTIM, "LE", 0, 0, 205
+	SYMB	LTIM, "LE", 0, 0, 77
+; rs232.c   585	
+; rs232.c   586	  LastError = 0;
+	SYMB	LINE, 586
+	MOV.B	ES,#SEG( _LastError )
+	MOV.W	R1,#SOF( _LastError )
+	MOV.B	[R1],#00H
+; rs232.c   587	
+; rs232.c   588	  return( LE);
+	SYMB	LINE, 588
+	MOV.B	R0L,R0L
+	SEXT.B	R0H
+; rs232.c   589	}
+	SYMB	LINE, 589
+	RET
+	SYMB	EFUN
+	SYMB	ENDF
+
+	SYMB	TYPE, 472, 'n', #447, 130
+	SYMB	TYPE, 473, 'P', #472
+	SYMB	TYPE, 474, 'X', 12, #473, 30, 2, #16, #16
+	SYMB	ALAB, _newTStream, #474
+	EXTRN	HCODE(_newTStream)
+	SYMB	IDEN, "LastError", _LastError, #2, 130, 4
+RS232_CLR_FA	SEGMENT	HDATA INSEGMENT CLEAR
+	RSEG	RS232_CLR_FA
+_LastError:	DS	1
+	SYMB	TYPE, 475, 'X', 12, #450, 30, 2, #450, #292
+	SYMB	ALAB, _KS_ISRexit, #475
+	EXTRN	HCODE(_KS_ISRexit)
+	SYMB	TYPE, 476, 'n', #410, 130
+	SYMB	TYPE, 477, 'P', #476
+	SYMB	IDEN, "rs232iThread", _rs232iThread, #477, 130, 4
+	ALIGN	1
+_rs232iThread:	DS	4
+	EXTRN	HCODE(__DIVR_DPF)
+	SYMB	IDEN, "rs232oThread", _rs232oThread, #477, 130, 4
+	ALIGN	1
+_rs232oThread:	DS	4
+	SYMB	TYPE, 478, 'X', 12, #16, 30, 3, #258, #258, #265
+	SYMB	ALAB, _vsprintf, #478
+	EXTRN	HCODE(_vsprintf)
+	EXTRN	HCODE(__SUBR_DPF)
+	SYMB	TYPE, 479, 'g', 0, 1
+	SYMB	TYPE, 480, 'g', 0, 1
+	SYMB	TYPE, 481, 'g', 0, 1
+	SYMB	TYPE, 482, 'g', 0, 1
+	SYMB	TYPE, 483, 'g', 1, 1
+	SYMB	TYPE, 484, 'g', 0, 1
+	SYMB	TYPE, 485, 'g', 0, 2
+	SYMB	TYPE, 486, 'S', 2,\
+		 "RI", #479, 0,\
+		 "TI", #480, 1,\
+		 "RB8", #481, 2,\
+		 "TB8", #482, 3,\
+		 "Enable", #483, 4,\
+		 "Multi", #484, 5,\
+		 "Mode", #485, 6
+	SYMB	TYPE, 487, 'U', 2,\
+		 "Bits", #486, 0,\
+		 "Byte", #3, 0
+	SYMB	IDEN, "_S1CON", __S1CON, #487, 130, 4
+	ALIGN	1
+__S1CON:	DS	2
+	SYMB	TYPE, 488, 'X', 12, #1, 30, 1, #262
+	SYMB	ALAB, _delete, #488
+	EXTRN	HCODE(_delete)
+	SYMB	IDEN, "rs232oEvent", _rs232oEvent, #348, 130, 4
+	ALIGN	1
+_rs232oEvent:	DS	4
+	SYMB	TYPE, 489, 'X', 12, #1, 30, 1, #307
+	SYMB	ALAB, _KS_purgequeue, #489
+	EXTRN	HCODE(_KS_purgequeue)
+	SYMB	TYPE, 490, 'n', #382, 130
+	SYMB	TYPE, 491, 'P', #490
+	SYMB	TYPE, 492, 'X', 12, #491, 30, 1, #258
+	SYMB	ALAB, _newTResource, #492
+	EXTRN	HCODE(_newTResource)
+	RSEG	RS232_INI_FA
+_37:	DB	045H,063H,068H,06FH,020H,04FH,04EH,02EH,00AH,000H
+	SYMB	IDEN, "ichar", _ichar, #462, 130, 4
+	RSEG	RS232_CLR_FA
+_ichar:	DS	2
+	SYMB	IDEN, "junk", _junk, #3, 130, 4
+_junk:	DS	1
+	SYMB	IDEN, "rs232iEvent", _rs232iEvent, #348, 130, 4
+	ALIGN	1
+_rs232iEvent:	DS	4
+	EXTRN	HCODE(__DPF2US)
+	SYMB	TYPE, 493, 'g', 0, 2
+	SYMB	TYPE, 494, 'g', 0, 1
+	SYMB	TYPE, 495, 'g', 0, 2
+	SYMB	TYPE, 496, 'g', 0, 2
+	SYMB	TYPE, 497, 'S', 2,\
+		 "DataBits", #493, 0,\
+		 "StopBits", #494, 2,\
+		 "Parity", #495, 3,\
+		 "HandShk", #496, 5
+	SYMB	TYPE, 498, 'U', 2,\
+		 "Bits", #497, 0,\
+		 "Byte", #2, 0
+	SYMB	IDEN, "LCR", _LCR, #498, 130, 4
+	ALIGN	1
+_LCR:	DS	2
+	SYMB	TYPE, 499, 'g', 0, 1
+	SYMB	TYPE, 500, 'g', 0, 1
+	SYMB	TYPE, 501, 'g', 0, 1
+	SYMB	TYPE, 502, 'g', 0, 1
+	SYMB	TYPE, 503, 'S', 2,\
+		 "EnableInt", #499, 0,\
+		 "OverFlowErr", #500, 1,\
+		 "BreakInt", #501, 2,\
+		 "FramingErr", #502, 3
+	SYMB	TYPE, 504, 'U', 2,\
+		 "Bits", #503, 0,\
+		 "Byte", #2, 0
+	SYMB	IDEN, "_S1STAT", __S1STAT, #504, 130, 4
+	ALIGN	1
+__S1STAT:	DS	2
+	EXTRN	HCODE(__ICALL)
+	SYMB	IDEN, "rs232iStream", _rs232iStream, #473, 130, 4
+	ALIGN	1
+_rs232iStream:	DS	4
+	SYMB	TYPE, 505, 'X', 12, #262, 30, 1, #6
+	SYMB	ALAB, _new, #505
+	EXTRN	HCODE(_new)
+	EXTRN	IDATA(__lc_bs)
+	EXTRN	HCODE(__UL2DPF)
+	SYMB	IDEN, "rs232oRes", _rs232oRes, #491, 130, 4
+	ALIGN	1
+_rs232oRes:	DS	4
+	SYMB	TYPE, 507, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 508, 'n', #507, 129
+	SYMB	TYPE, 509, 'P', #508
+	SYMB	TYPE, 506, 'X', 12, #477, 30, 2, #16, #509
+	SYMB	ALAB, _newTThread, #506
+	EXTRN	HCODE(_newTThread)
+	SYMB	TYPE, 510, 'X', 12, #348, 30, 1, #258
+	SYMB	ALAB, _newTEvent, #510
+	EXTRN	HCODE(_newTEvent)
+	SYMB	IDEN, "rs232oStream", _rs232oStream, #473, 130, 4
+	ALIGN	1
+_rs232oStream:	DS	4
+	RSEG	RS232_INI_FA
+_36:	DB	045H,063H,068H,06FH,020H,04FH,046H,046H,02EH,00DH,00AH,000H
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'int232o', 'KS_ISRexit'
+	CALLS	'int232i', 'CheckParity'
+	CALLS	'int232i', 'KS_ISRexit'
+	CALLS	'rs232_init', 'newTEvent'
+	CALLS	'rs232_init', 'newTResource'
+	CALLS	'rs232_init', 'newTStream'
+	CALLS	'rs232_init', 'newTThread'
+	CALLS	'rs232_init', 'rs232Setup'
+	CALLS	'rs232i', 'rs232puts'
+	CALLS	'rs232i', 'rs232putchar'
+	CALLS	'rs232o', 'CheckParity'
+	CALLS	'rs232Setup', 'KS_purgequeue'
+	CALLS	'rs232printf', 'new'
+	CALLS	'rs232printf', 'vsprintf'
+	CALLS	'rs232printf', 'delete'
+	CALLS	'rs232printf', 'new'
+	CALLS	'rs232printf', 'vsprintf'
+	CALLS	'rs232printf', 'delete'
+	END

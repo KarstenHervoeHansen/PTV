@@ -1,0 +1,89 @@
+NET "clk_10_i"			LOC = "p38";
+NET "clk_148_p"		LOC = "p94" | IOSTANDARD = LVDS_25 | DIFF_TERM = TRUE;
+NET "clk_148_n"		LOC = "p95" | IOSTANDARD = LVDS_25 | DIFF_TERM = TRUE;
+NET "led1_o" 			LOC = "p36";
+NET "led2_o"			LOC = "p35";
+NET "tp1_o"				LOC = "p40";
+NET "tp2_o"				LOC = "p41";
+NET "tp3_o"				LOC = "p47";
+NET "h_d_o"				LOC = "p24";
+NET "f_d_o"				LOC = "p23";
+NET "LTC_a_out"		LOC = "p71";
+NET "LTC_b_out"		LOC = "p70";
+NET "ext_int_o"		LOC = "p10";
+#NET "OXCO_locked_o"	LOC = "p9";
+NET "PPS_status_o"	LOC = "p11";
+NET "din_10mhz_o"		LOC = "p27";
+NET "sync_10mhz_o" 	LOC = "p33";
+NET "sclk_10mhz_o"	LOC = "p32";
+NET "din_148mhz"		LOC = "p3";
+NET "sync_148mhz"		LOC = "p5";
+NET "sclk_148mhz"		LOC = "p4";
+NET "PPS_i"				LOC = "p60";
+#NET "jump_i"			LOC = "p53";
+NET "rst_i"				LOC = "p2";
+NET "SDA_io" 			LOC = "p15";
+NET "SCL_i"				LOC = "p12";
+NET "UBX_TX_i"			LOC = "p58";
+NET "NTP_RX"			LOC = "p48";
+NET "MCU_RX"			LOC = "p49";
+NET "NTP_PPS"			LOC = "p9";
+
+
+NET "clk_10_i" TNM_NET = "clk_10_tm";
+TIMESPEC "TS_clk_10"	 = period "clk_10_tm" 10 MHz HIGH 50% input_jitter 1 ns;
+
+NET "clk_148" TNM_NET = "clk_148_tm";
+TIMESPEC "TS_clk_148" = period "clk_148_tm" 149 MHz HIGH 50% input_jitter 1 ns;
+
+INST "OCXO_pll/phase_loop/*"                   		   	TNM = "multi_cycle_100";
+INST "OCXO_pll/phase_detect/phase_diff*"  					TNM = "multi_cycle_100";
+INST "dac_OCXO/shift_reg*"											TNM = "multi_cycle_100";
+
+TIMESPEC "TS_multi_cycle_100" = FROM "multi_cycle_100" TO "multi_cycle_100" "TS_clk_10" / 1000;
+
+#INST "VCXO_pll/VCXO_phase_loop/*"                     	TNM = "multi_cycle_148";
+#INST "VCXO_pll/phase_detector/phase_diff*"           		TNM = "multi_cycle_148";
+#INST "dac_148mhz/shift_reg*"										TNM = "multi_cycle_148";
+
+TIMESPEC "TS_multi_cycle_148" = FROM "multi_cycle_148" TO "multi_cycle_148" "TS_clk_148" / 149;
+
+INST "LTC_A/LTC_clockgenerator/ltc_bitcount*"			TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_clockgenerator/ltc_bitcount*"			TNM = "multi_cycle_LTC";
+
+INST "LTC_A/ltc_frame*"											TNM = "multi_cycle_LTC";
+INST "LTC_B/ltc_frame*"											TNM = "multi_cycle_LTC";
+
+INST "LTC_A/delay_count_high*"								TNM = "multi_cycle_LTC";
+INST "LTC_B/delay_count_high*"								TNM = "multi_cycle_LTC";
+
+INST "LTC_A/LTC_biphase_generator/biphase_code"			TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_biphase_generator/biphase_code"			TNM = "multi_cycle_LTC";
+
+INST "LTC_A/LTC_frame_count/hour_tens*"					TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/hour_units*"					TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/min_tens*"						TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/min_units*"					TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/sec_tens*"						TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/sec_units*"					TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/frame_tens*"					TNM = "multi_cycle_LTC";
+INST "LTC_A/LTC_frame_count/frame_units*"					TNM = "multi_cycle_LTC";
+
+INST "LTC_B/LTC_frame_count/hour_tens*"					TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/hour_units*"					TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/min_tens*"						TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/min_units*"					TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/sec_tens*"						TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/sec_units*"					TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/frame_tens*"					TNM = "multi_cycle_LTC";
+INST "LTC_B/LTC_frame_count/frame_units*"					TNM = "multi_cycle_LTC";
+
+NET "ltc_setup*" TIG;
+NET "system_control*" TIG;
+NET "serial_interface/send_byte*" TIG;
+
+TIMESPEC "TS_multi_cycle_LTC" = FROM "multi_cycle_LTC" TO "multi_cycle_LTC" "TS_clk_148" / 15;
+
+# clock routes
+NET "clk_148_p" CLOCK_DEDICATED_ROUTE = FALSE;
+NET "clk_148_n" CLOCK_DEDICATED_ROUTE = FALSE;

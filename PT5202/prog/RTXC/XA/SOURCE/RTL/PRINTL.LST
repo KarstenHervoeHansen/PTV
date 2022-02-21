@@ -1,0 +1,95 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTL\cc7146db.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    PRINTL
+                          6 ; printl.c    1 /****************************************************************************
+                          7 ; printl.c    2 * MODULE:
+                          8 ; printl.c    3 *    printl.c  -  print string to queue protected by resource
+                          9 ; printl.c    4 *****************************************************************************
+                         10 ; printl.c    5 * FUNCTIONS:
+                         11 ; printl.c    6 *    void printl(char *buffer, RESOURCE resource, QUEUE queue);
+                         12 ; printl.c    7 *****************************************************************************
+                         13 ; printl.c    8 * RTXCio    
+                         14 ; printl.c    9 * Copyright (c) 
+                         15 ; printl.c   10 * Embedded System Products, Inc.
+                         16 ; printl.c   11 * ALL RIGHTS RESERVED
+                         17 ; printl.c   12 *****************************************************************************/
+                         18 ; printl.c   13 
+                         19 ; printl.c   14 #include "rtxcapi.h"
+                         20 ; printl.c   15 
+                         21 ; printl.c   16 void printl(char *buffer, RESOURCE resource, QUEUE queue)
+                         22 ; printl.c   17 {
+                         23         PUBLIC  _printl
+000000                   24 PRINTL_PR       SEGMENT HCODE
+000000                   25         RSEG    PRINTL_PR
+000000                   25         RSEG    PRINTL_PR
+000000                   26 _printl:
+000000 0F10              27         PUSH.W  R4
+000002 A97C              28         ADDS.W  R7,#0CH
+000004 8195              29         MOV.B   R4H,R2H
+000006 8C1F02            30         MOV.W   [R7+2],R1
+000009 8A0F              31         MOV.W   [R7],R0
+                         32 ; printl.c   18    if (resource)
+00000B 8184              33         MOV.B   R4L,R2L
+00000D F304              34         BEQ     _3
+00000F 8108              35         MOV.B   R0L,R4L
+                         36 ; printl.c   19       KS_lockw(resource);
+                         37         CALL    _KS_lockw
+000011 C4rrrrrr         +37 ;       FCALL   _KS_lockw
+000011 C4rrrrrr00       +37 ;       FCALL   _KS_lockw
+000016                   38 _3:
+                         39 ; printl.c   20 
+                         40 ; printl.c   21    while (*buffer != '\0') /* till end of string mark */
+000016 8C1702            41         MOV.W   R1,[R7+2]
+000019 8A07              42         MOV.W   R0,[R7]
+00001B 862C42            43         MOV.B   ES,R1L
+00001E 8200              44         MOV.B   R0L,[R0]
+000020 F313              45         BEQ     _5
+000020 F313              45         BEQ     _5
+000022                   46 _4:
+                         47 ; printl.c   22       KS_enqueuew(queue, buffer++);
+000022 8C3702            48         MOV.W   R3,[R7+2]
+000025 8A27              49         MOV.W   R2,[R7]
+000027 8C1702            50         MOV.W   R1,[R7+2]
+00002A 8A07              51         MOV.W   R0,[R7]
+00002C 99000001          52         ADD.W   R0,#01H
+000030 8C1F02            53         MOV.W   [R7+2],R1
+000033 8A0F              54         MOV.W   [R7],R0
+000035 8109              55         MOV.B   R0L,R4H
+                         56         CALL    _KS_enqueuew
+000037 C4rrrrrr         +56 ;       FCALL   _KS_enqueuew
+00003B 8C1702            57         MOV.W   R1,[R7+2]
+00003E 8A07              58         MOV.W   R0,[R7]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+000040 862C42            59         MOV.B   ES,R1L
+000043 8200              60         MOV.B   R0L,[R0]
+000045 F2EE              61         BNE     _4
+000045 F2EE00            61         BNE     _4
+000048                   62 _5:
+                         63 ; printl.c   23 
+                         64 ; printl.c   24    if (resource)
+000048 6188              65         OR.B    R4L,R4L
+00004A F303              66         BEQ     _6
+                         67 ; printl.c   25       KS_unlock(resource);
+00004C 8108              68         MOV.B   R0L,R4L
+                         69         CALL    _KS_unlock
+00004E C4rrrrrr         +69 ;       FCALL   _KS_unlock
+00004E C4rrrrrr         +69 ;       FCALL   _KS_unlock
+000052                   70 _6:
+                         71 ; printl.c   26 }
+000052 A974              72         ADDS.W  R7,#04H
+000054 2F10              73         POP.W   R4
+000056 D680              74         RET
+                         76         EXTRN   HCODE(_KS_unlock)
+                         77         EXTRN   HCODE(_KS_lockw)
+                         78         EXTRN   HCODE(_KS_enqueuew)
+                         79         CALLS   'printl', 'KS_lockw'
+                         80         CALLS   'printl', 'KS_enqueuew'
+                         81         CALLS   'printl', 'KS_unlock'

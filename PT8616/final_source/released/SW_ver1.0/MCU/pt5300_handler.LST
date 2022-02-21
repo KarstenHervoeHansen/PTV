@@ -1,0 +1,358 @@
+C51 COMPILER V7.05   PT5300_HANDLER                                                        02/14/2008 11:13:45 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE PT5300_HANDLER
+OBJECT MODULE PLACED IN pt5300_handler.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe pt5300_handler.c DB OE
+
+stmt level    source
+
+   1          #include <c8051f320.h>
+   2          #include <string.h>
+   3          #include "globals.h"
+   4          #include "i2c_slave.h"
+   5          #include "i2c_bus.h"
+   6          #include "LTC_handler.h"
+   7          #include "EEPROM_drv.h"
+   8          
+   9          sbit LED2 = P2^1;
+  10          
+  11          //håndtere indkomne data fra PT5300 mainframe
+  12          void pt5300_in_handle()
+  13          {
+  14   1              //tæller til diverse formål
+  15   1              unsigned char counter=0;
+  16   1              
+  17   1              switch(in_buffer[0])
+  18   1              {
+  19   2                      ////////// SYSTEM IND DATA ////////////////
+  20   2                      //register 0: Genlock format
+  21   2                      case 0: 
+  22   2                              //4 = SDI625@50, 5=SDI525@30/1,001
+  23   2                              if(in_buffer[1]==5)
+  24   2                                      set_bit(&FPGA_system_control, 0);
+  25   2                              else 
+  26   2                                      clear_bit(&FPGA_system_control, 0);
+  27   2                              
+  28   2                              //Afsend FPGA system setup
+  29   2                              FPGA_write_byte(20, FPGA_system_control);
+  30   2                              EEPROM_write_byte(0, 0, FPGA_system_control);
+  31   2      
+  32   2                              break;
+  33   2              
+  34   2                      ////////// LTC GENERATOR A IND DATA ////////////////
+  35   2                      //register 7-10: LTC a offset
+  36   2                      case 7:
+  37   2                              LTC_a_offset.LTC_offset_bytes[3]=in_buffer[1];
+  38   2                              break;
+  39   2                      case 8:
+  40   2                              LTC_a_offset.LTC_offset_bytes[2]=in_buffer[1];
+  41   2                              break;
+  42   2                      case 9:
+  43   2                              LTC_a_offset.LTC_offset_bytes[1]=in_buffer[1];
+  44   2                              break;
+  45   2                      case 10:
+  46   2                              LTC_a_offset.LTC_offset_bytes[0]=in_buffer[1];
+  47   2                              break;
+  48   2      
+  49   2                      //register 11: LTC a format
+  50   2                      case 11:
+  51   2                              LTC_setup&=0xF0;        //Reset LTC a format bits
+  52   2                              //sæt korrekt format
+  53   2                              switch(in_buffer[1])
+  54   2                              {
+  55   3                                      case 0x00:                              
+C51 COMPILER V7.05   PT5300_HANDLER                                                        02/14/2008 11:13:45 PAGE 2   
+
+  56   3                                              LTC_setup|=0x00;        //hvis 24 FPS
+  57   3                                              break;
+  58   3                                      case 0x01:                              
+  59   3                                              LTC_setup|=0x01;        //hvis 25 FPS
+  60   3                                              break;
+  61   3                                      case 0x02:
+  62   3                                              LTC_setup|=0x06;        //hvis 29.97 Drop frame
+  63   3                                              break;
+  64   3                                      case 0x03:
+  65   3                                              LTC_setup|=0x02;        //hvis 29.97 Nondrop frame
+  66   3                                              break;
+  67   3                                      case 0x04:
+  68   3                                              LTC_setup|=0x03;        //hvis 30 FPS
+  69   3                                              break;
+  70   3                              }
+  71   2                              break;
+  72   2      
+  73   2                      //register 12-14: Dropframe setup + timer/min
+  74   2                      case 12:
+  75   2                              dropframe_setup&=0xF0;                                  //Reset dropframe mode
+  76   2                              dropframe_setup|=in_buffer[1];                  //Set bits for LTC a
+  77   2                              break;
+  78   2      
+  79   2                      case 13:
+  80   2                              LTC_a_sync_hour=in_buffer[1];
+  81   2                              break;
+  82   2                      
+  83   2                      case 14:
+  84   2                              LTC_a_sync_min=in_buffer[1];
+  85   2                              break;
+  86   2      
+  87   2                      //register 15: Tidszone, timer
+  88   2                      case 15:        
+  89   2                              LTC_a_watchoffset[0]=in_buffer[1];
+  90   2                              break;
+  91   2      
+  92   2                      //register 16: Tidszone, minutter
+  93   2                      case 16:
+  94   2                              LTC_a_watchoffset[1]=in_buffer[1];
+  95   2                              break;
+  96   2      
+  97   2                      //register 17: Sommer/vinter tid skift mode
+  98   2                      case 17:
+  99   2                              daylight_switch_setup&=0xF0; //reset switch mode
+ 100   2                              daylight_switch_setup|=in_buffer[1];
+ 101   2                              break;
+ 102   2      
+ 103   2                      //register 18-20: sommertid (måned, dag, år)
+ 104   2                      case 18:
+ 105   2                              daylight_on_a_time.month=in_buffer[1]+1;
+ 106   2                              break;
+ 107   2                      case 19:
+ 108   2                              daylight_on_a_time.day=in_buffer[1];
+ 109   2                              break;
+ 110   2                      case 20:
+ 111   2                              daylight_on_a_time.hour=in_buffer[1];
+ 112   2                              break;
+ 113   2      
+ 114   2                      //register 21-23: vintertid (måned, dag, år)
+ 115   2                      case 21:
+ 116   2                              daylight_off_a_time.month=in_buffer[1]+1;
+ 117   2                              break;
+C51 COMPILER V7.05   PT5300_HANDLER                                                        02/14/2008 11:13:45 PAGE 3   
+
+ 118   2                      case 22:
+ 119   2                              daylight_off_a_time.day=in_buffer[1];
+ 120   2                              break;
+ 121   2                      case 23:
+ 122   2                              daylight_off_a_time.hour=in_buffer[1];
+ 123   2                              break;
+ 124   2      
+ 125   2      
+ 126   2                      ////////// LTC GENERATOR B IND DATA ////////////////
+ 127   2                      //register 27-30: LTC b offset
+ 128   2                      case 27:
+ 129   2                              LTC_b_offset.LTC_offset_bytes[3]=in_buffer[1];
+ 130   2                              break;
+ 131   2                      case 28:
+ 132   2                              LTC_b_offset.LTC_offset_bytes[2]=in_buffer[1];
+ 133   2                              break;
+ 134   2                      case 29:
+ 135   2                              LTC_b_offset.LTC_offset_bytes[1]=in_buffer[1];
+ 136   2                              break;
+ 137   2                      case 30:
+ 138   2                              LTC_b_offset.LTC_offset_bytes[0]=in_buffer[1];
+ 139   2                              break;
+ 140   2      
+ 141   2                      //register 31: LTC b format
+ 142   2                      case 31:
+ 143   2                              LTC_setup&=0x0F;        //Reset LTC b format bits
+ 144   2                              //sæt korrekt format
+ 145   2                              switch(in_buffer[1])
+ 146   2                              {
+ 147   3                                      case 0x00:
+ 148   3                                              LTC_setup|=0x00;        //hvis 24 FPS
+ 149   3                                              break;
+ 150   3                                      case 0x01:
+ 151   3                                              LTC_setup|=0x10;        //hvis 25 FPS
+ 152   3                                              break;
+ 153   3                                      case 0x02:
+ 154   3                                              LTC_setup|=0x60;        //hvis 29.97 Drop frame
+ 155   3                                              break;
+ 156   3                                      case 0x03:
+ 157   3                                              LTC_setup|=0x20;        //hvis 29.97 Nondrop frame
+ 158   3                                              break;
+ 159   3                                      case 0x04:
+ 160   3                                              LTC_setup|=0x30;        //hvis 30 FPS
+ 161   3                                              break;
+ 162   3                              }
+ 163   2                              break;
+ 164   2      
+ 165   2                      //register 33-34: Dropframe setup + timer/min
+ 166   2                      case 32:
+ 167   2                              dropframe_setup&=0x0F;                                  //Reset dropframe mode
+ 168   2                              dropframe_setup|=in_buffer[1]<<4;               //Set bits for LTC a
+ 169   2                              break;
+ 170   2      
+ 171   2                      case 33:
+ 172   2                              LTC_b_sync_hour=in_buffer[1];                   
+ 173   2                              break;
+ 174   2                      
+ 175   2                      case 34:
+ 176   2                              LTC_b_sync_min=in_buffer[1];
+ 177   2                              break;
+ 178   2      
+ 179   2                      //register 35: Tidszone, timer
+C51 COMPILER V7.05   PT5300_HANDLER                                                        02/14/2008 11:13:45 PAGE 4   
+
+ 180   2                      case 35:        
+ 181   2                              LTC_b_watchoffset[0]=in_buffer[1];
+ 182   2                              break;
+ 183   2      
+ 184   2                      //register 36: Tidszone, minutter
+ 185   2                      case 36:        
+ 186   2                              LTC_b_watchoffset[1]=in_buffer[1];
+ 187   2                              break;
+ 188   2                      //register 37: Sommer/vinter tid skift mode
+ 189   2                      case 37:
+ 190   2                              daylight_switch_setup&=0x0F; //reset switch mode
+ 191   2                              daylight_switch_setup|=in_buffer[1]<<4;
+ 192   2                              break;
+ 193   2      
+ 194   2                      //register 38-40: sommertid (måned, dag, år)
+ 195   2                      case 38:
+ 196   2                              daylight_on_b_time.month=in_buffer[1]+1;
+ 197   2                              break;
+ 198   2                      case 39:
+ 199   2                              daylight_on_b_time.day=in_buffer[1];
+ 200   2                              break;
+ 201   2                      case 40:
+ 202   2                              daylight_on_b_time.hour=in_buffer[1];
+ 203   2                              break;
+ 204   2      
+ 205   2                      //register 41-43: vintertid (måned, dag, år)
+ 206   2                      case 41:
+ 207   2                              daylight_off_b_time.month=in_buffer[1]+1;
+ 208   2                              break;
+ 209   2                      case 42:
+ 210   2                              daylight_off_b_time.day=in_buffer[1];
+ 211   2                              break;
+ 212   2                      case 43:
+ 213   2                              daylight_off_b_time.hour=in_buffer[1];
+ 214   2                              break;
+ 215   2              
+ 216   2                      //register 50+51 = confirm/annuler skift til sommer/vintertid for hhv. LTC A/B
+ 217   2                      case 50:
+ 218   2                              if(in_buffer[1])
+ 219   2                                      set_bit(&LTC_confirm, 0);
+ 220   2                              else
+ 221   2                                      set_bit(&LTC_confirm, 1);
+ 222   2                              break;
+ 223   2      
+ 224   2                      case 51:
+ 225   2                              if(in_buffer[1])
+ 226   2                                      set_bit(&LTC_confirm, 4);
+ 227   2                              else
+ 228   2                                      set_bit(&LTC_confirm, 5);
+ 229   2                              break;
+ 230   2      
+ 231   2                      //register 52+53 = sæt sync tidspunkt for LTC
+ 232   2                      case 52:
+ 233   2                              secs_since_sync_a=int_GPS_tow%600; //set synctime til nærmeste 10'er minut
+ 234   2                              break;
+ 235   2                      case 53:
+ 236   2                              secs_since_sync_b=int_GPS_tow%600; //set synctime til nærmeste 10'er minut
+ 237   2                              break;
+ 238   2      
+ 239   2                      //register 54+55 = requested sync for LTC a og b
+ 240   2                      //LTC a
+ 241   2                      case 54:
+C51 COMPILER V7.05   PT5300_HANDLER                                                        02/14/2008 11:13:45 PAGE 5   
+
+ 242   2                              if(in_buffer[1]==1)
+ 243   2                                      secs_since_sync_a=int_GPS_tow%600; //set synctime til nærmeste 10'er minut
+ 244   2      
+ 245   2                              //reset request
+ 246   2                              clear_bit(&LTC_sync_request, 0);
+ 247   2                              clear_bit(&LTC_sync_request, 1);
+ 248   2                              break;
+ 249   2      
+ 250   2                      //LTC b
+ 251   2                      case 55:
+ 252   2                              if(in_buffer[1]==1)
+ 253   2                                      secs_since_sync_b=int_GPS_tow%600; //set synctime til nærmeste 10'er minut
+ 254   2      
+ 255   2                                      //reset request
+ 256   2                              clear_bit(&LTC_sync_request, 4);
+ 257   2                              clear_bit(&LTC_sync_request, 5);
+ 258   2                              break;
+ 259   2      
+ 260   2                      //daylight setup LTC A+B bit:0 DL on, bit 1: DL off, bit 4 DL on, bit 5 DL off
+ 261   2                      case 56:
+ 262   2                              if (in_buffer[1]&1)
+ 263   2                                      LTC_a_daylight_flag=1;
+ 264   2                              else if (in_buffer[1]&2)
+ 265   2                                      LTC_a_daylight_flag=0;
+ 266   2      
+ 267   2                              if (in_buffer[1]&16)
+ 268   2                                      LTC_b_daylight_flag=1;
+ 269   2                              else if (in_buffer[1]&32)
+ 270   2                                      LTC_b_daylight_flag=0;
+ 271   2                              break;
+ 272   2      
+ 273   2                      //hvis der skrives en KU streng
+ 274   2                      case 62:
+ 275   2                              memcpy(KU_str, &in_buffer[1], sizeof(KU_str));
+ 276   2      
+ 277   2                              for(counter=0;counter<11;counter++)
+ 278   2                                      EEPROM_write_byte(0, 200+counter, KU_str[counter]);
+ 279   2                              break;
+ 280   2                              
+ 281   2              }
+ 282   1      }
+ 283          
+ 284          //håndtere udgående data fra PT5300 mainframe
+ 285          void pt5300_out_handle()
+ 286          {
+ 287   1              switch(in_buffer[0])
+ 288   1              {
+ 289   2                      ////////////////////////////////////////////////////////////////////////////
+ 290   2                      // Første læste I2C char over 100 = subadresse til udstreng, herefter læses
+ 291   2                      ////////////////////////////////////////////////////////////////////////////
+ 292   2      
+ 293   2                      // 100 = LTC A ud
+ 294   2                      case 100:
+ 295   2                              out_buffer_select=0;
+ 296   2                              break;
+ 297   2                      // 101 = LTC B ud
+ 298   2                      case 101:
+ 299   2                              out_buffer_select=1;
+ 300   2                              break;
+ 301   2                      // 105 = master status byte ud
+ 302   2                      case 105:
+ 303   2                              out_buffer_select=5;
+C51 COMPILER V7.05   PT5300_HANDLER                                                        02/14/2008 11:13:45 PAGE 6   
+
+ 304   2                              break;
+ 305   2                      // 106 = LTC request byte ud
+ 306   2                      case 106:
+ 307   2                              out_buffer_select=6;
+ 308   2                              break;
+ 309   2                      // 107 = LTC sync request byte ud
+ 310   2                      case 107:
+ 311   2                              out_buffer_select=7;
+ 312   2                              break;
+ 313   2                      // 108 = sommer/vintertid status
+ 314   2                      case 108: 
+ 315   2                              out_buffer_select=8;
+ 316   2                              break;
+ 317   2                      // 201 = SW version ud
+ 318   2                      case 201:
+ 319   2                              out_buffer_select=101;
+ 320   2                              break;
+ 321   2                      // 202 = KU nummer ud
+ 322   2                      case 202:
+ 323   2                              out_buffer_select=102;
+ 324   2              }
+ 325   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1065    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

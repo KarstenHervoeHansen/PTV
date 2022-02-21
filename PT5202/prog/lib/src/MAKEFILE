@@ -1,0 +1,64 @@
+#----------------------------------------------------------------------
+#- @(#)makefile	1.10	97/10/20
+#- Makefile for building libraries.
+#- 
+#- Usage: mkxa LIB=libname
+#-        mkxa LIB=libname clean
+#- 
+#- 	Build library specified by:
+#-         libname  name of the library file
+#- 
+#- 	Second form:
+#- 	Remove created files for specified library.
+#- 
+#- Examples:
+#- 	mkxa LIB=libcs
+#- 	mkxa LIB=libcs clean
+#----------------------------------------------------------------------
+
+TYPE =xa
+
+ifndef 	LIB
+all		: error
+else
+all		: libs
+endif
+
+SRCDIR		= .\\
+CP		= $(PRODDIR)\bin\ccxa -c++
+CC		= $(PRODDIR)\bin\ccxa -c
+MPP		= $(PRODDIR)\bin\mppxa
+AS		= $(PRODDIR)\bin\asxa
+AR		= $(PRODDIR)\bin\arxa
+MODULEDEFS	= $(TYPE)\$(LIB).mak
+OBJDIR		= $(TYPE)\$(LIB)
+OBJDIRSEP	= $(OBJDIR)\\
+LIBFILE		= $(TYPE)\$(LIB).a
+
+MKDIR		= mkdir
+DELTREE		= deltree -y
+DELFILE		= del
+
+include		  $(MODULEDEFS)
+
+libs		: $(OBJDIR) $(SEPOBJ) $(LIBFILE)
+
+$(LIBFILE)	: $(TARGOBJ)
+	$(AR)  -rv $@ -f <<EOF
+		$(separate "\n" $(match .obj $!))
+	EOF
+
+.PRECIOUS	: $(TYPEDIR) $(OBJDIR)
+
+$(TYPE)		:
+	$(nexist $(TYPE) $(MKDIR) $(TYPE))
+
+$(OBJDIR)	: $(TYPE)
+	$(nexist $(OBJDIR) $(MKDIR) $(OBJDIR))
+
+clean		:
+	-$(DELTREE) $(OBJDIR)
+	-$(DELFILE) $(LIBFILE)
+
+error		:
+	@echo please specify LIB (e.g. LIB=libcl)

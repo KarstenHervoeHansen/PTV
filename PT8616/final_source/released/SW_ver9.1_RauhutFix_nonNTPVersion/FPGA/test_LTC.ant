@@ -1,0 +1,120 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 1995-2007 Xilinx, Inc.
+// All Right Reserved.
+////////////////////////////////////////////////////////////////////////////////
+//   ____  ____ 
+//  /   /\/   / 
+// /___/  \  /    Vendor: Xilinx 
+// \   \   \/     Version : 9.2.03i
+//  \   \         Application : ISE
+//  /   /         Filename : test_LTC.ant
+// /___/   /\     Timestamp : Thu Jan 24 15:14:29 2008
+// \   \  /  \ 
+//  \___\/\___\ 
+//
+//Command: 
+//Design Name: test_LTC
+//Device: Xilinx
+//
+`timescale 1ns/1ps
+
+module test_LTC;
+    reg [7:0] hours_i = 8'b00000000;
+    reg [7:0] mins_i = 8'b00000000;
+    reg [7:0] secs_i = 8'b00000000;
+    reg [7:0] frames_i = 8'b00000000;
+    reg [31:0] delay_i = 32'b00000000000000000000000000000000;
+    reg dropframe_i = 1'b0;
+    reg [1:0] format_select_i = 2'b00;
+    reg sync_i = 1'b0;
+    reg clk_i = 1'b0;
+    wire debug_o;
+    wire ltc_code_o;
+
+    parameter PERIOD = 200;
+    parameter real DUTY_CYCLE = 0.5;
+    parameter OFFSET = 100;
+
+    initial    // Clock process for clk_i
+    begin
+        #OFFSET;
+        forever
+        begin
+            clk_i = 1'b0;
+            #(PERIOD-(PERIOD*DUTY_CYCLE)) clk_i = 1'b1;
+            #(PERIOD*DUTY_CYCLE);
+        end
+    end
+
+    LTC_generator UUT (
+        .hours_i(hours_i),
+        .mins_i(mins_i),
+        .secs_i(secs_i),
+        .frames_i(frames_i),
+        .delay_i(delay_i),
+        .dropframe_i(dropframe_i),
+        .format_select_i(format_select_i),
+        .sync_i(sync_i),
+        .clk_i(clk_i),
+        .debug_o(debug_o),
+        .ltc_code_o(ltc_code_o));
+
+    integer TX_FILE = 0;
+    integer TX_ERROR = 0;
+    
+    initial begin    // Annotation process for clock clk_i
+        #0;
+        ANNOTATE_debug_o;
+        ANNOTATE_ltc_code_o;
+        #OFFSET;
+        forever begin
+            #115;
+            ANNOTATE_debug_o;
+            ANNOTATE_ltc_code_o;
+            #85;
+        end
+    end
+
+    initial begin  // Open the annotations file...
+        TX_FILE = $fopen("\\\\wts\\data1\\PT8616\\final_source\\FPGA\\test_LTC.ano");
+        #1200 // Final time:  1200 ns
+        $display("Success! Annotation Simulation Complete.");
+        $fdisplay(TX_FILE, "Total[%d]", TX_ERROR);
+        $fclose(TX_FILE);
+        $finish;
+    end
+
+    initial begin
+        // -------------  Current Time:  100ns
+        #100;
+        secs_i = 8'b01011001;
+        frames_i = 8'b00100010;
+        // -------------------------------------
+        // -------------  Current Time:  185ns
+        #85;
+        sync_i = 1'b1;
+        // -------------------------------------
+        // -------------  Current Time:  385ns
+        #200;
+        sync_i = 1'b0;
+        // -------------------------------------
+    end
+
+    task ANNOTATE_debug_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,debug_o,%b]", $time, debug_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_ltc_code_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,ltc_code_o,%b]", $time, ltc_code_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+endmodule
+

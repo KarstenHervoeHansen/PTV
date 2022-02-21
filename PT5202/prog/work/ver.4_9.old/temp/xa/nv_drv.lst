@@ -1,0 +1,1223 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+C:\LT428\work\ver.4_9\temp\xa\nv_drv.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\LT428\rtxc\xa\include -I. -Ml
+                          3 ;          -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    NV_DRV
+                         10 ; nv_drv.c    1 
+                         11 ; nv_drv.c    2 #include "define.h"
+                         14 ; nv_drv.c    3 #include "nv_drv.h"
+                         18 ; nv_drv.c    4 
+                         19 ; nv_drv.c    5 #ifdef __BORLANDC__
+                         20 ; nv_drv.c    6  #include <stdio.h>
+                         21 ; nv_drv.c    7 #endif
+                         22 ; nv_drv.c    8 
+                         23 ; nv_drv.c    9 /* Write array of bytes from RAM 'source' to Non-volatile back up 'dest' */
+                         24 ; nv_drv.c   10 /* Writing includes checksum update and two copies in bytewide NV-RAM    */
+                         25 ; nv_drv.c   11 /* Calling modules needs to allocate NV-memory with a total of 4 times   */
+                         26 ; nv_drv.c   12 /* the required datastorage plus 4 times the checksum size */
+                         27 ; nv_drv.c   13 
+                         28 ; nv_drv.c   14 
+                         29 ; nv_drv.c   15 /* Memory allocation in nonvolatile RAM         */
+                         30 ; nv_drv.c   16 /* Start address fixed in HW (PC fixed or file) */
+                         31 ; nv_drv.c   17 
+                         32 ; nv_drv.c   18 /* In the top of the memory som fixed locations are used :*/
+                         33 ; nv_drv.c   19 /* Real time clock (HW ) */
+                         34 ; nv_drv.c   20 /* Some housekeping data with fixed allocation 
+                         35 ; nv_drv.c   21    (only accessed via function calls)          */
+                         36 ; nv_drv.c   22    
+                         37 ; nv_drv.c   23 /* The bottom part is used as array of events  */
+                         38 ; nv_drv.c   24 
+                         39 ; nv_drv.c   25 
+                         40 ; nv_drv.c   26 /* NV ram is 32 kbytes excluding 16 bytes reserved for HW RTC */
+                         41 ; nv_drv.c   27 #define NV_size ((NvPointer)8*1024-16)
+                         42 ; nv_drv.c   28 
+                         43 ; nv_drv.c   29 // Allocation definitions
+                         44 ; nv_drv.c   30 #define NV_time (NV_size-16)
+                         45 ; nv_drv.c   31 
+                         46 ; nv_drv.c   32 
+                         47 ; nv_drv.c   33 /* Checksum related definitions */
+                         48 ; nv_drv.c   34 /* By changing CheckBase you can force all checksums i NV to fail */
+                         49 ; nv_drv.c   35 
+                         50 ; nv_drv.c   36 typedef UI CheckType ;
+                         51 ; nv_drv.c   37 
+                         52 ; nv_drv.c   38 #define CheckSumSize sizeof(CheckType)
+                         53 ; nv_drv.c   39 #define CheckBase  0x1234
+                         55 ; nv_drv.c   40 
+                         56 ; nv_drv.c   41 /* prototype of checksum calculator */
+                         57 ; nv_drv.c   42 static CheckType CheckUpdate(CheckType sum,UC data);
+                         58 ; nv_drv.c   43 
+                         59 ; nv_drv.c   44 /* Define pointer-type used as reference to NV_array*/
+                         60 ; nv_drv.c   45 /* ( done in .h file ) */
+                         61 ; nv_drv.c   46 
+                         62 ; nv_drv.c   47 /* declare  struct occupying 16 bits */
+                         63 ; nv_drv.c   48 typedef struct halfwidth
+                         64 ; nv_drv.c   49 {
+                         65 ; nv_drv.c   50    UC low;
+                         66 ; nv_drv.c   51 // borland does not like array of 64 kbytes
+                         67 ; nv_drv.c   52 #ifndef __BORLANDC__
+                         68 ; nv_drv.c   53    UC high;
+                         69 ; nv_drv.c   54 #endif
+                         70 ; nv_drv.c   55 
+                         71 ; nv_drv.c   56 }  NvByte;
+                         72 ; nv_drv.c   57 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         73 ; nv_drv.c   58 
+                         74 ; nv_drv.c   59 #ifdef __BORLANDC__
+                         75 ; nv_drv.c   60 static far NvByte NV_array[NV_size];
+                         76 ; nv_drv.c   61 #else
+                         81 ; nv_drv.c   62 static NvByte NV_array[NV_size] _at (0x80000) ;
+                         82 ; nv_drv.c   63 #endif
+                         83 ; nv_drv.c   64 
+                         84 ; nv_drv.c   65 //  Addressing : NV_array[Nvpointer].low
+                         85 ; nv_drv.c   66 
+                         86 ; nv_drv.c   67 
+                         87 ; nv_drv.c   68 #define First_nv        0
+                         88 ; nv_drv.c   69 /* Zero used as null pointer, allocation error => dont start alloc @ 0 */
+                         89 ; nv_drv.c   70 
+                         90 ; nv_drv.c   71 
+                         91 ; nv_drv.c   72 
+                         92 ; nv_drv.c   73 #define AllocateStart   ( EventLogStart + EventLogSize)
+                         93 ; nv_drv.c   74 #define AllocateEnd     ( NV_time-1)
+                         94 ; nv_drv.c   75 
+                         95 ; nv_drv.c   76 #if ( AllocateStart > 20000)
+                         96 ; nv_drv.c   77 #Not space for NV items
+                         97 ; nv_drv.c   78 #endif
+                         98 ; nv_drv.c   79 
+                         99 ; nv_drv.c   80 // Layout of fixed data
+                        100 ; nv_drv.c   81 
+                        101 ; nv_drv.c   82 // Eventlog definitions
+                        102 ; nv_drv.c   83 // Two pointers to eventlog
+                        103 ; nv_drv.c   84 
+                        104 ; nv_drv.c   85 // Pointers to nonvolatile variables for eventlog :
+                        105 ; nv_drv.c   86 //static NvPointer FirstEventP,CountEventP;
+                        106 ; nv_drv.c   87 // Volatile memory locations :
+                        107 ; nv_drv.c   88 //static UI        FirstEvent,CountEvent;
+                        108 ; nv_drv.c   89 
+                        109 ; nv_drv.c   90 // allocation pointer
+                        110 ; nv_drv.c   91 static NvPointer AllocTop;
+                        111 ; nv_drv.c   92 
+                        112 ; nv_drv.c   93 #ifdef __BORLANDC__
+                        113 ; nv_drv.c   94 FILE* fp;
+                        114 ; nv_drv.c   95 #endif
+                        115 ; nv_drv.c   96 
+                        116 ; nv_drv.c   97 /**************************************************************************/
+                        117 ; nv_drv.c   98 /* NV_Init                                                                       
+                                                                                                                             
+                                                                       NV_DRV.C     */
+                        118 ; nv_drv.c   99 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        119 ; nv_drv.c  100 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                        120 ; nv_drv.c  101 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        121 ; nv_drv.c  102 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        122 ; nv_drv.c  103 /* Function:    Initialise NV RAM hardware                                       
+                                                                                                                            *
+                            /
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        123 ; nv_drv.c  104 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        124 ; nv_drv.c  105 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        125 ; nv_drv.c  106 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        126 ; nv_drv.c  107 /**************************************************************************/
+                        127 ; nv_drv.c  108 int NV_Init( void)
+                        128 ; nv_drv.c  109 {
+000000                  129 NV_DRV_PR       SEGMENT HCODE
+000000                  130         RSEG    NV_DRV_PR
+                        131         ALIGN   1
+                        133         PUBLIC  _NV_Init
+000000                  134 _NV_Init:
+                        138 ; nv_drv.c  110         // PC version : load NV file ?
+                        139 ; nv_drv.c  111 
+                        140 ; nv_drv.c  112   // Allocate fixed part of nv_ram
+                        141 ; nv_drv.c  113   // Reset allocation pointers, REQUIRED before any allocation
+                        142 ; nv_drv.c  114   AllocTop = AllocateStart;
+000000 964842rr         144         MOV.B   ES,#SEG( _AllocTop )
+000004 9908rrrr         145         MOV.W   R0,#SOF( _AllocTop )
+000008 9A080FA0         146         MOV.W   [R0],#0FA0H
+                        147 ; nv_drv.c  115 
+                        148 ; nv_drv.c  116   // Allocation has to be in the same order if NV readings
+                        149 ; nv_drv.c  117   // are supposed to be identical to earlier writes
+                        150 ; nv_drv.c  118 
+                        151 ; nv_drv.c  119 #ifdef __BORLANDC__
+                        152 ; nv_drv.c  120 
+                        153 ; nv_drv.c  121         if (( fp = fopen( "NV.dat", "rb")) == NULL)
+                        154 ; nv_drv.c  122         {
+                        155 ; nv_drv.c  123         fp = fopen( "NV.dat", "wb");    
+                        156 ; nv_drv.c  124                 fwrite( &NV_array, NV_size, 1, fp);
+                        157 ; nv_drv.c  125         }
+                        158 ; nv_drv.c  126         else
+                        159 ; nv_drv.c  127                 fread( &NV_array, NV_size, 1, fp);
+                        160 ; nv_drv.c  128                 fclose( fp);
+                        161 ; nv_drv.c  129 
+                        162 ; nv_drv.c  130 #endif
+                        163 ; nv_drv.c  131 
+                        164 ; nv_drv.c  132         return( OK);
+00000C 9908FFFF         166         MOV.W   R0,#0FFFFH
+                        167 ; nv_drv.c  133 }
+000010 D680             169         RET
+                        171 ; nv_drv.c  134 
+                        172 ; nv_drv.c  135 /**************************************************************************/
+                        173 ; nv_drv.c  136 /* NV_AllocP                                                                     
+                                                                                                                             
+                                                               NV_DRV.C     */
+                        174 ; nv_drv.c  137 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        175 ; nv_drv.c  138 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                        176 ; nv_drv.c  139 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        177 ; nv_drv.c  140 /*                                                                               
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                             
+                                            */
+                        178 ; nv_drv.c  141 /* Function:    Allocate preset memories using allocP                            
+                                                                                            */
+                        179 ; nv_drv.c  142 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        180 ; nv_drv.c  143 /* Returns:             NvPointer to allocated preset if ram available, otherwise
+                                    */
+                        181 ; nv_drv.c  144 /*                                              NvNull                           
+                                                                                                                             
+                                                                                                                    */
+                        182 ; nv_drv.c  145 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        183 ; nv_drv.c  146 /**************************************************************************/
+                        184 ; nv_drv.c  147 NvPointer NV_AllocP( int numbytes)
+                        185 ; nv_drv.c  148 {
+                        186         ALIGN   1
+                        188         PUBLIC  _NV_AllocP
+000012                  189 _NV_AllocP:
+000012 8920             194         MOV.W   R2,R0
+                        200 ; nv_drv.c  149         NvPointer loc;
+                        201 ; nv_drv.c  150 
+                        202 ; nv_drv.c  151         loc = AllocTop;
+000014 964842rr         204         MOV.B   ES,#SEG( _AllocTop )
+000018 9918rrrr         205         MOV.W   R1,#SOF( _AllocTop )
+00001C 8A11             206         MOV.W   R1,[R1]
+00001E 8931             207         MOV.W   R3,R1
+                        209 ; nv_drv.c  152 
+                        210 ; nv_drv.c  153         if ( AllocTop + numbytes + CheckSumSize <= AllocateEnd )
+000020 0912             212         ADD.W   R1,R2
+000022 8901             213         MOV.W   R0,R1
+000024 A902             214         ADDS.W  R0,#02H
+000026 99041FDF         215         CMP.W   R0,#01FDFH
+00002A F806             216         BG      _3
+                        217 ; nv_drv.c  154         {
+                        218 ; nv_drv.c  155         AllocTop = AllocTop + numbytes + CheckSumSize;
+00002C 964842rr         220         MOV.B   ES,#SEG( _AllocTop )
+000030 9918rrrr         221         MOV.W   R1,#SOF( _AllocTop )
+000034 8A09             222         MOV.W   [R1],R0
+                        223 ; nv_drv.c  156         }       
+000036 FE01             225         BR      _4
+000036 FE01             225         BR      _4
+000038                  226 _3:
+                        227 ; nv_drv.c  157         else
+                        228 ; nv_drv.c  158         {
+                        229 ; nv_drv.c  159         // Allocation error
+                        230 ; nv_drv.c  160                 loc = NvNull;
+000038 B930             232         MOV.W   R3,#00H
+                        235 ; nv_drv.c  161         }
+00003A                  237 _4:
+                        238 ; nv_drv.c  162 
+                        239 ; nv_drv.c  163         return( loc);
+00003A 8903             241         MOV.W   R0,R3
+                        244 ; nv_drv.c  164 }
+00003C D680             246         RET
+                        250 ; nv_drv.c  165 
+                        251 ; nv_drv.c  166 /**************************************************************************/
+                        252 ; nv_drv.c  167 /* NV_Alloc                                                                      
+                                                                                                                             
+                                                                       NV_DRV.C     */
+                        253 ; nv_drv.c  168 /*                                                                               
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        254 ; nv_drv.c  169 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                        255 ; nv_drv.c  170 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        256 ; nv_drv.c  171 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        257 ; nv_drv.c  172 /* Function:    Allocate memory for storing data with double & checksum          
+                                    */
+                        258 ; nv_drv.c  173 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        259 ; nv_drv.c  174 /* Returns:             NvPointer to allocated preset if ram available, otherwise
+                                    */
+                        260 ; nv_drv.c  175 /*                                              NvNull                           
+                                                                                                                             
+                                                                                                                    */
+                        261 ; nv_drv.c  176 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        262 ; nv_drv.c  177 /**************************************************************************/
+                        263 ; nv_drv.c  178 NvPointer NV_Alloc( int numbytes)
+                        264 ; nv_drv.c  179 {
+                        265         ALIGN   1
+                        267         PUBLIC  _NV_Alloc
+00003E                  268 _NV_Alloc:
+00003E 8920             273         MOV.W   R2,R0
+                        279 ; nv_drv.c  180         NvPointer loc;
+                        280 ; nv_drv.c  181 
+                        281 ; nv_drv.c  182         loc = AllocTop;
+000040 964842rr         283         MOV.B   ES,#SEG( _AllocTop )
+000044 9918rrrr         284         MOV.W   R1,#SOF( _AllocTop )
+000048 8A11             285         MOV.W   R1,[R1]
+00004A 8931             286         MOV.W   R3,R1
+                        288 ; nv_drv.c  183 
+                        289 ; nv_drv.c  184         if ( AllocTop + 2*numbytes + 2*CheckSumSize <= AllocateEnd )
+00004C D921             291         ASL.W   R2,#01H
+00004E 0912             293         ADD.W   R1,R2
+000050 8901             294         MOV.W   R0,R1
+000052 A904             295         ADDS.W  R0,#04H
+000054 99041FDF         296         CMP.W   R0,#01FDFH
+000058 F806             297         BG      _6
+                        298 ; nv_drv.c  185         {
+                        299 ; nv_drv.c  186         AllocTop = AllocTop+2*numbytes+2*CheckSumSize;
+00005A 964842rr         301         MOV.B   ES,#SEG( _AllocTop )
+00005E 9918rrrr         302         MOV.W   R1,#SOF( _AllocTop )
+000062 8A09             303         MOV.W   [R1],R0
+                        304 ; nv_drv.c  187         }       
+000064 FE01             306         BR      _7
+000064 FE01             306         BR      _7
+000066                  307 _6:
+                        308 ; nv_drv.c  188         else
+                        309 ; nv_drv.c  189         {
+                        310 ; nv_drv.c  190         // Allocation error
+                        311 ; nv_drv.c  191         loc = NvNull;
+000066 B930             313         MOV.W   R3,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        316 ; nv_drv.c  192         }
+000068                  318 _7:
+                        319 ; nv_drv.c  193 
+                        320 ; nv_drv.c  194         return( loc);
+000068 8903             322         MOV.W   R0,R3
+                        325 ; nv_drv.c  195 }
+00006A D680             327         RET
+                        330 ; nv_drv.c  196 
+                        331 ; nv_drv.c  197 /**************************************************************************/
+                        332 ; nv_drv.c  198 /* NV_Write                                                                      
+                                                                                                                             
+                                                                       NV_DRV.C     */
+                        333 ; nv_drv.c  199 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        334 ; nv_drv.c  200 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                        335 ; nv_drv.c  201 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        336 ; nv_drv.c  202 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        337 ; nv_drv.c  203 /* Function:    Store item in NV memory                                          
+                                                                                                                             
+                                    */
+                        338 ; nv_drv.c  204 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        339 ; nv_drv.c  205 /* Returns:             OK only                                                  
+                                                                                                                             
+                                                                                            */
+                        340 ; nv_drv.c  206 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        341 ; nv_drv.c  207 /**************************************************************************/
+                        342 ; nv_drv.c  208 int NV_Write( void *source, NvPointer dest, int bytes)
+                        343 ; nv_drv.c  209 {
+                        344         ALIGN   1
+                        346         PUBLIC  _NV_Write
+00006C                  347 _NV_Write:
+00006C 0F70             353         PUSH.W  R4, R5, R6
+00006E 9972000E         355         SUB.W   R7,#0EH
+000072 8C2F06           360         MOV.W   [R7+6],R2
+                        369 ; nv_drv.c  210         int i;
+                        370 ; nv_drv.c  211         UI checksum = CheckBase;
+000075 9C780C1234       372         MOV.W   [R7+12],#01234H
+                        377 ; nv_drv.c  212         UC *src_point = source;
+00007A 8C1F0A           379         MOV.W   [R7+10],R1
+00007D 8C0F08           380         MOV.W   [R7+8],R0
+000080 8951             381         MOV.W   R5,R1
+000082 8940             382         MOV.W   R4,R0
+                        386 ; nv_drv.c  213 
+                        387 ; nv_drv.c  214         for ( i = 0; i < bytes; i++, dest++, src_point++)
+000084 B960             389         MOV.W   R6,#00H
+000086 8C3F04           391         MOV.W   [R7+4],R3
+000089 99340000         392         CMP.W   R3,#00H
+00008D FD1D             395         BLE     _10
+00008D FD1D00           395         BLE     _10
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+000090                  396 _9:
+                        397 ; nv_drv.c  215   {
+                        398 ; nv_drv.c  216         NV_array[dest].low = *src_point;
+000090 86AC42           400         MOV.B   ES,R5L
+000093 8204             401         MOV.B   R0L,[R4]
+000095 8C1706           402         MOV.W   R1,[R7+6]
+000098 D911             403         ASL.W   R1,#01H
+00009A 8921             404         MOV.W   R2,R1
+00009C B930             405         MOVS.W  R3,#00H
+00009E 96484208         406         MOV.B   ES,#SEG( _NV_array )
+0000A2 850A0000         407         MOV.B   [R2+SOF( _NV_array )],R0L
+                        408 ; nv_drv.c  217                 checksum = CheckUpdate( checksum, *src_point);
+0000A6 8C070C           410         MOV.W   R0,[R7+12]
+0000A9 86AC42           411         MOV.B   ES,R5L
+0000AC 8224             412         MOV.B   R1L,[R4]
+0000AE C5020F           413         CALL    _CheckUpdate
+0000B1 8C0F0C           414         MOV.W   [R7+12],R0
+0000B4 A961             416         ADDS.W  R6,#01H
+0000B6 8C0706           419         MOV.W   R0,[R7+6]
+0000B9 A901             420         ADDS.W  R0,#01H
+0000BB 8C0F06           424         MOV.W   [R7+6],R0
+0000BE 99400001         426         ADD.W   R4,#01H
+0000C2 4C6704           429         CMP.W   R6,[R7+4]
+0000C5 FBE5             430         BLT     _9
+                        431 ; nv_drv.c  218         }
+0000C8                  433 _10:
+                        434 ; nv_drv.c  219 
+                        435 ; nv_drv.c  220         src_point =(UC*)&checksum;
+0000C8 91A8rr           437         MOV.B   R5L,#SEG( __lc_bs )
+0000CB 71BB             438         XOR.B   R5H,R5H
+0000CD 40470C           439         LEA     R4,R7+12
+0000D0 8915             441         MOV.W   R1,R5
+0000D2 8904             442         MOV.W   R0,R4
+                        444 ; nv_drv.c  221         NV_array[dest++].low = *src_point;
+0000D4 8951             446         MOV.W   R5,R1
+0000D6 8940             447         MOV.W   R4,R0
+0000D8 862C42           448         MOV.B   ES,R1L
+0000DB 8260             449         MOV.B   R3L,[R0]
+0000DD 8C2706           452         MOV.W   R2,[R7+6]
+0000E0 D921             453         ASL.W   R2,#01H
+0000E2 8902             454         MOV.W   R0,R2
+0000E4 B910             455         MOVS.W  R1,#00H
+0000E6 96484208         456         MOV.B   ES,#SEG( _NV_array )
+0000EA 85680000         457         MOV.B   [R0+SOF( _NV_array )],R3L
+0000EE 8C2706           458         MOV.W   R2,[R7+6]
+0000F1 A921             459         ADDS.W  R2,#01H
+                        464 ; nv_drv.c  222 
+                        465 ; nv_drv.c  223         src_point++;
+0000F3 8915             467         MOV.W   R1,R5
+0000F5 8904             468         MOV.W   R0,R4
+0000F7 99000001         469         ADD.W   R0,#01H
+                        474 ; nv_drv.c  224         NV_array[dest++].low = *src_point;
+0000FB 862C42           476         MOV.B   ES,R1L
+0000FE 8220             477         MOV.B   R1L,[R0]
+000100 8902             479         MOV.W   R0,R2
+000102 D901             480         ASL.W   R0,#01H
+000104 8940             481         MOV.W   R4,R0
+000106 B950             482         MOVS.W  R5,#00H
+000108 96484208         483         MOV.B   ES,#SEG( _NV_array )
+00010C 852C0000         484         MOV.B   [R4+SOF( _NV_array )],R1L
+000110 A921             485         ADDS.W  R2,#01H
+000112 8962             487         MOV.W   R6,R2
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        490 ; nv_drv.c  225 
+                        491 ; nv_drv.c  226         /* Repeat for 2nd copy without recalculating checksum */
+                        492 ; nv_drv.c  227   src_point = source;
+000114 8C370A           494         MOV.W   R3,[R7+10]
+000117 8C2708           495         MOV.W   R2,[R7+8]
+                        500 ; nv_drv.c  228   for ( i = 0; i < bytes; i++, dest++, src_point++)
+00011A B900             502         MOV.W   R0,#00H
+00011C 9C74040000       504         CMP.W   [R7+4],#00H
+000121 FD17             505         BLE     _12
+000121 FD1700           505         BLE     _12
+000124                  506 _11:
+                        507 ; nv_drv.c  229   {
+                        508 ; nv_drv.c  230         NV_array[dest].low = *src_point;
+000124 8C3F02           510         MOV.W   [R7+2],R3
+000127 8A2F             511         MOV.W   [R7],R2
+000129 866C42           512         MOV.B   ES,R3L
+00012C 8282             513         MOV.B   R4L,[R2]
+00012E 8916             516         MOV.W   R1,R6
+000130 D911             517         ASL.W   R1,#01H
+000132 8921             518         MOV.W   R2,R1
+000134 B930             519         MOVS.W  R3,#00H
+000136 96484208         520         MOV.B   ES,#SEG( _NV_array )
+00013A 858A0000         521         MOV.B   [R2+SOF( _NV_array )],R4L
+00013E A901             523         ADDS.W  R0,#01H
+000140 A961             526         ADDS.W  R6,#01H
+000142 8C3702           529         MOV.W   R3,[R7+2]
+000145 8A27             530         MOV.W   R2,[R7]
+000147 99200001         531         ADD.W   R2,#01H
+00014B 4C0704           536         CMP.W   R0,[R7+4]
+00014E FBEA             537         BLT     _11
+                        538 ; nv_drv.c  231         }
+000150                  540 _12:
+                        541 ; nv_drv.c  232 
+                        542 ; nv_drv.c  233   src_point = (UC*)&checksum;
+000150 9128rr           544         MOV.B   R1L,#SEG( __lc_bs )
+000153 7133             545         XOR.B   R1H,R1H
+000155 40070C           546         LEA     R0,R7+12
+                        550 ; nv_drv.c  234         NV_array[dest++].low = *src_point;
+000158 862C42           552         MOV.B   ES,R1L
+00015B 8240             553         MOV.B   R2L,[R0]
+00015D 8936             554         MOV.W   R3,R6
+00015F D931             555         ASL.W   R3,#01H
+000161 8943             556         MOV.W   R4,R3
+000163 B950             557         MOVS.W  R5,#00H
+000165 96484208         558         MOV.B   ES,#SEG( _NV_array )
+000169 854C0000         559         MOV.B   [R4+SOF( _NV_array )],R2L
+00016D A961             560         ADDS.W  R6,#01H
+                        563 ; nv_drv.c  235 
+                        564 ; nv_drv.c  236         src_point++;
+00016F 99000001         566         ADD.W   R0,#01H
+                        569 ; nv_drv.c  237         NV_array[dest++].low = *src_point;
+000173 862C42           571         MOV.B   ES,R1L
+000176 8200             572         MOV.B   R0L,[R0]
+000178 D961             574         ASL.W   R6,#01H
+00017A 8926             576         MOV.W   R2,R6
+00017C B930             577         MOVS.W  R3,#00H
+00017E 96484208         578         MOV.B   ES,#SEG( _NV_array )
+000182 850A0000         579         MOV.B   [R2+SOF( _NV_array )],R0L
+                        580 ; nv_drv.c  238 
+                        581 ; nv_drv.c  239         return( OK);
+000186 9908FFFF         583         MOV.W   R0,#0FFFFH
+                        584 ; nv_drv.c  240 }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+00018A 9970000E         586         ADD.W   R7,#0EH
+00018E 2F70             588         POP.W   R4, R5, R6
+000190 D680             590         RET
+                        593 ; nv_drv.c  241 
+                        594 ; nv_drv.c  242 /**************************************************************************/
+                        595 ; nv_drv.c  243 /* NV_Read                                                                       
+                                                                                                                             
+                                                                       NV_DRV.C     */
+                        596 ; nv_drv.c  244 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        597 ; nv_drv.c  245 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                        598 ; nv_drv.c  246 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        599 ; nv_drv.c  247 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        600 ; nv_drv.c  248 /* Function:    Read item from NV memory                                         
+                                                                                                                             
+                                    */
+                        601 ; nv_drv.c  249 /* Remarks:             If 1st item fails and the 2nd item is allright, the 2nd  
+                                            */
+                        602 ; nv_drv.c  250 /*                                              item will be copied to the 1st it
+                            em                                                                                               
+                                    */
+                        603 ; nv_drv.c  251 /* Returns:             FAIL if both 1st & 2nd copy     checksum test fails other
+                            wise            */
+                        604 ; nv_drv.c  252 /*                                              OK                               
+                                                                                                                             
+                                                                                                                             
+                                    */
+                        605 ; nv_drv.c  253 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        606 ; nv_drv.c  254 /**************************************************************************/
+                        607 ; nv_drv.c  255 int NV_Read( void *dest, NvPointer source, int bytes)
+                        608 ; nv_drv.c  256 {
+                        609         ALIGN   1
+                        611         PUBLIC  _NV_Read
+000192                  612 _NV_Read:
+000192 0F70             616         PUSH.W  R4, R5, R6
+000194 9972000E         618         SUB.W   R7,#0EH
+000198 8C1F08           622         MOV.W   [R7+8],R1
+00019B 8C0F06           623         MOV.W   [R7+6],R0
+                        634 ; nv_drv.c  257         int i;
+                        635 ; nv_drv.c  258         CheckType testsum, checksum = CheckBase;
+00019E 9C78041234       637         MOV.W   [R7+4],#01234H
+0001A3 8C0704           639         MOV.W   R0,[R7+4]
+                        644 ; nv_drv.c  259         UC *dst_point ;
+                        645 ; nv_drv.c  260         
+                        646 ; nv_drv.c  261         NvPointer srcP = source;
+0001A6 8C2F0A           648         MOV.W   [R7+10],R2
+0001A9 8952             649         MOV.W   R5,R2
+                        651 ; nv_drv.c  262 
+                        652 ; nv_drv.c  263         // Checksum test
+                        653 ; nv_drv.c  264         for ( i = 0; i < bytes; i++, srcP++)
+0001AB B940             655         MOV.W   R4,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+0001AD 8963             657         MOV.W   R6,R3
+0001AF 99640000         658         CMP.W   R6,#00H
+0001B3 FD12             661         BLE     _18
+0001B3 FD1200           661         BLE     _18
+0001B6                  662 _17:
+                        663 ; nv_drv.c  265         {
+                        664 ; nv_drv.c  266         //*dst_point =NV_array[source].low;
+                        665 ; nv_drv.c  267     checksum = CheckUpdate( checksum, NV_array[srcP].low);
+0001B6 8915             667         MOV.W   R1,R5
+0001B8 D911             668         ASL.W   R1,#01H
+0001BA 8921             669         MOV.W   R2,R1
+0001BC B930             670         MOVS.W  R3,#00H
+0001BE 96484208         671         MOV.B   ES,#SEG( _NV_array )
+0001C2 85220000         672         MOV.B   R1L,[R2+SOF( _NV_array )]
+0001C6 8C0704           673         MOV.W   R0,[R7+4]
+0001C9 C50181           674         CALL    _CheckUpdate
+0001CC 8C0F04           678         MOV.W   [R7+4],R0
+0001CF A941             681         ADDS.W  R4,#01H
+0001D1 A951             684         ADDS.W  R5,#01H
+0001D3 4946             687         CMP.W   R4,R6
+0001D5 FBF0             688         BLT     _17
+                        689 ; nv_drv.c  268         }
+0001D8                  691 _18:
+                        692 ; nv_drv.c  269         dst_point =(UC*)&testsum;
+0001D8 9168rr           694         MOV.B   R3L,#SEG( __lc_bs )
+0001DB 7177             695         XOR.B   R3H,R3H
+0001DD 40270C           696         LEA     R2,R7+12
+                        698 ; nv_drv.c  270         *dst_point = NV_array[srcP++].low;
+0001E0 8915             700         MOV.W   R1,R5
+0001E2 D911             701         ASL.W   R1,#01H
+0001E4 8901             702         MOV.W   R0,R1
+0001E6 B910             703         MOVS.W  R1,#00H
+0001E8 96484208         704         MOV.B   ES,#SEG( _NV_array )
+0001EC 85000000         705         MOV.B   R0L,[R0+SOF( _NV_array )]
+0001F0 866C42           706         MOV.B   ES,R3L
+0001F3 820A             707         MOV.B   [R2],R0L
+0001F5 A951             708         ADDS.W  R5,#01H
+                        711 ; nv_drv.c  271 
+                        712 ; nv_drv.c  272         dst_point++;
+0001F7 99200001         714         ADD.W   R2,#01H
+                        717 ; nv_drv.c  273         *dst_point = NV_array[srcP++].low;
+0001FB 8915             719         MOV.W   R1,R5
+0001FD D911             720         ASL.W   R1,#01H
+0001FF 8901             721         MOV.W   R0,R1
+000201 B910             722         MOVS.W  R1,#00H
+000203 96484208         723         MOV.B   ES,#SEG( _NV_array )
+000207 85000000         724         MOV.B   R0L,[R0+SOF( _NV_array )]
+00020B 866C42           725         MOV.B   ES,R3L
+00020E 820A             726         MOV.B   [R2],R0L
+000210 A951             727         ADDS.W  R5,#01H
+                        730 ; nv_drv.c  274 
+                        731 ; nv_drv.c  275         if (testsum != checksum)
+000212 8C1704           733         MOV.W   R1,[R7+4]
+000215 8C070C           734         MOV.W   R0,[R7+12]
+000218 4901             735         CMP.W   R0,R1
+                        738         BEQ     _24
+00021A F202            +738 ;       BNE     _LG_16
+00021C D50093          +738 ;       JMP.L   _24
+00021C D5009300        +738 ;       JMP.L   _24
+000220                 +738 _LG_16:
+                        739 ; nv_drv.c  276         {
+                        740 ; nv_drv.c  277                 // test 2nd copy
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        741 ; nv_drv.c  278           checksum = CheckBase;
+000220 9C78041234       743         MOV.W   [R7+4],#01234H
+000225 8C0704           746         MOV.W   R0,[R7+4]
+                        747 ; nv_drv.c  279 
+                        748 ; nv_drv.c  280                 // Checksum test
+                        749 ; nv_drv.c  281           for ( i = 0; i < bytes; i++, srcP++)
+000228 B940             751         MOV.W   R4,#00H
+00022A 99640000         754         CMP.W   R6,#00H
+00022E FD11             755         BLE     _20
+00022E FD11             755         BLE     _20
+000230                  756 _19:
+                        757 ; nv_drv.c  282                 {
+                        758 ; nv_drv.c  283                 //*dst_point =NV_array[source].low;
+                        759 ; nv_drv.c  284             checksum = CheckUpdate( checksum, NV_array[srcP].low);
+000230 8915             761         MOV.W   R1,R5
+000232 D911             762         ASL.W   R1,#01H
+000234 8921             763         MOV.W   R2,R1
+000236 B930             764         MOVS.W  R3,#00H
+000238 96484208         766         MOV.B   ES,#SEG( _NV_array )
+00023C 85220000         767         MOV.B   R1L,[R2+SOF( _NV_array )]
+000240 8C0704           768         MOV.W   R0,[R7+4]
+000243 C50144           769         CALL    _CheckUpdate
+000246 8C0F04           773         MOV.W   [R7+4],R0
+000249 A941             776         ADDS.W  R4,#01H
+00024B A951             779         ADDS.W  R5,#01H
+00024D 4946             782         CMP.W   R4,R6
+00024F FBF0             783         BLT     _19
+                        784 ; nv_drv.c  285                 }
+000252                  786 _20:
+                        787 ; nv_drv.c  286           dst_point = (UC*)&testsum;
+000252 9168rr           789         MOV.B   R3L,#SEG( __lc_bs )
+000255 7177             790         XOR.B   R3H,R3H
+000257 40270C           791         LEA     R2,R7+12
+                        793 ; nv_drv.c  287           *dst_point = NV_array[srcP++].low;
+00025A 8915             795         MOV.W   R1,R5
+00025C D911             796         ASL.W   R1,#01H
+00025E 8901             797         MOV.W   R0,R1
+000260 B910             798         MOVS.W  R1,#00H
+000262 96484208         799         MOV.B   ES,#SEG( _NV_array )
+000266 85000000         800         MOV.B   R0L,[R0+SOF( _NV_array )]
+00026A 866C42           801         MOV.B   ES,R3L
+00026D 820A             802         MOV.B   [R2],R0L
+00026F A951             803         ADDS.W  R5,#01H
+                        806 ; nv_drv.c  288 
+                        807 ; nv_drv.c  289           dst_point++;
+000271 99200001         809         ADD.W   R2,#01H
+                        812 ; nv_drv.c  290           *dst_point = NV_array[srcP++].low;
+000275 D951             814         ASL.W   R5,#01H
+000277 8945             816         MOV.W   R4,R5
+000279 B950             817         MOVS.W  R5,#00H
+00027B 96484208         819         MOV.B   ES,#SEG( _NV_array )
+00027F 85040000         820         MOV.B   R0L,[R4+SOF( _NV_array )]
+000283 866C42           821         MOV.B   ES,R3L
+000286 820A             822         MOV.B   [R2],R0L
+                        823 ; nv_drv.c  291 
+                        824 ; nv_drv.c  292                 if (testsum != checksum)
+000288 8C1704           826         MOV.W   R1,[R7+4]
+00028B 8C070C           827         MOV.W   R0,[R7+12]
+00028E 4901             828         CMP.W   R0,R1
+000290 F302             831         BEQ     _21
+                        832 ; nv_drv.c  293                 {
+                        833 ; nv_drv.c  294                         // 2nd sum FAIL
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                        834 ; nv_drv.c  295                         return( FAIL);
+000292 B900             836         MOV.W   R0,#00H
+000294 FE72             837         BR      _28
+                        838 ; nv_drv.c  296                 }
+000296                  840 _21:
+                        845 ; nv_drv.c  297                 else
+                        846 ; nv_drv.c  298                 {
+                        847 ; nv_drv.c  299                         // 2nd copy works
+                        848 ; nv_drv.c  300                         // Read data copy #2 and copy to #1
+                        849 ; nv_drv.c  301                         srcP = source + bytes + 2;
+000296 8C370A           851         MOV.W   R3,[R7+10]
+000299 0936             852         ADD.W   R3,R6
+00029B A932             854         ADDS.W  R3,#02H
+                        856 ; nv_drv.c  302                         dst_point = dest;
+00029D 8C5708           858         MOV.W   R5,[R7+8]
+0002A0 8C4706           859         MOV.W   R4,[R7+6]
+                        864 ; nv_drv.c  303 
+                        865 ; nv_drv.c  304                   for ( i = 0; i < bytes; i++, srcP++, dst_point++)
+0002A3 BA70             867         MOV.W   [R7],#00H
+0002A5 99640000         869         CMP.W   R6,#00H
+0002A9 FD29             870         BLE     _23
+0002A9 FD2900           870         BLE     _23
+0002AC                  871 _22:
+                        872 ; nv_drv.c  305                   {
+                        873 ; nv_drv.c  306                                 *dst_point = NV_array[srcP].low;
+0002AC 8903             875         MOV.W   R0,R3
+0002AE D901             876         ASL.W   R0,#01H
+0002B0 B910             877         MOVS.W  R1,#00H
+0002B2 96484208         879         MOV.B   ES,#SEG( _NV_array )
+0002B6 85400000         880         MOV.B   R2L,[R0+SOF( _NV_array )]
+0002BA 86AC42           881         MOV.B   ES,R5L
+0002BD 824C             882         MOV.B   [R4],R2L
+0002BF 8C5F04           883         MOV.W   [R7+4],R5
+0002C2 8C4F02           884         MOV.W   [R7+2],R4
+                        887 ; nv_drv.c  307                     NV_array[source++].low = NV_array[srcP].low;
+0002C5 96484208         889         MOV.B   ES,#SEG( _NV_array )
+0002C9 85200000         890         MOV.B   R1L,[R0+SOF( _NV_array )]
+0002CD 8C070A           891         MOV.W   R0,[R7+10]
+0002D0 D901             892         ASL.W   R0,#01H
+0002D2 8940             893         MOV.W   R4,R0
+0002D4 B950             894         MOVS.W  R5,#00H
+0002D6 96484208         895         MOV.B   ES,#SEG( _NV_array )
+0002DA 852C0000         896         MOV.B   [R4+SOF( _NV_array )],R1L
+0002DE 8C070A           897         MOV.W   R0,[R7+10]
+0002E1 A901             898         ADDS.W  R0,#01H
+0002E3 8C0F0A           899         MOV.W   [R7+10],R0
+0002E6 8A27             901         MOV.W   R2,[R7]
+0002E8 A921             902         ADDS.W  R2,#01H
+0002EA A931             907         ADDS.W  R3,#01H
+0002EC 8C5704           910         MOV.W   R5,[R7+4]
+0002EF 8C4702           911         MOV.W   R4,[R7+2]
+0002F2 99400001         912         ADD.W   R4,#01H
+0002F6 8A2F             917         MOV.W   [R7],R2
+0002F8 4926             918         CMP.W   R2,R6
+0002FA FBD8             921         BLT     _22
+                        922 ; nv_drv.c  308                   }
+0002FC                  924 _23:
+                        925 ; nv_drv.c  309 
+                        926 ; nv_drv.c  310                         // copy checksum from 2nd to 1st
+                        927 ; nv_drv.c  311       NV_array[source++].low = NV_array[srcP++].low;
+0002FC 8903             929         MOV.W   R0,R3
+0002FE D901             930         ASL.W   R0,#01H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+000300 B910             931         MOVS.W  R1,#00H
+000302 96484208         932         MOV.B   ES,#SEG( _NV_array )
+000306 85000000         933         MOV.B   R0L,[R0+SOF( _NV_array )]
+00030A 8C170A           934         MOV.W   R1,[R7+10]
+00030D D911             935         ASL.W   R1,#01H
+00030F 8941             936         MOV.W   R4,R1
+000311 B950             937         MOVS.W  R5,#00H
+000313 96484208         939         MOV.B   ES,#SEG( _NV_array )
+000317 850C0000         940         MOV.B   [R4+SOF( _NV_array )],R0L
+00031B A931             941         ADDS.W  R3,#01H
+00031D 8C070A           944         MOV.W   R0,[R7+10]
+000320 A901             945         ADDS.W  R0,#01H
+                        946 ; nv_drv.c  312       NV_array[source++].low = NV_array[srcP++].low;
+000322 D931             948         ASL.W   R3,#01H
+000324 8923             950         MOV.W   R2,R3
+000326 B930             951         MOVS.W  R3,#00H
+000328 96484208         952         MOV.B   ES,#SEG( _NV_array )
+00032C 85220000         953         MOV.B   R1L,[R2+SOF( _NV_array )]
+000330 D901             954         ASL.W   R0,#01H
+000332 8920             955         MOV.W   R2,R0
+000334 B930             956         MOVS.W  R3,#00H
+000336 96484208         957         MOV.B   ES,#SEG( _NV_array )
+00033A 852A0000         958         MOV.B   [R2+SOF( _NV_array )],R1L
+                        959 ; nv_drv.c  313 
+                        960 ; nv_drv.c  314                         return( OK);
+00033E 9908FFFF         962         MOV.W   R0,#0FFFFH
+000342 FE1B             963         BR      _28
+                        964 ; nv_drv.c  315                 }
+                        965 ; nv_drv.c  316         }
+000344                  967 _24:
+                        971 ; nv_drv.c  317         else
+                        972 ; nv_drv.c  318         {
+                        973 ; nv_drv.c  319                 srcP = source;
+000344 8C170A           975         MOV.W   R1,[R7+10]
+                        977 ; nv_drv.c  320     dst_point = dest;
+000347 8C3708           979         MOV.W   R3,[R7+8]
+00034A 8C2706           980         MOV.W   R2,[R7+6]
+                        985 ; nv_drv.c  321 
+                        986 ; nv_drv.c  322                 // Read data copy #1
+                        987 ; nv_drv.c  323           for ( i = 0; i < bytes; i++, srcP++, dst_point++)
+00034D B900             989         MOV.W   R0,#00H
+00034F 99640000         992         CMP.W   R6,#00H
+000353 FD11             993         BLE     _26
+000353 FD1100           993         BLE     _26
+000356                  994 _25:
+                        995 ; nv_drv.c  324           {
+                        996 ; nv_drv.c  325                 *dst_point =NV_array[srcP].low;
+000356 8941             998         MOV.W   R4,R1
+000358 D941             999         ASL.W   R4,#01H
+00035A B950            1000         MOVS.W  R5,#00H
+00035C 96484208        1001         MOV.B   ES,#SEG( _NV_array )
+000360 85840000        1002         MOV.B   R4L,[R4+SOF( _NV_array )]
+000364 866C42          1003         MOV.B   ES,R3L
+000367 828A            1004         MOV.B   [R2],R4L
+000369 A901            1006         ADDS.W  R0,#01H
+00036B A911            1009         ADDS.W  R1,#01H
+00036D 99200001        1012         ADD.W   R2,#01H
+000371 4906            1015         CMP.W   R0,R6
+000373 FBF1            1016         BLT     _25
+                       1017 ; nv_drv.c  326           }
+000376                 1019 _26:
+                       1020 ; nv_drv.c  327                  return( OK);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+000376 9908FFFF        1022         MOV.W   R0,#0FFFFH
+                       1024 ; nv_drv.c  328         }
+                       1025 ; nv_drv.c  329 }
+00037A                 1027 _28:
+00037A 9970000E        1028         ADD.W   R7,#0EH
+00037E 2F70            1030         POP.W   R4, R5, R6
+000380 D680            1032         RET
+                       1037 ; nv_drv.c  330 
+                       1038 ; nv_drv.c  331 /**************************************************************************/
+                       1039 ; nv_drv.c  332 /* NV_Store                                                                      
+                                                                                                                             
+                                                                       NV_DRV.C     */
+                       1040 ; nv_drv.c  333 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1041 ; nv_drv.c  334 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                       1042 ; nv_drv.c  335 /* Revised:             000413, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                       1043 ; nv_drv.c  336 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1044 ; nv_drv.c  337 /* Function:    Store presets, (single storage items with checksum)              
+                                                    */
+                       1045 ; nv_drv.c  338 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1046 ; nv_drv.c  339 /* Returns:             OK only                                                  
+                                                                                                                             
+                                                                                            */
+                       1047 ; nv_drv.c  340 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1048 ; nv_drv.c  341 /**************************************************************************/
+                       1049 ; nv_drv.c  342 int NV_Store( void *source, NvPointer dest, int bytes)
+                       1050 ; nv_drv.c  343 {
+                       1051         ALIGN   1
+                       1053         PUBLIC  _NV_Store
+000382                 1054 _NV_Store:
+000382 0F70            1058         PUSH.W  R4, R5, R6
+000384 A97A            1060         ADDS.W  R7,#0AH
+                       1071 ; nv_drv.c  344         int i;
+                       1072 ; nv_drv.c  345         CheckType checksum = CheckBase;
+000386 9C78041234      1074         MOV.W   [R7+4],#01234H
+                       1077 ; nv_drv.c  346         UC *src_point = source;
+00038B 8951            1079         MOV.W   R5,R1
+00038D 8940            1080         MOV.W   R4,R0
+                       1082 ; nv_drv.c  347 
+                       1083 ; nv_drv.c  348   for ( i = 0; i < bytes; i++, dest++, src_point++)
+00038F B960            1085         MOV.W   R6,#00H
+000391 8A3F            1087         MOV.W   [R7],R3
+000393 99340000        1088         CMP.W   R3,#00H
+000397 FD1B            1091         BLE     _40
+000397 FD1B00          1091         BLE     _40
+00039A                 1092 _39:
+                       1093 ; nv_drv.c  349   {
+                       1094 ; nv_drv.c  350         NV_array[dest].low = *src_point;
+00039A 86AC42          1096         MOV.B   ES,R5L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+00039D 8204            1097         MOV.B   R0L,[R4]
+00039F 8C2F02          1099         MOV.W   [R7+2],R2
+0003A2 D921            1100         ASL.W   R2,#01H
+0003A4 B930            1103         MOVS.W  R3,#00H
+0003A6 96484208        1104         MOV.B   ES,#SEG( _NV_array )
+0003AA 850A0000        1105         MOV.B   [R2+SOF( _NV_array )],R0L
+                       1106 ; nv_drv.c  351         checksum = CheckUpdate( checksum, *src_point);
+0003AE 8C0704          1108         MOV.W   R0,[R7+4]
+0003B1 86AC42          1109         MOV.B   ES,R5L
+0003B4 8224            1110         MOV.B   R1L,[R4]
+0003B6 C5008B          1111         CALL    _CheckUpdate
+0003B9 8C0F04          1112         MOV.W   [R7+4],R0
+0003BC A961            1114         ADDS.W  R6,#01H
+0003BE 8C0702          1117         MOV.W   R0,[R7+2]
+0003C1 A901            1118         ADDS.W  R0,#01H
+0003C3 8920            1122         MOV.W   R2,R0
+0003C5 99400001        1124         ADD.W   R4,#01H
+0003C9 4A67            1127         CMP.W   R6,[R7]
+0003CB FBE7            1128         BLT     _39
+                       1129 ; nv_drv.c  352         }
+0003CE                 1131 _40:
+                       1132 ; nv_drv.c  353 
+                       1133 ; nv_drv.c  354         src_point = (UC*)&checksum;
+0003CE 9128rr          1135         MOV.B   R1L,#SEG( __lc_bs )
+0003D1 7133            1136         XOR.B   R1H,R1H
+0003D3 400704          1137         LEA     R0,R7+4
+                       1140 ; nv_drv.c  355         NV_array[dest++].low = *src_point;
+0003D6 862C42          1142         MOV.B   ES,R1L
+0003D9 8260            1143         MOV.B   R3L,[R0]
+0003DB 8942            1144         MOV.W   R4,R2
+0003DD D941            1145         ASL.W   R4,#01H
+0003DF B950            1146         MOVS.W  R5,#00H
+0003E1 96484208        1147         MOV.B   ES,#SEG( _NV_array )
+0003E5 856C0000        1148         MOV.B   [R4+SOF( _NV_array )],R3L
+0003E9 A921            1149         ADDS.W  R2,#01H
+                       1152 ; nv_drv.c  356 
+                       1153 ; nv_drv.c  357         src_point++;
+0003EB 99000001        1155         ADD.W   R0,#01H
+                       1158 ; nv_drv.c  358   NV_array[dest++].low = *src_point;
+0003EF 862C42          1160         MOV.B   ES,R1L
+0003F2 8200            1161         MOV.B   R0L,[R0]
+0003F4 D921            1163         ASL.W   R2,#01H
+0003F6 B930            1165         MOVS.W  R3,#00H
+0003F8 96484208        1166         MOV.B   ES,#SEG( _NV_array )
+0003FC 850A0000        1167         MOV.B   [R2+SOF( _NV_array )],R0L
+                       1168 ; nv_drv.c  359   
+                       1169 ; nv_drv.c  360         return( OK);
+000400 9908FFFF        1171         MOV.W   R0,#0FFFFH
+                       1172 ; nv_drv.c  361 }
+000404 A976            1174         ADDS.W  R7,#06H
+000406 2F70            1176         POP.W   R4, R5, R6
+000408 D680            1178         RET
+                       1182 ; nv_drv.c  362 
+                       1183 ; nv_drv.c  363 /**************************************************************************/
+                       1184 ; nv_drv.c  364 /* NV_Recall                                                                     
+                                                                                                                             
+                                                               NV_DRV.C     */
+                       1185 ; nv_drv.c  365 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                       1186 ; nv_drv.c  366 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                       1187 ; nv_drv.c  367 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                       1188 ; nv_drv.c  368 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1189 ; nv_drv.c  369 /* Function:    Recall presets, (single storage items with checksum)             
+                                            */
+                       1190 ; nv_drv.c  370 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1191 ; nv_drv.c  371 /* Returns:             FAIL if checksum error, otherwise OK                     
+                                                                                                    */
+                       1192 ; nv_drv.c  372 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1193 ; nv_drv.c  373 /**************************************************************************/
+                       1194 ; nv_drv.c  374 int NV_Recall( void *dest, NvPointer source, int bytes)
+                       1195 ; nv_drv.c  375 {
+                       1196         ALIGN   1
+                       1198         PUBLIC  _NV_Recall
+00040A                 1199 _NV_Recall:
+00040A 0F70            1203         PUSH.W  R4, R5, R6
+00040C 9972000A        1205         SUB.W   R7,#0AH
+000410 8C1F06          1210         MOV.W   [R7+6],R1
+000413 8C0F04          1211         MOV.W   [R7+4],R0
+                       1222 ; nv_drv.c  376         int i;
+                       1223 ; nv_drv.c  377         CheckType testsum, checksum = CheckBase;
+000416 9A781234        1225         MOV.W   [R7],#01234H
+00041A 8A07            1227         MOV.W   R0,[R7]
+                       1232 ; nv_drv.c  378         UC *dst_point ;
+                       1233 ; nv_drv.c  379         NvPointer srcP = source;
+00041C 8C2F02          1235         MOV.W   [R7+2],R2
+00041F 8952            1236         MOV.W   R5,R2
+                       1240 ; nv_drv.c  380 
+                       1241 ; nv_drv.c  381         // Checksum test
+                       1242 ; nv_drv.c  382   for ( i = 0; i < bytes; i++, srcP++)
+000421 B940            1244         MOV.W   R4,#00H
+000423 8963            1246         MOV.W   R6,R3
+000425 99640000        1247         CMP.W   R6,#00H
+000429 FD11            1250         BLE     _44
+000429 FD1100          1250         BLE     _44
+00042C                 1251 _43:
+                       1252 ; nv_drv.c  383   {
+                       1253 ; nv_drv.c  384         //*dst_point =NV_array[source].low;
+                       1254 ; nv_drv.c  385     checksum = CheckUpdate( checksum, NV_array[srcP].low);
+00042C 8915            1256         MOV.W   R1,R5
+00042E D911            1257         ASL.W   R1,#01H
+000430 8921            1258         MOV.W   R2,R1
+000432 B930            1259         MOVS.W  R3,#00H
+000434 96484208        1260         MOV.B   ES,#SEG( _NV_array )
+000438 85220000        1261         MOV.B   R1L,[R2+SOF( _NV_array )]
+00043C 8A07            1262         MOV.W   R0,[R7]
+00043E C50047          1263         CALL    _CheckUpdate
+000441 8A0F            1267         MOV.W   [R7],R0
+000443 A941            1270         ADDS.W  R4,#01H
+000445 A951            1273         ADDS.W  R5,#01H
+000447 4946            1276         CMP.W   R4,R6
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+000449 FBF1            1277         BLT     _43
+                       1278 ; nv_drv.c  386         }
+00044C                 1280 _44:
+                       1281 ; nv_drv.c  387 
+                       1282 ; nv_drv.c  388   dst_point = (UC*)&testsum;
+00044C 9168rr          1284         MOV.B   R3L,#SEG( __lc_bs )
+00044F 7177            1285         XOR.B   R3H,R3H
+000451 402708          1286         LEA     R2,R7+8
+                       1288 ; nv_drv.c  389         *dst_point = NV_array[srcP++].low;
+000454 8915            1290         MOV.W   R1,R5
+000456 D911            1291         ASL.W   R1,#01H
+000458 8901            1292         MOV.W   R0,R1
+00045A B910            1293         MOVS.W  R1,#00H
+00045C 96484208        1294         MOV.B   ES,#SEG( _NV_array )
+000460 85000000        1295         MOV.B   R0L,[R0+SOF( _NV_array )]
+000464 866C42          1296         MOV.B   ES,R3L
+000467 820A            1297         MOV.B   [R2],R0L
+000469 A951            1298         ADDS.W  R5,#01H
+                       1301 ; nv_drv.c  390 
+                       1302 ; nv_drv.c  391         dst_point++;
+00046B 99200001        1304         ADD.W   R2,#01H
+                       1307 ; nv_drv.c  392   *dst_point = NV_array[srcP++].low;
+00046F D951            1309         ASL.W   R5,#01H
+000471 8945            1311         MOV.W   R4,R5
+000473 B950            1312         MOVS.W  R5,#00H
+000475 96484208        1314         MOV.B   ES,#SEG( _NV_array )
+000479 85040000        1315         MOV.B   R0L,[R4+SOF( _NV_array )]
+00047D 866C42          1316         MOV.B   ES,R3L
+000480 820A            1317         MOV.B   [R2],R0L
+                       1318 ; nv_drv.c  393 
+                       1319 ; nv_drv.c  394         if (testsum != checksum) 
+000482 8A17            1321         MOV.W   R1,[R7]
+000484 8C0708          1322         MOV.W   R0,[R7+8]
+000487 4901            1323         CMP.W   R0,R1
+000489 F303            1326         BEQ     _45
+                       1327 ; nv_drv.c  395         {
+                       1328 ; nv_drv.c  396         return( FAIL);
+00048B B900            1330         MOV.W   R0,#00H
+00048D FE1C            1331         BR      _48
+                       1332 ; nv_drv.c  397         }
+000490                 1334 _45:
+                       1341 ; nv_drv.c  398         else
+                       1342 ; nv_drv.c  399         {
+                       1343 ; nv_drv.c  400                 srcP = source;
+000490 8C1702          1345         MOV.W   R1,[R7+2]
+                       1351 ; nv_drv.c  401                 dst_point = dest;
+000493 8C3706          1353         MOV.W   R3,[R7+6]
+000496 8C2704          1354         MOV.W   R2,[R7+4]
+                       1360 ; nv_drv.c  402 
+                       1361 ; nv_drv.c  403                 // Read data 
+                       1362 ; nv_drv.c  404                 for ( i = 0; i < bytes; i++, srcP++, dst_point++)
+000499 B900            1364         MOV.W   R0,#00H
+00049B 99640000        1366         CMP.W   R6,#00H
+00049F FD11            1367         BLE     _47
+00049F FD1100          1367         BLE     _47
+0004A2                 1368 _46:
+                       1369 ; nv_drv.c  405           {
+                       1370 ; nv_drv.c  406                 *dst_point = NV_array[srcP].low;
+0004A2 8941            1372         MOV.W   R4,R1
+0004A4 D941            1373         ASL.W   R4,#01H
+0004A6 B950            1374         MOVS.W  R5,#00H
+0004A8 96484208        1375         MOV.B   ES,#SEG( _NV_array )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+0004AC 85840000        1376         MOV.B   R4L,[R4+SOF( _NV_array )]
+0004B0 866C42          1377         MOV.B   ES,R3L
+0004B3 828A            1378         MOV.B   [R2],R4L
+0004B5 A901            1380         ADDS.W  R0,#01H
+0004B7 A911            1383         ADDS.W  R1,#01H
+0004B9 99200001        1386         ADD.W   R2,#01H
+0004BD 4906            1389         CMP.W   R0,R6
+0004BF FBF1            1390         BLT     _46
+                       1391 ; nv_drv.c  407           }
+0004C2                 1393 _47:
+                       1394 ; nv_drv.c  408 
+                       1395 ; nv_drv.c  409                 return( OK);
+0004C2 9908FFFF        1397         MOV.W   R0,#0FFFFH
+                       1399 ; nv_drv.c  410         }
+                       1400 ; nv_drv.c  411 }
+0004C6                 1402 _48:
+0004C6 9970000A        1403         ADD.W   R7,#0AH
+0004CA 2F70            1405         POP.W   R4, R5, R6
+0004CC D680            1407         RET
+                       1412 ; nv_drv.c  412 
+                       1413 ; nv_drv.c  413 /**************************************************************************/
+                       1414 ; nv_drv.c  414 /* CheckUpdate                                                                   
+                                                                                                                             
+                                                       NV_DRV.C     */
+                       1415 ; nv_drv.c  415 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1416 ; nv_drv.c  416 /* Author:              Sten A.Andersen, DEV, xxxxxx                             
+                                                                                                                            *
+                            /
+                       1417 ; nv_drv.c  417 /* Revised:             000411, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                       1418 ; nv_drv.c  418 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1419 ; nv_drv.c  419 /* Function:                                                                     
+                                                                                                                             
+                                                                                                            */
+                       1420 ; nv_drv.c  420 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1421 ; nv_drv.c  421 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1422 ; nv_drv.c  422 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1423 ; nv_drv.c  423 /**************************************************************************/
+                       1424 ; nv_drv.c  424 static CheckType CheckUpdate( CheckType sum, UC data)
+                       1425 ; nv_drv.c  425 {
+                       1426         ALIGN   1
+0004CE                 1428 _CheckUpdate:
+                       1435 ; nv_drv.c  426    return((sum ^ data) << 1 );
+0004CE B130            1437         MOVS.B  R1H,#00H
+0004D0 7901            1439         XOR.W   R0,R1
+0004D2 D901            1441         ASL.W   R0,#01H
+                       1442 ; nv_drv.c  427 }
+0004D4 D680            1444         RET
+                       1446 ; nv_drv.c  428 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+                       1447 ; nv_drv.c  429 // PC version : update NV file
+                       1448 ; nv_drv.c  430 #ifdef __BORLANDC__
+                       1449 ; nv_drv.c  431 
+                       1450 ; nv_drv.c  432 void NV_file_update(void)
+                       1451 ; nv_drv.c  433 {
+                       1452 ; nv_drv.c  434  if ((fp=fopen("NV.dat","r+b"))!=NULL)
+                       1453 ; nv_drv.c  435  {
+                       1454 ; nv_drv.c  436    fwrite(&NV_array,NV_size,1,fp);
+                       1455 ; nv_drv.c  437    fclose(fp);
+                       1456 ; nv_drv.c  438  }
+                       1457 ; nv_drv.c  439 }
+                       1458 ; nv_drv.c  440 
+                       1459 ; nv_drv.c  441 #endif
+                       1460 ; nv_drv.c  442 
+080000                 1465         HSEG AT 080000H
+                       1466         ALIGN   1
+080000                 1467 _NV_array:      DS      16352
+   |  RESERVED             
+083FDF
+000000                 1469 NV_DRV_CLR_FA   SEGMENT HDATA INSEGMENT CLEAR
+000000                 1470         RSEG    NV_DRV_CLR_FA
+                       1471         ALIGN   1
+000000                 1472 _AllocTop:      DS      2
+   |  RESERVED             
+000001
+                       1473         EXTRN   IDATA(__lc_bs)
+                       1474         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1475         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1476         CALLS   'NV_Write', 'NV_DRV?CheckUpdate'
+                       1477         CALLS   'NV_Read', 'NV_DRV?CheckUpdate'
+                       1478         CALLS   'NV_Store', 'NV_DRV?CheckUpdate'
+                       1479         CALLS   'NV_Recall', 'NV_DRV?CheckUpdate'

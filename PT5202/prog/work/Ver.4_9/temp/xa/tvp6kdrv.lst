@@ -1,0 +1,988 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+F:\PT5202\prog\work\Ver.4_9\temp\xa\tvp6kdrv.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -IcF:\PT5202\prog\include
+                          3 ;          -IF:\PT5202\prog\rtxc\xa\include -I. -Ml -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    TVP6KDRV
+                         10 ; tvp6kdrv.c    1       /************************************************************************
+                            ****/
+                         11 ; tvp6kdrv.c    2       /* MODULE:                                                               
+                               */
+                         12 ; tvp6kdrv.c    3       /*  tvp6kdrv.c - TI TVP600+ Multimedie chip driver                       
+                               */
+                         13 ; tvp6kdrv.c    4       /************************************************************************
+                            ****/
+                         14 ; tvp6kdrv.c    5       /* FUNCTIONS:                                                            
+                               */
+                         15 ; tvp6kdrv.c    6       /*                                                                       
+                               */
+                         16 ; tvp6kdrv.c    7       /*  int pld_Init( void);                                                 
+                               */
+                         17 ; tvp6kdrv.c    8       /*                                                                       
+                               */
+                         18 ; tvp6kdrv.c    9       /* TASKS:                                                                
+                               */
+                         19 ; tvp6kdrv.c   10       /*                                                                       
+                               */
+                         20 ; tvp6kdrv.c   11       /* NOTES:                                                                
+                               */
+                         21 ; tvp6kdrv.c   12       /*                                                                       
+                               */
+                         22 ; tvp6kdrv.c   13       /************************************************************************
+                            ****/
+                         23 ; tvp6kdrv.c   14       /*
+                         24 ; tvp6kdrv.c   15        *   PTV software for PT5201    
+                         25 ; tvp6kdrv.c   16        *   Copyright (c) 
+                         26 ; tvp6kdrv.c   17        *   ProTeleVision Technologies A/S.
+                         27 ; tvp6kdrv.c   18        *   ALL RIGHTS RESERVED
+                         28 ; tvp6kdrv.c   19       */
+                         29 ; tvp6kdrv.c   20       /************************************************************************
+                            ****/
+                         30 ; tvp6kdrv.c   21       
+                         31 ; tvp6kdrv.c   22       #include "define.h"
+                         34 ; tvp6kdrv.c   23       #include "tables.h"
+                         37 ; tvp6kdrv.c   24       #include "tvp6kdrv.h"
+                         40 ; tvp6kdrv.c   25       #include "i2c_drv.h"
+                         43 ; tvp6kdrv.c   26       
+                         44 ; tvp6kdrv.c   27       
+                         45 ; tvp6kdrv.c   28       /************************************************************************
+                            **/
+                         46 ; tvp6kdrv.c   29       /* tvp6k_init                                                   TVP6KDRV.
+                            C  */
+                         47 ; tvp6kdrv.c   30       /*                                                                       
+                             */
+                         48 ; tvp6kdrv.c   31       /* Author:   Kim Engedahl, DEV, 000401                                   
+                             */
+                         49 ; tvp6kdrv.c   32       /* Revised:   000401, KEn, DEV                                           
+                              */
+                         50 ; tvp6kdrv.c   33       /*                                                                       
+                             */
+                         51 ; tvp6kdrv.c   34       /* Function:                                                             
+                              */
+                         52 ; tvp6kdrv.c   35       /* Remarks:                                                              
+                               */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         53 ; tvp6kdrv.c   36       /* Returns:                                                              
+                              */
+                         54 ; tvp6kdrv.c   37       /* Updates:                                                              
+                              */
+                         55 ; tvp6kdrv.c   38       /************************************************************************
+                            **/
+                         56 ; tvp6kdrv.c   39       int tvp6k_init( void)
+                         57 ; tvp6kdrv.c   40       {
+000000                   58 TVP6KDRV_PR     SEGMENT HCODE
+000000                   59         RSEG    TVP6KDRV_PR
+                         60         ALIGN   1
+                         62         PUBLIC  _tvp6k_init
+000000                   63 _tvp6k_init:
+                         67 ; tvp6kdrv.c   41         return( tvp6k_system( PAL));
+000000 B900              69         MOV.W   R0,#00H
+000002 C50002            70         CALL    _tvp6k_system
+                         71 ; tvp6kdrv.c   42       }
+000005 D680              73         RET
+                         75 ; tvp6kdrv.c   43       
+                         76 ; tvp6kdrv.c   44       /************************************************************************
+                            **/
+                         77 ; tvp6kdrv.c   45       /* tvp6k_system                                                  TVP6KDRV
+                            .C  */
+                         78 ; tvp6kdrv.c   46       /*                                                                       
+                             */
+                         79 ; tvp6kdrv.c   47       /* Author:   Kim Engedahl, DEV, 000401                                   
+                             */
+                         80 ; tvp6kdrv.c   48       /* Revised:   000705, KEn, DEV                                           
+                              */
+                         81 ; tvp6kdrv.c   49       /*                                                                       
+                             */
+                         82 ; tvp6kdrv.c   50       /* Function:                                                             
+                              */
+                         83 ; tvp6kdrv.c   51       /* Remarks:                                                              
+                               */
+                         84 ; tvp6kdrv.c   52       /* Returns:                                                              
+                              */
+                         85 ; tvp6kdrv.c   53       /* Updates:                                                              
+                              */
+                         86 ; tvp6kdrv.c   54       /************************************************************************
+                            **/
+                         87 ; tvp6kdrv.c   55       int tvp6k_system( int system)
+                         88 ; tvp6kdrv.c   56       {
+000007 00                89         ALIGN   1
+                         91         PUBLIC  _tvp6k_system
+000008                   92 _tvp6k_system:
+000008 0F30              96         PUSH.W  R4, R5
+00000A 99720010          98         SUB.W   R7,#010H
+                        104 ; tvp6kdrv.c   57       
+                        105 ; tvp6kdrv.c   58       enum 
+                        106 ; tvp6kdrv.c   59         {  
+                        107 ; tvp6kdrv.c   60         PAL_Gain_U = 304,      /* (default datasheep 0x115 (227 dec)) */
+                        108 ; tvp6kdrv.c   61         PAL_Gain_V = 406,      /* (default datasheep 0x18C (396 dec)) */
+                        109 ; tvp6kdrv.c   62         PAL_Black_level = 51,  /* (default datasheep 0x3C (60 dec)) */
+                        110 ; tvp6kdrv.c   63         PAL_Blank_level = 62,  /* (default datasheep 0x3C (60 dec)) */
+                        111 ; tvp6kdrv.c   64         PAL_Gain_Y =     319,  /* (default datasheep 0x145 (325 dec)) */
+                        112 ; tvp6kdrv.c   65         PAL_COLOR_BURST_AMP = 62, /* (default datasheep 0x41 (65 dec) */
+                        113 ; tvp6kdrv.c   66       
+                        114 ; tvp6kdrv.c   67         NTSC_Gain_U = 274,     /* (default datasheep 0x101 (257 dec)) */
+                        115 ; tvp6kdrv.c   68         NTSC_Gain_V = 389,      /* (default datasheep 0x16B (363 dec)) */
+                        116 ; tvp6kdrv.c   69         NTSC_Black_level = 65,  /* (default datasheep 0x4C (76 dec)) */
+                        117 ; tvp6kdrv.c   70         NTSC_Blank_level = 56,  /* (default datasheep 0x38 (56 dec)) */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        118 ; tvp6kdrv.c   71         NTSC_Gain_Y =     304,  /* (default datasheep 0x1E2 (482 dec)) */
+                        119 ; tvp6kdrv.c   72         NTSC_COLOR_BURST_AMP = 60, /* (default datasheep 0x38 (56 dec) */
+                        120 ; tvp6kdrv.c   73       
+                        121 ; tvp6kdrv.c   74         JNTSC_Gain_U = 299,     /* (default datasheep 0x101 (257 dec)) */
+                        122 ; tvp6kdrv.c   75         JNTSC_Gain_V = 419,      /* (default datasheep 0x16B (363 dec)) */
+                        123 ; tvp6kdrv.c   76         JNTSC_Black_level = 45,  /* (default datasheep 0x4C (76 dec)) */
+                        124 ; tvp6kdrv.c   77         JNTSC_Blank_level = 56,  /* (default datasheep 0x38 (56 dec)) */
+                        125 ; tvp6kdrv.c   78         JNTSC_Gain_Y =     326,  /* (default datasheep 0x1E2 (482 dec)) */
+                        126 ; tvp6kdrv.c   79         JNTSC_COLOR_BURST_AMP = 60  /* (default datasheep 0x38 (56 dec) */
+                        127 ; tvp6kdrv.c   80         };
+                        128 ; tvp6kdrv.c   81       
+                        129 ; tvp6kdrv.c   82         UC buffer[15];
+                        130 ; tvp6kdrv.c   83       
+                        131 ; tvp6kdrv.c   84         if ( system < NTSC_US)
+00000E 99040002         133         CMP.W   R0,#02H
+                        134         BGE     _3
+000012 FB02            +134 ;       BLT     _LG_0
+000014 D5009C          +134 ;       JMP.L   _3
+000014 D5009C00        +134 ;       JMP.L   _3
+000018                 +134 _LG_0:
+                        135 ; tvp6kdrv.c   85           {
+                        136 ; tvp6kdrv.c   86           /*------------------------------------------------------
+                        137 ; tvp6kdrv.c   87           |    P A L   S e t u p
+                        138 ; tvp6kdrv.c   88           -----+----+----------------------------------------------
+                        139 ; tvp6kdrv.c   89           | 3A | 8F | CBAR=1, FTM=0x03, Y2C=1, UV2C=1, (SCN=0)
+                        140 ; tvp6kdrv.c   90           |----+----+----------------------------------------------
+                        141 ; tvp6kdrv.c   91           | 5A | 00 | CPHS=0x00                 (User adj.)
+                        142 ; tvp6kdrv.c   92           |----+----+----------------------------------------------
+                        143 ; tvp6kdrv.c   93           | 5B | 30 | GU=0x130      (default datasheep 0x115)
+                        144 ; tvp6kdrv.c   94           |    |    |   Gain_U
+                        145 ; tvp6kdrv.c   95           |----+----+----------------------------------------------
+                        146 ; tvp6kdrv.c   96           | 5C | 96 | GV=0x196      (default datasheep 0x18C)
+                        147 ; tvp6kdrv.c   97           |    |    |   Gain_V
+                        148 ; tvp6kdrv.c   98           |----+----+----------------------------------------------
+                        149 ; tvp6kdrv.c   99           | 5D | B3 | BLACK=0x33
+                        150 ; tvp6kdrv.c  100           |    |    |   Black_Level
+                        151 ; tvp6kdrv.c  101           |----+----+----------------------------------------------
+                        152 ; tvp6kdrv.c  102           | 5E | BE | BLANK=0x3E
+                        153 ; tvp6kdrv.c  103           |    |    |   Blank_Level
+                        154 ; tvp6kdrv.c  104           |----+----+----------------------------------------------
+                        155 ; tvp6kdrv.c  105           | 5F | 3F | GY=0x13F
+                        156 ; tvp6kdrv.c  106           |    |    |   Gain_Y
+                        157 ; tvp6kdrv.c  107           |----+----+----------------------------------------------
+                        158 ; tvp6kdrv.c  108           | 60 | 20 | XC=0, LCD=0x0
+                        159 ; tvp6kdrv.c  109           |----+----+----------------------------------------------
+                        160 ; tvp6kdrv.c  110           | 61 | 42 | SDOWN=0, CDOWN=1, PALPHS=0, GLCE=0, CBW=0, PAL=1, FREQ=0
+                        161 ; tvp6kdrv.c  111           |----+----+----------------------------------------------
+                        162 ; tvp6kdrv.c  112           | 62 | 3E | SQP=0, BSTAP=0x3E
+                        163 ; tvp6kdrv.c  113           |    |    |   Color_burst_amplitude
+                        164 ; tvp6kdrv.c  114           |----+----+----------------------------------------------
+                        165 ; tvp6kdrv.c  115           | 63 | CB | FSC=0x2A098ACB
+                        166 ; tvp6kdrv.c  116           |----+----+----------------------------------------------
+                        167 ; tvp6kdrv.c  117           | 64 | 8A |
+                        168 ; tvp6kdrv.c  118           |----+----+----------------------------------------------
+                        169 ; tvp6kdrv.c  119           | 65 | 09 |
+                        170 ; tvp6kdrv.c  120           |----+----+----------------------------------------------
+                        171 ; tvp6kdrv.c  121           | 66 | 2A |
+                        172 ; tvp6kdrv.c  122           |----+----+----------------------------------------------
+                        173 ; tvp6kdrv.c  123           | 67 | 00 | L21O=0x0000
+                        174 ; tvp6kdrv.c  124           |----+----+----------------------------------------------
+                        175 ; tvp6kdrv.c  125           | 68 | 00 |
+                        176 ; tvp6kdrv.c  126           |----+----+----------------------------------------------
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        177 ; tvp6kdrv.c  127           | 69 | 00 | L21E=0x0000
+                        178 ; tvp6kdrv.c  128           |----+----+----------------------------------------------
+                        179 ; tvp6kdrv.c  129           | 6A | 00 |
+                        180 ; tvp6kdrv.c  130           |----+----+----------------------------------------------
+                        181 ; tvp6kdrv.c  131           | 6B | 11 | SLINE=0x11
+                        182 ; tvp6kdrv.c  132           |----+----+----------------------------------------------
+                        183 ; tvp6kdrv.c  133           | 6C | A0 | RCV1A=1, RCV1B=0, HSINSEL=1, ORCV1=0, PRCV1=0,
+                        184 ; tvp6kdrv.c  134           |    |    | CBLFV2=0, ORCV2=0, PRCV2=0
+                        185 ; tvp6kdrv.c  135           |----+----+----------------------------------------------
+                        186 ; tvp6kdrv.c  136           | 6D | 00 | CRCM2=0, CBLFM2=0, ORCM2=0, PRCM2=0, RCM1A=0,
+                        187 ; tvp6kdrv.c  137           |    |    | RCM1B=0, L21ENA=0, L21ENB=0
+                        188 ; tvp6kdrv.c  138           |----+----+----------------------------------------------
+                        189 ; tvp6kdrv.c  139           | 6E | 0A |  HTRIG=0x10A
+                        190 ; tvp6kdrv.c  140           |----+----+----------------------------------------------
+                        191 ; tvp6kdrv.c  141           | 6F | 01 |
+                        192 ; tvp6kdrv.c  142           |----+----+----------------------------------------------
+                        193 ; tvp6kdrv.c  143           | 70 | 80 | PRESA=1, PRESB=0, SBLANK=0, VTRIG=0x00
+                        194 ; tvp6kdrv.c  144           |----+----+----------------------------------------------
+                        195 ; tvp6kdrv.c  145           | 71 | 8C | BMRQ=0x08C
+                        196 ; tvp6kdrv.c  146           |----+----+----------------------------------------------
+                        197 ; tvp6kdrv.c  147           | 72 | 4C | EMRQ=0x34C
+                        198 ; tvp6kdrv.c  148           |----+----+----------------------------------------------
+                        199 ; tvp6kdrv.c  149           | 73 | 30 |
+                        200 ; tvp6kdrv.c  150           |----+----+----------------------------------------------
+                        201 ; tvp6kdrv.c  151           | 77 | 8C | BRCV=0x08C
+                        202 ; tvp6kdrv.c  152           |----+----+----------------------------------------------
+                        203 ; tvp6kdrv.c  153           | 78 | 4C | ERCV=0x34C
+                        204 ; tvp6kdrv.c  154           |----+----+----------------------------------------------
+                        205 ; tvp6kdrv.c  155           | 79 | 30 |
+                        206 ; tvp6kdrv.c  156           |----+----+----------------------------------------------
+                        207 ; tvp6kdrv.c  157           | 7A | 70 | FLEN=0x270
+                        208 ; tvp6kdrv.c  158           |----+----+----------------------------------------------
+                        209 ; tvp6kdrv.c  159           | 7B | 16 | FAL=0x016
+                        210 ; tvp6kdrv.c  160           |----+----+----------------------------------------------
+                        211 ; tvp6kdrv.c  161           | 7C | 35 | LAL=0x135
+                        212 ; tvp6kdrv.c  162           |----+----+----------------------------------------------
+                        213 ; tvp6kdrv.c  163           | 7D | 22 |
+                        214 ; tvp6kdrv.c  164           |----+----+----------------------------------------------
+                        215 ; tvp6kdrv.c  165           | 7E | 0A | ESAV=0, IGNP=0, FREE=0, BLINKS=1, AVM=0x01, FID=0
+                        216 ; tvp6kdrv.c  166           |----+----+----------------------------------------------
+                        217 ; tvp6kdrv.c  167           | 90 | 00 | SWPF=0, HSC=0x0, VSC=0x0, SCN=0
+                        218 ; tvp6kdrv.c  168           |----+----+----------------------------------------------
+                        219 ; tvp6kdrv.c  169           | 91 | 00 | SLPF=0x000
+                        220 ; tvp6kdrv.c  170           |----+----+----------------------------------------------
+                        221 ; tvp6kdrv.c  171           | 92 | 00 | SPPL=0x000
+                        222 ; tvp6kdrv.c  172           |----+----+----------------------------------------------
+                        223 ; tvp6kdrv.c  173           | 93 | 00 |
+                        224 ; tvp6kdrv.c  174           |----+----+----------------------------------------------
+                        225 ; tvp6kdrv.c  175           | 94 | 00 | DLPF=0x000
+                        226 ; tvp6kdrv.c  176           |----+----+----------------------------------------------
+                        227 ; tvp6kdrv.c  177           | 95 | 00 | DPPL=0x000
+                        228 ; tvp6kdrv.c  178           |----+----+----------------------------------------------
+                        229 ; tvp6kdrv.c  179           | 96 | 00 |
+                        230 ; tvp6kdrv.c  180           |----+----+----------------------------------------------
+                        231 ; tvp6kdrv.c  181           | 97 | 00 | VDTA=0x0000
+                        232 ; tvp6kdrv.c  182           |----+----+----------------------------------------------
+                        233 ; tvp6kdrv.c  183           | 98 | 00 |
+                        234 ; tvp6kdrv.c  184           |----+----+----------------------------------------------
+                        235 ; tvp6kdrv.c  185           | 99 | 00 | HDTA=0x0000
+                        236 ; tvp6kdrv.c  186           |----+----+----------------------------------------------
+                        237 ; tvp6kdrv.c  187           | 9A | 00 |
+                        238 ; tvp6kdrv.c  188           |----+----+----------------------------------------------
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        239 ; tvp6kdrv.c  189           | 9B | 00 | VOFS=0x00
+                        240 ; tvp6kdrv.c  190           |----+----+----------------------------------------------
+                        241 ; tvp6kdrv.c  191           | 9C | 00 | HOFS=0x00
+                        242 ; tvp6kdrv.c  192           |----+----+----------------------------------------------
+                        243 ; tvp6kdrv.c  193           | 9D | 00 | NLR=0x00
+                        244 ; tvp6kdrv.c  194           |--------------------------------------------------------
+                        245 ; tvp6kdrv.c  195           */
+                        246 ; tvp6kdrv.c  196       
+                        247 ; tvp6kdrv.c  197           // PAL setup
+                        248 ; tvp6kdrv.c  198           buffer[0] = 0x3A;
+000018 92783A           250         MOV.B   [R7],#03AH
+                        251 ; tvp6kdrv.c  199           buffer[1] = 0x8F;
+00001B 9478018F         253         MOV.B   [R7+1],#08FH
+                        254 ; tvp6kdrv.c  200           TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV);
+00001F 91A8rr           256         MOV.B   R5L,#SEG( __lc_bs )
+000022 71BB             257         XOR.B   R5H,R5H
+000024 8947             258         MOV.W   R4,R7
+000026 912800           259         MOV.B   R1L,#00H
+000029 8935             260         MOV.W   R3,R5
+00002B 8924             261         MOV.W   R2,R4
+00002D 911802           262         MOV.B   R0H,#02H
+000030 910840           264         MOV.B   R0L,#040H
+                        265         CALL    _TransmitIIC
+000033 C4rrrrrr        +265 ;       FCALL   _TransmitIIC
+                        266 ; tvp6kdrv.c  201       
+                        267 ; tvp6kdrv.c  202           buffer[0] = 0x5A;
+000037 92785A           269         MOV.B   [R7],#05AH
+                        270 ; tvp6kdrv.c  203           buffer[1] = 0x00;               // [5A]
+00003A B47001           272         MOV.B   [R7+1],#00H
+                        273 ; tvp6kdrv.c  204           buffer[2] = 0xFF & PAL_Gain_U;  // [5B]      //was 0x10, 0x32
+00003D 94780230         275         MOV.B   [R7+2],#030H
+                        276 ; tvp6kdrv.c  205           buffer[3] = 0xFF & PAL_Gain_V;  // [5C]     //was 0x80, 0xAC
+000041 94780396         278         MOV.B   [R7+3],#096H
+                        279 ; tvp6kdrv.c  206           buffer[4] = PAL_Black_level | ((PAL_Gain_U & 0x100) >> 1);   // [5D]
+000045 947804B3         281         MOV.B   [R7+4],#0B3H
+                        282 ; tvp6kdrv.c  207           buffer[5] = PAL_Blank_level | ((PAL_Gain_V & 0x100) >> 1);   // [5E]
+000049 947805BE         284         MOV.B   [R7+5],#0BEH
+                        285 ; tvp6kdrv.c  208           buffer[6] = 0xFF & PAL_Gain_Y;  // [5F]
+00004D 9478063F         287         MOV.B   [R7+6],#03FH
+                        288 ; tvp6kdrv.c  209           buffer[7] = 0x00 | ((PAL_Gain_Y & 0x100) >> 3);  // [60]
+000051 94780720         290         MOV.B   [R7+7],#020H
+                        291 ; tvp6kdrv.c  210           buffer[8] = 0x42;         // [61]
+000055 94780842         293         MOV.B   [R7+8],#042H
+                        294 ; tvp6kdrv.c  211           buffer[9] = PAL_COLOR_BURST_AMP;  // [62]               // was 0x41
+000059 9478093E         296         MOV.B   [R7+9],#03EH
+                        297 ; tvp6kdrv.c  212           buffer[10] = 0xCB;        // [62]
+00005D 94780ACB         299         MOV.B   [R7+10],#0CBH
+                        300 ; tvp6kdrv.c  213           buffer[11] = 0x8A;        // [63]
+000061 94780B8A         302         MOV.B   [R7+11],#08AH
+                        303 ; tvp6kdrv.c  214           buffer[12] = 0x09;
+000065 94780C09         305         MOV.B   [R7+12],#09H
+                        306 ; tvp6kdrv.c  215           buffer[13] = 0x2A;
+000069 94780D2A         308         MOV.B   [R7+13],#02AH
+                        309 ; tvp6kdrv.c  216           TransmitIIC( TVP6K_IIC_address, 14, buffer, IIC_PTV);
+00006D 912800           311         MOV.B   R1L,#00H
+000070 8935             312         MOV.W   R3,R5
+000072 8924             313         MOV.W   R2,R4
+000074 91180E           314         MOV.B   R0H,#0EH
+000077 910840           315         MOV.B   R0L,#040H
+                        316         CALL    _TransmitIIC
+00007A C4rrrrrr        +316 ;       FCALL   _TransmitIIC
+                        317 ; tvp6kdrv.c  217       
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        318 ; tvp6kdrv.c  218           buffer[0] = 0x67;
+00007E 927867           320         MOV.B   [R7],#067H
+                        321 ; tvp6kdrv.c  219           buffer[1] = 0x00;
+000081 B47001           323         MOV.B   [R7+1],#00H
+                        324 ; tvp6kdrv.c  220           buffer[2] = 0x00;
+000084 B47002           326         MOV.B   [R7+2],#00H
+                        327 ; tvp6kdrv.c  221           buffer[3] = 0x00;
+000087 B47003           329         MOV.B   [R7+3],#00H
+                        330 ; tvp6kdrv.c  222           buffer[4] = 0x00;
+00008A B47004           332         MOV.B   [R7+4],#00H
+                        333 ; tvp6kdrv.c  223           buffer[5] = 0x11;
+00008D 94780511         335         MOV.B   [R7+5],#011H
+                        336 ; tvp6kdrv.c  224           buffer[6] = 0xA0;
+000091 947806A0         338         MOV.B   [R7+6],#0A0H
+                        339 ; tvp6kdrv.c  225           buffer[7] = 0x00;
+000095 B47007           341         MOV.B   [R7+7],#00H
+                        342 ; tvp6kdrv.c  226           buffer[8] = 0x0A;
+000098 9478080A         344         MOV.B   [R7+8],#0AH
+                        345 ; tvp6kdrv.c  227           buffer[9] = 0x01;
+00009C B47109           347         MOV.B   [R7+9],#01H
+                        348 ; tvp6kdrv.c  228           buffer[10] = 0x80;
+00009F 94780A80         350         MOV.B   [R7+10],#080H
+                        351 ; tvp6kdrv.c  229           buffer[11] = 0x8C;
+0000A3 94780B8C         353         MOV.B   [R7+11],#08CH
+                        354 ; tvp6kdrv.c  230           buffer[12] = 0x4C;
+0000A7 94780C4C         356         MOV.B   [R7+12],#04CH
+                        357 ; tvp6kdrv.c  231           buffer[13] = 0x30;
+0000AB 94780D30         359         MOV.B   [R7+13],#030H
+0000AF 912800           360         MOV.B   R1L,#00H
+0000B2 8935             361         MOV.W   R3,R5
+0000B4 8924             362         MOV.W   R2,R4
+0000B6 910840           363         MOV.B   R0L,#040H
+                        364 ; tvp6kdrv.c  232       
+                        365 ; tvp6kdrv.c  233           TransmitIIC( TVP6K_IIC_address, 14, buffer, IIC_PTV);
+0000B9 91180E           367         MOV.B   R0H,#0EH
+                        368         CALL    _TransmitIIC
+0000BC C4rrrrrr        +368 ;       FCALL   _TransmitIIC
+                        369 ; tvp6kdrv.c  234       
+                        370 ; tvp6kdrv.c  235           buffer[0] = 0x77;
+0000C0 927877           372         MOV.B   [R7],#077H
+                        373 ; tvp6kdrv.c  236            buffer[1] = 0x8C;
+0000C3 9478018C         375         MOV.B   [R7+1],#08CH
+                        376 ; tvp6kdrv.c  237           buffer[2] = 0x4C;
+0000C7 9478024C         378         MOV.B   [R7+2],#04CH
+                        379 ; tvp6kdrv.c  238           buffer[3] = 0x30;
+0000CB 94780330         381         MOV.B   [R7+3],#030H
+                        382 ; tvp6kdrv.c  239           buffer[4] = 0x70;
+0000CF 94780470         384         MOV.B   [R7+4],#070H
+                        385 ; tvp6kdrv.c  240           buffer[5] = 0x16;
+0000D3 94780516         387         MOV.B   [R7+5],#016H
+                        388 ; tvp6kdrv.c  241           buffer[6] = 0x35;
+0000D7 94780635         390         MOV.B   [R7+6],#035H
+                        391 ; tvp6kdrv.c  242           buffer[7] = 0x22;
+0000DB 94780722         393         MOV.B   [R7+7],#022H
+                        394 ; tvp6kdrv.c  243           buffer[8] = 0x0A;
+0000DF 9478080A         396         MOV.B   [R7+8],#0AH
+0000E3 912800           397         MOV.B   R1L,#00H
+0000E6 8935             398         MOV.W   R3,R5
+0000E8 8924             399         MOV.W   R2,R4
+0000EA 910840           400         MOV.B   R0L,#040H
+                        401 ; tvp6kdrv.c  244           TransmitIIC( TVP6K_IIC_address, 9, buffer, IIC_PTV);
+0000ED 911809           403         MOV.B   R0H,#09H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        404         CALL    _TransmitIIC
+0000F0 C4rrrrrr        +404 ;       FCALL   _TransmitIIC
+                        405 ; tvp6kdrv.c  245       
+                        406 ; tvp6kdrv.c  246           buffer[0] = 0x90;
+0000F4 927890           408         MOV.B   [R7],#090H
+                        409 ; tvp6kdrv.c  247           buffer[1] = 0x00;
+0000F7 B47001           411         MOV.B   [R7+1],#00H
+                        412 ; tvp6kdrv.c  248           buffer[2] = 0x00;
+0000FA B47002           414         MOV.B   [R7+2],#00H
+                        415 ; tvp6kdrv.c  249           buffer[3] = 0x00;
+0000FD B47003           417         MOV.B   [R7+3],#00H
+                        418 ; tvp6kdrv.c  250           buffer[4] = 0x00;
+000100 B47004           420         MOV.B   [R7+4],#00H
+                        421 ; tvp6kdrv.c  251           buffer[5] = 0x00;
+000103 B47005           423         MOV.B   [R7+5],#00H
+                        424 ; tvp6kdrv.c  252           buffer[6] = 0x00;
+000106 B47006           426         MOV.B   [R7+6],#00H
+                        427 ; tvp6kdrv.c  253           buffer[7] = 0x00;
+000109 B47007           429         MOV.B   [R7+7],#00H
+                        430 ; tvp6kdrv.c  254           buffer[8] = 0x00;
+00010C B47008           432         MOV.B   [R7+8],#00H
+                        433 ; tvp6kdrv.c  255           buffer[9] = 0x00;
+00010F B47009           435         MOV.B   [R7+9],#00H
+                        436 ; tvp6kdrv.c  256           buffer[10] = 0x00;
+000112 B4700A           438         MOV.B   [R7+10],#00H
+                        439 ; tvp6kdrv.c  257           buffer[11] = 0x00;
+000115 B4700B           441         MOV.B   [R7+11],#00H
+                        442 ; tvp6kdrv.c  258           buffer[12] = 0x00;
+000118 B4700C           444         MOV.B   [R7+12],#00H
+                        445 ; tvp6kdrv.c  259           buffer[13] = 0x00;
+00011B B4700D           447         MOV.B   [R7+13],#00H
+                        448 ; tvp6kdrv.c  260           buffer[14] = 0x00;
+00011E B4700E           450         MOV.B   [R7+14],#00H
+                        451 ; tvp6kdrv.c  261       
+                        452 ; tvp6kdrv.c  262           TransmitIIC( TVP6K_IIC_address, 15, buffer, IIC_PTV);
+000121 912800           454         MOV.B   R1L,#00H
+000124 8935             455         MOV.W   R3,R5
+000126 8924             456         MOV.W   R2,R4
+000128 91180F           457         MOV.B   R0H,#0FH
+00012B 910840           458         MOV.B   R0L,#040H
+                        459         CALL    _TransmitIIC
+00012E C4rrrrrr        +459 ;       FCALL   _TransmitIIC
+                        460 ; tvp6kdrv.c  263       
+                        461 ; tvp6kdrv.c  264           buffer[0] = 0x3A;
+000132 92783A           463         MOV.B   [R7],#03AH
+                        464 ; tvp6kdrv.c  265           buffer[1] = 0x0F;
+000135 9478010F         466         MOV.B   [R7+1],#0FH
+                        467 ; tvp6kdrv.c  266           TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV);
+000139 911802           469         MOV.B   R0H,#02H
+00013C 910840           470         MOV.B   R0L,#040H
+00013F 8935             471         MOV.W   R3,R5
+000141 8924             472         MOV.W   R2,R4
+000143 912800           473         MOV.B   R1L,#00H
+                        474         CALL    _TransmitIIC
+000146 C4rrrrrr        +474 ;       FCALL   _TransmitIIC
+                        475 ; tvp6kdrv.c  267         }
+                        477         BR      _6
+00014A D50139          +477         JMP.L   _6
+00014A D5013900        +477         JMP.L   _6
+00014E                  478 _3:
+                        480 ; tvp6kdrv.c  268         else
+                        481 ; tvp6kdrv.c  269           {
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        482 ; tvp6kdrv.c  270           if ( system < NTSC_J)
+00014E 99040003         484         CMP.W   R0,#03H
+                        485         BGE     _4
+000152 FB02            +485 ;       BLT     _LG_2
+000154 D5009B          +485 ;       JMP.L   _4
+000154 D5009B00        +485 ;       JMP.L   _4
+000158                 +485 _LG_2:
+                        486 ; tvp6kdrv.c  271             {
+                        487 ; tvp6kdrv.c  272             /*------------------------------------------------------
+                        488 ; tvp6kdrv.c  273             |    N T S C   S e t u p
+                        489 ; tvp6kdrv.c  274             -----+----+----------------------------------------------
+                        490 ; tvp6kdrv.c  275             | 3A | 8F | CBAR=1, FTM=0x03, Y2C=1, UV2C=1, (SCN=0)
+                        491 ; tvp6kdrv.c  276             |----+----+----------------------------------------------
+                        492 ; tvp6kdrv.c  277             | 5A | 00 | CPHS=0x00                 (User adj.)
+                        493 ; tvp6kdrv.c  278             |----+----+----------------------------------------------
+                        494 ; tvp6kdrv.c  279             | 5B | 12 | GU=0x112      (default datasheep 0x101)
+                        495 ; tvp6kdrv.c  280             |    |    |   Gain_U
+                        496 ; tvp6kdrv.c  281             |----+----+----------------------------------------------
+                        497 ; tvp6kdrv.c  282             | 5C | 85 | GV=0x185      (default datasheep 0x)
+                        498 ; tvp6kdrv.c  283             |    |    |   Gain_V
+                        499 ; tvp6kdrv.c  284             |----+----+----------------------------------------------
+                        500 ; tvp6kdrv.c  285             | 5D | c1 | BLACK=0x41
+                        501 ; tvp6kdrv.c  286             |    |    |   Black_Level
+                        502 ; tvp6kdrv.c  287             |----+----+----------------------------------------------
+                        503 ; tvp6kdrv.c  288             | 5E | B8 | BLANK=0x38
+                        504 ; tvp6kdrv.c  289             |    |    |   Blank_Level
+                        505 ; tvp6kdrv.c  290             |----+----+----------------------------------------------
+                        506 ; tvp6kdrv.c  291             | 5F | 30 | GY=0x130
+                        507 ; tvp6kdrv.c  292             |    |    |   Gain_Y
+                        508 ; tvp6kdrv.c  293             |----+----+----------------------------------------------
+                        509 ; tvp6kdrv.c  294             | 60 | 20 | XC=0, LCD=0x0
+                        510 ; tvp6kdrv.c  295             |----+----+----------------------------------------------
+                        511 ; tvp6kdrv.c  296             | 61 | 41 | SDOWN=0, CDOWN=1, PALPHS=0, GLCE=0, CBW=0, PAL=0, FREQ=
+                            1
+                        512 ; tvp6kdrv.c  297             |----+----+----------------------------------------------
+                        513 ; tvp6kdrv.c  298             | 62 | 3C | SQP=0, BSTAP=0x3C     // was 0x38
+                        514 ; tvp6kdrv.c  299             |    |    |   Color_burst_amplitude
+                        515 ; tvp6kdrv.c  300             |----+----+----------------------------------------------
+                        516 ; tvp6kdrv.c  301             | 63 | CB | FSC=0x21F07C1F
+                        517 ; tvp6kdrv.c  302             |----+----+----------------------------------------------
+                        518 ; tvp6kdrv.c  303             | 64 | 8A |
+                        519 ; tvp6kdrv.c  304             |----+----+----------------------------------------------
+                        520 ; tvp6kdrv.c  305             | 65 | 09 |
+                        521 ; tvp6kdrv.c  306             |----+----+----------------------------------------------
+                        522 ; tvp6kdrv.c  307             | 66 | 2A |
+                        523 ; tvp6kdrv.c  308             |----+----+----------------------------------------------
+                        524 ; tvp6kdrv.c  309             | 67 | 00 | L21O=0x0000
+                        525 ; tvp6kdrv.c  310             |----+----+----------------------------------------------
+                        526 ; tvp6kdrv.c  311             | 68 | 00 |
+                        527 ; tvp6kdrv.c  312             |----+----+----------------------------------------------
+                        528 ; tvp6kdrv.c  313             | 69 | 00 | L21E=0x0000
+                        529 ; tvp6kdrv.c  314             |----+----+----------------------------------------------
+                        530 ; tvp6kdrv.c  315             | 6A | 00 |
+                        531 ; tvp6kdrv.c  316             |----+----+----------------------------------------------
+                        532 ; tvp6kdrv.c  317             | 6B | 11 | SLINE=0x11
+                        533 ; tvp6kdrv.c  318             |----+----+----------------------------------------------
+                        534 ; tvp6kdrv.c  319             | 6C | A0 | RCV1A=1, RCV1B=0, HSINSEL=1, ORCV1=0, PRCV1=0,
+                        535 ; tvp6kdrv.c  320             |    |    | CBLFV2=0, ORCV2=0, PRCV2=0
+                        536 ; tvp6kdrv.c  321             |----+----+----------------------------------------------
+                        537 ; tvp6kdrv.c  322             | 6D | 00 | CRCM2=0, CBLFM2=0, ORCM2=0, PRCM2=0, RCM1A=0,
+                        538 ; tvp6kdrv.c  323             |    |    | RCM1B=0, L21ENA=0, L21ENB=0
+                        539 ; tvp6kdrv.c  324             |----+----+----------------------------------------------
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        540 ; tvp6kdrv.c  325             | 6E | 0A |  HTRIG=0x10A
+                        541 ; tvp6kdrv.c  326             |----+----+----------------------------------------------
+                        542 ; tvp6kdrv.c  327             | 6F | 01 |
+                        543 ; tvp6kdrv.c  328             |----+----+----------------------------------------------
+                        544 ; tvp6kdrv.c  329             | 70 | C0 | PRESA=1, PRESB=1, SBLANK=0, VTRIG=0x00
+                        545 ; tvp6kdrv.c  330             |----+----+----------------------------------------------
+                        546 ; tvp6kdrv.c  331             | 71 | 82 | BMRQ=0x082
+                        547 ; tvp6kdrv.c  332             |----+----+----------------------------------------------
+                        548 ; tvp6kdrv.c  333             | 72 | 46 | EMRQ=0x346
+                        549 ; tvp6kdrv.c  334             |----+----+----------------------------------------------
+                        550 ; tvp6kdrv.c  335             | 73 | 30 |
+                        551 ; tvp6kdrv.c  336             |----+----+----------------------------------------------
+                        552 ; tvp6kdrv.c  337             | 77 | 82 | BRCV=0x082
+                        553 ; tvp6kdrv.c  338             |----+----+----------------------------------------------
+                        554 ; tvp6kdrv.c  339             | 78 | 46 | ERCV=0x346
+                        555 ; tvp6kdrv.c  340             |----+----+----------------------------------------------
+                        556 ; tvp6kdrv.c  341             | 79 | 30 |
+                        557 ; tvp6kdrv.c  342             |----+----+----------------------------------------------
+                        558 ; tvp6kdrv.c  343             | 7A | 0C | FLEN=0x20C
+                        559 ; tvp6kdrv.c  344             |----+----+----------------------------------------------
+                        560 ; tvp6kdrv.c  345             | 7B | 11 | FAL=0x011
+                        561 ; tvp6kdrv.c  346             |----+----+----------------------------------------------
+                        562 ; tvp6kdrv.c  347             | 7C | 03 | LAL=0x103
+                        563 ; tvp6kdrv.c  348             |----+----+----------------------------------------------
+                        564 ; tvp6kdrv.c  349             | 7D | 22 |
+                        565 ; tvp6kdrv.c  350             |----+----+----------------------------------------------
+                        566 ; tvp6kdrv.c  351             | 7E | 0A | ESAV=0, IGNP=0, FREE=0, BLINKS=1, AVM=0x01, FID=0
+                        567 ; tvp6kdrv.c  352             |----+----+----------------------------------------------
+                        568 ; tvp6kdrv.c  353             | 90 | 00 | SWPF=0, HSC=0x0, VSC=0x0, SCN=0
+                        569 ; tvp6kdrv.c  354             |----+----+----------------------------------------------
+                        570 ; tvp6kdrv.c  355             | 91 | 00 | SLPF=0x000
+                        571 ; tvp6kdrv.c  356             |----+----+----------------------------------------------
+                        572 ; tvp6kdrv.c  357             | 92 | 00 | SPPL=0x000
+                        573 ; tvp6kdrv.c  358             |----+----+----------------------------------------------
+                        574 ; tvp6kdrv.c  359             | 93 | 00 |
+                        575 ; tvp6kdrv.c  360             |----+----+----------------------------------------------
+                        576 ; tvp6kdrv.c  361             | 94 | 00 | DLPF=0x000
+                        577 ; tvp6kdrv.c  362             |----+----+----------------------------------------------
+                        578 ; tvp6kdrv.c  363             | 95 | 00 | DPPL=0x000
+                        579 ; tvp6kdrv.c  364             |----+----+----------------------------------------------
+                        580 ; tvp6kdrv.c  365             | 96 | 00 |
+                        581 ; tvp6kdrv.c  366             |----+----+----------------------------------------------
+                        582 ; tvp6kdrv.c  367             | 97 | 00 | VDTA=0x0000
+                        583 ; tvp6kdrv.c  368             |----+----+----------------------------------------------
+                        584 ; tvp6kdrv.c  369             | 98 | 00 |
+                        585 ; tvp6kdrv.c  370             |----+----+----------------------------------------------
+                        586 ; tvp6kdrv.c  371             | 99 | 00 | HDTA=0x0000
+                        587 ; tvp6kdrv.c  372             |----+----+----------------------------------------------
+                        588 ; tvp6kdrv.c  373             | 9A | 00 |
+                        589 ; tvp6kdrv.c  374             |----+----+----------------------------------------------
+                        590 ; tvp6kdrv.c  375             | 9B | 00 | VOFS=0x00
+                        591 ; tvp6kdrv.c  376             |----+----+----------------------------------------------
+                        592 ; tvp6kdrv.c  377             | 9C | 00 | HOFS=0x00
+                        593 ; tvp6kdrv.c  378             |----+----+----------------------------------------------
+                        594 ; tvp6kdrv.c  379             | 9D | 00 | NLR=0x00
+                        595 ; tvp6kdrv.c  380             |--------------------------------------------------------
+                        596 ; tvp6kdrv.c  381             */
+                        597 ; tvp6kdrv.c  382       
+                        598 ; tvp6kdrv.c  383             // NTSC US
+                        599 ; tvp6kdrv.c  384       
+                        600 ; tvp6kdrv.c  385             buffer[0] = 0x3A;
+000158 92783A           602         MOV.B   [R7],#03AH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        603 ; tvp6kdrv.c  386             buffer[1] = 0x8F;
+00015B 9478018F         605         MOV.B   [R7+1],#08FH
+                        606 ; tvp6kdrv.c  387             TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV);
+00015F 91A8rr           608         MOV.B   R5L,#SEG( __lc_bs )
+000162 71BB             609         XOR.B   R5H,R5H
+000164 8947             610         MOV.W   R4,R7
+000166 912800           611         MOV.B   R1L,#00H
+000169 8935             612         MOV.W   R3,R5
+00016B 8924             613         MOV.W   R2,R4
+00016D 911802           614         MOV.B   R0H,#02H
+000170 910840           616         MOV.B   R0L,#040H
+                        617         CALL    _TransmitIIC
+000173 C4rrrrrr        +617 ;       FCALL   _TransmitIIC
+                        618 ; tvp6kdrv.c  388       
+                        619 ; tvp6kdrv.c  389             buffer[0] = 0x5A;
+000177 92785A           621         MOV.B   [R7],#05AH
+                        622 ; tvp6kdrv.c  390             buffer[1] = 0x00;
+00017A B47001           624         MOV.B   [R7+1],#00H
+                        625 ; tvp6kdrv.c  391             buffer[2] = 0xFF & NTSC_Gain_U;    // [5B]        // was 0x01, 0x03
+                            
+00017D 94780212         627         MOV.B   [R7+2],#012H
+                        628 ; tvp6kdrv.c  392             buffer[3] = 0xFF & NTSC_Gain_V;    // [5C]        // was 0x6B, 0x6E
+                            
+000181 94780385         630         MOV.B   [R7+3],#085H
+                        631 ; tvp6kdrv.c  393             buffer[4] = NTSC_Black_level | ((NTSC_Gain_U & 0x100) >> 1);   // [
+                            5D]
+000185 947804C1         633         MOV.B   [R7+4],#0C1H
+                        634 ; tvp6kdrv.c  394             buffer[5] = NTSC_Blank_level | ((NTSC_Gain_V & 0x100) >> 1);   // [
+                            5E]
+000189 947805B8         636         MOV.B   [R7+5],#0B8H
+                        637 ; tvp6kdrv.c  395             buffer[6] = 0xFF & NTSC_Gain_Y;  // [5F]       // was 0x2E
+00018D 94780630         639         MOV.B   [R7+6],#030H
+                        640 ; tvp6kdrv.c  396             buffer[7] = 0x00 | ((NTSC_Gain_Y & 0x100) >> 3);  // [60]
+000191 94780720         642         MOV.B   [R7+7],#020H
+                        643 ; tvp6kdrv.c  397             buffer[8] = 0x41;    // [61]
+000195 94780841         645         MOV.B   [R7+8],#041H
+                        646 ; tvp6kdrv.c  398             buffer[9] = NTSC_COLOR_BURST_AMP;  // [62]               // was 0x3
+                            8
+000199 9478093C         648         MOV.B   [R7+9],#03CH
+                        649 ; tvp6kdrv.c  399             buffer[10] = 0x1F;    // [63]
+00019D 94780A1F         651         MOV.B   [R7+10],#01FH
+                        652 ; tvp6kdrv.c  400             buffer[11] = 0x7C;    // [64]
+0001A1 94780B7C         654         MOV.B   [R7+11],#07CH
+                        655 ; tvp6kdrv.c  401             buffer[12] = 0xF0;    // [65]
+0001A5 94780CF0         657         MOV.B   [R7+12],#0F0H
+                        658 ; tvp6kdrv.c  402             buffer[13] = 0x21;    // [66]
+0001A9 94780D21         660         MOV.B   [R7+13],#021H
+                        661 ; tvp6kdrv.c  403             TransmitIIC( TVP6K_IIC_address, 14, buffer, IIC_PTV);
+0001AD 912800           663         MOV.B   R1L,#00H
+0001B0 8935             664         MOV.W   R3,R5
+0001B2 8924             665         MOV.W   R2,R4
+0001B4 91180E           666         MOV.B   R0H,#0EH
+0001B7 910840           667         MOV.B   R0L,#040H
+                        668         CALL    _TransmitIIC
+0001BA C4rrrrrr        +668 ;       FCALL   _TransmitIIC
+                        669 ; tvp6kdrv.c  404       
+                        670 ; tvp6kdrv.c  405             buffer[0] = 0x67;
+0001BE 927867           672         MOV.B   [R7],#067H
+                        673 ; tvp6kdrv.c  406             buffer[1] = 0x00;
+0001C1 B47001           675         MOV.B   [R7+1],#00H
+                        676 ; tvp6kdrv.c  407             buffer[2] = 0x00;
+0001C4 B47002           678         MOV.B   [R7+2],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        679 ; tvp6kdrv.c  408             buffer[3] = 0x00;
+0001C7 B47003           681         MOV.B   [R7+3],#00H
+                        682 ; tvp6kdrv.c  409             buffer[4] = 0x00;
+0001CA B47004           684         MOV.B   [R7+4],#00H
+                        685 ; tvp6kdrv.c  410             buffer[5] = 0x11;
+0001CD 94780511         687         MOV.B   [R7+5],#011H
+                        688 ; tvp6kdrv.c  411             buffer[6] = 0xA0;
+0001D1 947806A0         690         MOV.B   [R7+6],#0A0H
+                        691 ; tvp6kdrv.c  412             buffer[7] = 0x00;
+0001D5 B47007           693         MOV.B   [R7+7],#00H
+                        694 ; tvp6kdrv.c  413             buffer[8] = 0x0A;
+0001D8 9478080A         696         MOV.B   [R7+8],#0AH
+                        697 ; tvp6kdrv.c  414             buffer[9] = 0x01;
+0001DC B47109           699         MOV.B   [R7+9],#01H
+                        700 ; tvp6kdrv.c  415             buffer[10] = 0xC0;
+0001DF 94780AC0         702         MOV.B   [R7+10],#0C0H
+                        703 ; tvp6kdrv.c  416             buffer[11] = 0x82;
+0001E3 94780B82         705         MOV.B   [R7+11],#082H
+                        706 ; tvp6kdrv.c  417             buffer[12] = 0x46;
+0001E7 94780C46         708         MOV.B   [R7+12],#046H
+                        709 ; tvp6kdrv.c  418             buffer[13] = 0x30;
+0001EB 94780D30         711         MOV.B   [R7+13],#030H
+0001EF 912800           712         MOV.B   R1L,#00H
+0001F2 8935             713         MOV.W   R3,R5
+0001F4 8924             714         MOV.W   R2,R4
+0001F6 910840           715         MOV.B   R0L,#040H
+                        716 ; tvp6kdrv.c  419       
+                        717 ; tvp6kdrv.c  420             TransmitIIC( TVP6K_IIC_address, 14, buffer, IIC_PTV);
+0001F9 91180E           719         MOV.B   R0H,#0EH
+                        720         CALL    _TransmitIIC
+0001FC C4rrrrrr        +720 ;       FCALL   _TransmitIIC
+                        721 ; tvp6kdrv.c  421       
+                        722 ; tvp6kdrv.c  422             buffer[0] = 0x77;
+000200 927877           724         MOV.B   [R7],#077H
+                        725 ; tvp6kdrv.c  423             buffer[1] = 0x82;
+000203 94780182         727         MOV.B   [R7+1],#082H
+                        728 ; tvp6kdrv.c  424             buffer[2] = 0x46;
+000207 94780246         730         MOV.B   [R7+2],#046H
+                        731 ; tvp6kdrv.c  425             buffer[3] = 0x30;
+00020B 94780330         733         MOV.B   [R7+3],#030H
+                        734 ; tvp6kdrv.c  426             buffer[4] = 0x0C;
+00020F 9478040C         736         MOV.B   [R7+4],#0CH
+                        737 ; tvp6kdrv.c  427             buffer[5] = 0x11;
+000213 94780511         739         MOV.B   [R7+5],#011H
+                        740 ; tvp6kdrv.c  428             buffer[6] = 0x03;
+000217 B47306           742         MOV.B   [R7+6],#03H
+                        743 ; tvp6kdrv.c  429             buffer[7] = 0x22;
+00021A 94780722         745         MOV.B   [R7+7],#022H
+                        746 ; tvp6kdrv.c  430             buffer[8] = 0x0A;
+00021E 9478080A         748         MOV.B   [R7+8],#0AH
+                        749 ; tvp6kdrv.c  431             TransmitIIC( TVP6K_IIC_address, 9, buffer, IIC_PTV);
+000222 911809           751         MOV.B   R0H,#09H
+000225 912800           752         MOV.B   R1L,#00H
+000228 8935             753         MOV.W   R3,R5
+00022A 8924             754         MOV.W   R2,R4
+00022C 910840           755         MOV.B   R0L,#040H
+                        756         CALL    _TransmitIIC
+00022F C4rrrrrr        +756 ;       FCALL   _TransmitIIC
+                        757 ; tvp6kdrv.c  432       
+                        758 ; tvp6kdrv.c  433             buffer[0] = 0x90;
+000233 927890           760         MOV.B   [R7],#090H
+                        761 ; tvp6kdrv.c  434             buffer[1] = 0x00;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000236 B47001           763         MOV.B   [R7+1],#00H
+                        764 ; tvp6kdrv.c  435             buffer[2] = 0x00;
+000239 B47002           766         MOV.B   [R7+2],#00H
+                        767 ; tvp6kdrv.c  436             buffer[3] = 0x00;
+00023C B47003           769         MOV.B   [R7+3],#00H
+                        770 ; tvp6kdrv.c  437             buffer[4] = 0x00;
+00023F B47004           772         MOV.B   [R7+4],#00H
+                        773 ; tvp6kdrv.c  438             buffer[5] = 0x00;
+000242 B47005           775         MOV.B   [R7+5],#00H
+                        776 ; tvp6kdrv.c  439             buffer[6] = 0x00;
+000245 B47006           778         MOV.B   [R7+6],#00H
+                        779 ; tvp6kdrv.c  440             buffer[7] = 0x00;
+000248 B47007           781         MOV.B   [R7+7],#00H
+                        782 ; tvp6kdrv.c  441             buffer[8] = 0x00;
+00024B B47008           784         MOV.B   [R7+8],#00H
+                        785 ; tvp6kdrv.c  442             buffer[9] = 0x00;
+00024E B47009           787         MOV.B   [R7+9],#00H
+                        788 ; tvp6kdrv.c  443             buffer[10] = 0x00;
+000251 B4700A           790         MOV.B   [R7+10],#00H
+                        791 ; tvp6kdrv.c  444             buffer[11] = 0x00;
+000254 B4700B           793         MOV.B   [R7+11],#00H
+                        794 ; tvp6kdrv.c  445             buffer[12] = 0x00;
+000257 B4700C           796         MOV.B   [R7+12],#00H
+                        797 ; tvp6kdrv.c  446             buffer[13] = 0x00;
+00025A B4700D           799         MOV.B   [R7+13],#00H
+                        800 ; tvp6kdrv.c  447             buffer[14] = 0x00;
+00025D B4700E           802         MOV.B   [R7+14],#00H
+                        803 ; tvp6kdrv.c  448       
+                        804 ; tvp6kdrv.c  449             TransmitIIC( TVP6K_IIC_address, 15, buffer, IIC_PTV);
+000260 912800           806         MOV.B   R1L,#00H
+000263 8935             807         MOV.W   R3,R5
+000265 8924             808         MOV.W   R2,R4
+000267 91180F           809         MOV.B   R0H,#0FH
+00026A 910840           810         MOV.B   R0L,#040H
+                        811         CALL    _TransmitIIC
+00026D C4rrrrrr        +811 ;       FCALL   _TransmitIIC
+                        812 ; tvp6kdrv.c  450       
+                        813 ; tvp6kdrv.c  451             buffer[0] = 0x3A;
+000271 92783A           815         MOV.B   [R7],#03AH
+                        816 ; tvp6kdrv.c  452             buffer[1] = 0x0F;
+000274 9478010F         818         MOV.B   [R7+1],#0FH
+                        819 ; tvp6kdrv.c  453             TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV);
+000278 911802           821         MOV.B   R0H,#02H
+00027B 910840           822         MOV.B   R0L,#040H
+00027E 8935             823         MOV.W   R3,R5
+000280 8924             824         MOV.W   R2,R4
+000282 912800           825         MOV.B   R1L,#00H
+                        826         CALL    _TransmitIIC
+000285 C4rrrrrr        +826 ;       FCALL   _TransmitIIC
+                        827 ; tvp6kdrv.c  454           }
+                        829         BR      _6
+000289 D50099          +829         JMP.L   _6
+000289 D50099          +829         JMP.L   _6
+00028C                  830 _4:
+                        831 ; tvp6kdrv.c  455           else
+                        832 ; tvp6kdrv.c  456           {
+                        833 ; tvp6kdrv.c  457             // NTSC J
+                        834 ; tvp6kdrv.c  458       
+                        835 ; tvp6kdrv.c  459           buffer[0] = 0x3A;
+00028C 92783A           837         MOV.B   [R7],#03AH
+                        838 ; tvp6kdrv.c  460           buffer[1] = 0x8F;
+00028F 9478018F         840         MOV.B   [R7+1],#08FH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                        841 ; tvp6kdrv.c  461           TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV);
+000293 91A8rr           843         MOV.B   R5L,#SEG( __lc_bs )
+000296 71BB             844         XOR.B   R5H,R5H
+000298 8947             845         MOV.W   R4,R7
+00029A 912800           846         MOV.B   R1L,#00H
+00029D 8935             847         MOV.W   R3,R5
+00029F 8924             848         MOV.W   R2,R4
+0002A1 911802           849         MOV.B   R0H,#02H
+0002A4 910840           850         MOV.B   R0L,#040H
+                        851         CALL    _TransmitIIC
+0002A7 C4rrrrrr        +851 ;       FCALL   _TransmitIIC
+                        852 ; tvp6kdrv.c  462       
+                        853 ; tvp6kdrv.c  463           buffer[0] = 0x5A;
+0002AB 92785A           855         MOV.B   [R7],#05AH
+                        856 ; tvp6kdrv.c  464           buffer[1] = 0x00;
+0002AE B47001           858         MOV.B   [R7+1],#00H
+                        859 ; tvp6kdrv.c  465           buffer[2] = 0xFF & JNTSC_Gain_U;    // [5B]        // was 0x01, 0x03
+0002B1 9478022B         861         MOV.B   [R7+2],#02BH
+                        862 ; tvp6kdrv.c  466           buffer[3] = 0xFF & JNTSC_Gain_V;    // [5C]        // was 0x6B, 0x6E
+0002B5 947803A3         864         MOV.B   [R7+3],#0A3H
+                        865 ; tvp6kdrv.c  467           buffer[4] = JNTSC_Black_level | ((JNTSC_Gain_U & 0x100) >> 1);   // [
+                            5D]
+0002B9 947804AD         867         MOV.B   [R7+4],#0ADH
+                        868 ; tvp6kdrv.c  468           buffer[5] = JNTSC_Blank_level | ((JNTSC_Gain_V & 0x100) >> 1);   // [
+                            5E]
+0002BD 947805B8         870         MOV.B   [R7+5],#0B8H
+                        871 ; tvp6kdrv.c  469           buffer[6] = 0xFF & JNTSC_Gain_Y;  // [5F]       // was 0x2E
+0002C1 94780646         873         MOV.B   [R7+6],#046H
+                        874 ; tvp6kdrv.c  470           buffer[7] = 0x00 | ((JNTSC_Gain_Y & 0x100) >> 3);  // [60]
+0002C5 94780720         876         MOV.B   [R7+7],#020H
+                        877 ; tvp6kdrv.c  471           buffer[8] = 0x41;    // [61]
+0002C9 94780841         879         MOV.B   [R7+8],#041H
+                        880 ; tvp6kdrv.c  472           buffer[9] = JNTSC_COLOR_BURST_AMP;  // [62]               // was 0x38
+                            
+0002CD 9478093C         882         MOV.B   [R7+9],#03CH
+                        883 ; tvp6kdrv.c  473           buffer[10] = 0x1F;    // [63]
+0002D1 94780A1F         885         MOV.B   [R7+10],#01FH
+                        886 ; tvp6kdrv.c  474           buffer[11] = 0x7C;    // [64]
+0002D5 94780B7C         888         MOV.B   [R7+11],#07CH
+                        889 ; tvp6kdrv.c  475           buffer[12] = 0xF0;    // [65]
+0002D9 94780CF0         891         MOV.B   [R7+12],#0F0H
+                        892 ; tvp6kdrv.c  476           buffer[13] = 0x21;    // [66]
+0002DD 94780D21         894         MOV.B   [R7+13],#021H
+                        895 ; tvp6kdrv.c  477           TransmitIIC( TVP6K_IIC_address, 14, buffer, IIC_PTV);
+0002E1 912800           897         MOV.B   R1L,#00H
+0002E4 8935             898         MOV.W   R3,R5
+0002E6 8924             899         MOV.W   R2,R4
+0002E8 91180E           900         MOV.B   R0H,#0EH
+0002EB 910840           901         MOV.B   R0L,#040H
+                        902         CALL    _TransmitIIC
+0002EE C4rrrrrr        +902 ;       FCALL   _TransmitIIC
+                        903 ; tvp6kdrv.c  478       
+                        904 ; tvp6kdrv.c  479           buffer[0] = 0x67;
+0002F2 927867           906         MOV.B   [R7],#067H
+                        907 ; tvp6kdrv.c  480           buffer[1] = 0x00;
+0002F5 B47001           909         MOV.B   [R7+1],#00H
+                        910 ; tvp6kdrv.c  481           buffer[2] = 0x00;
+0002F8 B47002           912         MOV.B   [R7+2],#00H
+                        913 ; tvp6kdrv.c  482           buffer[3] = 0x00;
+0002FB B47003           915         MOV.B   [R7+3],#00H
+                        916 ; tvp6kdrv.c  483           buffer[4] = 0x00;
+0002FE B47004           918         MOV.B   [R7+4],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+                        919 ; tvp6kdrv.c  484           buffer[5] = 0x11;
+000301 94780511         921         MOV.B   [R7+5],#011H
+                        922 ; tvp6kdrv.c  485           buffer[6] = 0xA0;
+000305 947806A0         924         MOV.B   [R7+6],#0A0H
+                        925 ; tvp6kdrv.c  486           buffer[7] = 0x00;
+000309 B47007           927         MOV.B   [R7+7],#00H
+                        928 ; tvp6kdrv.c  487           buffer[8] = 0x0A;
+00030C 9478080A         930         MOV.B   [R7+8],#0AH
+                        931 ; tvp6kdrv.c  488           buffer[9] = 0x01;
+000310 B47109           933         MOV.B   [R7+9],#01H
+                        934 ; tvp6kdrv.c  489           buffer[10] = 0xC0;
+000313 94780AC0         936         MOV.B   [R7+10],#0C0H
+                        937 ; tvp6kdrv.c  490           buffer[11] = 0x82;
+000317 94780B82         939         MOV.B   [R7+11],#082H
+                        940 ; tvp6kdrv.c  491           buffer[12] = 0x46;
+00031B 94780C46         942         MOV.B   [R7+12],#046H
+                        943 ; tvp6kdrv.c  492           buffer[13] = 0x30;
+00031F 94780D30         945         MOV.B   [R7+13],#030H
+000323 912800           946         MOV.B   R1L,#00H
+000326 8935             947         MOV.W   R3,R5
+000328 8924             948         MOV.W   R2,R4
+00032A 910840           949         MOV.B   R0L,#040H
+                        950 ; tvp6kdrv.c  493       
+                        951 ; tvp6kdrv.c  494           TransmitIIC( TVP6K_IIC_address, 14, buffer, IIC_PTV);
+00032D 91180E           953         MOV.B   R0H,#0EH
+                        954         CALL    _TransmitIIC
+000330 C4rrrrrr        +954 ;       FCALL   _TransmitIIC
+                        955 ; tvp6kdrv.c  495       
+                        956 ; tvp6kdrv.c  496           buffer[0] = 0x77;
+000334 927877           958         MOV.B   [R7],#077H
+                        959 ; tvp6kdrv.c  497           buffer[1] = 0x82;
+000337 94780182         961         MOV.B   [R7+1],#082H
+                        962 ; tvp6kdrv.c  498           buffer[2] = 0x46;
+00033B 94780246         964         MOV.B   [R7+2],#046H
+                        965 ; tvp6kdrv.c  499           buffer[3] = 0x30;
+00033F 94780330         967         MOV.B   [R7+3],#030H
+                        968 ; tvp6kdrv.c  500           buffer[4] = 0x0C;
+000343 9478040C         970         MOV.B   [R7+4],#0CH
+                        971 ; tvp6kdrv.c  501           buffer[5] = 0x11;
+000347 94780511         973         MOV.B   [R7+5],#011H
+                        974 ; tvp6kdrv.c  502           buffer[6] = 0x03;
+00034B B47306           976         MOV.B   [R7+6],#03H
+                        977 ; tvp6kdrv.c  503           buffer[7] = 0x22;
+00034E 94780722         979         MOV.B   [R7+7],#022H
+                        980 ; tvp6kdrv.c  504           buffer[8] = 0x0A;
+000352 9478080A         982         MOV.B   [R7+8],#0AH
+                        983 ; tvp6kdrv.c  505           TransmitIIC( TVP6K_IIC_address, 9, buffer, IIC_PTV);
+000356 911809           985         MOV.B   R0H,#09H
+000359 912800           986         MOV.B   R1L,#00H
+00035C 8935             987         MOV.W   R3,R5
+00035E 8924             988         MOV.W   R2,R4
+000360 910840           989         MOV.B   R0L,#040H
+                        990         CALL    _TransmitIIC
+000363 C4rrrrrr        +990 ;       FCALL   _TransmitIIC
+                        991 ; tvp6kdrv.c  506       
+                        992 ; tvp6kdrv.c  507           buffer[0] = 0x90;
+000367 927890           994         MOV.B   [R7],#090H
+                        995 ; tvp6kdrv.c  508           buffer[1] = 0x00;
+00036A B47001           997         MOV.B   [R7+1],#00H
+                        998 ; tvp6kdrv.c  509           buffer[2] = 0x00;
+00036D B47002          1000         MOV.B   [R7+2],#00H
+                       1001 ; tvp6kdrv.c  510           buffer[3] = 0x00;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+000370 B47003          1003         MOV.B   [R7+3],#00H
+                       1004 ; tvp6kdrv.c  511           buffer[4] = 0x00;
+000373 B47004          1006         MOV.B   [R7+4],#00H
+                       1007 ; tvp6kdrv.c  512           buffer[5] = 0x00;
+000376 B47005          1009         MOV.B   [R7+5],#00H
+                       1010 ; tvp6kdrv.c  513           buffer[6] = 0x00;
+000379 B47006          1012         MOV.B   [R7+6],#00H
+                       1013 ; tvp6kdrv.c  514           buffer[7] = 0x00;
+00037C B47007          1015         MOV.B   [R7+7],#00H
+                       1016 ; tvp6kdrv.c  515           buffer[8] = 0x00;
+00037F B47008          1018         MOV.B   [R7+8],#00H
+                       1019 ; tvp6kdrv.c  516           buffer[9] = 0x00;
+000382 B47009          1021         MOV.B   [R7+9],#00H
+                       1022 ; tvp6kdrv.c  517           buffer[10] = 0x00;
+000385 B4700A          1024         MOV.B   [R7+10],#00H
+                       1025 ; tvp6kdrv.c  518           buffer[11] = 0x00;
+000388 B4700B          1027         MOV.B   [R7+11],#00H
+                       1028 ; tvp6kdrv.c  519           buffer[12] = 0x00;
+00038B B4700C          1030         MOV.B   [R7+12],#00H
+                       1031 ; tvp6kdrv.c  520           buffer[13] = 0x00;
+00038E B4700D          1033         MOV.B   [R7+13],#00H
+                       1034 ; tvp6kdrv.c  521           buffer[14] = 0x00;
+000391 B4700E          1036         MOV.B   [R7+14],#00H
+                       1037 ; tvp6kdrv.c  522       
+                       1038 ; tvp6kdrv.c  523           TransmitIIC( TVP6K_IIC_address, 15, buffer, IIC_PTV);
+000394 912800          1040         MOV.B   R1L,#00H
+000397 8935            1041         MOV.W   R3,R5
+000399 8924            1042         MOV.W   R2,R4
+00039B 91180F          1043         MOV.B   R0H,#0FH
+00039E 910840          1044         MOV.B   R0L,#040H
+                       1045         CALL    _TransmitIIC
+0003A1 C4rrrrrr       +1045 ;       FCALL   _TransmitIIC
+                       1046 ; tvp6kdrv.c  524       
+                       1047 ; tvp6kdrv.c  525           buffer[0] = 0x3A;
+0003A5 92783A          1049         MOV.B   [R7],#03AH
+                       1050 ; tvp6kdrv.c  526           buffer[1] = 0x0F;
+0003A8 9478010F        1052         MOV.B   [R7+1],#0FH
+                       1053 ; tvp6kdrv.c  527           TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV);
+0003AC 911802          1055         MOV.B   R0H,#02H
+0003AF 910840          1056         MOV.B   R0L,#040H
+0003B2 8935            1057         MOV.W   R3,R5
+0003B4 8924            1058         MOV.W   R2,R4
+0003B6 912800          1059         MOV.B   R1L,#00H
+                       1060         CALL    _TransmitIIC
+0003B9 C4rrrrrr       +1060 ;       FCALL   _TransmitIIC
+                       1061 ; tvp6kdrv.c  528           }
+                       1062 ; tvp6kdrv.c  529         }
+0003BE                 1064 _6:
+                       1065 ; tvp6kdrv.c  530         return( OK);
+0003BE 9908FFFF        1067         MOV.W   R0,#0FFFFH
+                       1068 ; tvp6kdrv.c  531         }
+0003C2 99700010        1070         ADD.W   R7,#010H
+0003C6 2F30            1072         POP.W   R4, R5
+0003C8 D680            1074         RET
+                       1082         EXTRN   HCODE(_TransmitIIC)
+                       1083         EXTRN   IDATA(__lc_bs)
+                       1084         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1085         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1086         CALLS   'tvp6k_init', 'tvp6k_system'
+                       1087         CALLS   'tvp6k_system', 'TransmitIIC'

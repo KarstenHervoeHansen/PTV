@@ -1,0 +1,58 @@
+; @(#)cprhb.src	1.1 11/4/97
+;*****************************************************************************
+;*
+;* MODULE	: cprhb.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: Copy data block from rom data to huge data. The source and
+;*		  destination address pointers and the number of bytes to
+;*		  copy are passed to this copy routine via registers. The
+;*		  registers used are :
+;*
+;*		
+;*		  R3:R2 = address source (LARGE)
+;*		  DS:R2 = address source (MEDIUM)
+;*		  R5:R4 = address destination
+;*		  R6    = number of bytes to copy
+;*
+;* INPUT	: R2-R6
+;*
+;* OUTPUT	: none
+;*
+;* USES		: R1,R2-R6
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+		NAME _CPRHB
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+
+		PUBLIC	__CPRHB
+__CPRHB:
+IF	MODEL_MEDIUM
+	SETB	SSEL.2		; source addressed via CS
+	SETB	SSEL.4		; destination addressed via ES
+ENDIF
+loop:	MOV.B	CS,R3L		; source addressed via CS
+	MOV.B	ES,R5L		; destination addressed via ES
+	MOVC.B	R1L,[R2+]	; copy source to destination
+	MOV.B	[R4+],R1L	;
+	SUB.W	R2,#01H		;
+	ADD.W	R2,#01H		; increment source pointer
+	ADDC.W	R3,#00H		;
+	SUB.W	R4,#01H		;
+	ADD.W	R4,#01H		; increment destination pointer
+	ADDC.W	R5,#00H		;
+	DJNZ.W	R6,loop		; loop if count not zero
+IF	MODEL_MEDIUM
+	CLR	SSEL.2		; restore source pointer
+	CLR	SSEL.4		; restore destination pointer
+ENDIF
+	RET			; and return
+
+	END

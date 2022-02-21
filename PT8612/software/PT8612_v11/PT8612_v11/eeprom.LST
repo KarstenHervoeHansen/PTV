@@ -1,0 +1,657 @@
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE EEPROM
+OBJECT MODULE PLACED IN eeprom.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe eeprom.c DB OE LARGE
+
+line level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2004                                           */
+   3          /*  Project:  PT8641 Trilevel HDTV generator (PT8612),                     */
+   4          /*            using 8051F320 Cygnal processor.                             */
+   5          /*  Module:   eeprom.c                                                     */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     14.04.2004                                                   */
+   8          /*  Purpose:  This module implements functions to read and write onboard   */
+   9          /*            EEPROM memory of 24C08 type.                                 */
+  10          /*  Notes:                                                                 */
+  11          /*            Based on                                                     */
+  12          /*            "Interfacing SLx 24Cxx I 2 C-Bus Serial EEPROMs              */
+  13          /*             to 8051 Controller Family": ap083701.pdf                    */
+  14          /*                                                                         */
+  15          /*            This module implemets read and write functions described in  */
+  16          /*            Atmels                                                       */
+  17          /*                   AT24C02.pdf                                           */
+  18          /*                   "2-wire Serial EEPROM"      (1)                       */
+  19          /*            datasheet:                                                   */
+  20          /*            byte write, page write, acknowledge polling, current address */
+  21          /*            read, random read and sequential read.                       */
+  22          /*            Timing is done entirely in software, using NOPs.             */
+  23          /*            For 8051F231 running at 16.6 MHz the clock SCL is approx.    */
+  24          /*            200 kHz, for 16 NOPs in Delay16.  Acknowledge polling        */
+  25          /*            has a software timeout (WAIT_CYCLE), so functions will not   */
+  26          /*            hang in case of hardware failure.                            */
+  27          /*                                                                         */
+  28          /*   In case there is a fault on the bus, for instance, the SDA line is    */
+  29          /*   shorted to ground or pulled down to LOW by the slave device, this     */
+  30          /*   module will generate clock pulses until the line is released with the */
+  31          /*   time-out of 10 ms before returing a "HIGH" value from the I2cInit or  */
+  32          /*   I2cStop. For SCL line, it will monitor until the line is released     */
+  33          /*   with the time-out of 10 ms.                                           */
+  34          /*                                                                         */
+  35          /*   To use all 1 K of 24C08, outside program must control page bits P0    */
+  36          /*   and P1 in the "command" argument to functions in this module.         */
+  37          /*   See Figure 1. Device Address of (1)                                   */
+  38          /***************************************************************************/
+  39          #pragma WARNINGLEVEL (1) /* Lists only those warnings which may generate   */
+  40                                   /* incorrect code. Default is 2.                  */
+  41          /***************************************************************************/
+  42          
+  43          #include <C8051F320.h>
+  44          #include "define.h"
+  45          #include <intrins.h>
+  46          #include "eeprom.h"
+  47          
+  48          #include "io.c"
+  49          
+  50          #define NOP _nop_();
+  51          #define Delay1 NOP
+  52          #define Delay16 { NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP}
+  53          
+  54          #define PERIOD     2900   /* 2900 approximately 10 ms time out for bus faulty */
+  55          
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 2   
+
+  56          #define WAIT_CYCLE  100   /* 100 org  */
+  57          
+  58          UI time_out;
+  59          
+  60          void CheckClock(void);
+  61          UC   Check_SCL(void);
+  62          
+  63          #if 0
+              /******************************************************************************/
+              /* Function:    ByteWriteE2prom                                               */
+              /*                                                                            */
+              /* Description: Write data byte to E2PROM                                     */        
+              /*                                                                            */
+              /*              Data format for writing into memory:                          */
+              /*              |ST|  CSW  |As|  EEA  |As|  DB  |As|SP|                       */
+              /*                                                                            */
+              /*              ST=START, CSW= command byte write,                            */
+              /*              As=acknowledge from slave, EEA=EEPROM address                 */
+              /*              DB=data byte to be sent, SP=stop                              */         
+              /*                                                                            */
+              /* Args :       (command) = command byte                                      */
+              /*              (address) = EEPROM address                                    */
+              /*              (*buffer) = location of data byte to be sent                  */
+              /*                                                                            */
+              /* Returns:     "0" - the programming is OK                                   */
+              /*              "1" - the data transfer has no acknowledge from slave         */                       
+              /*                                                                            */
+              /* Notes:       This function is illustrated on Figure 2. Byte Write of (1)   */
+              /******************************************************************************/
+              UC ByteWriteE2prom(UC command, UC address, UC *buffer)
+                {
+                I2cStart();                     /* START condition  */
+                if (I2cMasterWrite(command))    /* command byte CSW (device address) */
+                  {
+                  I2cStop();
+                  return(1);        
+                  }
+                if (I2cMasterWrite(address))    /* EEPROM address */        
+                  {
+                  I2cStop();
+                  return(1);
+                  }
+                if (I2cMasterWrite(*buffer))    /* Data byte to be send */   
+                  {
+                  I2cStop();          
+                  return(1);
+                  }
+                I2cStop();                      /* STOP condition */        
+                return(0);
+                }                
+              #endif
+ 107          
+ 108          #if 1
+ 109          /******************************************************************************/
+ 110          /* Function:     PageWriteE2prom                                              */
+ 111          /*                                                                            */
+ 112          /* Description:  Write number of data bytes to E2PROM                         */        
+ 113          /*                                                                            */
+ 114          /*               Data format for writing into memory:                         */
+ 115          /*               |ST|  CSW  |As|  EEA  |As| DB |As| DB |As|...|SP|            */
+ 116          /*                                                                            */
+ 117          /*               ST=START, CSW= command byte write,                           */
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 3   
+
+ 118          /*               As=acknowledge from slave, EEA=EEPROM address                */
+ 119          /*               DB=data byte to be sent, SP=stop                             */         
+ 120          /*                                                                            */
+ 121          /* Args :        (command) = command byte                                     */
+ 122          /*               (address) = EEPROM address                                   */
+ 123          /*               (*buffer) = location of data byte to be sent                 */
+ 124          /*               (count)   = number of byte to be send                        */
+ 125          /*                                                                            */
+ 126          /* Returns:      "0" - the programming is OK                                  */
+ 127          /*               "1" - the data transfer has no acknowledge from slave        */                       
+ 128          /*                                                                            */
+ 129          /* Notes:        This function is illustrated on Figure 3. Page Write of (1)  */
+ 130          /*               Up to 16 bytes can be written for 24C08                      */
+ 131          /******************************************************************************/
+ 132          UC PageWriteE2prom(UC command, UC address, UC *buffer, UC count)
+ 133            {
+ 134   1        UC i;
+ 135   1        
+ 136   1        I2cStart();                    /* START condition  */
+ 137   1        if (I2cMasterWrite(command))   /* command byte CSW  (device address) */
+ 138   1          {
+ 139   2          I2cStop();
+ 140   2          return(1);        
+ 141   2          }
+ 142   1        if (I2cMasterWrite(address))   /* EEPROM address */        
+ 143   1          {
+ 144   2          I2cStop();
+ 145   2          return(1);
+ 146   2          }
+ 147   1        for (i = 0; i < count; i++)    /* bytes of data to be sent */
+ 148   1          {
+ 149   2          if (I2cMasterWrite(*buffer))           
+ 150   2            {
+ 151   3            I2cStop();  
+ 152   3            return(1);
+ 153   3            }
+ 154   2          buffer++;
+ 155   2          }
+ 156   1        I2cStop();                     /* STOP condition */
+ 157   1        Ack_pol_r(command);            /* check for end of programming to E2PROM */
+ 158   1        return(0);
+ 159   1        }                
+ 160          #endif
+ 161          /******************************************************************************/
+ 162          /* Function:     Ack_pol_r                                                    */
+ 163          /*                                                                            */
+ 164          /* Description:  Check for the completion of programming after the            */
+ 165          /*               memory write with a read sequence. If the programming        */
+ 166          /*               is completed, the acknowledge bit will be "0".               */        
+ 167          /*                                                                            */
+ 168          /*               Data format for writing into memory:                         */
+ 169          /*                |ST|  CSR  |ST|  CSR  |......|As|DA|SP|                     */
+ 170          /*                                                                            */
+ 171          /*               ST=START, CSW= command byte write, As=acknowledge            */
+ 172          /*               from slave, DA=data byte to be read, SP=stop                 */
+ 173          /*                                                                            */ 
+ 174          /*                                                                            */
+ 175          /* Args :        (command) = command byte                                     */
+ 176          /*                                                                            */
+ 177          /* Return:        "0" - the programming is finished                           */
+ 178          /*                "1" - the programming is not finished, an error             */
+ 179          /*                      occured                                               */                       
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 4   
+
+ 180          /*                                                                            */
+ 181          /******************************************************************************/
+ 182          UC Ack_pol_r(UC command)
+ 183            {
+ 184   1        UC wait_cycle;        
+ 185   1        
+ 186   1        wait_cycle = WAIT_CYCLE;
+ 187   1      
+ 188   1        while (wait_cycle --)        
+ 189   1          {
+ 190   2          I2cStart();
+ 191   2          if (!I2cMasterWrite(command + 1)) /* wait if SCL is pulled down to LOW by */
+ 192   2            {                               /* slave device */
+ 193   3            I2cMasterRead(1); 
+ 194   3            I2cStop();
+ 195   3            return (0);
+ 196   3            }
+ 197   2          }
+ 198   1        return (1);    /* ERROR: SCL line is stuck to low */
+ 199   1        } 
+ 200          
+ 201          /******************************************************************************/
+ 202          /* Function:     Ack_pol_w                                                    */
+ 203          /*                                                                            */
+ 204          /* Description:  Check for the completion of programming after the            */
+ 205          /*               memory write with a write sequence. If the programming       */
+ 206          /*               is completed, the acknowledge bit will be "0".               */        
+ 207          /*                                                                            */
+ 208          /*               Data format for writing into memory:                         */
+ 209          /*               |ST|  CSW  |ST|  CSW  |......|As|SP|                         */
+ 210          /*                                                                            */
+ 211          /*               ST=START, CSW= command byte write,                           */
+ 212          /*               As=acknowledge from slave, SP=stop                           */
+ 213          /*                                                                            */
+ 214          /* Args :        (command) = command byte                                     */
+ 215          /*                                                                            */
+ 216          /* Return:       "0" - the programming is finished                            */
+ 217          /*               "1" - the programming is not finished, an error              */
+ 218          /*                     occured                                                */                       
+ 219          /*                                                                            */
+ 220          /******************************************************************************/
+ 221          #if 0
+              UC Ack_pol_w(UC command)
+                {
+                UC wait_cycle;
+                
+                wait_cycle = WAIT_CYCLE;  /* wait_cycle at least 10mS */
+              
+                while (wait_cycle --)        
+                  {
+                  I2cStart();
+                  if (!I2cMasterWrite(command)) /* wait if SCL is pulled down to LOW by slave device */
+                    { 
+                    I2cStop();
+                    return (0);
+                    }
+                  }
+                return (1);  /* ERROR: SCL line is stuck to low */
+                } 
+              #endif
+ 240          
+ 241          #if 0
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 5   
+
+              /******************************************************************************/
+              /* Function:     RandomReadE2prom                                             */
+              /*                                                                            */        
+              /* Description:  Read number of data bytes from E2PROM                        */        
+              /*                                                                            */
+              /*               Data format for reading from the memory:                     */
+              /*               |ST| CSW |As| EEA |As|ST| CSR |As| DA |NAm|SP|               */
+              /*                                                                            */
+              /*               ST=START, CSW= command byte write,                           */
+              /*               As=acknowledge from slave, EEA=EEPROM address                */
+              /*               CSR=command byte read, NAm=no aknowledge from master         */
+              /*               DA=data byte to be read, SP=stop                             */
+              /*                                                                            */
+              /*                                                                            */
+              /*                                                                            */
+              /* Args :        (command) = command byte                                     */
+              /*               (address) = EEPROM address                                   */
+              /*               (*buffer) = location of data to be stored                    */
+              /*                                                                            */
+              /*                                                                            */
+              /* Returns:      "0" - the reading of data is OK                              */
+              /*               "1" - the data transfer has no acknowledge from slave        */                       
+              /*                                                                            */
+              /* Notes:        This function is illustrated on Figure 5. Random Read of (1) */
+              /******************************************************************************/
+              UC RandomReadE2prom(UC command, UC  address, UC *buffer)
+                {
+                I2cStart();                    /* START condition  */
+                
+                if (I2cMasterWrite(command))   /* command byte CSW  (device address) */
+                  {
+                  I2cStop();
+                  return(1);
+                  }
+                if (I2cMasterWrite(address))   /* EEPROM address */        
+                  {                            
+                  I2cStop();
+                  return(1);
+                  }
+                I2cStart();                       /* START condition  */
+                if (I2cMasterWrite(command + 1))  /* command byte CSR */
+                  {                                       
+                  I2cStop();
+                  return(1);
+                  }
+                *buffer = I2cMasterRead(1);     /* byte read with "HIGH"/ No acknowlege */
+                I2cStop();                      /* STOP condition */
+                return(0);
+                }
+              #endif
+ 292          
+ 293          #if 0
+              /******************************************************************************/
+              /* Function:     CurrentReadE2prom                                            */
+              /*                                                                            */        
+              /* Description:  Read data byte from E2PROM without setting                   */
+              /*               the address counter                                          */
+              /*                                                                            */
+              /*                                                                            */
+              /*               Data format for reading from the memory:                     */
+              /*               |ST| CSR |As| DA |NAm|SP|                                    */
+              /*                                                                            */
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 6   
+
+              /*               ST=START, As=acknowledge from slave,                         */
+              /*               CSR= command byte read, NAm=no aknowledge from master        */
+              /*               DA=data byte to be read, SP=stop                             */
+              /*                                                                            */
+              /*                                                                            */
+              /*                                                                            */
+              /* Args :        command) = command byte                                      */
+              /*               (*buffer) = location of data to be stored                    */
+              /*                                                                            */
+              /* Returns:     "0" - the reading of data is OK                               */
+              /*              "1" - the data transfer has no acknowledge from slave         */                       
+              /*                                                                            */
+              /* Notes:       This function is illustrated on Figure 4. Current Address     */
+              /*              Read of (1)                                                   */
+              /******************************************************************************/
+              UC CurrentReadE2prom(UC command, UC *buffer)
+                {
+                I2cStart();                       /* START condition  */
+                if (I2cMasterWrite(command + 1))   /* command byte CSW  (device address) */
+                  {                                       
+                  I2cStop();
+                  return(1);
+                  }
+                *buffer = I2cMasterRead(1);     /*  byte read with "HIGH"/No acknowlege */
+                                             
+                I2cStop();                      /* STOP condition */
+                return(0);
+                }
+              #endif 
+ 333          /******************************************************************************/
+ 334          /* Function:     SeqReadE2prom                                                */
+ 335          /*                                                                            */        
+ 336          /* Description:  Read number of data bytes from E2PROM                        */        
+ 337          /*                                                                            */
+ 338          /*                                                                            */
+ 339          /*               Data format for reading from the memory:                     */
+ 340          /*               |ST| CSW |As| EEA |As|ST| CSR |As| DA |Am|...| DA |NAm|SP|   */
+ 341          /*                                                                            */
+ 342          /*               ST=START, CSW= command byte write ,                          */
+ 343          /*               As=acknowledge from slave, EEA=EEPROM address                */
+ 344          /*               CSR= command byte read , Am=aknowledge from master,          */
+ 345          /*               NAm=no aknowledge from master, DA=data byte to be read       */
+ 346          /*               SP=stop                                                      */
+ 347          /* Args :        (command) = command byte                                     */
+ 348          /*               (address) = EEPROM address                                   */
+ 349          /*               (*buffer) = location of data to be stored                    */
+ 350          /*               (count)   = number of byte to be received                    */
+ 351          /*                                                                            */
+ 352          /* Return:       "0" - the reading of data is OK                              */
+ 353          /*               "1" - the data transfer has no acknowledge from slave        */                       
+ 354          /*                                                                            */
+ 355          /* Notes:        This function is illustrated on Figure 6. Seq. Read of (1)   */
+ 356          /******************************************************************************/
+ 357          UC SeqReadE2prom(UC command, UC  address, UC *buffer, UC count)
+ 358            {
+ 359   1        UC i;
+ 360   1        
+ 361   1        I2cStart();                    /* START condition  */
+ 362   1        if (I2cMasterWrite(command))   /* command byte CSW  (device address) */
+ 363   1          {
+ 364   2          I2cStop();
+ 365   2          return(1);
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 7   
+
+ 366   2          }
+ 367   1        if (I2cMasterWrite(address))         /* EEPROM address */
+ 368   1          {                            
+ 369   2          I2cStop();
+ 370   2          return(1);
+ 371   2          }
+ 372   1        I2cStart();                          /* START condition  */
+ 373   1          if (I2cMasterWrite(command + 1))   /* command byte CSR (read) */
+ 374   1          {                                       
+ 375   2          I2cStop();
+ 376   2          return(1);
+ 377   2          }
+ 378   1      
+ 379   1        for (i = 0; i < count - 1; i++) /* number of bytes to be read */
+ 380   1          {
+ 381   2          *buffer = I2cMasterRead(0);
+ 382   2          buffer++;
+ 383   2          }
+ 384   1        *buffer = I2cMasterRead(1);     /* last byte read with "HIGH"/No acknowlege */
+ 385   1        I2cStop();                      /* STOP condition */
+ 386   1        return(0);
+ 387   1        }
+ 388          
+ 389          /******************************************************************************/
+ 390          /*                         Low Level Functions                                */
+ 391          /******************************************************************************/
+ 392          
+ 393          /******************************************************************************/
+ 394          /* Function:      CheckClock                                                  */
+ 395          /*                                                                            */
+ 396          /* Description:   Send HIGH and read the SCL line. It will wait until         */
+ 397          /*                the line has been released from slave device for            */
+ 398          /*                every bit of data to be sent or received.                   */
+ 399          /*                                                                            */
+ 400          /*      Args :    None                                                        */
+ 401          /*                                                                            */
+ 402          /*      Return:   None                                                        */
+ 403          /*                                                                            */
+ 404          /******************************************************************************/
+ 405          #if 0
+              void CheckClock(void)
+                {
+                while (!SCL)  /* check for wait state before sending or receiving any data. */
+                  SCL = 1;
+                }
+              #endif
+ 412          /******************************************************************************/
+ 413          /* Function:      Check_SCL                                                   */
+ 414          /*                                                                            */
+ 415          /* Description:   Send HIGH and read the SCL line. It will wait until         */
+ 416          /*                the line has been released from slave device with the       */
+ 417          /*                time out of approximately 10 ms.                            */        
+ 418          /*                                                                            */
+ 419          /* Args :         None                                                        */
+ 420          /*                                                                            */
+ 421          /* Return:        "0" - SCL line is OK                                        */
+ 422          /*                "1" - SCL line is faulty                                    */
+ 423          /*                                                                            */
+ 424          /******************************************************************************/
+ 425          UC Check_SCL(void)
+ 426            {
+ 427   1        time_out = PERIOD;    
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 8   
+
+ 428   1      
+ 429   1        while (time_out--)        
+ 430   1          {
+ 431   2          if (!SCL)           /* wait if SCL is pulled down to LOW by slave device */
+ 432   2            {
+ 433   3            SCL = 1;          /* set clock to high */
+ 434   3            return (0);
+ 435   3            }
+ 436   2          }
+ 437   1        return (1);           /* ERROR: SCL line is stuck to low */
+ 438   1        }
+ 439          
+ 440          /******************************************************************************/
+ 441          /* Function:        I2cInit                                                   */
+ 442          /*                                                                            */
+ 443          /* Description:     Initialize the I2C bus                                    */        
+ 444          /*                                                                            */
+ 445          /* Args :           None                                                      */
+ 446          /*                                                                            */
+ 447          /* Return:          "0" - bus line is OK                                      */
+ 448          /*                  "1" - bus line is faulty                                  */
+ 449          /*                                                                            */
+ 450          /******************************************************************************/
+ 451          UC I2cInit(void)
+ 452            {
+ 453   1        return (0); /*********************************************/
+ 454   1      
+ 455   1        if (!SDA)          /* if lines are low, set them to high */
+ 456   1          if (I2cStop())
+ 457   1            return (1);
+ 458   1      
+ 459   1        if (!SCL) 
+ 460   1          if (I2cStop())
+ 461   1            return (1);
+ 462   1        
+ 463   1        return (0);
+ 464   1        }
+ 465                          
+ 466          
+ 467          /******************************************************************************/
+ 468          /* Function:       I2cStart                                                   */
+ 469          /*                                                                            */
+ 470          /* Description:    Generate a START condition on I2C bus                      */        
+ 471          /*                                                                            */
+ 472          /* Args :          None                                                       */
+ 473          /*                                                                            */
+ 474          /* Return:         None                                                       */
+ 475          /*                                                                            */
+ 476          /******************************************************************************/
+ 477          void I2cStart(void)
+ 478            {
+ 479   1        SDA = 1;        /* to make sure the SDA and SCL are both high */
+ 480   1        SCL = 1;
+ 481   1        Delay16;
+ 482   1      
+ 483   1        SDA = 0;        /* SDA line go LOW first */
+ 484   1        Delay16;
+ 485   1        SCL = 0;        /* then followed by SCL line with time delay */
+ 486   1        }
+ 487          
+ 488          /******************************************************************************/
+ 489          /* Subroutine:   I2cMasterWrite                                               */
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 9   
+
+ 490          /*                                                                            */
+ 491          /* Description:  Output one byte of data to slave device. Check for           */
+ 492          /*               WAIT condition before every bit is sent.                     */ 
+ 493          /*                                                                            */
+ 494          /* Args :        one byte of data to be sent to slave device.                 */
+ 495          /*                                                                            */
+ 496          /* Return:       acknowledgement from slave:                                  */
+ 497          /*               0 = acknowledge is received                                  */
+ 498          /*               1 = no acknowledge is received                               */                       
+ 499          /*                                                                            */
+ 500          /******************************************************************************/
+ 501          UC I2cMasterWrite(UC input_byte)
+ 502            {
+ 503   1        UC mask, i;
+ 504   1      
+ 505   1        mask = 0x80;                    
+ 506   1      
+ 507   1        for (i = 0; i < 8; i++)     /* send one byte of data */
+ 508   1          {
+ 509   2          if (mask & input_byte)    /* send bit according to data */
+ 510   2            SDA = 1;
+ 511   2          else
+ 512   2            SDA = 0;
+ 513   2          mask = mask >> 1;         /* shift right for the next bit */
+ 514   2          Delay1;
+ 515   2          Check_SCL();             /* check SCL line */
+ 516   2          Delay16;        
+ 517   2          SCL = 0;                  /* clock is low */
+ 518   2          Delay16;
+ 519   2          }
+ 520   1              
+ 521   1        SDA = 1;                /* release SDA line*/
+ 522   1        Delay1;
+ 523   1        SCL = 1;                /* generate 9th clock pulse */
+ 524   1        Delay16;
+ 525   1        mask = SDA;             /* read acknowledge */
+ 526   1        SCL  = 0;               /* clock is low */
+ 527   1        Delay16;                /* to avoid short pulse transition on SDA line */
+ 528   1        return (mask);          /* return acknowledge bit */
+ 529   1        }        
+ 530          
+ 531          /******************************************************************************/
+ 532          /* Function:      I2cMasterRead                                               */
+ 533          /*                                                                            */
+ 534          /* Description:   Read one byte of data from the slave device. Check          */
+ 535          /*                for WAIT condition before every bit is received.            */        
+ 536          /*                                                                            */
+ 537          /* Args :         Acknowledge require:                                        */
+ 538          /*                0 - generate LOW  output after a byte is received           */
+ 539          /*                1 - generate HIGH output after a byte is received           */
+ 540          /*                                                                            */
+ 541          /* Return:        received one byte of data from slave device                 */
+ 542          /*                                                                            */                       
+ 543          /*                                                                            */
+ 544          /******************************************************************************/
+ 545          UC I2cMasterRead(UC ack)
+ 546            {
+ 547   1        UC mask, i, rec_data;
+ 548   1        
+ 549   1        rec_data = 0;        
+ 550   1        mask     = 0x80;
+ 551   1        
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 10  
+
+ 552   1        for (i = 0; i < 8; i++)
+ 553   1          {           
+ 554   2          Check_SCL();               /* clock is high */
+ 555   2          if (SDA)                    /* read data while clock is high */
+ 556   2            rec_data |= mask;
+ 557   2          mask = mask >> 1;
+ 558   2          SCL = 0;                    /* clock is low */
+ 559   2          Delay16;                                                                                      
+ 560   2          } 
+ 561   1        if (ack)                      /* set SDA data first before port direction */        
+ 562   1           SDA = 1;                   /* send acknowledge */
+ 563   1        else
+ 564   1           SDA = 0;
+ 565   1        Delay1;
+ 566   1        SCL = 1;              /* clock is high */
+ 567   1        Delay16;
+ 568   1        SCL = 0;              /* clock is low */
+ 569   1        SDA = 1;
+ 570   1        Delay16;              /* to avoid short pulse transition on SDA line */
+ 571   1        return (rec_data);
+ 572   1        }
+ 573          
+ 574          /******************************************************************************/
+ 575          /* Function:     I2cStop                                                      */
+ 576          /*                                                                            */
+ 577          /* Description:  generate stop condition on the I2C bus                       */        
+ 578          /*                                                                            */
+ 579          /* Args :        none                                                         */
+ 580          /*                                                                            */
+ 581          /* Return:       "0" - the bus line is OK                                     */
+ 582          /*               "1" - the bus line has been pulled down to low               */                       
+ 583          /*                                                                            */
+ 584          /*                                                                            */
+ 585          /******************************************************************************/
+ 586          UC I2cStop(void)
+ 587            {
+ 588   1        time_out = PERIOD;      
+ 589   1        
+ 590   1        while (time_out--)
+ 591   1          {
+ 592   2          if (!SDA)                 /* check SDA line */
+ 593   2            {
+ 594   3            SCL = 1;                /* generate a clock pulse if SDA is pull */
+ 595   3            Delay16;                /* down to low */
+ 596   3            SCL = 0;
+ 597   3            Delay16;
+ 598   3            }
+ 599   2          else                      /* check SCL line  */
+ 600   2            {
+ 601   3            SDA  = 0;
+ 602   3            Delay1;
+ 603   3            if (Check_SCL())        /* to generate STOP condition */
+ 604   3              return (1);           /* ERROR: SCL line is stuck to low */
+ 605   3            Delay16;
+ 606   3            SDA = 1;
+ 607   3            Delay16;
+ 608   3            return (0);
+ 609   3            }
+ 610   2          }
+ 611   1        return (1);                 /* ERROR: SDA line is stuck to low */
+ 612   1        }
+ 613                      
+C51 COMPILER V7.10   EEPROM                                                                01/28/2010 09:18:56 PAGE 11  
+
+ 614          /* end of eeprom.c */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    701    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2      16
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

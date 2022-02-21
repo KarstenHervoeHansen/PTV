@@ -1,0 +1,68 @@
+    if ( TF0)                        // If delayed field interrupt...
+      {
+      TF0 = 0;                      // Clear delayed field interrupt
+
+      if ( test_vars.CBX.FrameCnt > 9)
+        {
+        test_vars.CBX.FrameCnt = 1;
+        test_vars.CBX.SoundFrameCnt = 1;
+        }
+
+      test_vars.CBX.SyncLineCnt = 12;              // Next interrupt in 12 lines
+      test_vars.CBX.SyncLinePtr = 1;
+
+      test_vars.CBX.LineCnt = 6;
+
+      test_vars.CBX.SoundCnt = 2;
+      test_vars.CBX.SoundPtr = 3;
+      test_vars.CBX.SoundPtrMax = 47;
+
+      test_vars.CBX.Status |= FIELD1;                // This is field 1 of 4
+      test_vars.CBX.Status |= SYSSEL;
+      StatusPort = test_vars.CBX.Status;
+
+      return;
+      }
+    else
+      {
+      if ( test_vars.CBX.Status & FIELD1)
+        {
+        test_vars.CBX.Status &= ~FIELD1;
+        StatusPort = test_vars.CBX.Status;
+        }
+
+      if ( ++test_vars.CBX.LineCnt >= 525)
+        {
+        test_vars.CBX.FrameCnt++;
+        test_vars.CBX.LineCnt = 0;
+
+        if ( ++test_vars.CBX.SoundFrameCnt > 5)
+          test_vars.CBX.SoundFrameCnt = 1;
+        }
+
+      if ( !--test_vars.CBX.SoundCnt)
+        {
+        if ( test_vars.CBX.SoundPtr > test_vars.CBX.SoundPtrMax)
+          {
+          test_vars.CBX.SoundPtr = 0;
+
+          if ( test_vars.CBX.SoundPtrMax == 46)
+            test_vars.CBX.SoundPtrMax = 47;
+          else
+            test_vars.CBX.SoundPtrMax = 46;
+          }
+        tmp = Sound525[test_vars.CBX.SoundPtr];      // Get sound information
+
+        if ( test_vars.CBX.SoundPtr++ == 47)        // Prepare for line 263
+          if ( test_vars.CBX.SoundFrameCnt & 0x01)  // Sound frames 1,3,5 are special
+            tmp |= S3OR4;
+
+        test_vars.CBX.Status &= ~SOUND;              // Clear previous sound sample
+
+        if ( test_vars.CBX.SoundEnable)
+          test_vars.CBX.Status |= ( tmp & SOUND);    // Sound samples
+
+        test_vars.CBX.SoundCnt = tmp & 0x0F;         // Lines to next sound update
+        StatusPort = test_vars.CBX.Status;          // Update status port
+        }
+      }

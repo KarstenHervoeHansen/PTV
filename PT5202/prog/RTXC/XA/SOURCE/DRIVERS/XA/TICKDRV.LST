@@ -1,0 +1,87 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\MASTER\SOURCE\RTXC\XA\SOURCE\DRIVERS\XA\cc658efb.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -g -O2 -err -Ic:\cxa\\include -I..\..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    TICKDRV
+                          9 ; tickdrv.c    1        /* tickdrv.c - model TICK driver task for 8XC251 using software interrupt
+                             7 */
+                         10 ; tickdrv.c    2        
+                         11 ; tickdrv.c    3        /*
+                         12 ; tickdrv.c    4         *   RTXCio    
+                         13 ; tickdrv.c    5         *   Copyright (c) 
+                         14 ; tickdrv.c    6         *   Embedded System Products, Inc.
+                         15 ; tickdrv.c    7         *   ALL RIGHTS RESERVED
+                         16 ; tickdrv.c    8        */
+                         17 ; tickdrv.c    9        
+                         18 ; tickdrv.c   10        #include "rtxcapi.h"
+                        145 ; tickdrv.c   11        
+                        146 ; tickdrv.c   12        long ticktimercnt = 0;
+000000                  147 TICKDRV_INI_FA  SEGMENT HDATA INSEGMENT INIT
+000000                  148         RSEG    TICKDRV_INI_FA
+                        151         PUBLIC  _ticktimercnt
+                        152         ALIGN   1
+000000                  153 _ticktimercnt:
+                        154 ; tickdrv.c   13        
+                        155 ; tickdrv.c   14        FRAME ks_stk * ticktimer( FRAME ks_stk * frame)
+                        156 ; tickdrv.c   15        {
+000000 00000000         157         DD      000000000H
+000000                  158 TICKDRV_PR      SEGMENT HCODE
+000000                  159         RSEG    TICKDRV_PR
+                        160         ALIGN   1
+                        162         PUBLIC  _ticktimer
+000000                  163 _ticktimer:
+000000 0F30             169         PUSH.W  R4, R5
+000002 8951             172         MOV.W   R5,R1
+000004 8940             173         MOV.W   R4,R0
+                        177 ; tickdrv.c   16          SWR7 = 0;
+000006 080356           179         CLR     0356H
+                        180 ; tickdrv.c   17          ticktimercnt++;
+000009 964842rr         182         MOV.B   ES,#SEG( _ticktimercnt )
+00000D 9918rrrr         183         MOV.W   R1,#SOF( _ticktimercnt )
+000011 8B01             184         MOV.W   R0,[R1+]
+000013 8A11             185         MOV.W   R1,[R1]
+000015 99000001         186         ADD.W   R0,#01H
+000019 99110000         187         ADDC.W  R1,#00H
+00001D 964842rr         188         MOV.B   ES,#SEG( _ticktimercnt )
+000021 9928rrrr         189         MOV.W   R2,#SOF( _ticktimercnt )
+000025 8B0A             190         MOV.W   [R2+],R0
+000027 8A1A             191         MOV.W   [R2],R1
+                        192 ; tickdrv.c   18          KS_ISRtick();
+                        194         CALL    _KS_ISRtick
+000029 C4rrrrrr        +194 ;       FCALL   _KS_ISRtick
+                        195 ; tickdrv.c   19        
+                        196 ; tickdrv.c   20          return(KS_ISRexit(frame, 0 ));
+00002D 914800           198         MOV.B   R2L,#00H
+000030 8915             199         MOV.W   R1,R5
+000032 8904             200         MOV.W   R0,R4
+                        201         CALL    _KS_ISRexit
+000034 C4rrrrrr        +201 ;       FCALL   _KS_ISRexit
+                        205 ; tickdrv.c   21        }
+000038 2F30             207         POP.W   R4, R5
+00003A D680             209         RET
+                        211 ; tickdrv.c   22        
+                        212 ; tickdrv.c   23        /* initialization code for tick timer */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        213 ; tickdrv.c   24        void ticktimer_start(void)
+                        214 ; tickdrv.c   25        {
+                        215         ALIGN   1
+                        217         PUBLIC  _ticktimer_start
+00003C                  218 _ticktimer_start:
+                        222 ; tickdrv.c   26          SWE |= 0x40;    // SWE7 = 1
+00003C 96467A40         224         OR.B    047AH,#040H
+                        225 ; tickdrv.c   27        }
+000040 D680             227         RET
+                        229 ; tickdrv.c   28        
+                        230 ; tickdrv.c   29        /* end of tickdrv.c */
+                        235         EXTRN   HCODE(_KS_ISRtick)
+                        238         EXTRN   HCODE(_KS_ISRexit)
+                        239         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        240         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        241         CALLS   'ticktimer', 'KS_ISRtick'
+                        242         CALLS   'ticktimer', 'KS_ISRexit'

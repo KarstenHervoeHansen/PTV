@@ -1,0 +1,49 @@
+#
+# Builtins.mak for C compilers and assemblers
+# 
+
+#CC = c:\bin\Bcc
+#LN = c:\bin\tlink
+
+CC = c:\tc\tcc
+LN = c:\tc\tlink
+
+#CC = C:\BORLAND\CBUILDER\BIN\BCC32
+#LN = C:\BORLAND\CBUILDER\BIN\TLINK32
+
+#CC = C:\HT-XA\BIN\XAC
+#LN = C:\HT-XA\BIN\HLINK
+
+AS = c:\bin\tasm
+#AS = c:\bin\masm
+CC51= c:\bin\c51
+LN51= c:\bin\l51
+C80=c:\c80\bin\iccz80
+
+.c80.r01:
+      $(C80) $&.c80 $(CFLAGS)
+
+.a51.obj:
+      \bin\a51 $&.a51 $(AFLAGS)
+
+.c51.obj:
+      $(CC51) $&.c51 $(CFLAGS)
+
+.s03.r03:
+      \bin\a8051 $&.s03
+
+.s01.r01:
+      \bin\az80 $&.s01
+
+.asm.obj:
+      $(AS) $(AFLAGS) $&.asm
+
+.c.exe:
+      $(CC) $(CFLAGS) $&.c
+
+.c.obj:
+      $(CC) $(CFLAGS) $&.c
+
+
+#.SUFFIXES: .exe .obj .asm .c
+

@@ -1,0 +1,2309 @@
+
+
+
+
+
+
+
+
+
+var bn_tag = window["_baynote_0"];
+if ( bn_tag )
+{
+  bn_tag.getParam = function( name, defaultValue)
+  {
+    var value = this[name];
+    if ( typeof(value) == "undefined" || value == null )
+      return defaultValue;
+    else
+      return value;
+  }
+
+  
+
+function _createBaynoteObsCommon()
+{
+    var _baynoteObsCommon = new Object();
+    _baynoteObsCommon.handlers = new Object();
+
+    /**
+     * "Private" functions used by other functions in this object.
+     */
+
+    _baynoteObsCommon.removeAllHandlers = function()
+    {
+        var count = 0;
+
+        // Note: keep a separate list of unload handlers
+        //             and call the handler explicitly
+        //
+
+        // exec the unload handlers first(?)
+        var handlerList = _baynoteObsCommon.handlers["unload"];
+        if (handlerList)
+        {
+            // Note: walk & exec the unload handlers here
+            for (var i = 0; i < handlerList.length; i++)
+            {
+              var entry = handlerList[i];
+              var obj = entry["obj"];
+              var handler = entry["handler"];
+              //Is this IE or Firefox?
+              if (obj.detachEvent)
+              {
+                //IE's attach/detachEvent API
+                obj.detachEvent("on" + "unload", handler);
+              }
+              else if (obj.removeEventListener)
+              {
+                var useCapture = entry["useCapture"]
+                obj.removeEventListener( "unload", handler, useCapture);
+              }
+              count++;
+              entry["obj"] = null;
+              entry["handler"] = null;
+              handlerList[i] = null;
+            }
+
+            _baynoteObsCommon.handlers["unload"] = null;
+        }
+
+        if (_baynoteObsCommon.handlers.length > 0)
+        {
+
+          for (var event in _baynoteObsCommon.handlers)
+          {
+            var handlerList = _baynoteObsCommon.handlers[event];
+            for (var i = 0; i < handlerList.length; i++)
+            {
+              var entry = handlerList[i];
+              var obj = entry["obj"];
+              var handler = entry["handler"];
+              //Is this IE or Firefox?
+              if (obj.detachEvent)
+              {
+                //IE's attach/detachEvent API
+                obj.detachEvent("on" + event, handler);
+              }
+              else if (obj.removeEventListener)
+              {
+                var useCapture = entry["useCapture"]
+                obj.removeEventListener( event, handler, useCapture);
+              }
+              count++;
+              entry["obj"] = null;
+              entry["handler"] = null;
+              handlerList[i] = null;            
+            }
+            _baynoteObsCommon.handlers[event] = null;
+          }
+
+        }
+        _baynoteObsCommon.gotoHandler = null;
+        //alert ("removeAllHandlers called on " + count +" handlers.");
+    }
+
+
+    /**
+     * Trim whitespace on both sides of a string.
+     */
+    _baynoteObsCommon._trim = function(str)
+    {
+        // trim leading whitespace
+        str = str.replace( /^\s+/g, "" );
+        // strip trailing whitespace
+        return str.replace( /\s+$/g, "" );
+    }
+
+    /**
+     * "Public" functions that can be used by other Baynote tags.
+     */
+
+
+
+    _baynoteObsCommon.getCookie = function(key)
+    {
+      var regexStr = "(^" + key + "|; " + key + ")=([^;]*)"
+      var re = new RegExp( regexStr, "i");
+      var match = re.exec( document.cookie);
+      if ( match != null && match.length >= 3 )
+        return decodeURIComponent( match[2]);
+      else
+        return null;
+    }
+
+
+    _baynoteObsCommon.setCookie = function(key, value, expire, baynote_tag)
+    {
+      var cookieStr = key + "=" + encodeURIComponent(value);
+      if ( expire )
+        cookieStr += "; expires=" + expire;
+      var path = "/";
+      if ( baynote_tag )
+        path = baynote_tag.getParam( "cookie_path", path);
+      cookieStr += "; path=" + path;
+      var cookieStrNoDomain = cookieStr;
+
+      if ( baynote_tag )
+      {
+        var domain = baynote_tag.getParam( "cookie_domain", null);
+        if ( domain )
+          cookieStr += "; domain=" + domain;
+      }
+      document.cookie = cookieStr;
+      if ( _baynoteObsCommon.getCookie( key) != value )
+        document.cookie = cookieStrNoDomain;
+    }
+
+
+    _baynoteObsCommon.setCookieForever = function(key, value, baynote_tag)
+    {
+      var expirationTime = new Date().getTime() + 3153600000000;
+      _baynoteObsCommon.setCookie( key, value, new Date( expirationTime).toGMTString(), baynote_tag);
+    }
+
+
+    _baynoteObsCommon.removeCookie = function(key, baynote_tag)
+    {
+        //Expire the cookie.
+        _baynoteObsCommon.setCookie(key, null, _baynoteObsCommon.EPOCH, baynote_tag);
+    }
+
+    /***** Common Tag Attributes *****/
+    _baynoteObsCommon.getFullContextPath = function()
+    {
+        return baynote_tag.server + "/baynote/";
+    }
+
+    _baynoteObsCommon.createActionPath = function( name, baynote_tag)
+    {
+        return baynote_tag.server + "/baynote/" + name + "/" + baynote_tag.customerId + "-" + baynote_tag.code;
+    }
+
+
+    _baynoteObsCommon.getUserId = function( baynote_tag)
+    {
+      var tagUserId = baynote_tag.getParam( "userId", null);
+
+      if ( _baynoteObsCommon.userId )
+      {
+        if ( tagUserId )
+        {
+
+          if ( tagUserId == _baynoteObsCommon.userId )
+            return _baynoteObsCommon.userId;
+        }
+        else
+          return _baynoteObsCommon.userId;
+      }
+
+
+      var userId = tagUserId;
+      if ( userId )
+      {
+        _baynoteObsCommon.setCookieForever( _baynoteObsCommon.BN_USER_KEY, userId, baynote_tag);
+      }
+      else
+      {
+
+        userId = _baynoteObsCommon.getCookie( _baynoteObsCommon.BN_USER_KEY);
+        if ( !userId )
+        {
+
+          userId = _baynoteObsCommon.getCookie( _baynoteObsCommon.BN_ANON_USER_KEY);
+          if ( !userId )
+          {
+
+            userId = _baynoteObsCommon._createAnonymousUser(baynote_tag);
+            _baynoteObsCommon.setCookieForever( _baynoteObsCommon.BN_ANON_USER_KEY, userId, baynote_tag);
+          }
+        }
+      }
+
+      _baynoteObsCommon.userId = userId;
+      return userId;
+    }
+
+    _baynoteObsCommon._createAnonymousUser = function(baynote_tag)
+    {
+        var timestamp = new Date().getTime();
+        var rand = new String(Math.random());
+        rand = rand.substring(2,rand.length);
+        var customer = baynote_tag.customerId;
+        var code = baynote_tag.code;
+        return customer + "-" + code + "-" + timestamp + "-" + rand;
+    }
+
+
+    _baynoteObsCommon.getDocTrail = function()
+    {
+      return _baynoteTrailManager.getTrail();
+    }
+
+
+    _baynoteObsCommon.isNullOrEmpty = function( value)
+    {
+      return value == null || value == "";
+    }
+
+
+    _baynoteObsCommon.isTrue = function( value)
+    {
+      return value == true || value == "true";
+    }
+
+    /**
+     * A helper function that creates <input> elements in a given form.
+     */
+    _baynoteObsCommon.addInputElement = function( name, value, theForm)
+    {
+      if ( value != null )
+        return _baynoteObsCommon.addInputElementAlways( name, value, theForm);
+      return null;
+    }
+
+    /**
+     * A helper function that creates <input> elements in a given form.
+     */
+    _baynoteObsCommon.addInputElementAlways = function( name, value, theForm)
+    {
+      var inputElement = document.createElement("input");
+      inputElement.name = name;
+      inputElement.type = "hidden";
+      inputElement.value = value;
+      theForm.appendChild(inputElement);
+      return inputElement;
+    }
+
+    _baynoteObsCommon.getInnerText = function(obj)
+    {
+      if( obj.innerText)
+        return obj.innerText;
+      else
+      {
+        var text = "";
+        switch ( obj.nodeType )
+        {
+          case 1: //ELEMENT_NODE
+            for ( var i = 0; i < obj.childNodes.length; i++)
+              text += _baynoteObsCommon.getInnerText( obj.childNodes.item(i));
+            break;
+          case 3: //TEXT_NODE
+            text += obj.nodeValue;
+            break;
+        }
+        return text;
+      }
+    }
+
+    _baynoteObsCommon.getWordCount = function()
+    {
+        var bodyTags = document.getElementsByTagName("body");
+        if (bodyTags.length == 0)
+        {
+            return;
+        }
+        var bodyText = _baynoteObsCommon.getInnerText(bodyTags[0]);
+        var words = bodyText.match(/\S+/g);
+        if (!words)
+        {
+            return 0;
+        }
+        return words.length;
+    }
+
+    _baynoteObsCommon.getLinkCount = function()
+    {
+        var linkTags = document.getElementsByTagName("a");
+        if (!linkTags)
+        {
+            return 0;
+        }
+        return linkTags.length;
+    }
+
+    _baynoteObsCommon.getPageTitle = function()
+    {
+        var title = null;
+        var metas = document.getElementsByName( "baynote_subtitle");
+        if ( metas && metas.length == 1 )
+          title = metas[0].content;
+        if ( !title )
+        {
+          var metas = document.getElementsByName( "baynote_title");
+          if ( metas && metas.length >= 1 )
+            title = metas[0].content;
+          if ( !title )
+            title = document.title;
+        }
+        return title ? title : "";
+    }
+
+    _baynoteObsCommon.encodeKeyValueMap = function(valueMap)
+    {
+        if (valueMap)
+        {
+            var encodedValue = "";
+            for(var i in valueMap)
+            {
+                var key = i;
+                var value = valueMap[i];
+                value = encodeURIComponent(value);
+                var entry = key + "=" + value + ";";
+                encodedValue += entry;
+            }
+            return encodedValue;
+        }
+        return null;
+    }
+
+    _baynoteObsCommon.createCommonFormElements = function( baynote_tag, theForm)
+    {
+        _baynoteObsCommon.addInputElement("userId", _baynoteObsCommon.getUserId( baynote_tag), theForm);
+        _baynoteObsCommon.addInputElement("customerId", baynote_tag.customerId, theForm);
+        _baynoteObsCommon.addInputElement("code", baynote_tag.code, theForm);
+        _baynoteObsCommon.addInputElement("population", baynote_tag.population, theForm);
+        _baynoteObsCommon.addInputElement("displayTerms", baynote_tag.displaySearchTerms, theForm);
+
+        //UI configuration strings...
+        _baynoteObsCommon.addInputElement("popup", baynote_tag.popup, theForm);
+        _baynoteObsCommon.addInputElement("popupWidth", baynote_tag.popupWidth, theForm);
+        _baynoteObsCommon.addInputElement("title", baynote_tag.title, theForm);
+        _baynoteObsCommon.addInputElement("showTitle", baynote_tag.showTitle, theForm);
+        _baynoteObsCommon.addInputElement("globalLabel", baynote_tag.globalLabel, theForm);
+        _baynoteObsCommon.addInputElement("peerLabel", baynote_tag.peerLabel, theForm);
+        _baynoteObsCommon.addInputElement("expertLabel", baynote_tag.expertLabel, theForm);
+
+        _baynoteObsCommon.addInputElement("showGlobalViewLink", baynote_tag.showGlobalViewLink, theForm);
+        _baynoteObsCommon.addInputElement("showPeerViewLink", baynote_tag.showPeerViewLink, theForm);
+        _baynoteObsCommon.addInputElement("showExpertViewLink", baynote_tag.showExpertViewLink, theForm);
+        _baynoteObsCommon.addInputElement("noSearchTermString", baynote_tag.noSearchTermString, theForm);
+        _baynoteObsCommon.addInputElement("css", baynote_tag.css, theForm);
+
+
+        _baynoteObsCommon.addInputElement("linkTestEnabled", baynote_tag.linkTestEnabled ? "true" : "false", theForm);
+        _baynoteObsCommon.addInputElement("linkTestServerPage", baynote_tag.linkTestServerPage, theForm);
+
+        //Any domain resolution?
+        var domain = _baynoteObsCommon.domain;
+        _baynoteObsCommon.addInputElement("domain", domain, theForm);
+
+        //Now pass in the baynote server name and the current page.
+
+        var url = _baynoteObsCommon.normalizeUrl( baynote_tag, baynote_tag.getParam( "url", location.href));
+        _baynoteObsCommon.addInputElement("currentPage", url, theForm);
+        _baynoteObsCommon.addInputElement("baynoteServer", baynote_tag.server, theForm);
+
+        _baynoteObsCommon.addInputElement("urlFilter", baynote_tag.urlFilter, theForm);
+        _baynoteObsCommon.addInputElement("urlTransformer", baynote_tag.urlTransformer, theForm);
+
+        var transformValuesMap = baynote_tag.urlTransformerValues;
+        if (transformValuesMap)
+        {
+            var encodedValues = _baynoteObsCommon.encodeKeyValueMap(transformValuesMap);
+            _baynoteObsCommon.addInputElement("urlTransformerValues", 
+                                           encodedValues, 
+                                           theForm);
+        }
+        _baynoteObsCommon.addInputElement("showLogo", baynote_tag.showLogo, theForm);
+        _baynoteObsCommon.addInputElement("logoUrl", baynote_tag.logoUrl, theForm);
+        _baynoteObsCommon.addInputElement("logoHref", baynote_tag.logoHref, theForm);
+
+        _baynoteObsCommon.addInputElement("resultsPerPage", (typeof(baynote_tag.listSize)=="undefined")?3:baynote_tag.listSize, theForm);
+        _baynoteObsCommon.addInputElement("linkTarget", baynote_tag.linkTarget, theForm);
+        _baynoteObsCommon.addInputElement("bnProxyPrefix", baynote_tag.bnProxyPrefix, theForm);
+
+
+        //Send in the encoding of the page, if available.  If not, set the form
+        //to send UTF-8.  This works around an IE issue where setting the form
+        //charset has no effect.
+        if (document.charset)
+        {
+            theForm.action = theForm.action + "?encoding=" + encodeURIComponent(document.charset);
+        }
+        else
+        {
+            //The default charset on the dispatcher is UTF-8, so we don't have
+            //to send the encoding in.
+            theForm.acceptCharset = "UTF-8";
+        }
+    }
+
+    _baynoteObsCommon.sendForm = function( frame, theForm, cleanupCallback)
+    {
+
+      var getstr = theForm.action;
+      if ( getstr.indexOf( '?') == -1 )
+        getstr += '?';
+      else
+        getstr += '&';
+
+      for (i = 0; i < theForm.childNodes.length; i++)
+      {
+        if (theForm.childNodes[i].tagName == "INPUT")
+        {
+          if (theForm.childNodes[i].type == "text" || theForm.childNodes[i].type == "hidden")
+          {
+            getstr += theForm.childNodes[i].name + "=" + encodeURIComponent( theForm.childNodes[i].value) + "&";
+          }
+          else if (theForm.childNodes[i].type == "checkbox")
+          {
+            if (theForm.childNodes[i].checked)
+            {
+              getstr += theForm.childNodes[i].name + "=" + encodeURIComponent( theForm.childNodes[i].value) + "&";
+            }
+            else
+            {
+              getstr += theForm.childNodes[i].name + "=&";
+            }
+          }
+          else if (theForm.childNodes[i].type == "radio")
+          {
+            if (theForm.childNodes[i].checked)
+            {
+              getstr += theForm.childNodes[i].name + "=" + encodeURIComponent( theForm.childNodes[i].value) + "&";
+            }
+          }
+        }
+        else if (theForm.childNodes[i].tagName == "SELECT")
+        {
+          var sel = theForm.childNodes[i];
+          getstr += sel.name + "=" + encodeURIComponent( sel.options[sel.selectedIndex].value) + "&";
+        }
+      }
+
+      if ( getstr.length < 2000 )
+      {
+
+        _baynoteObsCommon.addOnload( frame, _baynoteObsCommon.setSrc( frame, getstr, cleanupCallback));
+      }
+      else
+      {
+          document.body.appendChild(theForm);
+          _baynoteObsCommon.addOnload( frame, _baynoteObsCommon.addSubmit( frame, theForm, cleanupCallback));
+      }
+    }
+
+    _baynoteObsCommon.addSubmit = function( frame, form, cleanupCallback)
+    {
+      return function()
+      {
+        form.submit();
+        window.status = window.defaultStatus;
+        //Cleanup.
+        document.body.removeChild( form);
+        if ( cleanupCallback )
+          _baynoteObsCommon.addOnload( frame, cleanupCallback);
+      }
+    }
+
+    _baynoteObsCommon.setSrc = function( frame, getstr, cleanupCallback)
+    {
+      return function()
+      {
+        frame.src = getstr;
+        window.status = window.defaultStatus;
+        if ( cleanupCallback )
+          _baynoteObsCommon.addOnload( frame, cleanupCallback);
+      }
+    }
+
+
+    _baynoteObsCommon.needFrameLater = function(frame)
+    {
+        if ( frame.addEventListener )
+        {
+          _baynoteObsCommon.addOnload( frame, function()
+          {
+            frame.onloadDone = true;
+          });
+        }
+    }
+    _baynoteObsCommon.loadStyleSheet = function( css)
+    {
+      //Put in the appropriate stylesheet, if necessary.
+      var styleSheetFound = false;
+      var styleSheets = document.styleSheets;
+      if ( styleSheets )
+      {
+        for (var i = 0; i < styleSheets.length; i++)
+        {
+          var styleSheet = styleSheets[i];
+          if (styleSheet.href == css)
+          {
+            styleSheetFound = true;
+            break;
+          }
+        }
+      }
+      if (!styleSheetFound)
+      {
+        if ( typeof( document.createStyleSheet) != "undefined" )
+        {
+            document.createStyleSheet(css);
+        }
+        else
+        {
+            var linkNode = document.createElement("link");
+            linkNode.rel = "stylesheet";
+            linkNode.href = css;
+            linkNode.type = "text/css";
+            var headNodes = document.getElementsByTagName("head");
+            if ( headNodes && headNodes.length > 0 )
+            {
+                headNodes[0].appendChild( linkNode);
+            }
+        }
+      }
+    }
+
+    _baynoteObsCommon.addOnload = function( target, callback)
+    {
+      callbackWrapper = function()
+      {
+
+        if ( callback.onloadDone == true )
+          return;
+        callback();
+        callback.onloadDone = true;
+      }
+
+      if ( target.attachEvent )
+      {
+
+        if ( target.readyState == "complete" || window.opera )
+        {
+          callback();
+        }
+        else
+        {
+
+          target.detachEvent("onload", callbackWrapper);
+          target.attachEvent("onload", callbackWrapper);
+        }
+      }
+      else if ( target.addEventListener )
+      {
+
+        if ( typeof( target.onload) != "undefined" && target.tagName == "IFRAME" )
+        {
+          callback();
+        }
+        else
+        {
+
+          if ( target.onloadDone )
+          {
+            callback();
+          }
+          else
+          {
+
+            setTimeout( function()
+              {
+                callbackWrapper();
+              },5000);
+            target.addEventListener("load", callbackWrapper, false);
+          }
+        }
+      }
+    }
+
+
+    _baynoteObsCommon.removeOnload = function( target, fname)
+    {
+      if (target.detachEvent)
+      {
+        target.detachEvent("onload", fname);
+      }
+      else if (target.removeEventListener)
+      {
+        target.removeEventListener("load", fname, false);
+      }
+    }
+
+    _baynoteObsCommon.normalizeUrl = function(baynote_tag, url)
+    {
+        if (typeof (baynote_tag.bnProxyPrefix) != "undefined" &&
+            baynote_tag.bnProxyPrefix && url.indexOf(baynote_tag.bnProxyPrefix) == 0 &&
+            url.length > baynote_tag.bnProxyPrefix.length)
+        {
+            return url.substring(baynote_tag.bnProxyPrefix.length, url.length);
+        }
+        return url;
+    }
+
+    _baynoteObsCommon.getExternalReferrer = function()
+    {
+      if ( document.referrer )
+      {
+        return ( 
+            _baynoteObsCommon.checkExternalReferrer( /.*\.google\..*[?&]q=([^&]*)(&.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*\.google\..*[?&]as_q=([^&]*)(&.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*\.yahoo\..*[?&]p=([^&]*)(&.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*search.*\.msn\..*[?&]q=([^&]*)(&.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*\.altavista\..*[?&]q=([^&]*)(&.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*\.ask\..*[?&]q=([^&]*)(&.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*a9\.com\/([^\/?]*)(\?.*)?$/i ) ||
+            _baynoteObsCommon.checkExternalReferrer( /.*[?&]query=([^&]*)(&.*)?$/i )
+        );
+      }
+      return false;
+    }
+
+
+
+    _baynoteObsCommon.getExternalReferrerInfo = function(inUrl)
+    {
+      var query = false;
+      var info  = new Object();
+      var referrer = document.referrer;
+
+
+      // approach to address externalpage-->redirectpage-->indexpage case
+      // the redirectpage will set bn_referdata cookie with referrer & referee
+
+      var bn_referdata = _baynoteObsCommon.getCookie("bn_referdata");
+      if (bn_referdata)
+      {
+        var parts = bn_referdata.split("|");
+        if (inUrl == parts[1])     // this current page is the referee
+        {
+            referrer = parts[0];
+        }
+        else                       // this is not referee, no need for cookie
+        {
+            _baynoteObsCommon.removeCookie("bn_referdata");
+        }
+      }
+
+      var testrefer = _baynoteObsCommon.getCookie("baynote_test_refer");
+      if (testrefer)
+      {
+        referrer = testrefer;
+      }
+      if ( referrer )
+      {
+        query = _baynoteObsCommon.checkExternalReferrer( /.*\.google\..*[?&]q=([^&]*)(&.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="Google";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*\.google\..*[?&]as_q=([^&]*)(&.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="Google";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*\.yahoo\..*[?&]p=([^&]*)(&.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="Yahoo";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*search.*\.msn\..*[?&]q=([^&]*)(&.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="MSN";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*\.altavista\..*[?&]q=([^&]*)(&.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="AltaVista";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*\.ask\..*[?&]q=([^&]*)(&.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="Ask";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*a9\.com\/([^\/?]*)(\?.*)?$/i, referrer );
+        if (query) 
+        {
+          info["referrer"]="A9";
+          info["query"]   = query;
+          return info;
+        }
+
+        query = _baynoteObsCommon.checkExternalReferrer( /.*[?&]query=([^&]*)(&.*)?$/i, referrer ); 
+        if (query) 
+        {
+          info["referrer"]="external search";
+          info["query"]   = query;
+          return info;
+        }
+      }
+      return false;
+    }
+
+    _baynoteObsCommon.checkExternalReferrer = function( re, extrefer)
+    {
+      //TEST
+      //var match = re.exec( "http://www.google.com/search?hl=en&q=megaraid");
+
+      var referrer = document.referrer;
+      if (typeof (extrefer) != "undefined")
+      {
+        referrer = extrefer;
+      }
+      var match = re.exec( referrer);
+
+      if ( match != null && match.length >= 1 )
+      {
+        var query = match[1].replace('"','');  // hack to strip trailing quote
+        return query;
+      }
+      else
+      {
+        return false;
+      }
+    }
+
+    _baynoteObsCommon.showMsg = function( msg)
+    {
+      div = document.createElement( "div");
+      div.innerHTML = msg
+      document.body.appendChild( div);
+    }
+
+    _baynoteObsCommon.getEscapedQueryFromSearchPage = function( url)
+    {
+      if ( url.indexOf( _baynoteObsCommon.EXTERNAL_SEARCH_URL) == 0 )
+        return url.substr( _baynoteObsCommon.EXTERNAL_SEARCH_URL.length);
+
+      var re = new RegExp( "(.*xilinx.com\\/cgi-bin\\/search\\/googleSearch)\\?(.*&)(q|as_q)=([^&]*)", "i");
+      var match = re.exec( url);
+      if ( match != null && match.length >= 5 )
+        return match[4];
+      else
+
+        return null;
+    }
+
+    _baynoteObsCommon.getQueryFromSearchPage = function( url)
+    {
+      var query = _baynoteObsCommon.getEscapedQueryFromSearchPage( url);
+      if ( query != null )
+        return decodeURIComponent( query);
+      else
+        return null;
+    }
+
+
+    _baynoteObsCommon.addEventHandler = function( element, eventName, handler, useCapture)
+    {
+      useCapture = useCapture ? true : false;
+
+      var xhandler = function( evt)
+      {
+        if ( !evt )
+          evt = window.event;
+        if ( !evt.target && evt.srcElement )
+          evt.target = evt.srcElement;
+        handler( evt);
+      };
+
+      var attached = false;
+      if (element.attachEvent)
+      {
+        element.attachEvent("on" + eventName, xhandler);
+        attached = true;
+      }
+      else if (element.addEventListener)
+      {
+        element.addEventListener( eventName, xhandler, useCapture);
+        attached = true;
+      }
+
+      if (attached)
+      {
+        var handlerList = _baynoteObsCommon.handlers[eventName];
+        if (!handlerList)
+        {
+          handlerList = new Array();
+          _baynoteObsCommon.handlers[eventName] = handlerList;
+        }
+        var entry = new Object();
+        entry["obj"] = element;
+        entry["handler"] = handler;
+        entry["useCapture"] = useCapture;
+        handlerList[handlerList.length] = entry;
+      }
+
+    }
+
+    _baynoteObsCommon.createIframe = function( name)
+    {
+      var iframe = null;
+
+      try
+      {
+
+        iframe = document.createElement('<iframe name="' + name + '">');
+
+        if ( !iframe || iframe.tagName.toLowerCase() != "iframe" ||
+              iframe.name != name)
+        {
+          iframe = document.createElement( "iframe");
+          iframe.name = name;
+        }
+      }
+      catch ( e )
+      {
+
+        iframe = document.createElement( "iframe");
+        iframe.name = name;
+      }
+      return iframe;
+    }
+
+    _baynoteObsCommon.loadedScripts = new Object();
+
+    _baynoteObsCommon.createLoadScriptTag = function(src)
+    {
+        if (!_baynoteObsCommon.loadedScripts[src])
+        {
+            var scriptTag = document.createElement("script");
+            scriptTag.language = "javascript";
+            scriptTag.src = src;
+            var head = document.getElementsByTagName("head");
+            head[0].appendChild(scriptTag);
+            _baynoteObsCommon.loadedScripts[src] = scriptTag;
+        }
+    }
+
+
+    //Constants
+    _baynoteObsCommon.EPOCH = new Date(0).toGMTString();
+    _baynoteObsCommon.BN_USER_KEY = "baynote_user";
+    _baynoteObsCommon.BN_ANON_USER_KEY = "_baynote_anon_user";
+    _baynoteObsCommon.BN_DOC_TRAIL_KEY = "_baynote_doctrail";
+    _baynoteObsCommon.LINKTEXT_KEY = "_baynote_linktext";
+    _baynoteObsCommon.BIN_URL_CLICKED = "_baynote_binary_url";
+    _baynoteObsCommon.BAYNOTE_STATUS_META_NAME = "baynote_status";
+    _baynoteObsCommon.BAYNOTE_OBSERVATION_REFERRER = "baynote_referrer";
+    _baynoteObsCommon.BAYNOTE_RANK = "baynoteRank";
+    _baynoteObsCommon.IR_RANK = "irRank";
+
+    _baynoteObsCommon.EVENTS_TAG = "events";
+    _baynoteObsCommon.EVENT_TAG = "event";
+    _baynoteObsCommon.TITLE_TAG = "title";
+    _baynoteObsCommon.WORDCOUNT_TAG = "wc";
+    _baynoteObsCommon.LINKCOUNT_TAG = "lc";
+    _baynoteObsCommon.LINKTEXT_TAG = "lt";
+    _baynoteObsCommon.REFERRER_TAG = "rfr";
+    
+    _baynoteObsCommon.IS404_ATTR = "is404";
+    _baynoteObsCommon.TRAILID_ATTR = "tid";
+    _baynoteObsCommon.ACTION_ATTR = "action";
+    _baynoteObsCommon.IRRANK_TAG = "irr";
+    _baynoteObsCommon.BNRANK_TAG = "bnr";
+    _baynoteObsCommon.TIMESTAMP_TAG = "time";
+    _baynoteObsCommon.QUERY_TAG = "query";
+
+    _baynoteObsCommon.TARGET_TAG = "target";
+    _baynoteObsCommon.ABGROUP_ATTR = "abgroup";
+    _baynoteObsCommon.ADGUIDE_ATTR = "adguide";
+    _baynoteObsCommon.STEPS_ATTR = "steps";
+
+    _baynoteObsCommon.EXTERNAL_SEARCH_URL = "/bn_extern?q=";
+    _baynoteObsCommon.ORIGINAL_RANKING = "originalRanking";
+    _baynoteObsCommon.BAYNOTE_RANKING = "baynoteRanking";
+    _baynoteObsCommon.MAX_RATING= "maxRating";
+    _baynoteObsCommon.POPULATION = "population";
+    _baynoteObsCommon.QUERY = "query";
+    _baynoteObsCommon.SCALE_ICON_FILLED = "scaleIconFilled";
+    _baynoteObsCommon.SCALE_ICON_EMPTY = "scaleIconEmpty"
+    _baynoteObsCommon.TOTAL_IR_COUNT= "totalIRCount"
+    _baynoteObsCommon.URL = "url";
+
+    _baynoteObsCommon.ONTOPIC_LABEL = "onTopicLabel";
+    _baynoteObsCommon.WELL_READ_LABEL = "wellReadLabel";
+    _baynoteObsCommon.COMMUNITY_RANK_LABEL = "communityRankLabel";
+    _baynoteObsCommon.KEYWORD_RANK_LABEL = "keywordRankLabel";
+    _baynoteObsCommon.TOPIC_TERM_LABEL = "topicTermLabel";
+
+    _baynoteObsCommon.POPUP_POSITION = "popupPosition";
+    _baynoteObsCommon.userId = null;
+
+    _baynoteObsCommon.addEventHandler(window, "unload", _baynoteObsCommon.removeAllHandlers);
+    return _baynoteObsCommon;
+}
+
+function _createBaynoteTrailManager()
+{
+
+
+
+    var _baynoteTrailManager = new Object();
+
+    _baynoteTrailManager.trailRead = false;
+
+
+    _baynoteTrailManager.escapedQuery = null;
+    _baynoteTrailManager.query_age = 0;
+    _baynoteTrailManager.query_timestamp = 0;
+    _baynoteTrailManager.docs = null;
+
+    _baynoteTrailManager.readTrail = function( forceReRead)
+    {
+      if ( !this.trailRead || forceReRead )
+      {
+        this.escapedQuery = null;
+        this.docs = null;
+        if ( !this.doReadTrail() )
+        {
+          this.escapedQuery = null;
+          this.docs = null;
+        }
+        this.trailRead = true;
+      }
+    }
+
+    _baynoteTrailManager.writeTrail = function( baynote_tag)
+    {
+      if ( !this.trailRead )
+        this.readTrail();
+      this.doWriteTrail( baynote_tag);
+    }
+
+    _baynoteTrailManager.getTrail = function()
+    {
+      if ( !this.trailRead )
+        this.readTrail();
+      return this.doCreateTrail();
+    }
+
+    _baynoteTrailManager.doReadTrail = function()
+    {
+      var trailStr = _baynoteObsCommon.getCookie(_baynoteObsCommon.BN_DOC_TRAIL_KEY);
+      if ( trailStr == null )
+        return false;
+      var trailArray = trailStr.split( "&");
+      if ( trailArray.length == 0 )
+        return false;
+      var headerArray = trailArray[0].split( "?");
+      if ( headerArray.length != 4 )
+        return false;
+      if ( headerArray[0] != "V2" )
+        return false;
+      if ( headerArray[1] != "" )
+      {
+        this.escapedQuery = headerArray[1];
+        this.query_age = parseInt( headerArray[2]);
+        if ( this.query_age == NaN )
+          return false;
+        this.query_timestamp = headerArray[3];
+      }
+      for ( var i = 1; i < trailArray.length; i++)
+      {
+        var docArray = trailArray[i].split( "?");
+        if ( docArray.length != 9 )
+          break;
+        if ( this.docs == null )
+          this.docs = new Array();
+        var doc = new Object();
+        doc.escapedUrl = docArray[0];
+        doc.escapedLinkText = docArray[1];
+        doc.wordCount = docArray[2];
+        doc.linkCount = docArray[3];
+        doc.escapedTitle = docArray[4];
+        doc.action = docArray[5];
+        doc.timeStamp = docArray[6];
+        doc.irRank = docArray[7];
+        doc.bnRank = docArray[8];
+        this.docs[ this.docs.length] = doc;
+      }
+      return true;
+    }
+
+    _baynoteTrailManager.doWriteTrail = function( baynote_tag)
+    {
+      var trailStr = this.doCreateTrail();
+      _baynoteObsCommon.setCookie( _baynoteObsCommon.BN_DOC_TRAIL_KEY, trailStr, null, baynote_tag);
+    }
+
+    _baynoteTrailManager.doCreateTrail = function()
+    {
+      var trailStr = "V2?";
+      if ( this.escapedQuery != null )
+      {
+        trailStr += this.escapedQuery + "?" +
+          this.query_age + "?" +
+          this.query_timestamp;
+      }
+      else
+      {
+        trailStr += "??";
+      }
+      var totalLength = encodeURIComponent( trailStr).length;
+      if ( this.docs != null )
+      {
+        for ( var i = 0; i < this.docs.length; i++)
+        {
+          var doc = this.docs[i];
+          var docStr = "&" + 
+            doc.escapedUrl + "?" +
+            doc.escapedLinkText + "?" +
+            doc.wordCount + "?" +
+            doc.linkCount + "?" +
+            doc.escapedTitle + "?" +
+            doc.action + "?" + 
+            doc.timeStamp + "?" +
+            doc.irRank + "?" +
+            doc.bnRank;
+          var docStrLength = encodeURIComponent( docStr).length;
+          if ( totalLength + docStrLength > 4000 )
+            break;
+          trailStr += docStr;
+        }
+      }
+      return trailStr;
+    }
+
+
+    _baynoteTrailManager.addToTrail = function(url, linkText, wordCount, linkCount, title, action, irRank, bnRank)
+    {
+      var escapedQuery = _baynoteObsCommon.getEscapedQueryFromSearchPage( url);
+      if ( escapedQuery != null )
+      {
+        this.addQueryToTrail( escapedQuery);
+      }
+      else
+      {
+        this.readTrail();
+        var escapedUrl = _baynoteTrailManager.urlEscapeForXML( url);
+        var escapedLinkText = linkText ? _baynoteTrailManager.urlEscapeForXML( linkText.substr( 0, 200)) : "";
+        var escapedTitle = title ? _baynoteTrailManager.urlEscapeForXML( title.substr( 0, 200)) : "";
+  
+        if ( this.docs != null && this.docs.length > 0 )
+        {
+
+          if ( this.docs[0].escapedUrl == escapedUrl )
+          {
+              var currentDoc = this.docs[0];
+              //Begin merging in the latest data, if available.
+              
+              if (escapedTitle.length > 0)
+              {
+                  currentDoc.escapedTitle = escapedTitle;
+              }
+              if (escapedLinkText.length > 0)
+              {
+                  currentDoc.escapedLinkText = escapedLinkText;
+              }
+              if (wordCount > 0)
+              {
+                  currentDoc.wordCount = wordCount;
+              }
+              if (linkCount > 0)
+              {
+                  currentDoc.linkCount = linkCount;
+              }
+              return;
+          }
+        }
+        var doc = new Object();
+        doc.escapedUrl = escapedUrl;
+
+        doc.escapedLinkText = escapedLinkText;
+        doc.wordCount = wordCount;
+        doc.linkCount = linkCount;
+        doc.escapedTitle = escapedTitle;
+        doc.timeStamp = new Date().getTime();
+        doc.action = action ? action : "";
+        doc.irRank = irRank;
+        doc.bnRank = bnRank;
+        if ( this.docs == null )
+        {
+          this.docs = new Array();
+          this.docs[0] = doc;
+        }
+        else
+        {
+
+          this.docs.unshift( doc);
+
+          if ( this.docs.length > 6 )
+            this.docs.length = 6;
+        }
+
+        if ( this.escapedQuery != null )
+          this.query_age++;
+      }
+    }
+
+
+    _baynoteTrailManager.addQueryToTrail = function( escapedQuery)
+    {
+
+      this.escapedQuery = _baynoteTrailManager.escapeForXML( escapedQuery);
+      this.query_age = 0;
+      this.query_timestamp = new Date().getTime();
+      this.docs = null;
+      this.trailRead = true;
+    }
+
+
+    _baynoteTrailManager.escapeForXML = function( str)
+    {
+      return str.replace( /'/g, "%27").replace( /\?/g, "%3F");
+    }
+
+
+    _baynoteTrailManager.urlEscapeForXML = function( str)
+    {
+      return _baynoteTrailManager.escapeForXML( encodeURIComponent( str));
+    }
+
+    return _baynoteTrailManager;
+}
+
+var _baynoteObsCommon = typeof(_baynoteObsCommon) == "undefined" ? _createBaynoteObsCommon() : _baynoteObsCommon;
+var _baynoteTrailManager = typeof(_baynoteTrailManager) == "undefined" ? _createBaynoteTrailManager() : _baynoteTrailManager;
+
+
+function _createBaynoteTagTest()
+{
+  var _baynoteTagTest = new Object();
+
+  _baynoteTagTest.baynoteCookieSetCheck = function( name)
+  {
+    var qp = location.search;
+
+    var regexStr = "[?&]" + name + "=([^&]*)";
+    var re = new RegExp( regexStr, "i");
+    var match = re.exec( qp);
+    if ( match != null && match.length >= 2 )
+    {
+      var value = unescape(match[1]);
+      if ( value && value != "" )
+      {
+        var now = new Date();
+        var expire = new Date(now.getTime() + (1000 * 60 * 60 * 24 * 30));
+        _baynoteObsCommon.setCookie( name, value, expire.toGMTString(), bn_tag);
+      }
+      else
+      {
+        _baynoteObsCommon.removeCookie( name, bn_tag);
+      }
+    }
+  }
+
+  _baynoteTagTest.baynoteCookieSetCheck( "baynote_testing");
+  _baynoteTagTest.baynoteCookieSetCheck( "baynote_ignore_observations");
+  _baynoteTagTest.baynoteCookieSetCheck( "baynote_showexplain");
+  _baynoteTagTest.baynoteCookieSetCheck( "baynote_demo");
+
+  var testMsg = "";
+
+  var testServer = _baynoteObsCommon.getCookie( "baynote_testing");
+  if ( testServer != null && testServer != "" )
+  {
+    testMsg += "baynote test server: " + testServer + "<br>";
+  }
+
+  var ignoreObs = _baynoteObsCommon.getCookie( "baynote_ignore_observations");
+  if ( ignoreObs == "true" )
+  {
+    testMsg += "baynote observations ignored" + "<br>";
+  }
+
+  if ( testMsg != "" )
+  {
+      div = document.createElement( "div");
+      div.innerHTML = testMsg;
+      div.style.position = "absolute";
+      div.style.filter = "alpha(opacity=50)";
+      div.style.opacity = 0.5;
+      div.style.top = "0px";
+      div.style.left = "0px";
+      div.style.padding = "2px";
+      div.style.border = "1px black solid";
+      div.style.backgroundColor = "#CC9999";
+      div.style.fontSize = "8pt";
+      document.body.appendChild( div);
+  }
+
+  return _baynoteTagTest;
+}
+
+var _baynoteTagTest = typeof(_baynoteTagTest) == "undefined" ? _createBaynoteTagTest() : _baynoteTagTest;
+
+
+
+
+
+function _baynote_hashCookies(cookieString)
+{
+    var cookieMap = new Object();
+    if (cookieString)
+    {
+        var cookies = cookieString.split(';');
+        for (var i = 0; i < cookies.length; i++)
+        {
+            var cookie = cookies[i];
+            var keyValPair = cookie.split('=');
+            var key = _baynoteObsCommon._trim(keyValPair[0]);
+            var value = _baynoteObsCommon._trim(decodeURIComponent(keyValPair[1]));
+            cookieMap[key] = value;
+        }
+    }
+    return cookieMap;
+}
+
+function _baynote_checkForActivationCookie(cookieMap) 
+{
+    return (cookieMap["baynote_activate"] == "true");
+}
+
+function _baynote_useBaynoteCheckForBackoff(cookieMap, threshHold, backoffTime)
+{
+    var curTime = new Date().getTime();
+    var nextActivationTime = cookieMap["_baynote_nexttry"];
+    var lastPerf = cookieMap["_baynote_perf"];
+    if (typeof (nextActivationTime) != "undefined" &&
+        nextActivationTime != "")
+    {
+        //Check to see if a backoff was established before, and that
+       //enough time has passed
+        nextActivationTime = parseInt(nextActivationTime);
+        var allow = nextActivationTime <= curTime;
+        if (allow)
+        {
+            //Clear the next try cookie...
+            document.cookie = "_baynote_nexttry=; expires=" + new Date(0).toGMTString();
+        }
+        return allow;
+    }
+    else if (typeof(lastPerf) != "undefined" && lastPerf != "")
+    {
+        //Check to see if we need to back off.  lastPerf in milliseconds
+        lastPerf = parseInt(lastPerf);
+        if (lastPerf > threshHold * 1000)
+        {
+            //Unacceptable performance.  Backing off...
+            if (typeof (backoffTime) == "undefined" || 
+                backoffTime == "")
+            {
+                //Default is to wait 1 min. before trying again.
+                backoffTime = 60;
+            }
+            else
+            {
+                backoffTime = parseInt(backoffTime);
+                if (isNaN(backoffTime) || backoffTime <= 0)
+                {
+                    //Bad value for backoff time.  Set to default.
+                    backoffTime = 60;
+                }
+            }
+            nextActivationTime = (new Date().getTime()) + (backoffTime*1000);
+            document.cookie = "_baynote_nexttry=" + nextActivationTime;
+            return false;
+        }
+    }
+    return true;
+}
+
+
+function _baynote_shouldUseBaynote( baynote_tag)
+{
+    var useBaynote = true;
+
+    var here = new String(window.location);
+    if (-1 != here.indexOf("bn_disable=1"))
+    {
+        return false;
+    }
+
+    var limitAvailability = baynote_tag.getParam( "limitAvailability", false);
+
+    //An easy to access snapshot of the cookies.
+    var cookieMap = _baynote_hashCookies(document.cookie);
+    if (limitAvailability)
+    {
+        useBaynote = _baynote_checkForActivationCookie(cookieMap);
+    }
+
+    //Check to see how performance was the last time Baynote was hit.
+    var threshHold = baynote_tag.performanceThreshold;
+    var backoffTime = baynote_tag.performanceBackoffPeriod;
+    if (typeof(threshHold) != "undefined")
+    {
+        threshHold = parseInt(threshHold);
+        if (!isNaN(threshHold) && threshHold > 0)
+        {
+            useBaynote = useBaynote && _baynote_useBaynoteCheckForBackoff(cookieMap, threshHold, backoffTime);
+        }
+    }
+
+    return useBaynote;
+}
+
+
+function _baynote_showGuide( baynote_tag)
+{
+    var bn_abg    = _baynoteObsCommon.getCookie("bn_abg");
+    var bn_abtest = _baynoteObsCommon.getCookie("bn_abtest");
+
+    if ( typeof(bn_abtest) == "undefined" || bn_abtest == null )
+    {
+        return true;
+    }
+
+    if (bn_abtest == "false")
+    {
+        _baynoteObsCommon.removeCookie("bn_abg", baynote_tag);
+        _baynoteObsCommon.setCookie("bn_abg", "do-show", null, baynote_tag);
+        baynote_tag.sampling = false;
+        return true;
+    }
+    else
+    {
+        // AB test enabled,  clear out any previous "do-show" cookie
+        // a random A/B cookie will be generated later
+        if ( typeof(bn_abg) != "undefined" && bn_abg!=null && 
+             (bn_abg == "do-show" || bn_abg == "show-guide") )
+        {
+            _baynoteObsCommon.removeCookie("bn_abg", baynote_tag);
+        }
+        baynote_tag.sampling = true;
+    }
+
+    if ( typeof(bn_abg) != "undefined" && bn_abg!=null)
+    {
+        if (bn_abg == "group-b")
+        {
+            // no show
+            return false;
+        }
+        // else show
+    }
+    else
+    {
+        var randnum=Math.floor(Math.random()+0.5);  // zero or one
+        if (randnum==1)
+        {
+            _baynoteObsCommon.setCookieForever("bn_abg", "group-b", baynote_tag);
+           // no show
+           return false;
+        }
+        else
+        {
+            _baynoteObsCommon.setCookieForever("bn_abg", "group-a", baynote_tag);
+        }
+    }
+    return true;
+}
+
+
+  _baynote_showGuide( bn_tag);
+
+  if ( _baynote_shouldUseBaynote( bn_tag) )
+  {
+    
+
+function _createShowBaynote()
+{
+    function _showBaynote()
+    {
+    }
+
+    _showBaynote.prototype.initialize = function( frame)
+    {
+      this.baynote_tag = frame.baynote_tag;
+      this.url = this.baynote_tag.getParam( "url", location.href);
+
+      if ( frame )
+      {
+        frame.style.display="inline";
+
+        var theForm = this.createPostingForm( frame.name);
+        if ( theForm == null )
+          return;
+
+        _baynoteObsCommon.sendForm( frame, theForm);
+      }
+    }
+
+    _showBaynote.prototype.createPostingForm = function( target)
+    {
+        var theForm = document.createElement("form");
+        theForm.name= "form_" + this.baynote_tag.id;
+        theForm.id =  "form_" + this.baynote_tag.id;
+        theForm.method = "post";
+        theForm.target = target;
+        _baynoteObsCommon.createCommonFormElements( this.baynote_tag, theForm);
+        return theForm;
+    }
+
+
+    _showBaynote.URL_PARAM = "url";
+    _showBaynote.QUERY_PARAM = "query";
+    _showBaynote.NAV_TRAIL_PARAM = "navTrail";
+
+    return _showBaynote;
+}
+
+var _showBaynote = typeof(_showBaynote) == "undefined" ? _createShowBaynote() : _showBaynote;
+
+
+    <!-- observer tag needs these -->
+    bn_tag.dwellThreshold = bn_tag.getParam( "dwellThreshold", 60);
+    bn_tag.maxDwellThreshold = bn_tag.getParam( "maxDwellThreshold", 28800);
+
+    bn_tag.placeholder = document.getElementById( "_baynote_0_placeholder");
+
+    var bn_css = bn_tag.getParam( "css", null);
+    if ( !_baynoteObsCommon.isNullOrEmpty( bn_css) )
+    {
+      _baynoteObsCommon.loadStyleSheet( bn_css);
+    }
+
+    if ( bn_tag.placeholder )
+    {
+      var bn_iframe;
+      var bn_name = "_baynote_0_iframe";
+      if ( !_baynoteObsCommon.isNullOrEmpty( bn_tag.frameName) )
+      {
+        bn_name = bn_tag.frameName;
+        bn_iframe = document.getElementById( bn_name);
+      }
+      else
+      {
+        // 200k-300k leak occurs here
+        bn_iframe = _baynoteObsCommon.createIframe( bn_name);
+      }
+
+      bn_iframe.id = bn_name;
+      bn_iframe.baynote_tag = bn_tag;
+      bn_tag.frame = bn_iframe;
+
+      // hack to avoid touching baynote.js
+      bn_tag.destroy = function()
+      {
+          // null out references to avoid mem leak (still leaks)
+
+          try
+          {
+            bn_tag.placeholder.removeChild( bn_tag.frame);
+          }
+          catch(e)
+          {
+            // no-op
+          }
+          bn_tag.frame = null;
+          bn_tag.placeholder = null;
+          if (bn_iframe)
+          {
+            if (bn_iframe.baynote_tag)
+            {
+              bn_iframe.baynote_tag = null;
+            }
+            bn_iframe = null;
+          }
+      }
+      _baynoteObsCommon.addEventHandler(window, "unload", bn_tag.destroy);
+
+      var bn_frameClass = bn_tag.getParam( "frameClass", null);
+      if ( !_baynoteObsCommon.isNullOrEmpty( bn_frameClass) )
+      {
+          bn_iframe.className = bn_frameClass;
+          bn_iframe.frameBorder = "yes";
+      }
+      else
+      {
+          bn_iframe.style.width = bn_tag.getParam( "width", "0px");
+          bn_iframe.style.height = bn_tag.getParam( "height", "0px");
+          var bn_border = bn_tag.getParam( "border", "none");
+          if ( _baynoteObsCommon.isNullOrEmpty( bn_border) )
+          {
+            bn_iframe.frameBorder = "yes";
+          }
+          else if ( bn_border == "none" )
+          {
+            bn_iframe.style.border = "none";
+            bn_iframe.frameBorder = "no";
+          }
+          else
+          {
+            bn_iframe.style.border = bn_border;
+            bn_iframe.frameBorder = "yes";
+          }
+      }
+      bn_tag.placeholder.appendChild( bn_iframe);
+
+      bn_target = bn_iframe;
+      /**
+ * _baynoteObserver
+ * A singleton that handles sending back observations to the dispatcher.
+ */
+
+function _baynote_createObserverClass()
+{
+    function _baynoteObserver( frame)
+    {
+      this.target = frame;
+      this.baynote_tag = frame.baynote_tag;
+      this.url = this.baynote_tag.getParam( "url", location.href);
+
+      var isSearchPageParam = this.baynote_tag.getParam( "isSearchPage", null);
+      if ( isSearchPageParam != null )
+      {
+        this.isSearchPage = _baynoteObsCommon.isTrue( isSearchPageParam);
+        if ( this.isSearchPage )
+        {
+          var query = this.baynote_tag.getParam( "query", null);
+          if ( query == null )
+            this.escapedQuery = _baynoteObsCommon.getEscapedQueryFromSearchPage( this.url);
+          else
+            this.escapedQuery = encodeURIComponent( query);
+        }
+      }
+      else
+      {
+        this.escapedQuery = _baynoteObsCommon.getEscapedQueryFromSearchPage( this.url);
+        this.isSearchPage = (this.escapedQuery != null) ? true : false;
+      }
+
+      this.userId = _baynoteObsCommon.getUserId( this.baynote_tag);
+
+      this.startTime = new Date().getTime();
+      this.scroll = 0;
+
+      this.dwellThreshold = this.baynote_tag.getParam( "dwellThreshold", 2);
+      this.maxDwellThreshold = this.baynote_tag.getParam( "maxDwellThreshold", 60);
+      this.sampling = this.baynote_tag.getParam( "sampling", false);
+      this.searchbox = this.baynote_tag.getParam( "searchbox", false);
+      if (this.searchbox)
+      {
+          var actionUrl = this.baynote_tag.server + "/search/query";
+          var searchButtonImg = this.baynote_tag.getParam("searchButtonImg", null);
+          if (searchButtonImg)
+          {
+              searchButtonHTML = '<input type="image" alt="Search" id="bn_search_button" src="' + searchButtonImg + '">';
+              searchImgParam = '<input type="hidden" name="sbi" value=' + searchButtonImg + '>';
+          }
+          else
+          {
+              searchButtonHTML = '<input type="submit" value="Search" id="bn_search_button" class="bn_sb_button">';
+              searchImgParam = '';
+          }
+
+          var searchboxHtml = '\
+<table width="100%" class="bn_search_table"><tr>\
+ <td width="33%"></td>\
+ <td width="34%" align="center" class="bn_search_cell">\
+  <form action="' + actionUrl + '" style="margin: 0" id="bn_search_form" class="bn_search_form">\
+   <input type="hidden" name="cn" value="' + this.baynote_tag.customerId + '">\
+   <input type="hidden" name="cc" value="' + this.baynote_tag.code + '">\
+   <input type="hidden" name="u" value="' + this.userId + '">\
+   <input type="hidden" name="e" value="1">'
+   + searchImgParam + 
+   '<input type="text"   name="q" size="15" maxlength="255" id="bn_search_query" class="bn_sb_query">'
+   + searchButtonHTML +
+  '</form>\
+ </td>\
+ <td width="33%"></td>\
+</tr></table>\
+';
+
+          var searchboxDiv = document.createElement( "div");
+          searchboxDiv.innerHTML = searchboxHtml;
+          this.baynote_tag.placeholder.appendChild( searchboxDiv);
+      }
+
+      frame.style.width = "0px";
+      frame.style.height = "0px";
+      frame.style.zIndex = -1000;
+
+      this.checkBinObs();
+
+      this.instrumentLinks();
+
+      if ( this.isSearchPage )
+      {
+        this.logQueryPageNavigationPoint( this.escapedQuery);
+        this.addQueryObs();
+        this.removeExternalReferrer();
+      }
+      else
+      {
+        if (this.sampling)
+        {
+          if (document.referrer == "")
+          {
+            _baynoteObsCommon.removeCookie("bn_AdGuide_loc");
+            _baynoteObsCommon.removeCookie("bn_MostPopular_loc");
+            _baynoteObsCommon.removeCookie("bn_NextStep_loc");
+            _baynoteObsCommon.removeCookie("bn_SimilarDocs_loc");
+
+            _baynoteObsCommon.removeCookie("bn_extq");
+            _baynoteObsCommon.removeCookie("bn_extr");
+            _baynoteObsCommon.removeCookie("bn_extad");
+          }
+        }
+        // check for external search engine in referer
+        var info = _baynoteObsCommon.getExternalReferrerInfo(this.url);
+        if ( info )
+        {
+          var escapedExternalQuery = info["query"];
+          if (this.sampling)
+          {
+            // external entry
+            _baynoteObsCommon.removeCookie("bn_AdGuide", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_AdGuide_loc", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_MostPopular", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_MostPopular_loc", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_NextStep", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_NextStep_loc", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_SimilarDocs", this.baynote_tag);
+            _baynoteObsCommon.removeCookie("bn_SimilarDocs_loc", this.baynote_tag);
+            this.setPaidAdCookie();
+            _baynoteObsCommon.setCookie("bn_extq",escapedExternalQuery,null,this.baynote_tag);
+            _baynoteObsCommon.setCookie("bn_extr",info["referrer"],null,this.baynote_tag);
+            this.fireSampleEvent("EXTENTRY");
+          }
+          this.logQueryPageNavigationPoint( escapedExternalQuery);
+          this.setExternalReferrer(document.referrer);
+          this.addQueryObs();
+        }
+        else
+        {
+          this.fireSampleEvent("VISIT");
+        }
+
+        var linkText = _baynoteObsCommon.getCookie( _baynoteObsCommon.LINKTEXT_KEY);
+        linkText = linkText ? linkText : "";
+        this.logCurrentPageNavigationPoint( this.url, linkText, 0, 0);
+        if ( this.is404() )
+        {
+          this.add404Obs();
+        }
+        else
+        {
+          _baynoteObsCommon.needFrameLater(frame);
+          //Set a dwell threshold now.
+          setTimeout( _baynoteObserver.createVirtualBookmark( this), this.dwellThreshold * 1000);
+          setTimeout( _baynoteObserver.createAbBookmark( this), (this.dwellThreshold-1) * 1000);
+        }
+      }
+
+      // we don't want to link text cookie to stay around
+      _baynoteObsCommon.removeCookie( _baynoteObsCommon.LINKTEXT_KEY, this.baynote_tag);
+
+      this.sendPendingObs();
+
+      var ustr = new String(this.userId);
+      if (ustr.indexOf(baynote_tag.customerId) != -1 )
+      {
+          // old userid format found, lets attempt get new format userid
+          var base = baynote_tag.server + "/baynote/";
+          var path = "/" + baynote_tag.customerId + "-" + baynote_tag.code +
+                     "?customerId=" + baynote_tag.customerId +
+                     "&code=" + baynote_tag.code;
+          var jssrc = base + "usergenjs" + path +
+                      "&userId=" + this.userId;
+
+          _baynoteObsCommon.createLoadScriptTag(jssrc);
+      }
+    }
+
+    _baynoteObserver.createXMLTag = function(tagname, data)
+    {
+      return "<" + tagname + ">" + _baynoteObserver.xmlEscape(data) + "</" + tagname + ">";
+    }
+
+    _baynoteObserver.prototype.setPaidAdCookie = function()
+    {
+      var adMarkers = _baynoteObsCommon.getCookie("bn_admarkers");
+      if ( typeof(adMarkers) != "undefined" && adMarkers!=null )
+      {
+        var adMarkersStr = new String(adMarkers);
+        var adMarkerSlices = adMarkersStr.split(",");
+        var urlStr = new String(this.url);
+        for (var i = 0; i < adMarkerSlices.length; i++)
+        {
+          if (urlStr.indexOf( adMarkerSlices[i] ) != -1)
+          {
+            _baynoteObsCommon.setCookie("bn_extad",adMarkerSlices[i],null,this.baynote_tag);
+            break;
+          }
+        }
+      }
+    }
+
+    _baynoteObserver.prototype.fireSampleEvent = function( type)
+    {
+      var ab = _baynoteObsCommon.getCookie("bn_abg");
+      if ( typeof(ab) != "undefined" && ab!=null && ab != "do-show")
+      {
+        var referStr = new String(document.referrer);
+        if (referStr.indexOf(document.domain) != -1)
+        {
+            //_baynoteObsCommon.removeCookie("bn_extq", this.baynote_tag);
+        }
+        var extquery = _baynoteObsCommon.getCookie("bn_extq");
+        var extrefer = _baynoteObsCommon.getCookie("bn_extr");
+        var extad    = _baynoteObsCommon.getCookie("bn_extad");
+        var tm = new Date().getTime();
+        this.addSampleEvent(
+            type,
+            this.url,
+            tm,
+            extrefer,
+            extquery,
+            extad);
+
+        this.sendSampleEvent();
+        this.ensurePostRequest(150);
+      }
+    }
+
+    _baynoteObserver.prototype.gatherGuideCookieInfo = function( kind, blob)
+    {
+          var bn_guide_loc = _baynoteObsCommon.getCookie("bn_"+kind+"_loc");
+          if ( typeof(bn_guide_loc) != "undefined" && bn_guide_loc!=null)
+          {
+              var locSlices = bn_guide_loc.split( "|");
+
+              // location where last guide was used
+              blob += _baynoteObserver.createXMLTag(kind+"Url", locSlices[1]);
+
+              // page clicked from where last guide was used
+              blob += _baynoteObserver.createXMLTag(kind+"Used", locSlices[0]);
+          }
+
+          return blob;
+    }
+
+    _baynoteObserver.prototype.addSampleEvent = function(
+        action,
+        url,
+        timestamp,
+        extrefer,
+        extquery,
+        extad)
+    {
+          // check for cookie that would be set if user presented with adguide
+
+          var abGroup = "-1"      // adguide-group 1 or no-adguide-group 2
+          var bn_abg = _baynoteObsCommon.getCookie("bn_abg");
+          if ( typeof(bn_abg) != "undefined" && bn_abg!=null)
+          {
+              if (bn_abg == "group-b")
+              {
+                  abGroup = "2";
+              }
+              else if (bn_abg == "group-a")
+              {
+                  abGroup = "1";
+              }
+          }
+
+          var id = timestamp;
+          if (action == "VISIT" || action == "EXTENTRY")
+          {
+              this.sampleId = timestamp;
+          }
+          else if (action == "DWELL")
+          {
+              id = this.sampleId;
+          }
+
+          var steps = "-1"
+
+          var xml = "<target " +
+              "sampleId"  + "='" + id  + "' " +
+              _baynoteObsCommon.ABGROUP_ATTR  + "='" + abGroup  + "' " +
+              ">";
+
+          xml += _baynoteObserver.createXMLTag("action", action);
+          xml += _baynoteObserver.createXMLTag(_baynoteObsCommon.TIMESTAMP_TAG, timestamp);
+          xml += _baynoteObserver.createXMLTag(_baynoteObsCommon.URL, url);
+
+          xml = this.gatherGuideCookieInfo("AdGuide",xml);
+          xml = this.gatherGuideCookieInfo("MostPopular",xml);
+          xml = this.gatherGuideCookieInfo("SimilarDocs",xml);
+          xml = this.gatherGuideCookieInfo("NextStep",xml);
+
+          var trail = _baynoteObsCommon.getDocTrail();
+          xml += _baynoteObserver.createXMLTag("trail", trail);
+
+          if (extquery)
+          {
+              xml += _baynoteObserver.createXMLTag(_baynoteObsCommon.QUERY_TAG, extquery);
+              xml += _baynoteObserver.createXMLTag("extrefer", extrefer);
+          }
+          if (extad)
+          {
+              xml += _baynoteObserver.createXMLTag("extad", extad);
+          }
+          xml += "</target>";
+          var pendingEvents = _baynoteObsCommon.getCookie("baynoteTarget");
+          if (!pendingEvents)
+          {
+              pendingEvents = "";
+          }
+          pendingEvents += xml;
+          _baynoteObsCommon.setCookie("baynoteTarget",pendingEvents, null, this.baynote_tag);
+    }
+
+    _baynoteObserver.prototype.sendSampleEvent = function( needsCleanup)
+    {
+      var ignoreObs = _baynoteObsCommon.getCookie( "baynote_ignore_observations");
+      var isDemo = _baynoteObsCommon.getCookie( "baynote_demo");
+      if ( ignoreObs != "true" && isDemo != "true" )
+      {
+        var pendingEvents = _baynoteObsCommon.getCookie("baynoteTarget");
+        if ( pendingEvents != "" )
+        {
+          var xml = "<events>";
+          xml += pendingEvents;
+          xml += "</events>";
+
+          var eventsForm = this.createForm("target");
+          this.dataField.value = xml;
+
+          var cleanup = null;
+// There is a race condition in FireFox where if we set the clean up callback
+// (which blanks out the form we used for sending an observation, which we
+// need to do, so a reload of a page after a max-dwell observation will not
+// resend the observation form) when we send the form from the onload handler,
+// it doesn't always send the observation.
+// To solve that, we only set the cleanup method if we are not called from the
+// unload handler. However, it turns out that in opera if you leave a page
+// and cause a dwell, using the back button to go back to that page again
+// causes the form to be resent. So, on opera, we always want to use the
+// cleanup function.
+          if ( needsCleanup || window.opera )
+          {
+            var tg = this.target;
+            cleanup = function()
+            {
+                setTimeout(_baynoteObsCommon.setSrc( tg, "about:blank"),5000);
+            };
+          }
+
+          _baynoteObsCommon.sendForm( this.target, eventsForm, cleanup);
+
+          _baynoteObsCommon.removeCookie("baynoteTarget", this.baynote_tag);
+          //_baynoteObsCommon.removeCookie("bn_adg", this.baynote_tag);
+        }
+      }
+    }
+
+    _baynoteObserver.prototype.setExternalReferrer = function(referrer)
+    {
+        _baynoteObsCommon.setCookie(_baynoteObsCommon.BAYNOTE_OBSERVATION_REFERRER, 
+                                 referrer, 
+                                 null, 
+                                 this.baynote_tag);
+    }
+
+    _baynoteObserver.prototype.removeExternalReferrer = function()
+    {
+        _baynoteObsCommon.removeCookie(_baynoteObsCommon.BAYNOTE_OBSERVATION_REFERRER, 
+                                    this.baynote_tag);
+    }
+
+    _baynoteObserver.prototype.logLinkTextHandler = function( target)
+    {
+      var anchorText = _baynoteObsCommon.getInnerText(target);
+
+      var binUrl = target.href;
+      var irRank = target.getAttribute("baynote_irrank");
+      var bnRank = target.getAttribute("baynote_bnrank");
+      if (irRank == null || typeof(irRank) == "undefined" || irRank == "")
+      {
+          irRank = 0;
+      }
+      if (bnRank == null || typeof(bnRank) == "undefined" || bnRank == "")
+      {
+          bnRank = 0;
+      }
+
+      if ( binUrl && binUrl.match( /^.*\.(pdf|doc|xls|ppt)(\?.*)?$/i) )
+      {
+        this.logNavigationPoint( binUrl, anchorText, irRank, bnRank);
+
+        var normUrl = _baynoteObsCommon.normalizeUrl( this.baynote_tag, binUrl);
+        _baynoteObsCommon.setCookie( _baynoteObsCommon.BIN_URL_CLICKED, new Date().getTime() + "&" + encodeURIComponent( normUrl), this.baynote_tag);
+      }
+      // Scott added this special case for certain customers: treat anything containing "/mgetfile?" or "/getfile?" as a binary type
+      //  This should be replaced with configurable binary regexes per customer
+      else if ( binUrl &&  binUrl.match( /^.*\/m?getfile\?.*$/i) )
+      {
+        this.logNavigationPoint( binUrl, anchorText, irRank, bnRank);
+
+        var normUrl = _baynoteObsCommon.normalizeUrl( this.baynote_tag, binUrl);
+        _baynoteObsCommon.setCookie( _baynoteObsCommon.BIN_URL_CLICKED, new Date().getTime() + "&" + encodeURIComponent( normUrl), this.baynote_tag);
+      }
+      else if ( !this.isSearchPage )
+      {
+        _baynoteObsCommon.setCookie(_baynoteObsCommon.LINKTEXT_KEY, anchorText, null, this.baynote_tag);
+      }
+      else if (this.isSearchPage)
+      {      
+          //Log the page the user is going to.
+          this.logNavigationPoint( target.href, 
+                                             null,  // we should record the search page link text
+                                             irRank, 
+                                             bnRank);
+      }            
+    }
+
+    _baynoteObserver.createLogLinkTextHandler = function( obs, alink)
+    {
+      return function(e)
+      {
+        target = alink;
+        obs.logLinkTextHandler( target);
+      }
+    }
+
+    _baynoteObserver.prototype.instrumentLinks = function()
+    {
+      var thisTag = this;
+      if ( this.baynote_tag.useLinkInstrument )
+      {
+        this.instrumenterTimeout = 500;
+        this.instrumenter = function()
+        {
+          var links = document.getElementsByTagName("a");
+          for (var i = 0; i < links.length; i++)
+          {
+            var link = links[i];
+            if ( link.name != "_baynote_link" && !link.baynote_link_added )
+            {
+              var handler = _baynoteObserver.createLogLinkTextHandler( thisTag, link);
+              if (link.attachEvent)
+              {
+                link.attachEvent("onclick", handler);
+              }
+              else if (link.addEventListener)
+              {
+                link.addEventListener("click", handler, false);
+              }
+              link.baynote_link_added = true;
+            }
+          }
+          setTimeout( thisTag.instrumenter, thisTag.instrumenterTimeout);
+          thisTag.instrumenterTimeout *= 2;
+        }
+        this.instrumenter();
+      }
+      else
+      {
+        // The following line accounts for about 200-300k leak
+        _baynoteObsCommon.addEventHandler( document.body, "click", function(evt)
+        {
+          var target = evt.target;
+
+          while ( target )
+          {
+            if ( target.tagName == "A" )
+              break;
+            target = target.parentNode;
+          }
+
+          if ( target )
+          {
+            thisTag.logLinkTextHandler( target);
+          }
+        });
+      }
+    }
+
+    _baynoteObserver.prototype.createRequiredFormElements = function( theForm)
+    {
+      _baynoteObsCommon.addInputElementAlways( "userId", this.userId, theForm);
+      _baynoteObsCommon.addInputElementAlways( "customerId", this.baynote_tag.customerId, theForm);
+      _baynoteObsCommon.addInputElementAlways( "code", this.baynote_tag.code, theForm);
+    }
+
+    _baynoteObserver.prototype.createForm = function( handlername)
+    {
+        var theForm = document.createElement("form");
+        var action = _baynoteObsCommon.getFullContextPath() + handlername;
+        if (document.charset)
+        {
+            action += "?encoding=" + encodeURIComponent(document.charset);
+        }
+        else
+        {
+            theForm.acceptCharset="utf-8";
+        }
+        theForm.action = action;
+        if (handlername == "target")
+        {
+            theForm.name = "_baynote_abevent";
+            theForm.id = "baynote_abevent_form";
+        }
+        else
+        {
+            theForm.name = "_baynote";
+            theForm.id = "baynote_obs_form";
+        }
+        theForm.method = "post";
+        theForm.target = this.target.name;
+
+        this.createRequiredFormElements( theForm);
+
+        //We need to keep a reference of the data field, as it is not accessible
+        //through traditional means afterwards.
+        this.dataField = _baynoteObsCommon.addInputElementAlways( "data", "", theForm);
+        this.ereferrer = _baynoteObsCommon.addInputElementAlways( "ereferrer", "", theForm);
+
+        return theForm;
+    }
+
+    _baynoteObserver.prototype.fireDwell = function(timeStamp, duration, needsCleanup)
+    {
+        this.addDwellObs( timeStamp, duration);
+        this.sendPendingObs( needsCleanup);
+        this.ensurePostRequest(150);
+    }
+
+    _baynoteObserver.prototype.ensurePostRequest = function(millisec)
+    {
+        var startTime = new Date().getTime();
+        var endTime = startTime + millisec;
+        var endDate = new Date(endTime);
+        var i = 0;
+        while (new Date().getTime() < endTime)
+        {
+            _baynoteObsCommon.setCookie("_baynote_obs",i, endDate.toGMTString(), this.baynote_tag);
+            _baynoteObsCommon.removeCookie("_baynote_obs", this.baynote_tag);
+            i++;
+        }
+    }
+
+    _baynoteObserver.prototype.sendPendingObs = function( needsCleanup)
+    {
+      var ignoreObs = _baynoteObsCommon.getCookie( "baynote_ignore_observations");
+      var isDemo = _baynoteObsCommon.getCookie( "baynote_demo");
+      if ( ignoreObs != "true" && isDemo != "true" )
+      {
+        if ( this.obsList != "" )
+        {
+          var xml = "<observation-list>";
+          xml += this.obsList;
+          xml += "</observation-list>";
+          var obsForm = this.createForm("eventReceiverJS")
+
+         // Normally, we would go through form.elements to get to the data field.
+         // However, since this node was dynamically added, that doesn't work on IE.
+          this.dataField.value = xml;
+
+          var cleanup = null;
+         // There is a race condition in FireFox where if we set the clean up callback
+         // (which blanks out the form we used for sending an observation, which we 
+         // need to do, so a reload of a page after a max-dwell observation will not 
+         // resend the observation form) when we send the form from the onload handler,
+         // it doesn't always send the observation.
+         // To solve that, we only set the cleanup method if we are not called from the
+         // unload handler. However, it turns out that in opera if you leave a page 
+         // and cause a dwell, using the back button to go back to that page again 
+         // causes the form to be resent. So, on opera, we always want to use the 
+         // cleanup function.
+          if ( needsCleanup || window.opera )
+          {
+            var tg = this.target;
+            cleanup = function()
+            {
+                setTimeout(_baynoteObsCommon.setSrc( tg, "about:blank"),5000);
+            };
+          }
+
+          //Get the external referrer, if any.
+          var externalReferrer = _baynoteObsCommon.getCookie( _baynoteObsCommon.BAYNOTE_OBSERVATION_REFERRER);
+          this.ereferrer.value = externalReferrer ? externalReferrer : "";
+          _baynoteObsCommon.sendForm( this.target, obsForm, cleanup);
+          this.obsList = "";
+        }
+      }
+    }
+
+    _baynoteObserver.prototype.addDwellObs = function(timeStamp, duration)
+    {
+      var trail = _baynoteObsCommon.getDocTrail();
+      this.obsList += "<observation action='DWELL' timestamp='" + timeStamp +
+        "' source='LIVE' dwell-duration='" + duration +
+        "' trail='" + _baynoteObserver.xmlEscape( trail) + "'/>";
+    }
+
+    _baynoteObserver.prototype.addQueryObs = function()
+    {
+      var trail = _baynoteObsCommon.getDocTrail();
+      this.obsList += "<observation action='QUERY' trail='" + _baynoteObserver.xmlEscape( trail) + "'/>";
+    }
+
+    _baynoteObserver.prototype.add404Obs = function()
+    {
+      var trail = _baynoteObsCommon.getDocTrail();
+      this.obsList += "<observation action='UNREACHABLE' trail='" + _baynoteObserver.xmlEscape( trail) + "'/>";
+    }
+
+    _baynoteObserver.xmlEscape = function(xml)
+    {
+        if (typeof(xml) == "string")
+        {
+            xml = xml.replace(/&/g,"&amp;");
+        }
+        return xml;
+    }
+
+    _baynoteObserver.prototype.abBookmark = function()
+    {
+        this.abDwellEventHandler( true, this.dwellThreshold-1);
+    }
+
+    _baynoteObserver.createAbBookmark = function( observer)
+    {
+      return function()
+      {
+        observer.abBookmark();
+      }
+    }
+
+    _baynoteObserver.prototype.abDwellEventHandler = function( needsCleanup, threshold)
+    {
+      var timeStamp = new Date().getTime();
+      var duration = timeStamp - this.startTime;
+      //Convert duration into seconds.
+      duration = Math.round(duration / 1000);
+      if (duration >= threshold)
+      {
+        this.fireSampleEvent("DWELL");
+      }
+    }
+
+    _baynoteObserver.prototype.virtualBookmark = function()
+    {
+        this.dwellEventHandler( true);
+    }
+
+    _baynoteObserver.createVirtualBookmark = function( observer)
+    {
+      return function()
+      {
+        observer.virtualBookmark();
+      }
+    }
+
+    _baynoteObserver.prototype.dwellEventHandler = function( needsCleanup)
+    {
+      var timeStamp = new Date().getTime();
+      var duration = timeStamp - this.startTime;
+      //Convert duration into seconds.
+      duration = Math.round(duration / 1000);
+      if (duration >= this.dwellThreshold)
+      {
+        this.fireDwell(timeStamp, duration, needsCleanup);
+      }
+    }
+
+    _baynoteObserver.prototype.checkBinObs = function()
+    {
+      var timeAndUrl = _baynoteObsCommon.getCookie( _baynoteObsCommon.BIN_URL_CLICKED);
+
+      if ( timeAndUrl )
+      {
+        timeAndUrl = timeAndUrl.split( "&");
+        if ( timeAndUrl.length == 2 )
+        {
+          var timeStamp = parseInt( timeAndUrl[0]);
+          var binUrl = decodeURIComponent( timeAndUrl[1]);
+          var duration = this.startTime - timeStamp;
+
+          //Convert duration into seconds.
+          duration = Math.round( duration / 1000);
+          if (duration >= this.dwellThreshold)
+          {
+            this.addDwellObs( timeStamp, duration);
+          }
+        }
+        _baynoteObsCommon.removeCookie( _baynoteObsCommon.BIN_URL_CLICKED, this.baynote_tag);
+      }
+    }
+
+    _baynoteObserver.prototype.is404 = function()
+    {
+      var status = null;
+      var statusStr = this.baynote_tag.getParam( "page_status", null);
+      if ( statusStr != null )
+      {
+        status = parseInt( statusStr);
+        if ( status == NaN )
+          status = null;
+      }
+      if ( status == null )
+      {
+        var metas = document.getElementsByName( _baynoteObsCommon.BAYNOTE_STATUS_META_NAME);
+        if ( metas && metas.length > 1 )
+        {
+          status = parseInt( metas[0].content);
+          if ( status == NaN )
+            status = null;
+        }
+      }
+      return status == 404;
+    }
+
+    _baynoteObserver.prototype.logCurrentPageNavigationPoint = function( url, linkText, irRank, bnRank)
+    {
+      url = _baynoteObsCommon.normalizeUrl( this.baynote_tag, url);
+      var wordCount = _baynoteObsCommon.getWordCount();
+      var linkCount = _baynoteObsCommon.getLinkCount();
+      var title = _baynoteObsCommon.getPageTitle();
+      _baynoteTrailManager.addToTrail( url, linkText, wordCount, linkCount, title, "", irRank, bnRank);
+      _baynoteTrailManager.writeTrail( this.baynote_tag);
+    }
+
+    _baynoteObserver.prototype.logQueryPageNavigationPoint = function( escapedQuery)
+    {
+      _baynoteTrailManager.addQueryToTrail( escapedQuery);
+      _baynoteTrailManager.writeTrail( this.baynote_tag);
+    }
+
+    _baynoteObserver.prototype.logNavigationPoint = function( url, linkText, irRank, bnRank)
+    {
+      url = _baynoteObsCommon.normalizeUrl( this.baynote_tag, url);
+      _baynoteTrailManager.addToTrail(url, linkText, 0, 0, null, "", irRank, bnRank);
+      _baynoteTrailManager.writeTrail( this.baynote_tag);
+    }
+
+    //Set to true if this is a search page.
+    _baynoteObserver.prototype.isSearchPage = false;
+    //Set this to false to deactivate the observer.
+    _baynoteObserver.prototype.active = true;
+    // the list of obs to send
+    _baynoteObserver.prototype.obsList = "";
+
+    return _baynoteObserver;
+}
+
+var _baynoteObserver = typeof(_baynoteObserver) == "undefined" ? _baynote_createObserverClass() : _baynoteObserver;
+
+var _bntmp = new _baynoteObserver( bn_target);
+
+    }
+  }
+}

@@ -1,0 +1,1115 @@
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE LTC_HANDLER
+OBJECT MODULE PLACED IN LTC_handler.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe LTC_handler.c DB OE
+
+line level    source
+
+   1          #include <C8051F320.h>
+   2          #include <string.h>
+   3          #include <stdio.h>
+   4          #include "globals.h"
+   5          #include "ublox_prot.h"
+   6          #include "LTC_handler.h"
+   7          #include "i2c_bus.h"
+   8          #include "EEPROM_drv.h"
+   9          #include "SW_uart.h"
+  10          
+  11          sbit LED2 = P2^1;
+  12          sbit timepulse_status = P1^0;
+  13          
+  14          bit first_time_run = 1;
+  15          
+  16          //antal dage i måneden
+  17          const unsigned char code month_days[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+  18          
+  19          //kvantiseringsfejl i 100 MHz clocksteps
+  20          char xdata quant_error_100MHz;
+  21          
+  22          //offset for NTSC forskydning
+  23          union  {
+  24                  unsigned int NTSC_offset_int;
+  25                  unsigned char NTSC_offset_bytes[2];
+  26          } NTSC_offset;
+  27          
+  28          //tidsstruct for intern tid
+  29          //intern tid
+  30          struct time xdata int_time;
+  31          
+  32          //intern GPS tow og week
+  33          unsigned long xdata int_GPS_tow;
+  34          unsigned int xdata int_GPS_week;
+  35          
+  36          //UTC læst direkte fra GPS chip
+  37          struct time xdata UTC_time;                             
+  38          
+  39          
+  40          //korrigeret LTC tid med tidzoner og NTSC offset
+  41          struct time xdata LTC_a_time;                   
+  42          struct time xdata LTC_b_time;
+  43          
+  44          
+  45          //offsets for ur - ltc a og ltc b (tidszoner)
+  46          char xdata LTC_a_watchoffset[3];
+  47          char xdata LTC_b_watchoffset[3];
+  48          
+  49          //frame offsets
+  50          unsigned char xdata LTC_a_frames=0;
+  51          unsigned char xdata LTC_b_frames=0;
+  52          
+  53          // LTC setup byte
+  54          // 0-1 = LTC A format ("00" = 24 fps, "01" = 25 fps, "10" = 30/1,001 fps, "11" = 30 FPS)
+  55          // 2 = dropframe, hvis NTSC 0 = non-drop, 1 = drop
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 2   
+
+  56          // 4-5 = LTC B format ("00" = 24 fps, "01" = 25 fps, "10" = 30/1,001 fps, "11" = 30 FPS)
+  57          // 6 = dropframe, hvis NTSC 0 = non-drop, 1 = drop
+  58          unsigned char xdata LTC_setup=0;
+  59          
+  60          
+  61          //Daylight saving switch mode
+  62          //0-1 = Dropframe mode ("00" = NONE, "01" = CONFIRM, "10" = AUTO)
+  63          //4-5 = Dropframe mode ("00" = NONE, "01" = CONFIRM, "10" = AUTO)
+  64          unsigned char xdata daylight_switch_setup=0;
+  65          
+  66          struct time xdata daylight_on_a_time;   //sommertid for LTC A
+  67          struct time xdata daylight_off_a_time;  //vintertid for LTC A
+  68          struct time xdata daylight_on_b_time;   //sommertid for LTC B
+  69          struct time xdata daylight_off_b_time;  //vintertid for LTC B
+  70          
+  71          //sommer/vinter tids variable
+  72          bit LTC_a_daylight_flag=0;
+  73          bit LTC_b_daylight_flag=0;
+  74          
+  75          //Request byte (request for sommer/vintertid)
+  76          //sendes til PT5300, hvor en menu skal bekræfte/annullere at sætte indstilling
+  77          //Bekræftelse sendes tilbage til GPS modul
+  78          unsigned char xdata LTC_request=0;
+  79          
+  80          #define request_LTC_a_daylight_on_bit           0       //0: Høj = request for skift til sommertid      (LTC A)
+  81          #define request_LTC_a_daylight_off_bit          1       //1: Høj = request for skift til vintertid         --
+  82          #define request_LTC_a_daylight_mode_bit         2       //2: Høj = Confirm mode / Lav = Auto mode      --
+  83          #define request_LTC_b_daylight_on_bit           4       //4: Høj = request for skift til sommertid      (LTC B)
+  84          #define request_LTC_b_daylight_off_bit          5       //5: Høj = request for skift til vintertid         --
+  85          #define request_LTC_b_daylight_mode_bit         6       //6: Høj = Confirm mode / Lav = Auto mode      --
+  86          
+  87          
+  88          //LTC Dropframe sync setup
+  89          //0-1 = Dropframe mode ("00" = NONE, "01" = CONFIRM, "10" = AUTO)
+  90          //2-3 = reserveret
+  91          //4-5 = Dropframe mode ("00" = NONE, "01" = CONFIRM, "10" = AUTO)
+  92          //6-7 = reserveret
+  93          unsigned char xdata dropframe_setup=0;
+  94          
+  95          
+  96          //sync tider til LTC a og b (auto eller confirm sync)
+  97          unsigned char xdata LTC_a_sync_hour;
+  98          unsigned char xdata LTC_a_sync_min;
+  99          unsigned char xdata LTC_b_sync_hour;
+ 100          unsigned char xdata LTC_b_sync_min;
+ 101          unsigned long xdata secs_since_sync_a=0;
+ 102          unsigned long xdata secs_since_sync_b=0;
+ 103          
+ 104          
+ 105          //Request byte for LTC sync
+ 106          unsigned char xdata LTC_sync_request=0;
+ 107          
+ 108          #define request_LTC_a_resync_bit                        0       //0: Høj = LTC a sync request
+ 109          #define request_LTC_a_resync_mode_bit           1       //1: Høj = LTC a confirm mode, lav = auto mode
+ 110          #define request_LTC_b_resync_bit                        4       //4: Høj = LTC b sync request
+ 111          #define request_LTC_b_resync_mode_bit           5       //5: Høj = LTC b confirm mode, lav = auto mode
+ 112          
+ 113          
+ 114          //offsets for ltc a og ltc b
+ 115          union { 
+ 116                  char LTC_offset_bytes[4];
+ 117                  long LTC_offset_long;
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 3   
+
+ 118          } xdata LTC_a_offset;
+ 119          
+ 120          union { 
+ 121                  char LTC_offset_bytes[4];
+ 122                  long LTC_offset_long;
+ 123          } xdata LTC_b_offset;
+ 124          
+ 125          
+ 126          
+ 127          
+ 128          //omregnet tid til BCD kodede bytes
+ 129          unsigned char xdata BCD_coded_time_a[4];
+ 130          unsigned char xdata BCD_coded_time_b[4];
+ 131          
+ 132          //strenge, der indeholder LTC tidspunkter i format "TT:MM:SS   "
+ 133          char xdata LTC_a_str[11];
+ 134          char xdata LTC_b_str[11];
+ 135          
+ 136          
+ 137          //Confirm byte (confirm for sommer/vintertid + NTSC resync)
+ 138          //0: Høj = bekræft LTC A sommer/vinter skift
+ 139          //1: Høj = annuler LTC A sommer/vinter skift
+ 140          //2: Høj = bekræft LTC A resync
+ 141          //3: Høj = annuler LTC A resync
+ 142          //4: Høj = bekræft LTC B sommer/vinter skift
+ 143          //5: Høj = annuler LTC B sommer/vinter skift
+ 144          //6: Høj = bekræft LTC B resync
+ 145          //7: Høj = annuler LTC B resync
+ 146          unsigned char xdata LTC_confirm=0;
+ 147          
+ 148          
+ 149          //long til udregning af diverse
+ 150          union  {
+ 151                  unsigned long temp_long;
+ 152                  unsigned char bytes[4];
+ 153          } temp_long;
+ 154          
+ 155          
+ 156          //I2C variable
+ 157          unsigned char byte_index;
+ 158          unsigned char i2c_byte;
+ 159          
+ 160          //buffer til uddata til FPGA
+ 161          char xdata send_buffer[21];
+ 162          
+ 163          
+ 164          
+ 165          
+ 166          //konvertere et binært tal (8 bit) til 2x4 bit 10'ere og 1'ere (TTTT EEEE)
+ 167          unsigned char bin_to_BCD(unsigned char binary)
+ 168          {
+ 169   1              unsigned char tens, ones, BCD;
+ 170   1      
+ 171   1              ones = binary%10;
+ 172   1              tens = binary/10;
+ 173   1              BCD = (tens<<4)|ones;
+ 174   1      
+ 175   1              return BCD;
+ 176   1      }
+ 177          
+ 178          
+ 179          
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 4   
+
+ 180          
+ 181          //inkrementer tiden med ét sekund
+ 182          void sec_inc()
+ 183          {
+ 184   1              int_time.sec++;
+ 185   1      
+ 186   1              //incrementer minutter
+ 187   1              if (int_time.sec==60)
+ 188   1              {
+ 189   2                      int_time.sec=0;
+ 190   2                      int_time.min++;
+ 191   2              
+ 192   2                      //incrementer timer
+ 193   2                      if (int_time.min==60)
+ 194   2                      {
+ 195   3                              int_time.min=0;
+ 196   3                              int_time.hour++;
+ 197   3              
+ 198   3                              //incrementer dage
+ 199   3                              if (int_time.hour==24)
+ 200   3                              {
+ 201   4                                      int_time.hour=0;
+ 202   4                                      int_time.day++;
+ 203   4      
+ 204   4                                      //incrementer måneder (med højde for dag 29 i skudår)
+ 205   4                                      if ((int_time.year%4)==0 && int_time.month==2)
+ 206   4                                      {
+ 207   5                                              if(int_time.day==30)
+ 208   5                                              {
+ 209   6                                                      int_time.day=1;
+ 210   6                                                      int_time.month++;
+ 211   6                                              }
+ 212   5                                      }
+ 213   4      
+ 214   4                                      else if (int_time.day>month_days[int_time.month-1])
+ 215   4                                      {
+ 216   5                                              int_time.day=1;
+ 217   5                                              int_time.month++;
+ 218   5                                      }
+ 219   4      
+ 220   4                                      //inkrementer år
+ 221   4                                      if (int_time.month==13)
+ 222   4                                      {
+ 223   5                                              int_time.month=1;
+ 224   5                                              int_time.year++;
+ 225   5                                      }
+ 226   4                              }
+ 227   3                      }
+ 228   2              }
+ 229   1      }
+ 230          
+ 231          
+ 232          
+ 233          
+ 234          
+ 235          
+ 236          
+ 237          
+ 238          //forskyd tiden frem/tilbage
+ 239          //må kun forskyde i +/- 60 sekunder og timer og +/- 24 timer
+ 240          void offset_time(struct time in_time, struct time *out_time, char hours, char mins, char secs)
+ 241          {
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 5   
+
+ 242   1              struct time temp_time;
+ 243   1      
+ 244   1              //beskæring
+ 245   1              memcpy(&temp_time, &in_time, 7);
+ 246   1      
+ 247   1              //håndter sekunder
+ 248   1              temp_time.sec+=secs;
+ 249   1      
+ 250   1              //hvis overskredet minut nedaf
+ 251   1              if(temp_time.sec<0)
+ 252   1              {
+ 253   2                      temp_time.min--;
+ 254   2                      temp_time.sec+=60; //wrap rundt
+ 255   2              }
+ 256   1              //overskredet minut opad
+ 257   1              else if(temp_time.sec>59)
+ 258   1              {
+ 259   2                      temp_time.min++;
+ 260   2                      temp_time.sec=temp_time.sec%60;
+ 261   2              }
+ 262   1      
+ 263   1      
+ 264   1              //håndter minutter
+ 265   1              temp_time.min+=mins;
+ 266   1              
+ 267   1              //hvis negativ
+ 268   1              if(temp_time.min<0)
+ 269   1              {
+ 270   2                      temp_time.hour--;
+ 271   2                      temp_time.min+=60;
+ 272   2              }
+ 273   1              //hvis positiv
+ 274   1              else if(temp_time.min>59)
+ 275   1              {
+ 276   2                      temp_time.hour++;
+ 277   2                      temp_time.min=temp_time.min%60;
+ 278   2              }
+ 279   1      
+ 280   1      
+ 281   1              //håndter timer
+ 282   1              temp_time.hour+=hours;
+ 283   1      
+ 284   1              //hvis negativ
+ 285   1              if(temp_time.hour<0)
+ 286   1              {
+ 287   2                      temp_time.day--;
+ 288   2                      temp_time.hour+=24;
+ 289   2              }
+ 290   1              //hvis positiv
+ 291   1              else if(temp_time.hour>23)
+ 292   1              {
+ 293   2                      temp_time.day++;
+ 294   2                      temp_time.hour=temp_time.hour%24;
+ 295   2              }
+ 296   1      
+ 297   1              //håndter dag/måned/år
+ 298   1              //overskredet måned negativt
+ 299   1              if(temp_time.day<1)
+ 300   1              {
+ 301   2                      temp_time.month--;
+ 302   2      
+ 303   2                      if((int_time.year%4)==0 && temp_time.month==2)
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 6   
+
+ 304   2                              temp_time.day=29;
+ 305   2                      else
+ 306   2                              temp_time.day=month_days[temp_time.month-1];
+ 307   2                      
+ 308   2                      if(temp_time.month<1)
+ 309   2                      {
+ 310   3                              temp_time.year--;
+ 311   3                              temp_time.month=12;
+ 312   3                      }
+ 313   2              }
+ 314   1      
+ 315   1              //overskredet måned positivt (skudår og februar)
+ 316   1              else if((int_time.year%4)==0 && temp_time.month==2)
+ 317   1              {
+ 318   2                      if(temp_time.day>29)
+ 319   2                      {
+ 320   3                              temp_time.month++;
+ 321   3                              temp_time.day=1;
+ 322   3                      }
+ 323   2              }
+ 324   1      
+ 325   1              else if(temp_time.day>month_days[temp_time.month-1])
+ 326   1              {
+ 327   2                      temp_time.month++;
+ 328   2                      temp_time.day=1;
+ 329   2              }
+ 330   1      
+ 331   1              if(temp_time.month>12)
+ 332   1              {
+ 333   2                      temp_time.year++;
+ 334   2                      temp_time.month=1;
+ 335   2              }
+ 336   1      
+ 337   1              memcpy(out_time, &temp_time, 7);
+ 338   1      }
+ 339          
+ 340          
+ 341          
+ 342          
+ 343          
+ 344          
+ 345          
+ 346          
+ 347          //køres hvert sekund (500 ms efter GPS sekund start)
+ 348          void LTC_manager()
+ 349          {
+ 350   1              //NTSC
+ 351   1              unsigned long NTSC_offset_long;
+ 352   1              int skipped_frames = 0;
+ 353   1      
+ 354   1              char temp_offset[3];
+ 355   1              unsigned long temp_sec_offset = 0;
+ 356   1              unsigned long temp_secs_since_sync;
+ 357   1              
+ 358   1              //////////////////////////////////////////////////////////////////
+ 359   1              //                              intern tidshåndtering                                           //
+ 360   1              //////////////////////////////////////////////////////////////////
+ 361   1      
+ 362   1              //hent nyeste UTC tid fra GPS
+ 363   1              get_UTC_time(&UTC_time);
+ 364   1      
+ 365   1              //inkrementer intern clocks
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 7   
+
+ 366   1              sec_inc();
+ 367   1              int_GPS_tow=(int_GPS_tow+1)%604800;
+ 368   1              
+ 369   1              //inkrementer sekunder siden NTSC sync
+ 370   1              secs_since_sync_a++;
+ 371   1              secs_since_sync_b++;
+ 372   1      
+ 373   1              //hvis ny uge, inkrementer intern ugenummer
+ 374   1              if(int_GPS_tow==0)
+ 375   1                      int_GPS_week++;
+ 376   1      
+ 377   1              //sammenlign tider når GPS er tilgængelig (og opdater tider, hvis forskellig)
+ 378   1              if(timepulse_status==1)
+ 379   1              {
+ 380   2                      if(memcmp(&int_time, &UTC_time, 7))
+ 381   2                              get_UTC_time(&int_time);
+ 382   2      
+ 383   2                      if(memcmp(&int_GPS_tow, &GPS_tow.GPS_tow_long, 4))
+ 384   2                              int_GPS_tow=GPS_tow.GPS_tow_long;
+ 385   2              }
+ 386   1      
+ 387   1              //hent kvantiseringsfejl (i ps, omregnet til antal 100 MHz clocks) symmetrisk "rund op"
+ 388   1              if(quant_error<0)
+ 389   1                      quant_error_100MHz = (quant_error-5000)/10000;
+ 390   1              else
+ 391   1                      quant_error_100MHz = (quant_error+5000)/10000;
+ 392   1      
+ 393   1              //////////////////////////////////////////////////////////////////
+ 394   1              //                              PAL 1/4 sync håndtering                                         //
+ 395   1              //////////////////////////////////////////////////////////////////
+ 396   1              
+ 397   1              //lav signal hvert 4 sekund, GPS tilpasset
+ 398   1              NTSC_offset_long = (int_GPS_week%143)*604800;           //uge*sekunder siden start
+ 399   1              NTSC_offset_long = NTSC_offset_long + int_GPS_tow;      //sekunder i nuværende uge
+ 400   1              NTSC_offset_long = NTSC_offset_long%4;
+ 401   1              
+ 402   1              if(NTSC_offset_long==0)
+ 403   1                      set_bit(&FPGA_system_control, 1);
+ 404   1              else
+ 405   1                      clear_bit(&FPGA_system_control, 1);
+ 406   1      
+ 407   1      
+ 408   1      
+ 409   1              //////////////////////////////////////////////////////////////////
+ 410   1              //                              NTSC forskydningshåndtering                                     //
+ 411   1              //////////////////////////////////////////////////////////////////
+ 412   1      
+ 413   1              //udregn framestart forkskydning
+ 414   1              NTSC_offset_long = (int_GPS_week%143)*604800;           //uge*sekunder siden start
+ 415   1              NTSC_offset_long = NTSC_offset_long + int_GPS_tow;      //sekunder i nuværende uge
+ 416   1              NTSC_offset_long = NTSC_offset_long%1001;
+ 417   1      
+ 418   1              NTSC_offset.NTSC_offset_int=(unsigned int)NTSC_offset_long;
+ 419   1      
+ 420   1      
+ 421   1      
+ 422   1              //////////////////////////////////////////////////////////////////
+ 423   1              //                                              LTC A håndtering                                                //
+ 424   1              //////////////////////////////////////////////////////////////////
+ 425   1      
+ 426   1              //kopier offset til midlertidig offset, hvor sommer/vinter tidsforskel sættes
+ 427   1              memcpy(temp_offset, LTC_a_watchoffset, 3);
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 8   
+
+ 428   1      
+ 429   1              //sæt til korrekt tidszone og sæt sommer/vintertid
+ 430   1              if(LTC_a_daylight_flag==1)
+ 431   1                      temp_offset[0]=temp_offset[0]+1;
+ 432   1      
+ 433   1              //////////////////////////////////////////////////////////////////
+ 434   1              //                                      LTC NTSC tidsforsinkelse                                        //
+ 435   1              //////////////////////////////////////////////////////////////////
+ 436   1      
+ 437   1              //hvis format = NTSC, udregn LTC tids forsinkelse
+ 438   1              if((LTC_setup&0x03)==0x02)
+ 439   1              {                       
+ 440   2                      LTC_a_frames=0;
+ 441   2      
+ 442   2                      //udregn forsinkelse, udfra sekunder siden sidste sync
+ 443   2                      temp_offset[1]-=(secs_since_sync_a/60060);
+ 444   2                      temp_offset[2]-=((secs_since_sync_a/1001)%60);
+ 445   2                      
+ 446   2              //////////////////////////////////////////////////////////////////
+ 447   2              //                                      LTC DROPFRAME kompensering                                      //
+ 448   2              //////////////////////////////////////////////////////////////////
+ 449   2      
+ 450   2                      //hvis drop-frame, kompenser for dette
+ 451   2                      if((LTC_setup&0x04)==0x04)
+ 452   2                      {       
+ 453   3                              skipped_frames=0;
+ 454   3      
+ 455   3                              //gem i temp_sss, hvor mange NTSC(!) sekunder det er siden sync
+ 456   3                              temp_secs_since_sync=secs_since_sync_a+temp_offset[1]*60+temp_offset[2];
+ 457   3      
+ 458   3                              //skipped frames uger
+ 459   3                              skipped_frames = (temp_secs_since_sync / 86400) * 2592;
+ 460   3                              temp_secs_since_sync -= (temp_secs_since_sync / 86400)*86400;
+ 461   3                              
+ 462   3                              //skipped frames timer
+ 463   3                              skipped_frames += (temp_secs_since_sync / 3600) * 108;
+ 464   3                              temp_secs_since_sync -= (temp_secs_since_sync / 3600)*3600;
+ 465   3              
+ 466   3                              //skipped frames minutter
+ 467   3                              skipped_frames += (temp_secs_since_sync / 60) * 2;
+ 468   3                              skipped_frames -= (temp_secs_since_sync / 600) * 2; //spring 10+20+30+40+50 over
+ 469   3                              temp_secs_since_sync -= (temp_secs_since_sync / 60)*60; //hele minutter
+ 470   3      
+ 471   3                              //spring 00 over
+ 472   3                              skipped_frames += 2;
+ 473   3                              
+ 474   3                              temp_offset[0] += skipped_frames/108000; //skip 30*3600 frames (timer)
+ 475   3                              skipped_frames -= (skipped_frames/108000)*108000;
+ 476   3      
+ 477   3                              temp_offset[1] += skipped_frames/1800; //skip 30*60 frames (minutter)
+ 478   3                              skipped_frames -= (skipped_frames/1800)*1800;
+ 479   3                              
+ 480   3                              temp_offset[2] += skipped_frames/30;    //skip 30 frames (sekunder)
+ 481   3                              skipped_frames -= (skipped_frames/30)*30;
+ 482   3      
+ 483   3                              if(skipped_frames<0)
+ 484   3                                      skipped_frames = 0;
+ 485   3      
+ 486   3                              LTC_a_frames = skipped_frames;  //rest = hele frames
+ 487   3                      }
+ 488   2              }
+ 489   1              //Hvis ikke 30/1,001 frekvens
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 9   
+
+ 490   1              else
+ 491   1              {
+ 492   2                      temp_offset[2] = 0;
+ 493   2                      LTC_a_frames = 0;
+ 494   2              }
+ 495   1      
+ 496   1              
+ 497   1              //////////////////////////////////////////////////////////////////
+ 498   1              //                                      LTC manual offsetting                                           //
+ 499   1              //////////////////////////////////////////////////////////////////
+ 500   1              
+ 501   1              temp_long.temp_long=LTC_a_offset.LTC_offset_long;
+ 502   1      
+ 503   1              //hvis negativ forskydning, tæl et sekund forud
+ 504   1              if(LTC_a_offset.LTC_offset_long<0)
+ 505   1              {
+ 506   2                      temp_offset[2]=temp_offset[2]+1; //var +1 
+ 507   2                      temp_long.temp_long+=148500000;
+ 508   2              }
+ 509   1      
+ 510   1              //håndter at (delay + NTSC forskydning) ikke overskrider grænser
+ 511   1              if ((LTC_setup&3) == 0x02)
+ 512   1              {
+ 513   2                      temp_long.temp_long+=(NTSC_offset.NTSC_offset_int*148500);
+ 514   2      
+ 515   2                      //lav ikke puls, hvis 1001. frame
+ 516   2                      if ((temp_long.temp_long>148500000) && (temp_long.temp_long<(148500000+148500)))
+ 517   2                      {
+ 518   3                              temp_long.temp_long = -1;
+ 519   3                      }
+ 520   2      
+ 521   2                      else if (temp_long.temp_long>=(148500000+148500))
+ 522   2                      {
+ 523   3                              temp_long.temp_long-=(148500000+148500);
+ 524   3                              temp_offset[2]=temp_offset[2]-1;
+ 525   3                      }
+ 526   2              }
+ 527   1      
+ 528   1              LTC_a_frames+=1;        //forskyd frames, da denne hele tiden er én bagud i FPGA
+ 529   1              
+ 530   1              //hvis overskredet 29 frames, tæl ét sekund mere
+ 531   1              if(LTC_a_frames<30)
+ 532   1                      offset_time(int_time, &LTC_a_time, temp_offset[0], temp_offset[1], temp_offset[2]);
+ 533   1              else
+ 534   1              {
+ 535   2                      LTC_a_frames=0;
+ 536   2                      offset_time(int_time, &LTC_a_time, temp_offset[0], temp_offset[1], temp_offset[2]+1);
+ 537   2              }
+ 538   1      
+ 539   1              send_buffer[7] = temp_long.bytes[3];
+ 540   1              send_buffer[8] = temp_long.bytes[2];
+ 541   1              send_buffer[9] = temp_long.bytes[1];
+ 542   1              send_buffer[10] = temp_long.bytes[0];
+ 543   1      
+ 544   1              //////////////////////////////////////////////////////////////////
+ 545   1              //                                      LTC resync checking                                                     //
+ 546   1              //////////////////////////////////////////////////////////////////
+ 547   1      
+ 548   1              //Hvis i en 30/1.001 mode, check for resync
+ 549   1              if((LTC_setup&0x03)==0x02)
+ 550   1              {
+ 551   2                      //hvis i CONFIRM mode
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 10  
+
+ 552   2                      if((dropframe_setup&0x0F) == 0x01)
+ 553   2                      {
+ 554   3                              if(LTC_a_time.sec==0)
+ 555   3                              {
+ 556   4                                      if ((LTC_a_time.hour==LTC_a_sync_hour) && (LTC_a_time.min == LTC_a_sync_min))
+ 557   4                                      {
+ 558   5                                              //request for resync
+ 559   5                                              set_bit(&LTC_sync_request, request_LTC_a_resync_bit);
+ 560   5                                              set_bit(&LTC_sync_request, request_LTC_a_resync_mode_bit);
+ 561   5                                      }
+ 562   4                              }
+ 563   3                      }
+ 564   2      
+ 565   2                      //hvis i AUTO mode
+ 566   2                      else if((dropframe_setup&0x0F) == 0x02)
+ 567   2                      {
+ 568   3                              if(LTC_a_time.sec==0)
+ 569   3                              {
+ 570   4                                      if ((LTC_a_time.hour==LTC_a_sync_hour) && (LTC_a_time.min == LTC_a_sync_min))
+ 571   4                                      {
+ 572   5                                              //auto resync
+ 573   5                                              secs_since_sync_a = 0;
+ 574   5                                              set_bit(&LTC_sync_request, request_LTC_a_resync_bit);
+ 575   5                                      }
+ 576   4                              }
+ 577   3                      }
+ 578   2              }
+ 579   1      
+ 580   1              //////////////////////////////////////////////////////////////////
+ 581   1              //                                      LTC BCD konvertering                                            //
+ 582   1              //////////////////////////////////////////////////////////////////
+ 583   1      
+ 584   1              BCD_coded_time_a[0]=bin_to_BCD(LTC_a_time.hour);
+ 585   1              BCD_coded_time_a[1]=bin_to_BCD(LTC_a_time.min);
+ 586   1              BCD_coded_time_a[2]=bin_to_BCD(LTC_a_time.sec);
+ 587   1              BCD_coded_time_a[3]=bin_to_BCD(LTC_a_frames);
+ 588   1      
+ 589   1      
+ 590   1      
+ 591   1      
+ 592   1      
+ 593   1      
+ 594   1              //////////////////////////////////////////////////////////////////
+ 595   1              //                                              LTC B håndtering                                                //
+ 596   1              //////////////////////////////////////////////////////////////////
+ 597   1      
+ 598   1              //kopier offset til midlertidig offset, sommer/vinter tidsforskel sættes
+ 599   1              memcpy(temp_offset, LTC_b_watchoffset, 3);
+ 600   1      
+ 601   1              //sæt til korrekt tidszone og sæt sommer/vintertid
+ 602   1              if(LTC_b_daylight_flag==1)
+ 603   1                      temp_offset[0]=temp_offset[0]+1;
+ 604   1      
+ 605   1              //////////////////////////////////////////////////////////////////
+ 606   1              //                                      LTC NTSC tidsforsinkelse                                        //
+ 607   1              //////////////////////////////////////////////////////////////////
+ 608   1      
+ 609   1              //hvis format = NTSC, udregn LTC tids forsinkelse
+ 610   1              if((LTC_setup&0x30)==0x20)
+ 611   1              {       
+ 612   2                      LTC_b_frames=0;
+ 613   2                      
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 11  
+
+ 614   2                      //udregn forsinkelse, udfra sekunder siden sidste sync
+ 615   2                      temp_offset[1]-=(secs_since_sync_b/60060);
+ 616   2                      temp_offset[2]-=((secs_since_sync_b/1001)%60);
+ 617   2                      
+ 618   2              //////////////////////////////////////////////////////////////////
+ 619   2              //                                      LTC DROPFRAME kompensering                                      //
+ 620   2              //////////////////////////////////////////////////////////////////
+ 621   2      
+ 622   2                      //hvis drop-frame, kompenser for dette
+ 623   2                      if((LTC_setup&0x40)==0x40)
+ 624   2                      {       
+ 625   3                              skipped_frames=0;
+ 626   3                              //gem i temp_sss, hvor mange NTSC(!) sekunder det er siden sync
+ 627   3                              temp_secs_since_sync=secs_since_sync_b+temp_offset[1]*60+temp_offset[2];
+ 628   3      
+ 629   3                              //skipped frames uger
+ 630   3                              skipped_frames = (temp_secs_since_sync / 86400) * 2592;
+ 631   3                              temp_secs_since_sync -= (temp_secs_since_sync / 86400)*86400;
+ 632   3                              
+ 633   3                              //skipped frames timer
+ 634   3                              skipped_frames += (temp_secs_since_sync / 3600) * 108;
+ 635   3                              temp_secs_since_sync -= (temp_secs_since_sync / 3600)*3600;
+ 636   3              
+ 637   3                              //skipped frames minutter
+ 638   3                              skipped_frames += (temp_secs_since_sync / 60) * 2;
+ 639   3                              skipped_frames -= (temp_secs_since_sync / 600) * 2; //spring 10+20+30+40+50 over
+ 640   3                              temp_secs_since_sync -= (temp_secs_since_sync / 60)*60;
+ 641   3      
+ 642   3                              //spring 00 over
+ 643   3                              skipped_frames += 2;
+ 644   3                              
+ 645   3                              temp_offset[0] += skipped_frames/108000; //skip 30*3600 frames (timer)
+ 646   3                              skipped_frames -= (skipped_frames/108000)*108000;
+ 647   3      
+ 648   3                              temp_offset[1] += skipped_frames/1800; //skip 30*60 frames (minutter)
+ 649   3                              skipped_frames -= (skipped_frames/1800)*1800;
+ 650   3      
+ 651   3                              temp_offset[2] += skipped_frames/30;    //skip 30 frames (sekunder)
+ 652   3                              skipped_frames -= (skipped_frames/30)*30;
+ 653   3      
+ 654   3                              if(skipped_frames<0)
+ 655   3                                      skipped_frames = 0;
+ 656   3      
+ 657   3                              LTC_b_frames = skipped_frames;  //rest = hele frames
+ 658   3                      }
+ 659   2              }
+ 660   1              //Hvis ikke 30/1,001 frekvens
+ 661   1              else
+ 662   1              {
+ 663   2                      temp_offset[2] = 0;
+ 664   2                      LTC_b_frames = 0;
+ 665   2              }
+ 666   1      
+ 667   1              
+ 668   1              //////////////////////////////////////////////////////////////////
+ 669   1              //                                      LTC manual offsetting                                           //
+ 670   1              //////////////////////////////////////////////////////////////////
+ 671   1              
+ 672   1              temp_long.temp_long=LTC_b_offset.LTC_offset_long;
+ 673   1      
+ 674   1              //hvis negativ forskydning, tæl et sekund forud
+ 675   1              if(LTC_b_offset.LTC_offset_long<0)
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 12  
+
+ 676   1              {
+ 677   2                      temp_offset[2]=temp_offset[2]+1; //var +1
+ 678   2                      temp_long.temp_long+=148500000;
+ 679   2              }
+ 680   1      
+ 681   1              //håndter at (delay + NTSC forskydning) ikke overskrider grænser
+ 682   1              if ((LTC_setup&0x30) == 0x20)
+ 683   1              {
+ 684   2                      temp_long.temp_long+=(NTSC_offset.NTSC_offset_int*148500);
+ 685   2      
+ 686   2                      //lav ikke puls, hvis 1001. frame
+ 687   2                      if ((temp_long.temp_long>148500000) && (temp_long.temp_long<(148500000+148500)))
+ 688   2                      {
+ 689   3                              temp_long.temp_long = -1;
+ 690   3                      }
+ 691   2      
+ 692   2                      else if (temp_long.temp_long>=(148500000+148500))
+ 693   2                      {
+ 694   3                              temp_long.temp_long-=(148500000+148500);
+ 695   3                              temp_offset[2]=temp_offset[2]-1;
+ 696   3                      }
+ 697   2              }
+ 698   1      
+ 699   1              LTC_b_frames+=1;        //forskyd frames, da denne hele tiden er én bagud i FPGA
+ 700   1      
+ 701   1      
+ 702   1              //hvis overskredet 29 frames, tæl ét sekund mere
+ 703   1              if(LTC_b_frames<30)
+ 704   1                      offset_time(int_time, &LTC_b_time, temp_offset[0], temp_offset[1], temp_offset[2]);
+ 705   1              else
+ 706   1              {
+ 707   2                      LTC_b_frames=0;
+ 708   2                      offset_time(int_time, &LTC_b_time, temp_offset[0], temp_offset[1], temp_offset[2]+1);
+ 709   2              }
+ 710   1      
+ 711   1              send_buffer[15] = temp_long.bytes[3];
+ 712   1              send_buffer[16] = temp_long.bytes[2];
+ 713   1              send_buffer[17] = temp_long.bytes[1];
+ 714   1              send_buffer[18] = temp_long.bytes[0];
+ 715   1      
+ 716   1              //////////////////////////////////////////////////////////////////
+ 717   1              //                                      LTC resync checking                                                     //
+ 718   1              //////////////////////////////////////////////////////////////////
+ 719   1      
+ 720   1              //Hvis i en 30/1.001 mode, check for resync
+ 721   1              if((LTC_setup&0x30)==0x20)
+ 722   1              {
+ 723   2                      //hvis i CONFIRM mode
+ 724   2                      if((dropframe_setup&0xF0) == 0x10)
+ 725   2                      {
+ 726   3                              if(LTC_b_time.sec==0)
+ 727   3                              {
+ 728   4                                      if ((LTC_b_time.hour==LTC_b_sync_hour) && (LTC_b_time.min == LTC_b_sync_min))
+ 729   4                                      {
+ 730   5                                              //request for resync
+ 731   5                                              set_bit(&LTC_sync_request, request_LTC_b_resync_bit);
+ 732   5                                              set_bit(&LTC_sync_request, request_LTC_b_resync_mode_bit);
+ 733   5                                      }
+ 734   4                              }
+ 735   3                      }
+ 736   2      
+ 737   2                      //hvis i AUTO mode
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 13  
+
+ 738   2                      else if((dropframe_setup&0xF0) == 0x20)
+ 739   2                      {
+ 740   3                              if(LTC_b_time.sec==0)
+ 741   3                              {
+ 742   4                                      if ((LTC_b_time.hour==LTC_b_sync_hour) && (LTC_b_time.min == LTC_b_sync_min))
+ 743   4                                      {
+ 744   5                                              //auto resync
+ 745   5                                              secs_since_sync_b = 0;
+ 746   5                                              set_bit(&LTC_sync_request, request_LTC_b_resync_bit);
+ 747   5                                      }
+ 748   4                              }
+ 749   3                      }
+ 750   2              }
+ 751   1      
+ 752   1              //////////////////////////////////////////////////////////////////
+ 753   1              //                                      LTC BCD konvertering                                            //
+ 754   1              //////////////////////////////////////////////////////////////////
+ 755   1      
+ 756   1              BCD_coded_time_b[0]=bin_to_BCD(LTC_b_time.hour);
+ 757   1              BCD_coded_time_b[1]=bin_to_BCD(LTC_b_time.min);
+ 758   1              BCD_coded_time_b[2]=bin_to_BCD(LTC_b_time.sec);
+ 759   1              BCD_coded_time_b[3]=bin_to_BCD(LTC_b_frames);
+ 760   1      
+ 761   1      
+ 762   1      
+ 763   1              //////////////////////////////////////////////////////////////////
+ 764   1              //                                      Dropframe sync håndtering                                       //
+ 765   1              //////////////////////////////////////////////////////////////////
+ 766   1      
+ 767   1              //sørg for første resync
+ 768   1              if((UTC_time_valid==7) && first_time_run)
+ 769   1              {
+ 770   2                      secs_since_sync_a=(int_GPS_tow%600);
+ 771   2                      secs_since_sync_b=(int_GPS_tow%600);
+ 772   2                      first_time_run=0;
+ 773   2              }
+ 774   1      }
+ 775          
+ 776          
+ 777          void check_daylight_switch()
+ 778          {
+ 779   1              /////////////////// LTC A ////////////////////
+ 780   1      
+ 781   1              //check for sommer vintertid (kun på hele timer) (skal gøres EFTER NTSC offsetting)
+ 782   1              if( (LTC_a_time.min==0) && (LTC_a_time.sec==0) )
+ 783   1              {
+ 784   2                      //check for sommertid
+ 785   2                      if( (LTC_a_time.month==daylight_on_a_time.month) && (LTC_a_time.day==daylight_on_a_time.day) && (LTC_a_t
+             -ime.hour==daylight_on_a_time.hour))
+ 786   2                      {
+ 787   3                              switch (daylight_switch_setup&0x03)
+ 788   3                              {
+ 789   4                                      //Hvis none
+ 790   4                                      case 0x00:                      
+ 791   4                                              break;
+ 792   4                                      //Hvis confirm
+ 793   4                                      case 0x01:                      
+ 794   4                                              set_bit(&LTC_request, request_LTC_a_daylight_on_bit);   //sæt request for sommertid + confirm mode
+ 795   4                                              set_bit(&LTC_request, request_LTC_a_daylight_mode_bit);
+ 796   4                                              break;
+ 797   4                                      //Hvis auto
+ 798   4                                      case 0x02:
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 14  
+
+ 799   4                                              LTC_a_daylight_flag=1;  //sæt til sommertid
+ 800   4                                              set_bit(&LTC_request, request_LTC_a_daylight_on_bit);           //sæt request til sommertid + auto mode 
+ 801   4                                              break;  
+ 802   4                              }
+ 803   3                      }
+ 804   2      
+ 805   2                      //check for vintertid
+ 806   2                      else if( (LTC_a_time.month==daylight_off_a_time.month) && (LTC_a_time.day==daylight_off_a_time.day) && (
+             -LTC_a_time.hour==daylight_off_a_time.hour))
+ 807   2                      {       
+ 808   3                              switch (daylight_switch_setup&0x03)
+ 809   3                              {
+ 810   4                                      //Hvis none
+ 811   4                                      case 0x00:
+ 812   4                                              break;
+ 813   4                                      //Hvis confirm
+ 814   4                                      case 0x01:
+ 815   4                                              set_bit(&LTC_request, request_LTC_a_daylight_off_bit);  //sæt request for vintertid + confirm mode
+ 816   4                                              set_bit(&LTC_request, request_LTC_a_daylight_mode_bit);
+ 817   4                                              break;
+ 818   4                                      //Hvis auto
+ 819   4                                      case 0x02:
+ 820   4                                              LTC_a_daylight_flag=0;  //sæt til vintertid
+ 821   4                                              set_bit(&LTC_request, request_LTC_a_daylight_off_bit);  //sæt request for vintertid + auto mode
+ 822   4                                              break;  
+ 823   4                              }
+ 824   3                      }
+ 825   2              }
+ 826   1      
+ 827   1              /////////////////// LTC B ////////////////////
+ 828   1              
+ 829   1              //check for sommer vintertid (kun på hele timer) (skal gøres EFTER NTSC offsetting)
+ 830   1              if( (LTC_b_time.min==0) && (LTC_b_time.sec==0) )
+ 831   1              {
+ 832   2                      //check for sommertid
+ 833   2                      if( (LTC_b_time.month==daylight_on_b_time.month) && (LTC_b_time.day==daylight_on_b_time.day) && (LTC_b_t
+             -ime.hour==daylight_on_b_time.hour))
+ 834   2                      {
+ 835   3                              switch (daylight_switch_setup&0x30)
+ 836   3                              {
+ 837   4                                      //Hvis none
+ 838   4                                      case 0x00:                      
+ 839   4                                              break;
+ 840   4                                      //Hvis confirm
+ 841   4                                      case 0x10:                      
+ 842   4                                              set_bit(&LTC_request, request_LTC_b_daylight_on_bit);   //sæt request for sommertid + confirm mode
+ 843   4                                              set_bit(&LTC_request, request_LTC_b_daylight_mode_bit);
+ 844   4                                              break;
+ 845   4                                      //Hvis auto
+ 846   4                                      case 0x20:
+ 847   4                                              LTC_b_daylight_flag=1;  //sæt til sommertid
+ 848   4                                              set_bit(&LTC_request, request_LTC_b_daylight_on_bit);           //sæt request til sommertid + auto mode 
+ 849   4                                              break;  
+ 850   4                              }
+ 851   3                      }
+ 852   2      
+ 853   2                      //check for vintertid
+ 854   2                      else if( (LTC_b_time.month==daylight_off_b_time.month) && (LTC_b_time.day==daylight_off_b_time.day) && (
+             -LTC_b_time.hour==daylight_off_b_time.hour))
+ 855   2                      {       
+ 856   3                              switch (daylight_switch_setup&0x30)
+ 857   3                              {
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 15  
+
+ 858   4                                      //Hvis none
+ 859   4                                      case 0x00:
+ 860   4                                              break;
+ 861   4                                      //Hvis confirm
+ 862   4                                      case 0x10:
+ 863   4                                              set_bit(&LTC_request, request_LTC_b_daylight_off_bit);  //sæt request for vintertid + confirm mode
+ 864   4                                              set_bit(&LTC_request, request_LTC_b_daylight_mode_bit);
+ 865   4                                              break;
+ 866   4                                      //Hvis auto
+ 867   4                                      case 0x20:
+ 868   4                                              LTC_b_daylight_flag=0;  //sæt til vintertid
+ 869   4                                              set_bit(&LTC_request, request_LTC_b_daylight_off_bit);  //sæt request for vintertid + auto mode
+ 870   4                                              break;  
+ 871   4                              }
+ 872   3                      }
+ 873   2              }
+ 874   1      }
+ 875          
+ 876          
+ 877          void confirm_daylight_switch()
+ 878          {
+ 879   1              //hvis LTC A skift bekræftet
+ 880   1              if(LTC_confirm&1)
+ 881   1              {
+ 882   2                      //hvis sommertid var requestet
+ 883   2                      if(LTC_request&1)
+ 884   2                              LTC_a_daylight_flag=1;
+ 885   2                      //hvis vintertid var requestet
+ 886   2                      else if(LTC_request&2)
+ 887   2                              LTC_a_daylight_flag=0;
+ 888   2      
+ 889   2                      LTC_request&=0xF8;      //slet LTC a sommer/vintertids request
+ 890   2                      LTC_confirm&=0xFC;      //slet LTC a sommer/vintertids confirms
+ 891   2              }
+ 892   1              //hvis LTC A skift annuleret
+ 893   1              else if(LTC_confirm&2)
+ 894   1              {
+ 895   2                      LTC_request&=0xF8;      //slet LTC a sommer/vintertids request
+ 896   2                      LTC_confirm&=0xFC;      //slet LTC a sommer/vintertids confirms
+ 897   2              }
+ 898   1      
+ 899   1              //hvis LTC B skift bekræftet
+ 900   1              if(LTC_confirm&16)
+ 901   1              {
+ 902   2                      //hvis sommertid var requestet
+ 903   2                      if(LTC_request&16)
+ 904   2                              LTC_b_daylight_flag=1;
+ 905   2                      //hvis vintertid var requestet
+ 906   2                      else if(LTC_request&32)
+ 907   2                              LTC_b_daylight_flag=0;
+ 908   2      
+ 909   2                      LTC_request&=0x8F;      //slet LTC b sommer/vintertids request
+ 910   2                      LTC_confirm&=0xCF;      //slet LTC b sommer/vintertids confirms
+ 911   2              }
+ 912   1              //hvis LTC B skift annuleret
+ 913   1              else if(LTC_confirm&32)
+ 914   1              {
+ 915   2                      LTC_request&=0x8F;      //slet LTC b sommer/vintertids request
+ 916   2                      LTC_confirm&=0xCF;      //slet LTC b sommer/vintertids confirms
+ 917   2              }
+ 918   1      }
+ 919          
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 16  
+
+ 920          
+ 921          void update_LTC_strings()
+ 922          {
+ 923   1              sprintf(LTC_a_str, "%02d:%02d:%02d", (int)LTC_a_time.hour, (int)LTC_a_time.min, (int)LTC_a_time.sec);
+ 924   1              sprintf(LTC_b_str, "%02d:%02d:%02d", (int)LTC_b_time.hour, (int)LTC_b_time.min, (int)LTC_b_time.sec);
+ 925   1      
+ 926   1              //sprintf(LTC_a_str, "%08d", (int)OCXO_phase_diff);
+ 927   1      }
+ 928          
+ 929                  ////////////////////// TRANSMISSION ////////////////////////////////////
+ 930          
+ 931          
+ 932          void transmit_LTC_data()
+ 933          {
+ 934   1              //pak data i udbuffer
+ 935   1              send_buffer[0] = quant_error_100MHz;
+ 936   1              send_buffer[1] = NTSC_offset.NTSC_offset_bytes[1];
+ 937   1              send_buffer[2] = NTSC_offset.NTSC_offset_bytes[0];
+ 938   1              send_buffer[3] = BCD_coded_time_a[0];
+ 939   1              send_buffer[4] = BCD_coded_time_a[1];
+ 940   1              send_buffer[5] = BCD_coded_time_a[2];
+ 941   1              send_buffer[6] = BCD_coded_time_a[3];
+ 942   1              //7-10 = LTC a offset long
+ 943   1              send_buffer[11] = BCD_coded_time_b[0];
+ 944   1              send_buffer[12] = BCD_coded_time_b[1];
+ 945   1              send_buffer[13] = BCD_coded_time_b[2];
+ 946   1              send_buffer[14] = BCD_coded_time_b[3];
+ 947   1              //15-18 = LTC b offset long
+ 948   1              send_buffer[19] = LTC_setup;
+ 949   1              send_buffer[20] = FPGA_system_control;
+ 950   1      
+ 951   1              //foretag sending
+ 952   1              FPGA_write_array(0, &send_buffer, 21);
+ 953   1      }
+ 954          
+ 955          
+ 956          //reset alle parametre til 0 eller EEPROM-state
+ 957          void init_LTC()
+ 958          {
+ 959   1              quant_error_100MHz=0;
+ 960   1              secs_since_sync_a=0;
+ 961   1              secs_since_sync_b=0;
+ 962   1              LTC_request=0;
+ 963   1              LTC_sync_request=0;
+ 964   1              LTC_confirm=0;
+ 965   1              LTC_setup=0x00;
+ 966   1      
+ 967   1              //tidsstructs for intern og ublox tid, samt 2x LTC
+ 968   1              memset(&int_time, 0, sizeof (int_time));
+ 969   1              memset(&LTC_a_time, 0, sizeof (LTC_a_time));
+ 970   1              memset(&LTC_b_time, 0, sizeof (LTC_b_time));
+ 971   1      
+ 972   1              memset(BCD_coded_time_a, 0, sizeof (BCD_coded_time_a));
+ 973   1              memset(BCD_coded_time_b, 0, sizeof (BCD_coded_time_b));
+ 974   1      
+ 975   1              memset(LTC_a_str, 0, 11);
+ 976   1              memset(LTC_b_str, 0, 11);
+ 977   1      
+ 978   1              LTC_a_daylight_flag=0;
+ 979   1              LTC_b_daylight_flag=0;
+ 980   1      
+ 981   1              LTC_a_frames=0;
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 17  
+
+ 982   1              LTC_b_frames=0;
+ 983   1      
+ 984   1              int_GPS_tow=0;
+ 985   1              int_GPS_week=0;
+ 986   1      
+ 987   1              memset(&daylight_on_a_time, 0, sizeof (daylight_on_a_time));
+ 988   1              memset(&daylight_off_a_time, 0, sizeof (daylight_off_a_time));
+ 989   1      
+ 990   1              memset(&daylight_on_b_time, 0, sizeof (daylight_on_b_time));
+ 991   1              memset(&daylight_off_b_time, 0, sizeof (daylight_off_b_time));
+ 992   1      
+ 993   1              memset(&LTC_a_watchoffset, 0, sizeof (LTC_a_watchoffset));
+ 994   1              memset(&LTC_b_watchoffset, 0, sizeof (LTC_b_watchoffset));
+ 995   1      
+ 996   1              LTC_a_offset.LTC_offset_long=0;
+ 997   1              LTC_b_offset.LTC_offset_long=0;
+ 998   1      }
+ 999          
+1000          //29/4/08: Rev 2: Udskriver diverse LTC info
+1001          void print_LTC_info()
+1002          {
+1003   1              //UTC tid
+1004   1              sprintf(debug_buffer, "\n\r UTC T: %02d:%02d:%02d", (int)UTC_time.hour, (int)UTC_time.min, (int)UTC_time.
+             -sec);
+1005   1              SW_sendstr(&debug_buffer, strlen(debug_buffer));
+1006   1      
+1007   1              //internal time
+1008   1              sprintf(debug_buffer, "\n\r INT T: %02d:%02d:%02d", (int)int_time.hour, (int)int_time.min, (int)int_time.
+             -sec);
+1009   1              SW_sendstr(&debug_buffer, strlen(debug_buffer));
+1010   1      
+1011   1              //LTC a info
+1012   1              sprintf(debug_buffer, "\n\n\rLTC A:");
+1013   1              SW_sendstr(&debug_buffer, strlen(debug_buffer));
+1014   1      
+1015   1              //print mode
+1016   1              sprintf(debug_buffer, "\n\r\nMode: ");
+1017   1              SW_sendstr(&debug_buffer, strlen(debug_buffer));
+1018   1      
+1019   1              //setups
+1020   1              switch(LTC_setup&0x03)
+1021   1              {
+1022   2                      case 0:
+1023   2                              SW_sendstr("24 FPS", 6);
+1024   2                              break;
+1025   2                      case 1:
+1026   2                              SW_sendstr("25 FPS", 6);
+1027   2                              break;
+1028   2                      case 2:
+1029   2                              SW_sendstr("2997 FPS", 8);
+1030   2                              break;
+1031   2                      case 3:
+1032   2                              SW_sendstr("30 FPS", 6);
+1033   2                              break;
+1034   2              }
+1035   1      
+1036   1              //if dropframe
+1037   1              if(LTC_setup&4)
+1038   1                      SW_sendstr(", DF", 4);
+1039   1      
+1040   1              //daylight status
+1041   1              if(LTC_a_daylight_flag)
+C51 COMPILER V7.10   LTC_HANDLER                                                           06/15/2012 10:12:06 PAGE 18  
+
+1042   1                      SW_sendstr("\n\rDL Sav: ON", 12);
+1043   1              else
+1044   1                      SW_sendstr("\n\rDL Sav: OFF", 13);
+1045   1      
+1046   1              //print time
+1047   1              sprintf(debug_buffer, "\n\rTime: ");
+1048   1              SW_sendstr(&debug_buffer, strlen(debug_buffer));
+1049   1              SW_sendstr(&LTC_a_str, strlen(LTC_a_str));
+1050   1      
+1051   1      
+1052   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4846    ----
+   CONSTANT SIZE    =    168    ----
+   XDATA SIZE       =    148    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8      37
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

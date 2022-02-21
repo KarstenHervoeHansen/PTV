@@ -1,0 +1,986 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+C:\LT428\work\ver.4_9\temp\xa\instru.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\LT428\include -Ic:\LT428\rtxc\xa\include -I.
+                          3 ;          -Ml -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    INSTRU
+                         10 ; instru.c    1 /****************************************************************************/
+                         11 ; instru.c    2 /* MODULE:                                                                  */
+                         12 ; instru.c    3 /*  instru.c - Instrument control task                                      */
+                         13 ; instru.c    4 /****************************************************************************/
+                         14 ; instru.c    5 /* FUNCTIONS:                                                               */
+                         15 ; instru.c    6 /*                                                                          */
+                         16 ; instru.c    7 /*                                                                          */
+                         17 ; instru.c    8 /* TASKS:                                                                   */
+                         18 ; instru.c    9     void instru(void);
+                         19 ; instru.c   10 /*                                                                          */
+                         20 ; instru.c   11 /* NOTES:                                                                   */
+                         21 ; instru.c   12 /*  Receives command messages form user control tasks, processes them and   */   
+                                                        
+                         22 ; instru.c   13 /*  replies according to command.                                           */
+                         23 ; instru.c   14 /*                                                                          */
+                         24 ; instru.c   15 /* EDITOR:                                                                  */
+                         25 ; instru.c   16 /*  Tasking tabs 3 5                                                        */
+                         26 ; instru.c   17 /****************************************************************************/
+                         27 ; instru.c   18 /*
+                         28 ; instru.c   19  *   PTV software for PT5201    
+                         29 ; instru.c   20  *   Copyright (c) 
+                         30 ; instru.c   21  *   ProTeleVision Technologies A/S.
+                         31 ; instru.c   22  *   ALL RIGHTS RESERVED
+                         32 ; instru.c   23  */
+                         33 ; instru.c   24 
+                         34 ; instru.c   25 #include <string.h>
+                         38 ; instru.c   26 #include <stdio.h>
+                         58 ; instru.c   27 #include <stdlib.h>
+                         72 ; instru.c   28 #include "define.h"
+                         75 ; instru.c   29 #include "eventdef.h"
+                         78 ; instru.c   30 #include "rtxcobj.h"
+                        403 ; instru.c   31 #include "rs232.h"
+                        410 ; instru.c   32 #include "sio0drv.h"
+                        417 ; instru.c   33 #include "tim0drv.h"
+                        422 ; instru.c   34 #include "i2c_drv.h"
+                        425 ; instru.c   35 #include "tvp6kdrv.h"
+                        428 ; instru.c   36 #include "nv_drv.h"
+                        432 ; instru.c   37 #include "led_hw.h"
+                        439 ; instru.c   38 #include "genlock.h"
+                        446 ; instru.c   39 #include "bb.h"
+                        454 ; instru.c   40 #include "cbar.h"
+                        464 ; instru.c   41 #include "audio.h"
+                        475 ; instru.c   42 #include "keyscan.h"
+                        478 ; instru.c   43 #include "front.h"
+                        481 ; instru.c   44 #include "unitprg.h"
+                        484 ; instru.c   45 
+                        485 ; instru.c   46 #include "instru.h"
+                        564 ; instru.c   47 #include "interp.h"
+                        569 ; instru.c   48 
+                        570 ; instru.c   49 TTimer*  InstruTimer;
+                        571 ; instru.c   50 TThread* InstrumentControl;
+                        572 ; instru.c   51 TThread* InterpreterThread;
+                        573 ; instru.c   52 TThread* KeyScanThread;
+                        574 ; instru.c   53 TThread* FrontThread;
+                        575 ; instru.c   54 
+                        576 ; instru.c   55 NvPointer SettingsPtr;
+                        577 ; instru.c   56 NvPointer PresetPtr[NoOfPresets];
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        578 ; instru.c   57 NvPointer CalibrationPtr;
+                        579 ; instru.c   58 
+                        580 ; instru.c   59 SettingsObject Settings;
+                        581 ; instru.c   60 CalibrationObject Calibration;
+                        582 ; instru.c   61 
+                        583 ; instru.c   62 
+                        584 ; instru.c   63 UC GenlockStatus;
+                        585 ; instru.c   64 
+                        586 ; instru.c   65 /**/
+                        587 ; instru.c   66 extern UI LEDMirror;
+                        588 ; instru.c   67 extern UI TestLEDMirror;
+                        589 ; instru.c   68 
+                        590 ; instru.c   69 
+                        591 ; instru.c   70 /**************************************************************************/
+                        592 ; instru.c   71 /* Instrument_Control_Task                                   INSTRU.C     */
+                        593 ; instru.c   72 /* Author:              Kim Engedahl, DEV, 000321                         */
+                        594 ; instru.c   73 /* Revised:             001219, KEn, DEV                                  */
+                        595 ; instru.c   74 /* Function:                                                              */
+                        596 ; instru.c   75 /**************************************************************************/
+                        597 ; instru.c   76 void Instrument_Control_Task( void)
+                        598 ; instru.c   77   {
+000000                  599 INSTRU_PR       SEGMENT HCODE
+000000                  600         RSEG    INSTRU_PR
+                        601         ALIGN   1
+                        614         PUBLIC  _Instrument_Control_Task
+000000                  615 _Instrument_Control_Task:
+000000 0F30             619         PUSH.W  R4, R5
+000002 9972000A         621         SUB.W   R7,#0AH
+                        631 ; instru.c   78   /* VAR */
+                        632 ; instru.c   79   bool Test1LEDFlag = FALSE;
+                        633 ; instru.c   80   char result[10], i;
+                        634 ; instru.c   81   int tmp;
+                        635 ; instru.c   82 
+                        636 ; instru.c   83   /* BEGIN */
+                        637 ; instru.c   84   UnitPgmMode = 0;     // IMPORTANT!!! see module UNITPRG.C
+000006 080rrr           639         CLR     _UnitPgmMode
+                        646 ; instru.c   85 
+                        647 ; instru.c   86   rs232_init();        // init the rs232 driver
+                        649         CALL    _rs232_init
+000009 C4rrrrrr        +649 ;       FCALL   _rs232_init
+                        650 ; instru.c   87   sio0_init();         // init the sio0 driver
+                        652         CALL    _sio0_init
+00000D C4rrrrrr        +652 ;       FCALL   _sio0_init
+                        653 ; instru.c   88   tim0_init();         // init the T0 counter for field
+                        655         CALL    _tim0_init
+000011 C4rrrrrr        +655 ;       FCALL   _tim0_init
+                        656 ; instru.c   89   InitBus( IIC_PTV);   // init the IIC bus
+000015 910800           658         MOV.B   R0L,#00H
+                        659         CALL    _InitBus
+000018 C4rrrrrr        +659 ;       FCALL   _InitBus
+                        660 ; instru.c   90   tvp6k_init();        // init the TI TVP6000 Multimedie chip
+                        662         CALL    _tvp6k_init
+00001C C4rrrrrr        +662 ;       FCALL   _tvp6k_init
+                        663 ; instru.c   91 
+                        664 ; instru.c   92   NV_Init();           // init the NV RAM
+                        666         CALL    _NV_Init
+000020 C4rrrrrr        +666 ;       FCALL   _NV_Init
+                        667 ; instru.c   93                        // init the calibraion values
+                        668 ; instru.c   94   CalibrationPtr = NV_AllocP( sizeof( CalibrationObject));
+000024 990800E2         670         MOV.W   R0,#0E2H
+                        671         CALL    _NV_AllocP
+000028 C4rrrrrr        +671 ;       FCALL   _NV_AllocP
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+00002C 8920             672         MOV.W   R2,R0
+00002E 964842rr         673         MOV.B   ES,#SEG( _CalibrationPtr )
+000032 9908rrrr         674         MOV.W   R0,#SOF( _CalibrationPtr )
+000036 8A28             675         MOV.W   [R0],R2
+                        676 ; instru.c   95 
+                        677 ; instru.c   96   if ( NV_Recall( &Calibration, CalibrationPtr, sizeof( Calibration)) == FAIL)
+000038 9918rrrr         679         MOV.W   R1,#SEG( _Calibration )
+00003C 9908rrrr         680         MOV.W   R0,#SOF( _Calibration )
+000040 993800E2         681         MOV.W   R3,#0E2H
+                        682         CALL    _NV_Recall
+000044 C4rrrrrr        +682 ;       FCALL   _NV_Recall
+000048 6900             683         OR.W    R0,R0
+00004A F209             684         BNE     _10
+                        685 ; instru.c   97     {
+                        686 ; instru.c   98     SystemsLEDSet( ErrorLEDs, 0);
+00004C 910803           688         MOV.B   R0L,#03H
+00004F 911800           689         MOV.B   R0H,#00H
+                        690         CALL    _SystemsLEDSet
+000052 C4rrrrrr        +690 ;       FCALL   _SystemsLEDSet
+                        691 ; instru.c   99   
+                        692 ; instru.c  100     Sleep( 1000);
+000056 990803E8         694         MOV.W   R0,#03E8H
+                        695         CALL    _Sleep
+00005A C4rrrrrr        +695 ;       FCALL   _Sleep
+                        696 ; instru.c  101     // error reading calibration values
+                        697 ; instru.c  102     }
+00005E                  699 _10:
+                        700 ; instru.c  103   // init the presets
+                        701 ; instru.c  104   for ( i = 0; i < NoOfPresets; i++)
+00005E 9958rrrr         703         MOV.W   R5,#SEG( _PresetPtr )
+000062 9948rrrr         704         MOV.W   R4,#SOF( _PresetPtr )
+000066                  706 _11:
+                        707 ; instru.c  105     PresetPtr[i] = NV_AllocP( sizeof( PresetObject));
+000066 9908006E         709         MOV.W   R0,#06EH
+                        710         CALL    _NV_AllocP
+00006A C4rrrrrr        +710 ;       FCALL   _NV_AllocP
+00006E 86AC42           711         MOV.B   ES,R5L
+000071 8A0C             712         MOV.W   [R4],R0
+000073 99400002         714         ADD.W   R4,#02H
+000077 9954rrrr         717         CMP.W   R5,#SEG( _PresetPtr+8 )
+00007B F203             718         BNE     _17
+00007D 9944rrrr         719         CMP.W   R4,#SOF( _PresetPtr+8 )
+00007D 9944rrrr00       719         CMP.W   R4,#SOF( _PresetPtr+8 )
+000082                  720 _17:
+000082 F1F1             721         BCS     _11
+                        722 ; instru.c  106 
+                        723 ; instru.c  107   // init the last selected values
+                        724 ; instru.c  108   SettingsPtr = NV_AllocP( sizeof( SettingsObject));
+000084 9908004A         726         MOV.W   R0,#04AH
+                        727         CALL    _NV_AllocP
+000088 C4rrrrrr        +727 ;       FCALL   _NV_AllocP
+00008C 8920             728         MOV.W   R2,R0
+00008E 964842rr         729         MOV.B   ES,#SEG( _SettingsPtr )
+000092 9908rrrr         730         MOV.W   R0,#SOF( _SettingsPtr )
+000096 8A28             731         MOV.W   [R0],R2
+                        732 ; instru.c  109 
+                        733 ; instru.c  110   if ( NV_Recall( &Settings, SettingsPtr, sizeof( Settings)) == FAIL)
+000098 9938004A         735         MOV.W   R3,#04AH
+00009C 9918rrrr         736         MOV.W   R1,#SEG( _Settings )
+0000A0 9908rrrr         737         MOV.W   R0,#SOF( _Settings )
+                        738         CALL    _NV_Recall
+0000A4 C4rrrrrr        +738 ;       FCALL   _NV_Recall
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+0000A8 6900             739         OR.W    R0,R0
+0000AA F203             740         BNE     _12
+                        741 ; instru.c  111     ResetInstrument();
+0000AC C500AA           743         CALL    _ResetInstrument
+0000AF FE20             744         BR      _14
+0000AF FE2000           744         BR      _14
+0000B2                  745 _12:
+                        746 ; instru.c  112   else
+                        747 ; instru.c  113     {
+                        748 ; instru.c  114     // NOTE!! The Init()-routines WILL clear
+                        749 ; instru.c  115     //  Settings.ActivePreset!!!!!!!!!!
+                        750 ; instru.c  116     tmp = Settings.ActivePreset;
+0000B2 964842rr         752         MOV.B   ES,#SEG( _Settings )
+0000B6 9948rrrr         753         MOV.W   R4,#SOF( _Settings )
+0000BA 8A44             754         MOV.W   R4,[R4]
+                        757 ; instru.c  117 
+                        758 ; instru.c  118     GenlockInit();     // restore the genlock settings.
+                        760         CALL    _GenlockInit
+0000BC C4rrrrrr        +760 ;       FCALL   _GenlockInit
+                        761 ; instru.c  119     CBInit();          // restore the colorbar generator settings
+                        763         CALL    _CBInit
+0000C0 C4rrrrrr        +763 ;       FCALL   _CBInit
+                        764 ; instru.c  120     BBInit();          // restore the black burst settings
+                        766         CALL    _BBInit
+0000C4 C4rrrrrr        +766 ;       FCALL   _BBInit
+                        767 ; instru.c  121     AudioInit();       // restore the audio settings
+                        769         CALL    _AudioInit
+0000C8 C4rrrrrr        +769 ;       FCALL   _AudioInit
+                        770 ; instru.c  122 
+                        771 ; instru.c  123     GenlockUpdate();   // update the genlock setup.
+                        773         CALL    _GenlockUpdate
+0000CC C4rrrrrr        +773 ;       FCALL   _GenlockUpdate
+                        774 ; instru.c  124     CBUpdate();        // update the colorbar generator (PAL,EBU ColorBar)
+                        776         CALL    _CBUpdate
+0000D0 C4rrrrrr        +776 ;       FCALL   _CBUpdate
+                        777 ; instru.c  125     BBUpdate();        // update the black burst setups
+                        779         CALL    _BBUpdate
+0000D4 C4rrrrrr        +779 ;       FCALL   _BBUpdate
+                        780 ; instru.c  126     AudioUpdate();     // update the audio setup
+                        782         CALL    _AudioUpdate
+0000D8 C4rrrrrr        +782 ;       FCALL   _AudioUpdate
+                        783 ; instru.c  127 
+                        784 ; instru.c  128     Settings.ActivePreset = tmp;
+0000DC 964842rr         786         MOV.B   ES,#SEG( _Settings )
+0000E0 9908rrrr         787         MOV.W   R0,#SOF( _Settings )
+0000E4 8A48             788         MOV.W   [R0],R4
+                        789 ; instru.c  129 
+                        790 ; instru.c  130     if ( Settings.ActivePreset)
+0000E6 6944             792         OR.W    R4,R4
+0000E8 F303             793         BEQ     _14
+                        794 ; instru.c  131       RecallPreset( tmp);
+0000EA 8904             796         MOV.W   R0,R4
+0000EC C50144           797         CALL    _RecallPreset
+                        801 ; instru.c  132     }
+0000F0                  803 _14:
+                        804 ; instru.c  133 
+                        805 ; instru.c  134   KeyScanThread = newTThread( 3, keyscan);
+0000F0 B903             807         MOV.W   R0,#03H
+0000F2 9938rrrr         808         MOV.W   R3,#SEG( _keyscan )
+0000F6 9928rrrr         809         MOV.W   R2,#SOF( _keyscan )
+                        810         CALL    _newTThread
+0000FA C4rrrrrr        +810 ;       FCALL   _newTThread
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000FE 964842rr         811         MOV.B   ES,#SEG( _KeyScanThread )
+000102 9928rrrr         812         MOV.W   R2,#SOF( _KeyScanThread )
+000106 8B0A             813         MOV.W   [R2+],R0
+000108 8A1A             814         MOV.W   [R2],R1
+                        815 ; instru.c  135   FrontThread = newTThread( 4, front);
+00010A B904             817         MOV.W   R0,#04H
+00010C 9938rrrr         818         MOV.W   R3,#SEG( _front )
+000110 9928rrrr         819         MOV.W   R2,#SOF( _front )
+                        820         CALL    _newTThread
+000114 C4rrrrrr        +820 ;       FCALL   _newTThread
+000118 964842rr         821         MOV.B   ES,#SEG( _FrontThread )
+00011C 9928rrrr         822         MOV.W   R2,#SOF( _FrontThread )
+000120 8B0A             823         MOV.W   [R2+],R0
+000122 8A1A             824         MOV.W   [R2],R1
+                        825 ; instru.c  136   InterpreterThread = newTThread( 5, Interpreter);
+000124 B905             827         MOV.W   R0,#05H
+000126 9938rrrr         828         MOV.W   R3,#SEG( _Interpreter )
+00012A 9928rrrr         829         MOV.W   R2,#SOF( _Interpreter )
+                        830         CALL    _newTThread
+00012E C4rrrrrr        +830 ;       FCALL   _newTThread
+000132 964842rr         831         MOV.B   ES,#SEG( _InterpreterThread )
+000136 9928rrrr         832         MOV.W   R2,#SOF( _InterpreterThread )
+00013A 8B0A             833         MOV.W   [R2+],R0
+00013C 8A1A             834         MOV.W   [R2],R1
+                        835 ; instru.c  137 
+                        836 ; instru.c  138   KeyScanThread->Execute( KeyScanThread);
+00013E 964842rr         838         MOV.B   ES,#SEG( _KeyScanThread )
+000142 9918rrrr         839         MOV.W   R1,#SOF( _KeyScanThread )
+000146 8B01             840         MOV.W   R0,[R1+]
+000148 8A11             841         MOV.W   R1,[R1]
+00014A 862C42           842         MOV.B   ES,R1L
+00014D 8C4006           843         MOV.W   R4,[R0+6]
+000150 8C5008           844         MOV.W   R5,[R0+8]
+000153 C4rrrrrr         845         FCALL   __ICALL
+                        846 ; instru.c  139   FrontThread->Execute( FrontThread);
+000157 964842rr         848         MOV.B   ES,#SEG( _FrontThread )
+00015B 9918rrrr         849         MOV.W   R1,#SOF( _FrontThread )
+00015F 8B01             850         MOV.W   R0,[R1+]
+000161 8A11             851         MOV.W   R1,[R1]
+000163 862C42           852         MOV.B   ES,R1L
+000166 8C4006           853         MOV.W   R4,[R0+6]
+000169 8C5008           854         MOV.W   R5,[R0+8]
+00016C C4rrrrrr         855         FCALL   __ICALL
+                        856 ; instru.c  140   InterpreterThread->Execute( InterpreterThread);
+000170 964842rr         858         MOV.B   ES,#SEG( _InterpreterThread )
+000174 9918rrrr         859         MOV.W   R1,#SOF( _InterpreterThread )
+000178 8B01             860         MOV.W   R0,[R1+]
+00017A 8A11             861         MOV.W   R1,[R1]
+00017C 862C42           862         MOV.B   ES,R1L
+00017F 8C4006           863         MOV.W   R4,[R0+6]
+000182 8C5008           864         MOV.W   R5,[R0+8]
+000185 C4rrrrrr         865         FCALL   __ICALL
+                        866 ; instru.c  141 
+                        867 ; instru.c  142   InstruTimer = newTTimer();
+                        869         CALL    _newTTimer
+000189 C4rrrrrr        +869 ;       FCALL   _newTTimer
+00018D 964842rr         870         MOV.B   ES,#SEG( _InstruTimer )
+000191 9928rrrr         871         MOV.W   R2,#SOF( _InstruTimer )
+000195 8B0A             872         MOV.W   [R2+],R0
+000197 8A1A             873         MOV.W   [R2],R1
+                        874 ; instru.c  143   InstruTimer->SetPeriod( InstruTimer, 250);  //250
+000199 862C42           876         MOV.B   ES,R1L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+00019C 8C400A           877         MOV.W   R4,[R0+10]
+00019F 8C500C           878         MOV.W   R5,[R0+12]
+0001A2 992800FA         879         MOV.W   R2,#0FAH
+0001A6 C4rrrrrr         880         FCALL   __ICALL
+                        881 ; instru.c  144 
+                        882 ; instru.c  145   for(;;)
+0001AA                  884 _15:
+                        885 ; instru.c  146     {
+                        886 ; instru.c  147     InstruTimer->TimeOut->Wait( InstruTimer->TimeOut, 0);
+0001AA 964842rr         888         MOV.B   ES,#SEG( _InstruTimer )
+0001AE 9918rrrr         889         MOV.W   R1,#SOF( _InstruTimer )
+0001B2 8B01             890         MOV.W   R0,[R1+]
+0001B4 8A11             891         MOV.W   R1,[R1]
+0001B6 862C42           892         MOV.B   ES,R1L
+0001B9 8C4016           893         MOV.W   R4,[R0+22]
+0001BC 8C5018           894         MOV.W   R5,[R0+24]
+0001BF 86AC42           895         MOV.B   ES,R5L
+0001C2 8C540C           896         MOV.W   R5,[R4+12]
+0001C5 8C440A           897         MOV.W   R4,[R4+10]
+0001C8 862C42           898         MOV.B   ES,R1L
+0001CB 8C1018           899         MOV.W   R1,[R0+24]
+0001CE 8C0016           900         MOV.W   R0,[R0+22]
+0001D1 B930             901         MOV.W   R3,#00H
+0001D3 B920             902         MOV.W   R2,#00H
+0001D5 C4rrrrrr         903         FCALL   __ICALL
+                        904 ; instru.c  148 /*    if ( !GenlockSetup.System == Internal)                    :JK change */
+                        905 ; instru.c  149     sio0SndRequest( 12, SPG_V24_address, result, "GS?");
+0001D9 9908000C         907         MOV.W   R0,#0CH
+0001DD 99180015         908         MOV.W   R1,#015H
+0001E1 9168rr           909         MOV.B   R3L,#SEG( __lc_bs )
+0001E4 7177             910         XOR.B   R3H,R3H
+0001E6 8927             911         MOV.W   R2,R7
+0001E8 9958rrrr         912         MOV.W   R5,#SEG( _3 )
+0001EC 9948rrrr         913         MOV.W   R4,#SOF( _3 )
+0001F0 0F30             914         PUSH.W  R4, R5
+                        916         CALL    _sio0SndRequest
+0001F2 C4rrrrrr        +916 ;       FCALL   _sio0SndRequest
+0001F6 A974             917         ADDS.W  R7,#04H
+0001F8 FED8             920         BR      _15
+                        921 ; instru.c  150 //    GenlockStatus = (UC) atoi( result);
+                        922 ; instru.c  151 //    if ( GenlockSetup.System == MHzLock10)
+                        923 ; instru.c  152 //      GenlockStatus &= 0x02;
+                        924 ; instru.c  153 //    else
+                        925 ; instru.c  154 //      GenlockStatus &= 0x01;
+                        926 ; instru.c  155 //              if ( GenlockStatus > 0)
+                        927 ; instru.c  156 //                      LEDMirror |= GenlockLED;
+                        928 ; instru.c  157 //              else
+                        929 ; instru.c  158 //                      LEDMirror &= ~ GenlockLED;
+                        930 ; instru.c  159 //    
+                        931 ; instru.c  160 //    Test1LEDFlag ^= 1;                                    /* Togge L28 ON/OFF *
+                            /
+                        932 ; instru.c  161 //              if ( Test1LEDFlag)
+                        933 ; instru.c  162 //                      TestLEDMirror |= Test1LED;
+                        934 ; instru.c  163 //              else
+                        935 ; instru.c  164 //                      TestLEDMirror &= ~Test1LED;
+                        936 ; instru.c  165 //
+                        937 ; instru.c  166         
+                        938 ; instru.c  167     }
+                        939 ; instru.c  168   }
+0001FA 9970000A         941         ADD.W   R7,#0AH
+0001FE 2F30             943         POP.W   R4, R5
+000200 D680             945         RET
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        947 ; instru.c  169 
+                        948 ; instru.c  170 /**************************************************************************/
+                        949 ; instru.c  171 /* ResetInstrument                                           INSTRU.C     */
+                        950 ; instru.c  172 /* Author:              Kim Engedahl, DEV, 000411                         */
+                        951 ; instru.c  173 /* Revised:             000914, KEn, DEV                                  */
+                        952 ; instru.c  174 /* Function:                                                              */
+                        953 ; instru.c  175 /**************************************************************************/
+                        954 ; instru.c  176 int ResetInstrument( void)
+                        955 ; instru.c  177   {
+                        956         ALIGN   1
+                        958         PUBLIC  _ResetInstrument
+000202                  959 _ResetInstrument:
+                        963 ; instru.c  178   BBDefaults();         
+                        965         CALL    _BBDefaults
+000202 C4rrrrrr        +965 ;       FCALL   _BBDefaults
+                        966 ; instru.c  179   CBDefaults();         
+                        968         CALL    _CBDefaults
+000206 C4rrrrrr        +968 ;       FCALL   _CBDefaults
+                        969 ; instru.c  180   AudioDefaults();          
+                        971         CALL    _AudioDefaults
+00020A C4rrrrrr        +971 ;       FCALL   _AudioDefaults
+                        972 ; instru.c  181   GenlockDefaults();
+                        974         CALL    _GenlockDefaults
+00020E C4rrrrrr        +974 ;       FCALL   _GenlockDefaults
+                        975 ; instru.c  182 
+                        976 ; instru.c  183   BBInit();                // init the black burst setups
+                        978         CALL    _BBInit
+000212 C4rrrrrr        +978 ;       FCALL   _BBInit
+                        979 ; instru.c  184   CBInit();                // init the colorbar generator (PAL,EBU ColorBar)
+                        981         CALL    _CBInit
+000216 C4rrrrrr        +981 ;       FCALL   _CBInit
+                        982 ; instru.c  185   AudioInit();             // init the audio setup, (this includes an AudioTimer)
+                            
+                        984         CALL    _AudioInit
+00021A C4rrrrrr        +984 ;       FCALL   _AudioInit
+                        985 ; instru.c  186   GenlockInit();           // init the genlock setup.
+                        987         CALL    _GenlockInit
+00021E C4rrrrrr        +987 ;       FCALL   _GenlockInit
+                        988 ; instru.c  187 
+                        989 ; instru.c  188   GenlockUpdate();         // update the genlock setup.
+                        991         CALL    _GenlockUpdate
+000222 C4rrrrrr        +991 ;       FCALL   _GenlockUpdate
+                        992 ; instru.c  189   CBUpdate();              // update the colorbar generator (PAL,EBU ColorBar)
+                        994         CALL    _CBUpdate
+000226 C4rrrrrr        +994 ;       FCALL   _CBUpdate
+                        995 ; instru.c  190   BBUpdate();              // update the black burst setups
+                        997         CALL    _BBUpdate
+00022A C4rrrrrr        +997 ;       FCALL   _BBUpdate
+                        998 ; instru.c  191   AudioUpdate();           // update the audio setup
+                       1000         CALL    _AudioUpdate
+00022E C4rrrrrr       +1000 ;       FCALL   _AudioUpdate
+                       1001 ; instru.c  192 
+                       1002 ; instru.c  193   Settings.ActivePreset = 0;
+000232 964842rr        1004         MOV.B   ES,#SEG( _Settings )
+000236 9908rrrr        1005         MOV.W   R0,#SOF( _Settings )
+00023A BA00            1006         MOV.W   [R0],#00H
+                       1007 ; instru.c  194   NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+00023C 9918rrrr        1009         MOV.W   R1,#SEG( _Settings )
+000240 9908rrrr        1010         MOV.W   R0,#SOF( _Settings )
+000244 964842rr        1011         MOV.B   ES,#SEG( _SettingsPtr )
+000248 9928rrrr        1012         MOV.W   R2,#SOF( _SettingsPtr )
+00024C 8A22            1013         MOV.W   R2,[R2]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+00024E 9938004A        1014         MOV.W   R3,#04AH
+                       1015         CALL    _NV_Store
+000252 C4rrrrrr       +1015 ;       FCALL   _NV_Store
+                       1016 ; instru.c  195 
+                       1017 ; instru.c  196   return( OK);
+000256 9908FFFF        1019         MOV.W   R0,#0FFFFH
+                       1020 ; instru.c  197   }
+00025A D680            1022         RET
+                       1024 ; instru.c  198 
+                       1025 ; instru.c  199 /**************************************************************************/
+                       1026 ; instru.c  200 /* StorePreset                                               INSTRU.C     */
+                       1027 ; instru.c  201 /* Author:              Kim Engedahl, DEV, 000411                         */
+                       1028 ; instru.c  202 /* Revised:             000618, KEn, DEV                                  */
+                       1029 ; instru.c  203 /* Function:                                                              */
+                       1030 ; instru.c  204 /**************************************************************************/
+                       1031 ; instru.c  205 int StorePreset( int no)
+                       1032 ; instru.c  206   {
+                       1033         ALIGN   1
+                       1035         PUBLIC  _StorePreset
+00025C                 1036 _StorePreset:
+00025C 0F70            1040         PUSH.W  R4, R5, R6
+00025E 99720072        1042         SUB.W   R7,#072H
+                       1049 ; instru.c  207   int i;
+                       1050 ; instru.c  208   PresetObject Preset;
+                       1051 ; instru.c  209 
+                       1052 ; instru.c  210   if (( no == 0) || ( no > NoOfPresets))
+000262 8950            1054         MOV.W   R5,R0
+000264 F303            1057         BEQ     _18
+000266 99540004        1058         CMP.W   R5,#04H
+00026A FD02            1059         BLE     _19
+00026A FD02            1059         BLE     _19
+00026C                 1060 _18:
+                       1061 ; instru.c  211     return( FAIL);
+00026C B900            1063         MOV.W   R0,#00H
+00026E FE7F            1064         BR      _22
+00026E FE7F            1064         BR      _22
+000270                 1065 _19:
+                       1068 ; instru.c  212 
+                       1069 ; instru.c  213   // Copy genlock setup to preset
+                       1070 ; instru.c  214   memcpy( &Preset.GenlockSetup, &GenlockSetup, sizeof( GenlockSetup));
+000270 9128rr          1072         MOV.B   R1L,#SEG( __lc_bs )
+000273 7133            1073         XOR.B   R1H,R1H
+000275 40072A          1074         LEA     R0,R7+42
+000278 9938rrrr        1075         MOV.W   R3,#SEG( _GenlockSetup )
+00027C 9928rrrr        1076         MOV.W   R2,#SOF( _GenlockSetup )
+000280 B966            1077         MOV.W   R6,#06H
+                       1078         CALL    _memcpy
+000282 C4rrrrrr       +1078 ;       FCALL   _memcpy
+                       1079 ; instru.c  215 
+                       1080 ; instru.c  216   // Copy black burst setup to preset
+                       1081 ; instru.c  217   for ( i = 0; i < NoOfBBOutputs; i++)
+000286 B940            1083         MOV.W   R4,#00H
+000288                 1085 _20:
+                       1086 ; instru.c  218           memcpy( &Preset.BBSetup[i], &BBSetup[i], sizeof( BBSetup[0]));
+000288 8904            1088         MOV.W   R0,R4
+00028A D903            1089         ASL.W   R0,#03H
+00028C 8920            1090         MOV.W   R2,R0
+00028E B930            1091         MOVS.W  R3,#00H
+000290 9128rr          1092         MOV.B   R1L,#SEG( __lc_bs )
+000293 7133            1093         XOR.B   R1H,R1H
+000295 400730          1094         LEA     R0,R7+48
+000298 0902            1095         ADD.W   R0,R2
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+00029A 8C1F02          1096         MOV.W   [R7+2],R1
+00029D 8A0F            1097         MOV.W   [R7],R0
+00029F 9918rrrr        1098         MOV.W   R1,#SEG( _BBSetup )
+0002A3 9908rrrr        1099         MOV.W   R0,#SOF( _BBSetup )
+0002A7 0902            1100         ADD.W   R0,R2
+0002A9 99680008        1101         MOV.W   R6,#08H
+0002AD 8931            1102         MOV.W   R3,R1
+0002AF 8920            1103         MOV.W   R2,R0
+0002B1 8C1702          1104         MOV.W   R1,[R7+2]
+0002B4 8A07            1105         MOV.W   R0,[R7]
+                       1106         CALL    _memcpy
+0002B6 C4rrrrrr       +1106 ;       FCALL   _memcpy
+0002BA A941            1108         ADDS.W  R4,#01H
+0002BC 99440003        1111         CMP.W   R4,#03H
+0002C0 FBE3            1112         BLT     _20
+                       1113 ; instru.c  219 
+                       1114 ; instru.c  220   // Copy Colorbar setup to preset
+                       1115 ; instru.c  221   memcpy( &Preset.CBSetup, &CBSetup, sizeof( CBSetup));
+0002C2 9128rr          1117         MOV.B   R1L,#SEG( __lc_bs )
+0002C5 7133            1118         XOR.B   R1H,R1H
+0002C7 400748          1119         LEA     R0,R7+72
+0002CA 9938rrrr        1120         MOV.W   R3,#SEG( _CBSetup )
+0002CE 9928rrrr        1121         MOV.W   R2,#SOF( _CBSetup )
+0002D2 9968000C        1122         MOV.W   R6,#0CH
+                       1123         CALL    _memcpy
+0002D6 C4rrrrrr       +1123 ;       FCALL   _memcpy
+                       1124 ; instru.c  222 
+                       1125 ; instru.c  223   // Copy currently selected audio output to preset
+                       1126 ; instru.c  224   Preset.AudioOutput = AudioOutput;
+0002DA 964842rr        1128         MOV.B   ES,#SEG( _AudioOutput )
+0002DE 9908rrrr        1129         MOV.W   R0,#SOF( _AudioOutput )
+0002E2 8A00            1130         MOV.W   R0,[R0]
+0002E4 8C0F54          1131         MOV.W   [R7+84],R0
+                       1132 ; instru.c  225 
+                       1133 ; instru.c  226   // Copy audio setup to preset
+                       1134 ; instru.c  227   for ( i = 0; i < NoOfAudioOutputs; i++)
+0002E7 B940            1136         MOV.W   R4,#00H
+0002EA                 1139 _21:
+                       1140 ; instru.c  228     memcpy( &Preset.AudioSetup[i], &AudioSetup[i], sizeof( AudioSetup[0]));
+0002EA 9928000E        1142         MOV.W   R2,#0EH
+0002EE E424            1143         MULU.W  R2,R4
+0002F0 B930            1144         MOVS.W  R3,#00H
+0002F2 9128rr          1145         MOV.B   R1L,#SEG( __lc_bs )
+0002F5 7133            1146         XOR.B   R1H,R1H
+0002F7 400756          1147         LEA     R0,R7+86
+0002FA 0902            1148         ADD.W   R0,R2
+0002FC 8C1F02          1149         MOV.W   [R7+2],R1
+0002FF 8A0F            1150         MOV.W   [R7],R0
+000301 9918rrrr        1151         MOV.W   R1,#SEG( _AudioSetup )
+000305 9908rrrr        1152         MOV.W   R0,#SOF( _AudioSetup )
+000309 0902            1153         ADD.W   R0,R2
+00030B 9968000E        1154         MOV.W   R6,#0EH
+00030F 8931            1155         MOV.W   R3,R1
+000311 8920            1156         MOV.W   R2,R0
+000313 8C1702          1157         MOV.W   R1,[R7+2]
+000316 8A07            1158         MOV.W   R0,[R7]
+                       1159         CALL    _memcpy
+000318 C4rrrrrr       +1159 ;       FCALL   _memcpy
+00031C A941            1161         ADDS.W  R4,#01H
+00031E 99440002        1164         CMP.W   R4,#02H
+000322 FBE3            1165         BLT     _21
+                       1166 ; instru.c  229 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                       1167 ; instru.c  230   // Store preset in setected preset number
+                       1168 ; instru.c  231   NV_Store( &Preset, PresetPtr[no-1], sizeof( Preset));
+000324 9128rr          1170         MOV.B   R1L,#SEG( __lc_bs )
+000327 7133            1171         XOR.B   R1H,R1H
+000329 400704          1172         LEA     R0,R7+4
+00032C 8945            1173         MOV.W   R4,R5
+00032E D951            1174         ASL.W   R5,#01H
+000330 8925            1178         MOV.W   R2,R5
+000332 B930            1179         MOVS.W  R3,#00H
+000334 964842rr        1180         MOV.B   ES,#SEG( _PresetPtr+-2 )
+000338 8D22rrrr        1181         MOV.W   R2,[R2+SOF( _PresetPtr+-2 )]
+00033C 9938006E        1182         MOV.W   R3,#06EH
+                       1183         CALL    _NV_Store
+000340 C4rrrrrr       +1183 ;       FCALL   _NV_Store
+                       1184 ; instru.c  232 
+                       1185 ; instru.c  233   Settings.ActivePreset = no;
+000344 8904            1187         MOV.W   R0,R4
+000346 964842rr        1188         MOV.B   ES,#SEG( _Settings )
+00034A 9918rrrr        1189         MOV.W   R1,#SOF( _Settings )
+00034E 8A09            1190         MOV.W   [R1],R0
+                       1193 ; instru.c  234   NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000350 9918rrrr        1195         MOV.W   R1,#SEG( _Settings )
+000354 9908rrrr        1196         MOV.W   R0,#SOF( _Settings )
+000358 964842rr        1198         MOV.B   ES,#SEG( _SettingsPtr )
+00035C 9928rrrr        1199         MOV.W   R2,#SOF( _SettingsPtr )
+000360 8A22            1200         MOV.W   R2,[R2]
+000362 9938004A        1201         MOV.W   R3,#04AH
+                       1202         CALL    _NV_Store
+000366 C4rrrrrr       +1202 ;       FCALL   _NV_Store
+                       1203 ; instru.c  235 
+                       1204 ; instru.c  236   return( OK);
+00036A 9908FFFF        1206         MOV.W   R0,#0FFFFH
+                       1207 ; instru.c  237   }
+00036E                 1209 _22:
+00036E 99700072        1210         ADD.W   R7,#072H
+000372 2F70            1212         POP.W   R4, R5, R6
+000374 D680            1214         RET
+                       1216 ; instru.c  238 
+                       1217 ; instru.c  239 /**************************************************************************/
+                       1218 ; instru.c  240 /* RecallPreset                                              INSTRU.C     */
+                       1219 ; instru.c  241 /* Author:              Kim Engedahl, DEV, 000411                         */
+                       1220 ; instru.c  242 /* Revised:             000618, KEn, DEV                                  */
+                       1221 ; instru.c  243 /* Function:                                                              */
+                       1222 ; instru.c  244 /**************************************************************************/
+                       1223 ; instru.c  245 int RecallPreset( int no)
+                       1224 ; instru.c  246   {
+                       1225         ALIGN   1
+                       1227         PUBLIC  _RecallPreset
+000376                 1228 _RecallPreset:
+000376 0F70            1232         PUSH.W  R4, R5, R6
+000378 99720072        1234         SUB.W   R7,#072H
+                       1241 ; instru.c  247   int i;
+                       1242 ; instru.c  248   PresetObject Preset;
+                       1243 ; instru.c  249 
+                       1244 ; instru.c  250   if (( no == 0) || ( no > NoOfPresets))
+00037C 8950            1246         MOV.W   R5,R0
+00037E 6900            1247         OR.W    R0,R0
+000380 F303            1250         BEQ     _26
+000382 99540004        1251         CMP.W   R5,#04H
+000386 FD03            1252         BLE     _27
+000386 FD03            1252         BLE     _27
+000388                 1253 _26:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                       1254 ; instru.c  251     return( FAIL);
+000388 B900            1256         MOV.W   R0,#00H
+                       1257         BR      _32
+00038A D5008F         +1257         JMP.L   _32
+00038A D5008F00       +1257         JMP.L   _32
+00038E                 1258 _27:
+                       1261 ; instru.c  252 
+                       1262 ; instru.c  253   if ( NV_Recall( &Preset, PresetPtr[no-1], sizeof( Preset)))
+00038E 9128rr          1264         MOV.B   R1L,#SEG( __lc_bs )
+000391 7133            1265         XOR.B   R1H,R1H
+000393 400704          1266         LEA     R0,R7+4
+000396 8925            1267         MOV.W   R2,R5
+000398 D921            1268         ASL.W   R2,#01H
+00039A B930            1269         MOVS.W  R3,#00H
+00039C 964842rr        1270         MOV.B   ES,#SEG( _PresetPtr+-2 )
+0003A0 8D22rrrr        1271         MOV.W   R2,[R2+SOF( _PresetPtr+-2 )]
+0003A4 9938006E        1272         MOV.W   R3,#06EH
+                       1273         CALL    _NV_Recall
+0003A8 C4rrrrrr       +1273 ;       FCALL   _NV_Recall
+0003AC 6900            1274         OR.W    R0,R0
+0003AE F37C            1275         BEQ     _30
+                       1276 ; instru.c  254     {
+                       1277 ; instru.c  255     // Recall genlock setup from preset
+                       1278 ; instru.c  256     memcpy( &GenlockSetup, &Preset.GenlockSetup, sizeof( GenlockSetup));
+0003B0 9918rrrr        1280         MOV.W   R1,#SEG( _GenlockSetup )
+0003B4 9908rrrr        1281         MOV.W   R0,#SOF( _GenlockSetup )
+0003B8 9168rr          1282         MOV.B   R3L,#SEG( __lc_bs )
+0003BB 7177            1283         XOR.B   R3H,R3H
+0003BD 40272A          1284         LEA     R2,R7+42
+0003C0 B966            1285         MOV.W   R6,#06H
+                       1286         CALL    _memcpy
+0003C2 C4rrrrrr       +1286 ;       FCALL   _memcpy
+                       1287 ; instru.c  257 
+                       1288 ; instru.c  258     GenlockUpdate();                // update the genlock setup
+                       1290         CALL    _GenlockUpdate
+0003C6 C4rrrrrr       +1290 ;       FCALL   _GenlockUpdate
+                       1291 ; instru.c  259 
+                       1292 ; instru.c  260 
+                       1293 ; instru.c  261     // Recall black burst setup from preset
+                       1294 ; instru.c  262     for ( i = 0; i < NoOfBBOutputs; i++)
+0003CA B940            1296         MOV.W   R4,#00H
+0003CC                 1298 _28:
+                       1299 ; instru.c  263       memcpy( &BBSetup[i], &Preset.BBSetup[i], sizeof( BBSetup[0]));
+0003CC 8904            1301         MOV.W   R0,R4
+0003CE D903            1302         ASL.W   R0,#03H
+0003D0 8920            1303         MOV.W   R2,R0
+0003D2 B930            1304         MOVS.W  R3,#00H
+0003D4 9918rrrr        1305         MOV.W   R1,#SEG( _BBSetup )
+0003D8 9908rrrr        1306         MOV.W   R0,#SOF( _BBSetup )
+0003DC 0902            1307         ADD.W   R0,R2
+0003DE 8C1F02          1308         MOV.W   [R7+2],R1
+0003E1 8A0F            1309         MOV.W   [R7],R0
+0003E3 9128rr          1310         MOV.B   R1L,#SEG( __lc_bs )
+0003E6 7133            1311         XOR.B   R1H,R1H
+0003E8 400730          1312         LEA     R0,R7+48
+0003EB 0902            1313         ADD.W   R0,R2
+0003ED 99680008        1314         MOV.W   R6,#08H
+0003F1 8931            1315         MOV.W   R3,R1
+0003F3 8920            1316         MOV.W   R2,R0
+0003F5 8C1702          1317         MOV.W   R1,[R7+2]
+0003F8 8A07            1318         MOV.W   R0,[R7]
+                       1319         CALL    _memcpy
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+0003FA C4rrrrrr       +1319 ;       FCALL   _memcpy
+0003FE A941            1321         ADDS.W  R4,#01H
+000400 99440003        1324         CMP.W   R4,#03H
+000404 FBE3            1325         BLT     _28
+                       1326 ; instru.c  264 
+                       1327 ; instru.c  265     BBUpdate();   // update the black burst setups
+                       1329         CALL    _BBUpdate
+000406 C4rrrrrr       +1329 ;       FCALL   _BBUpdate
+                       1330 ; instru.c  266 
+                       1331 ; instru.c  267 
+                       1332 ; instru.c  268     // Recall Colorbar setup from preset
+                       1333 ; instru.c  269     memcpy( &CBSetup, &Preset.CBSetup, sizeof( CBSetup));
+00040A 9918rrrr        1335         MOV.W   R1,#SEG( _CBSetup )
+00040E 9908rrrr        1336         MOV.W   R0,#SOF( _CBSetup )
+000412 9168rr          1337         MOV.B   R3L,#SEG( __lc_bs )
+000415 7177            1338         XOR.B   R3H,R3H
+000417 402748          1339         LEA     R2,R7+72
+00041A 9968000C        1340         MOV.W   R6,#0CH
+                       1341         CALL    _memcpy
+00041E C4rrrrrr       +1341 ;       FCALL   _memcpy
+                       1342 ; instru.c  270 
+                       1343 ; instru.c  271     CBUpdate();   // update the colorbar generator (PAL,EBU ColorBar)
+                       1345         CALL    _CBUpdate
+000422 C4rrrrrr       +1345 ;       FCALL   _CBUpdate
+                       1346 ; instru.c  272 
+                       1347 ; instru.c  273     // Recall currently selected audio output from preset
+                       1348 ; instru.c  274     AudioOutput = Preset.AudioOutput;
+000426 8C0754          1350         MOV.W   R0,[R7+84]
+000429 964842rr        1351         MOV.B   ES,#SEG( _AudioOutput )
+00042D 9918rrrr        1352         MOV.W   R1,#SOF( _AudioOutput )
+000431 8A09            1353         MOV.W   [R1],R0
+                       1354 ; instru.c  275 
+                       1355 ; instru.c  276     // Recall audio setup from preset
+                       1356 ; instru.c  277     for ( i = 0; i < NoOfAudioOutputs; i++)
+000433 B940            1358         MOV.W   R4,#00H
+000436                 1361 _29:
+                       1362 ; instru.c  278       memcpy( &AudioSetup[i], &Preset.AudioSetup[i], sizeof( AudioSetup[0]));
+000436 9928000E        1364         MOV.W   R2,#0EH
+00043A E424            1365         MULU.W  R2,R4
+00043C B930            1366         MOVS.W  R3,#00H
+00043E 9918rrrr        1367         MOV.W   R1,#SEG( _AudioSetup )
+000442 9908rrrr        1368         MOV.W   R0,#SOF( _AudioSetup )
+000446 0902            1369         ADD.W   R0,R2
+000448 8C1F02          1370         MOV.W   [R7+2],R1
+00044B 8A0F            1371         MOV.W   [R7],R0
+00044D 9128rr          1372         MOV.B   R1L,#SEG( __lc_bs )
+000450 7133            1373         XOR.B   R1H,R1H
+000452 400756          1374         LEA     R0,R7+86
+000455 0902            1375         ADD.W   R0,R2
+000457 9968000E        1376         MOV.W   R6,#0EH
+00045B 8931            1377         MOV.W   R3,R1
+00045D 8920            1378         MOV.W   R2,R0
+00045F 8C1702          1379         MOV.W   R1,[R7+2]
+000462 8A07            1380         MOV.W   R0,[R7]
+                       1381         CALL    _memcpy
+000464 C4rrrrrr       +1381 ;       FCALL   _memcpy
+000468 A941            1383         ADDS.W  R4,#01H
+00046A 99440002        1386         CMP.W   R4,#02H
+00046E FBE3            1387         BLT     _29
+                       1388 ; instru.c  279 
+                       1389 ; instru.c  280     SetAudioOutput( AudioOutput);  // update the audio setup
+000470 964842rr        1391         MOV.B   ES,#SEG( _AudioOutput )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+000474 9908rrrr        1392         MOV.W   R0,#SOF( _AudioOutput )
+000478 8A00            1393         MOV.W   R0,[R0]
+                       1394         CALL    _SetAudioOutput
+00047A C4rrrrrr       +1394 ;       FCALL   _SetAudioOutput
+                       1395 ; instru.c  281 
+                       1396 ; instru.c  282     Settings.ActivePreset = no;
+00047E 964842rr        1398         MOV.B   ES,#SEG( _Settings )
+000482 9908rrrr        1399         MOV.W   R0,#SOF( _Settings )
+000486 8A58            1400         MOV.W   [R0],R5
+                       1401 ; instru.c  283     NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000488 9918rrrr        1403         MOV.W   R1,#SEG( _Settings )
+00048C 9908rrrr        1404         MOV.W   R0,#SOF( _Settings )
+000490 964842rr        1405         MOV.B   ES,#SEG( _SettingsPtr )
+000494 9928rrrr        1406         MOV.W   R2,#SOF( _SettingsPtr )
+000498 8A22            1407         MOV.W   R2,[R2]
+00049A 9938004A        1408         MOV.W   R3,#04AH
+                       1409         CALL    _NV_Store
+00049E C4rrrrrr       +1409 ;       FCALL   _NV_Store
+                       1410 ; instru.c  284 
+                       1411 ; instru.c  285     return( OK);
+0004A2 9908FFFF        1413         MOV.W   R0,#0FFFFH
+0004A6 FE01            1414         BR      _32
+                       1415 ; instru.c  286     }
+0004A8                 1417 _30:
+                       1418 ; instru.c  287   return( FAIL);
+0004A8 B900            1420         MOV.W   R0,#00H
+                       1421 ; instru.c  288   }
+0004AA                 1423 _32:
+0004AA 99700072        1424         ADD.W   R7,#072H
+0004AE 2F70            1426         POP.W   R4, R5, R6
+0004B0 D680            1428         RET
+                       1436         EXTRN   HCODE(_sio0_init)
+000000                 1440 INSTRU_CLR_FA   SEGMENT HDATA INSEGMENT CLEAR
+000000                 1441         RSEG    INSTRU_CLR_FA
+                       1442         PUBLIC  _PresetPtr
+                       1443         ALIGN   1
+000000                 1444 _PresetPtr:     DS      8
+   |  RESERVED             
+000007
+                       1447         EXTRN   HCODE(_front)
+                       1450         EXTRN   HCODE(_InitBus)
+                       1453         EXTRN   HCODE(_tvp6k_init)
+000000                 1454 INSTRU_INI_FA   SEGMENT HDATA INSEGMENT INIT
+000000                 1455         RSEG    INSTRU_INI_FA
+000000 47533F00        1456 _3:     DB      047H,053H,03FH,000H
+                       1459         EXTRN   HCODE(_BBUpdate)
+000008                 1464         RSEG    INSTRU_CLR_FA
+                       1465         PUBLIC  _FrontThread
+                       1466         ALIGN   1
+000008                 1467 _FrontThread:   DS      4
+   |  RESERVED             
+00000B
+                       1469         EXTRN   HDATA(_AudioOutput)
+                       1472         EXTRN   HCODE(_CBUpdate)
+                       1475         PUBLIC  _InstrumentControl
+                       1476         ALIGN   1
+00000C                 1477 _InstrumentControl:     DS      4
+   |  RESERVED             
+00000F
+                       1480         EXTRN   HCODE(_tim0_init)
+                       1483         EXTRN   HCODE(_NV_AllocP)
+                       1486         PUBLIC  _InterpreterThread
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+                       1487         ALIGN   1
+000010                 1488 _InterpreterThread:     DS      4
+   |  RESERVED             
+000013
+                       1493         EXTRN   HCODE(_newTTimer)
+                       1495         EXTRN   HDATA(_CBSetup)
+                       1497         EXTRN   HDATA(_BBSetup)
+                       1500         EXTRN   HCODE(_NV_Init)
+                       1503         EXTRN   HCODE(_GenlockInit)
+                       1506         EXTRN   HCODE(_GenlockUpdate)
+                       1509         EXTRN   HCODE(_CBInit)
+                       1512         EXTRN   HCODE(_NV_Recall)
+                       1515         PUBLIC  _GenlockStatus
+000014 RESERVED        1516 _GenlockStatus: DS      1
+000014
+                       1519         EXTRN   HCODE(_SetAudioOutput)
+                       1522         PUBLIC  _CalibrationPtr
+000015 RESERVED        1523         ALIGN   1
+000015
+000016                 1524 _CalibrationPtr:        DS      2
+   |  RESERVED             
+000017
+                       1526         EXTRN   HDATA(_AudioSetup)
+                       1529         PUBLIC  _InstruTimer
+                       1530         ALIGN   1
+000018                 1531 _InstruTimer:   DS      4
+   |  RESERVED             
+00001B
+                       1534         EXTRN   HCODE(_BBDefaults)
+                       1537         PUBLIC  _SettingsPtr
+                       1538         ALIGN   1
+00001C                 1539 _SettingsPtr:   DS      2
+   |  RESERVED             
+00001D
+                       1542         EXTRN   HCODE(_BBInit)
+                       1545         EXTRN   HCODE(_CBDefaults)
+                       1547         EXTRN   HDATA(_GenlockSetup)
+                       1550         EXTRN   HCODE(_AudioUpdate)
+                       1553         EXTRN   HCODE(_keyscan)
+                       1556         PUBLIC  _Settings
+                       1557         ALIGN   1
+00001E                 1558 _Settings:      DS      74
+   |  RESERVED             
+000067
+                       1561         EXTRN   HCODE(_rs232_init)
+                       1564         EXTRN   HCODE(_SystemsLEDSet)
+                       1565         EXTRN   HCODE(__ICALL)
+                       1568         PUBLIC  _KeyScanThread
+                       1569         ALIGN   1
+000068                 1570 _KeyScanThread: DS      4
+   |  RESERVED             
+00006B
+                       1573         EXTRN   HCODE(_NV_Store)
+                       1576         EXTRN   HCODE(_AudioInit)
+                       1579         PUBLIC  _Calibration
+                       1580         ALIGN   1
+00006C                 1581 _Calibration:   DS      226
+   |  RESERVED             
+00014D
+                       1584         EXTRN   HCODE(_Interpreter)
+                       1585         EXTRN   IDATA(__lc_bs)
+                       1587         EXTRN   BIT(_UnitPgmMode)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+                       1590         EXTRN   HCODE(_GenlockDefaults)
+                       1596         EXTRN   HCODE(_newTThread)
+                       1599         EXTRN   HCODE(_AudioDefaults)
+                       1602         EXTRN   HCODE(_Sleep)
+                       1605         EXTRN   HCODE(_memcpy)
+                       1608         EXTRN   HCODE(_sio0SndRequest)
+                       1609         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1610         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1611         CALLS   'Instrument_Control_Task', 'rs232_init'
+                       1612         CALLS   'Instrument_Control_Task', 'sio0_init'
+                       1613         CALLS   'Instrument_Control_Task', 'tim0_init'
+                       1614         CALLS   'Instrument_Control_Task', 'InitBus'
+                       1615         CALLS   'Instrument_Control_Task', 'tvp6k_init'
+                       1616         CALLS   'Instrument_Control_Task', 'NV_Init'
+                       1617         CALLS   'Instrument_Control_Task', 'NV_AllocP'
+                       1618         CALLS   'Instrument_Control_Task', 'NV_Recall'
+                       1619         CALLS   'Instrument_Control_Task', 'SystemsLEDSet'
+                       1620         CALLS   'Instrument_Control_Task', 'Sleep'
+                       1621         CALLS   'Instrument_Control_Task', 'NV_AllocP'
+                       1622         CALLS   'Instrument_Control_Task', 'NV_Recall'
+                       1623         CALLS   'Instrument_Control_Task', 'ResetInstrument'
+                       1624         CALLS   'Instrument_Control_Task', 'GenlockInit'
+                       1625         CALLS   'Instrument_Control_Task', 'CBInit'
+                       1626         CALLS   'Instrument_Control_Task', 'BBInit'
+                       1627         CALLS   'Instrument_Control_Task', 'AudioInit'
+                       1628         CALLS   'Instrument_Control_Task', 'GenlockUpdate'
+                       1629         CALLS   'Instrument_Control_Task', 'CBUpdate'
+                       1630         CALLS   'Instrument_Control_Task', 'BBUpdate'
+                       1631         CALLS   'Instrument_Control_Task', 'AudioUpdate'
+                       1632         CALLS   'Instrument_Control_Task', 'RecallPreset'
+                       1633         CALLS   'Instrument_Control_Task', 'newTThread'
+                       1634         CALLS   'Instrument_Control_Task', 'newTTimer'
+                       1635         CALLS   'Instrument_Control_Task', 'sio0SndRequest'
+                       1636         CALLS   'ResetInstrument', 'BBDefaults'
+                       1637         CALLS   'ResetInstrument', 'CBDefaults'
+                       1638         CALLS   'ResetInstrument', 'AudioDefaults'
+                       1639         CALLS   'ResetInstrument', 'GenlockDefaults'
+                       1640         CALLS   'ResetInstrument', 'BBInit'
+                       1641         CALLS   'ResetInstrument', 'CBInit'
+                       1642         CALLS   'ResetInstrument', 'AudioInit'
+                       1643         CALLS   'ResetInstrument', 'GenlockInit'
+                       1644         CALLS   'ResetInstrument', 'GenlockUpdate'
+                       1645         CALLS   'ResetInstrument', 'CBUpdate'
+                       1646         CALLS   'ResetInstrument', 'BBUpdate'
+                       1647         CALLS   'ResetInstrument', 'AudioUpdate'
+                       1648         CALLS   'ResetInstrument', 'NV_Store'
+                       1649         CALLS   'StorePreset', 'memcpy'
+                       1650         CALLS   'StorePreset', 'NV_Store'
+                       1651         CALLS   'RecallPreset', 'NV_Recall'
+                       1652         CALLS   'RecallPreset', 'memcpy'
+                       1653         CALLS   'RecallPreset', 'GenlockUpdate'
+                       1654         CALLS   'RecallPreset', 'memcpy'
+                       1655         CALLS   'RecallPreset', 'BBUpdate'
+                       1656         CALLS   'RecallPreset', 'memcpy'
+                       1657         CALLS   'RecallPreset', 'CBUpdate'
+                       1658         CALLS   'RecallPreset', 'memcpy'
+                       1659         CALLS   'RecallPreset', 'SetAudioOutput'
+                       1660         CALLS   'RecallPreset', 'NV_Store'

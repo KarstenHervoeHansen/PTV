@@ -1,0 +1,582 @@
+
+1. Software overview
+
+The function of master software is to handle user interface via RS232 port
+and LCD display/keyboard and to communicate with a number of distributed 
+systems: black burst generator, SPG unit, audio generator and TSG generator.
+
+Black burst and SPG generators are implemented as separate hardware units,
+each with its own microcomputer, ROM, RAM, boot loader, etc.  The master
+communicates with them via internal V24 serial bus.
+
+Audio generator is also a separate hardware unit, implemented in in large 
+extent in PLD, and the master communicates with it via PLD ports.
+
+TSG generator is implemented in master software via line interrupt and the 
+master has direct access to variables which control the TSG.
+
+1.1 Loading master software.
+
+The master controller can run either from its program ROM (V61) or from its
+Boot loader ROM (V68).  By powering PT5202 with PP2 shorted, a PLD selects
+the Boot Loader ROM.  The boot loader program allows downloading master 
+software in Intel Hex format into V61 via external RS232 interface.  The 
+speed used is 115000, no parity, 2 stop bits.
+When boot loader runs, diodes D28 and D31 blink.
+
+The software loaded to the master program ROM includes:
+- the master program          (PT52502.hex)
+- video data for TSG          (data03.hex)
+- contents of SPG PLD         (spg03.hex)
+- embedded sound data for TSG (5202snd3.hex)
+
+All these files are combined into one hex file by the combine.c program.
+Resulting hex file is named pt5202b.hex.  This file is then loaded by the 
+boot loader.
+
+The program used for uploading is loadall.exe.  It automatically checks the 
+checksums for all data uploaded, the checksum values are store in loadall.exe,
+so the program has to be compiled again for each new version of master 
+software (source: loadall.cpp, written in Borland Builder).
+
+As defined in master software, data and program reside in V61 as shown below:
+
+#define StartOfPROMCode				0x00000L
+#define SizeOfPROMCode 				0x30000L
+
+#define StartOfPLDCode				0x30000L
+#define SizeOfPLDCode					0x0A000L
+
+#define StartOfEmbAudioCode		0x3A000L
+#define SizeOfEmbAudioCode		0x02400L
+
+#define StartOfCBVideoCode		0x40000L
+#define SizeOfCBVideoCode			0x30000L
+
+
+1.2 Loading Black Burst controller software.
+
+To upload black burst software to the BB controller, the master software 
+must be running.  Using the following FACTORY commands:
+
+    :FACT:PASS 'PASS5201'; // to remove password protection
+    :FACT:V24C:TRAN:BB;
+
+will:
+ - blink D28 and D31,
+ - change master RS232 baud rate to 115000,
+ - change master V24 bus baud rate to 11500,
+ - run black burst boot loader,
+ - put master software in 'transparent mode', where all characters 
+   received vill be transmitted to black burst loader via internal
+   V24 bus and all characters received from black burst loader will
+   be transmited outside by master software.
+
+Black burst software may then be uploaded by an Intel hex loader.
+PT5202 must then be reset.
+
+1.3 Loading SPG controller software.
+
+The procedure is identical to the above, except that the commands are:
+
+    :FACT:PASS 'PASS5201'; // to remove password protection
+    :FACT:V24C:TRAN:SPG;
+
+PT5202 must then be reset.
+
+
+2. Calibration structures.
+
+The calibration structure is defined below (file: instru.h).
+
+typedef struct
+  {
+	char											Company[33];
+	char											Type[33];
+	char											KUNumber[9];
+	char											SWRevision[9];
+	char											NC12[13];
+	UC												ResetSystem;
+	UL												ProdDate;
+	UL												UpdateDate;
+	GenlockCalibrationObject	GenlockCalibration;
+	BBCalibrationObject				BBCalibration[NoOfBBOutputs];
+	CBCalibrationObject				CBCalibration;
+	AudioCalibrationObject		AudioCalibration;
+  } CalibrationObject;
+
+Its purpose is to maintain certain parameters for BB, TSG, Audio
+and Genlock generators, which have been calculated during calibration of
+the instrument.  This structure is then stored in NV memory, and on each
+start on the instrument these parameters are retrieved and transmitted
+to the particular generator by Master processor, thus ensuring that each
+generator is started up with correct set of parameters.
+
+The calibration structure contains calibration parametres for each
+genrator organized as XXCalibrationObjects, which are explained later.
+
+Apart from self explanatory members, it contains ResetSystem, which is 
+a TV system to which all systems will default after instrument reset is 
+performed.  ProdDate is the date of first post-assembly calibration.
+UpdateDate is the date of last subsequent recalibration.
+
+The first 8 members are accessible via FACTORY commands as follows:
+
+Company[33];    :FACT:MAIN:IDN:COMP
+Type[33];       :FACT:MAIN:IDN:TYPE
+KUNumber[9];    :FACT:MAIN:IDN:KUN
+SWRevision[9];  :FACT:MAIN:IDN:SWR
+NC12[13];        Not available
+ResetSystem;    :FACT:MAIN:SYST
+ProdDate;       :FACT:MAIN:FMSD:PROD
+UpdateDate;     :FACT:MAIN:FMSD:UPD
+
+Additionally, there is one parameter accessible by FACTORY command, which 
+is not a member of calibration structure:
+
+  FACT:MAIN:VER (querry only)
+
+This command returns software version number (defined in rs232cmd.c).  The
+version number resides in program ROM and cannot be changed.
+
+All other calibration object members are accessible via FACTORY commands,
+which will be shown in subsequent points.
+
+There are two global variables, related to calibration parameters:
+
+    CalibrationObject Calibration;
+    NvPointer         CalibrationPtr;
+
+Calibration is a global structure containing all calibration parameters,
+loaded from NV memory at instrument startup.
+
+CalibrationPtr is a global pointer to NV memory, used to retrieve and store
+calibration structure from/into NV memory.
+
+
+2.1 SPG calibration structure.
+
+The structure is presented below, together with FACTORY commands for 
+accessing its members.
+
+typedef struct 
+  {
+	UL Date;         :FACT:GENL:DATE
+ 
+	UL DACFactDate;  :FACT:GENL:FREF:DATE
+	UL DACUserDate;  :FACT:GENL:UREF:DATE
+
+	UI DACFactValue; :FACT:GENL:FREF:DAC
+	UI DACUserValue; :FACT:GENL:UREF:DAC
+
+	UL HPHZeroG;     :FACT:GENL:HPHZ
+	UL PhaseG;       :FACT:GENL:PHAS
+
+	UL HPHZeroM;     :FACT:GENL:HPHZ
+	UL PhaseM;       :FACT:GENL:PHAS
+	int DACOffset;   :FACT:GENL:DOFFSET
+  } GenlockCalibrationObject;
+
+The DACFactValue and DACUserValue members hold 10 bit values loaded into the 
+V74 DAC in SPG which give 27 MHz frequency of the reference SPG oscillator.
+
+These values are determined during post production testing and are equal.
+On instrument start-up, the DACUserValue is transmited to SPG and loaded
+into V75.
+
+If user performs calibration of the 27 MHz reference oscillator himself, a
+new value is put into DACUserValue.  DACFactValue remains unchanged and 
+can always be used to establish original setting.
+
+There are two date members for both of DAC values.
+
+HPHZeroG, PhaseG, HPHZeroM, PhaseM are SPG internal variables, determined
+under post production test procedure.
+
+The DACOffset contains an offset compensation value for V74 DAC, again established
+during test procedure.
+
+Below is a part of GenlockInit() function showing how members of SPG (Genlock)
+calibration members are transmitted to SPG.
+
+sio0SndCommand(20, SPG_V24_address, "GV%lu;", Calibration.GenlockCalibration.HPHZeroG);
+sio0SndCommand(20, SPG_V24_address, "GF%lu;", Calibration.GenlockCalibration.PhaseG);
+
+
+2.2 Audio calibration structure
+
+typedef struct
+  {
+	UL Date;                  :FACT:AUD:DATE
+	UC AnalogLeftChannel;     :FACT:AUD:ALEVEL
+	UC AnalogRightChannel;    :FACT:AUD:ALEVEL
+  } AudioCalibrationObject;
+
+The AnalogLeftChannel member contains value loaded into V5B digitally controlled
+potentiometer.
+The AnalogRightChannel contains value loaded into V5C digitally controlled pot.
+
+They represent default audio levels for both channels.
+
+Below is a fragment od AudioInit() function showing how members of Audio calibration
+members are used.
+
+WriteAnlAudioDACLevel(Calibration.AudioCalibration.AnalogLeftChannel,
+                      Calibration.AudioCalibration.AnalogRightChannel);
+
+This function writes calibration values into a port in PLD (V8), from where they are
+transmitted to the V5A AD8402 DAC (digitally controlled pot) via a local IIC bus, thus
+altering gain of audio output buffers V1A and V1B
+
+
+2.3 Black Burst calibration structures.
+
+The structure is presented below (1 of 3).
+
+typedef struct 
+  {
+	UL Date;        :FACT:BBx:DATE
+
+	UL PhaseG;      :FACT:BBx:PHAS
+	UI ScHPhaseG;   :FACT:BBx:SCHP
+
+	UL PhaseM;      :FACT:BBx:PHAS
+	UI ScHPhaseM;   :FACT:BBx:SCHP
+
+	UC DACGainG;    :FACT:BBx:DACG
+	UC DACOffsetG;  :FACT:BBx:DACG
+	UC DACLevelG;   :FACT:BBx:DACG
+
+	UC DACGainM;    :FACT:BBx:DACM
+	UC DACOffsetM;  :FACT:BBx:DACM
+	UC DACLevelM;   :FACT:BBx:DACM
+  } BBCalibrationObject;
+
+There are two separate sets of parameters (for PAL and NTSC) which which control
+gain, offset and level of BB output stage.  These parameters are loaded into 
+DACs V15B and V15E (in case of BB1) on startup and on BB system change.
+Again, these parameters are calculated during post production test and calibration.
+
+PhaseG, ScHPhaseG, and their M equivalents are internal parameters for BB,
+calculated during test and calibration.
+
+Date is the date of (BB) calibration.
+
+Below is a part of BBInit() function showing how members of Black Burst
+calibration members are transmitted to Black Burst Controller.
+
+
+sio0SndCommand(20, BB_V24_address, "%cY%lu;", cmd, Calibration.BBCalibration[i].PhaseM);
+sio0SndCommand(20, BB_V24_address, "%cU%u;",  cmd, Calibration.BBCalibration[i].ScHPhaseM);
+
+2.4 TSG calibration structure.
+
+typedef struct
+  {
+  UL Date;            :FACT:TSG:DATE
+  UL PhaseG;          :FACT:TSG:PHASE
+  UC ScHPhaseG;       :FACT:TSG:SCHP
+  UL PhaseM;          :FACT:TSG:PHASE
+  UC ScHPhaseM;       :FACT:TSG:SCHP
+  UC GainG;           :FACT:TSG:AGA
+  UC ChromaGainG;     :FACT:TSG:CGA
+  UC GainM;           :FACT:TSG:AGA
+  UC ChromaGainM;     :FACT:TSG:CGA
+  } CBCalibrationObject;
+
+Apart from Date, the members are internal parameters for TSG,
+calculated during test and calibration.
+
+Gain and ChromaGain members refer to signal at analog composite video output.
+
+ChromaGainG and ChromaGainM are used each time system is changed in TSG, using function
+WriteCBChromaGain():
+
+    WriteCBChromaGain(Calibration.CBCalibration.ChromaGainG);
+    WriteCBChromaGain(Calibration.CBCalibration.ChromaGainG);
+
+This function writes calibration vaues to V113, from where a set of DG611 Analog
+Switches is controlled, altering chroma input signal to amplifier V115A. 
+
+GainG and GainM are used each time system is changed in TSG, using function
+WriteCBGain()
+
+    WriteCBGain(Calibration.CBCalibration.GainG);
+    WriteCBGain(Calibration.CBCalibration.GainM);
+
+This function writes calibration values into a port in PLD (V8), from where they are
+transmitted to the V116A AD8402 DAC (digitally controlled pot) via a local IIC bus, thus
+altering voltage at pin 44 of V117(Multimedia Chip) (Gain Adjust by V116B).
+
+PhaseG, ScHPhaseG (and thein M equivalents) are added as offsets to 
+Delay, ScHPase variables when setting TSG Delay and ScH.
+
+3. Settings structures.
+
+The Settings structure is defined below (file: instru.h).
+
+typedef struct
+  {
+	int						ActivePreset;
+	GenlockObject GenlockSetup;
+	BBObject 			BBSetup[NoOfBBOutputs];
+	CBObject 			CBSetup;
+	int 					AudioOutput;
+	AudioObject 	AudioSetup[NoOfAudioOutputs];
+  } SettingsObject;
+
+Its purpose is to hold all current settings of all generators and store them in 
+NOVRAM, so that they can be retrieved and set upon startup.  In this way the 
+PT5202 will start with the same parametrs as they were before switching the unit
+off.
+
+There are two global variables, related to settings:
+
+    SettingsObject Settings;
+    NvPointer      SettingsPtr;
+
+Settings is a global structure containing all settings parameters,
+loaded from NV memory at instrument startup.
+
+SettingsPtr is a global pointer to NV memory, used to retrieve and store
+settings structure from/into NV memory.
+
+Member ActivePreset is used to which preset (if any) is currently active.
+See chapter on presets.
+
+AudioOutput indicates what kind of audio (digital or analog) is currently
+active.  Digital and analog audio outputs use the same sockets.
+
+3.1 Genlock settings structure
+
+The structure is presented below.
+
+typedef struct
+  {
+	UC System;
+	UL Delay;
+  } GenlockObject;
+
+System is the TV video system the SPG is set to lock to.  It may be PAL or NTSC.
+Additionaly, the system can be Internal, which means all outputs are locked
+to an internal oscilator, or 10MHz, which means a 10MHz reference signal is
+fed to genlock input and all output signal will be locked to it.
+
+If the system is PAL or NTSC, the Delay represents time offset between genlock
+signal and all outputs.  The Delay is measured in samples (0.15 nS).
+
+Setting Genlock Delay (function SetGenlockDelay() in genlock.c) involves setting
+the same genlock offset for all Black Burst Generators and TSG:
+
+	sio0SndCommand( 20, BB_V24_address, "HO%lu;", delay);
+	sio0SndCommand( 20, BB_V24_address, "JO%lu;", delay);
+	sio0SndCommand( 20, BB_V24_address, "KO%lu;", delay);
+
+	SetCBDelay( CBSetup.Delay);	// The delay routine also takes the genlock
+
+
+Settng the system involves, apart from changing the System member of Genlock
+settings structure, also sending appropriate system command to SPG,like this
+(function SetGenlockSystem() in genlock.c):
+
+	sio0SndCommand( 12, SPG_V24_address, "%s", "GM10"); // sets "NTSC burst"
+
+see: GENLOCK V24 COMMANDS, in "PT5201 Compact Varitime SPG Software".
+
+Note that in addition to:
+
+    Settings.GenlockSetup;
+
+we also have a global GenlockObject:
+
+    GenlockObject GenlockSetup;
+
+(defined in genlock.c), which is used when manipulating presets and menus.
+
+
+3.2 Black Burst settings structure
+
+The structure is presented below:
+
+typedef struct
+  {
+  UC  System;
+  UL  Delay;
+  int ScHPhase;
+  } BBObject;
+
+Here, the System can be:
+PAL, PAL with ID, NTSC, NTSC without piedestal (Japanese).
+
+Setting the system, apart from changing system member in settings
+structure, involves sending appropriate command to Black Burst generator:
+(function SetBBSystem() in bb.c):
+
+  sio0SndCommand(20, BB_V24_address, "%c%c%lu;", BBOutputCmd[output],
+                 BBSystemCmd[system], BBSetup[output].Delay);
+
+Note that setting a system sets also delay for that system.
+
+see: BLACK BURST GENERATOR V24 COMMANDS, in "PT5201 Compact Varitime SPG
+Software".
+
+Again, we have 3 global structures, defined in bb.c:
+
+    BBObject BBSetup[3];
+
+3.4. TSG (Color Bar) settings structure
+
+The structure is presented below.  The Pattern is the pattern number to 
+be displayed, as defined in cbar.h.  There is different set of patterns
+for PAL and NTSC.
+
+There may be embedded audio signal on SDI output.
+ScH phase may be changed on Composite (analog) output.
+
+Embedded audio level for NTSC is -20 dB and -18 dB for PAL.  Data for 
+embedded audio is synthesized by:
+
+5202SND1 PAS        11,313  02-03-03  1:41p 5202snd2.pas
+
+On SIMPTE and EBU clor bars a text may be added.  The text may be moving
+or stationary.
+
+typedef struct
+  {
+  UC     System;
+  UI     Pattern;
+  UL     Delay;
+  int    ScHPhase;
+  UC     EmbAudioSignal;
+  CBText TextData;
+  } CBObject;
+
+typedef struct
+  {
+  char Text[21];
+  char TextEnable;
+  char TextMovement;
+  } CBText;
+
+Again, in addition to:
+
+    Settings.CBSetup;
+
+we have (global variable);
+
+    CBObject CBSetup;
+
+The TSG is implemented in master software by means of line interrupt
+(CBLineInterrupt()), which takes care of synthesizing all patterns
+text and embedded audio.
+
+
+3.4 Audio Settings structure
+
+There are two audio generators in PT5202: digital and analog.  Only one
+of them can be active at the time.  They both have the same settings
+structure, presentd below:
+
+typedef struct
+  {
+	int   System;
+	int   Signal;
+	int   Level;
+	float Timing;
+	int   Frequency;
+ 	int   Click;
+  } AudioObject;
+
+In case of analog audio generator, members which are irrelevant (System, 
+Timing) are not used.
+
+Data necessary to synthesize Analog and Digital audio reside in PROMs
+V7 and V10.  This data is synthesized by 
+
+MAKETO~1 C          44,959  01-02-03  9:55a Maketone5202.c
+
+Both generators are implemented in PLD V8A and controlled by software via
+
+volatile int AudioModePort    _at(0x70000); 		// Port defined in PLD
+volatile int AudioLevelPort   _at(0x70002); 		// Port defined in PLD
+volatile int AudioTimingPort  _at(0x70004);     // Port defined in PLD
+volatile int AudioControlPort _at(0x70006);  		// Port defined in PLD
+
+Analog sound data is converted by CS4340 V4 DAC, digital sound data is 
+formated in PLD and fed to V55A.
+
+Again, in addition to:
+
+    Settings.AudioSetup[2];
+
+we have (global variable);
+
+    AudioObject AudioSetup[2];
+
+
+4.0 Interrupts
+
+There are 3 interrupts in master software.
+
+4.1 External 0 interrupt
+
+External interrupt 0 is used as line interrupt by TSG.
+Timer 0 works as a counter and is enabled only by TR0 control bit.
+It works in Mode 1 as 16 bit non-autoreload counter, i.e. it counts 
+pulses on T0 input, which is fed by HINT (horizontal interrupt signal)
+coming from SPG FPGA. The HINT period is ~ 64 uS for both PAL and
+NTSC.  The HINT signal is also fed to INT0, causing line interrupt.
+The VINT (vertical interrupt) signal, coming also from SPG, is fed to 
+INT2.  Interrupt 1 is not enabled, instead inside horizontal interrupt
+routine a check is made for interrupt 1 flag (IE1).
+
+Timer 0 counts HINT pulses.  On each vertical interrupt, it is reloaded
+with LineOffset variable (in line interrupt routine).  It counts up and 
+on reaching 0xffff it's TF0 flag is set.  This flag is tested in line
+interrupt routine (delayed field interrupt).
+
+External interrupt 0 is serviced by (module cbar.c):
+
+_interrupt(32) _using(0x9F00) void CBLineInterrupt(void)
+
+It has priority 15 (highiest) and uses register bank 1.
+
+
+4.2 UART0 receive interrupt
+
+UART0 receive interrupt is used for receiving characters on internal serial 
+V24 bus, used for communication with SPG and Black Burst controllers.
+UART0 works in Mode 3 (57600,n,9,1), for multiprocessor communication with
+automatic address recognition.  Timer 2 used for BR generation.
+
+UART0 receive interrupt is serviced by (module rs233.c):
+
+_interrupt(40) _using(0xBD00) void uart0_rx_nterrupt(void)
+
+It has priority 13 and uses register bank 3.
+
+4.3 UART1 receive interrupt
+
+UART1 receive interrupt is used for receiving characters on external RS232
+link, used for external communication according to SCPI 1995.0.
+UART1 works in Mode 1 (9800,n,8,1).  Timer 1 used for BR generation.
+
+There are not interupts for both UART0 and UART1 for sending. Functions 
+uart0_putchar() and uart1_putchar() block until character has left the 
+transmitter.
+
+UART1 is serviced by (module sio0drv.c):
+
+_interrupt(42) _using(0xAE00) void uart1_rx_nterrupt(void)
+
+It has priority 14 and uses register bank 2.
+
+***
+
+
+
+
+
+
+
+

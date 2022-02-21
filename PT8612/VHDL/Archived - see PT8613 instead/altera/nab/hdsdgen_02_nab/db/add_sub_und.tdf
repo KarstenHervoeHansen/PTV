@@ -1,0 +1,48 @@
+--lpm_add_sub CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=48 CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEVICE_FAMILY="Cyclone" LPM_WIDTH=2 dataa datab result
+--VERSION_BEGIN 4.1 cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_lpm_add_sub 2004:06:23:12:24:04:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_stratix 2004:04:28:15:20:14:SJ cbx_stratixii 2004:05:18:11:28:28:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION carry_sum (cin, sin)
+RETURNS ( cout, sout);
+
+--synthesis_resources = lut 2 
+SUBDESIGN add_sub_und
+( 
+	dataa[1..0]	:	input;
+	datab[1..0]	:	input;
+	result[1..0]	:	output;
+) 
+VARIABLE 
+	add_sub_cella[1..0] : carry_sum;
+	main_cin_wire	: WIRE;
+
+BEGIN 
+	add_sub_cella[0].cin = ((datab[0..0] & main_cin_wire) # (dataa[0..0] & (datab[0..0] $ main_cin_wire)));
+	add_sub_cella[1].cin = ((datab[1..1] & add_sub_cella[0].cout) # (dataa[1..1] & (datab[1..1] $ add_sub_cella[0].cout)));
+	add_sub_cella[0].sin = (dataa[0..0] $ (datab[0..0] $ main_cin_wire));
+	add_sub_cella[1].sin = (dataa[1..1] $ (datab[1..1] $ add_sub_cella[0].cout));
+	main_cin_wire = B"0";
+	result[] = add_sub_cella[].sout;
+END;
+--VALID FILE

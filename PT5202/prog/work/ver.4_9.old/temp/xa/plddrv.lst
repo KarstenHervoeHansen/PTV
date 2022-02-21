@@ -1,0 +1,494 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+C:\LT428\work\ver.4_9\temp\xa\plddrv.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\LT428\rtxc\xa\include -I. -Ml
+                          3 ;          -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    PLDDRV
+                         10 ; plddrv.c    1 /****************************************************************************/
+                         11 ; plddrv.c    2 /* MODULE:                                                                  */
+                         12 ; plddrv.c    3 /*  pldrv.c - PLD load driver                                               */
+                         13 ; plddrv.c    4 /****************************************************************************/
+                         14 ; plddrv.c    5 /* FUNCTIONS:                                                               */
+                         15 ; plddrv.c    6 /*                                                                          */
+                         16 ; plddrv.c    7 /*  int pld_init( void);                                                         
+                                    */
+                         17 ; plddrv.c    8 /*  int pld_version( void);                                                      
+                                    */
+                         18 ; plddrv.c    9 /*                                                                          */
+                         19 ; plddrv.c   10 /* TASKS:                                                                   */
+                         20 ; plddrv.c   11 /*                                                                          */
+                         21 ; plddrv.c   12 /* NOTES:                                                                   */
+                         22 ; plddrv.c   13 /*                                                                          */
+                         23 ; plddrv.c   14 /****************************************************************************/
+                         24 ; plddrv.c   15 /*
+                         25 ; plddrv.c   16  *   PTV software for PT5201    
+                         26 ; plddrv.c   17  *   Copyright (c) 
+                         27 ; plddrv.c   18  *   ProTeleVision Technologies A/S.
+                         28 ; plddrv.c   19  *   ALL RIGHTS RESERVED
+                         29 ; plddrv.c   20 */
+                         30 ; plddrv.c   21 /****************************************************************************/
+                         31 ; plddrv.c   22 
+                         32 ; plddrv.c   23 #include "reg8051.h"
+                         35 ; plddrv.c   24 #include "define.h"
+                         38 ; plddrv.c   25 #include "config.h"
+                         41 ; plddrv.c   26 #include "plddrv.h"
+                         44 ; plddrv.c   27 #include "unitprg.h"
+                         51 ; plddrv.c   28                                                                                  
+                                            
+                         52 ; plddrv.c   29 #define nCONFIGMask     0x01
+                         53 ; plddrv.c   30 #define DATAMask                                0x02
+                         54 ; plddrv.c   31 #define DCLKMask                                0x04
+                         55 ; plddrv.c   32 
+                         56 ; plddrv.c   33 #define nSTATUSMask                     0x02
+                         57 ; plddrv.c   34 #define CONF_DONEMask           0x04
+                         58 ; plddrv.c   35 
+                         59 ; plddrv.c   36 #define Low                     0
+                         60 ; plddrv.c   37 #define High            1
+                         61 ; plddrv.c   38 
+                         62 ; plddrv.c   39 #define Bit0    0x01
+                         63 ; plddrv.c   40 
+                         64 ; plddrv.c   41 code UC DataArray[SizeOfPLDCode] _at( StartOfPLDCode);
+                         65 ; plddrv.c   42 
+                         66 ; plddrv.c   43 volatile UI SPGPLDPort _at( 0x6A01C);                           // Port defined i
+                            n VIDEO PLD
+                         67 ; plddrv.c   44 volatile UI PLDHWVersionPort _at(0x7000E);      // Port defined in AUDIO PLD
+                         68 ; plddrv.c   45 volatile UI PLDTCXOStatusPort _at(0x7000A);     // Port defined in AUDIO PLD
+                         69 ; plddrv.c   46 
+                         70 ; plddrv.c   47 
+                         71 ; plddrv.c   48 static UC SPGPLDBuf;
+                         72 ; plddrv.c   49 
+                         73 ; plddrv.c   50 /**************************************************************************/
+                         74 ; plddrv.c   51 /* TxByte                                                                        
+                                                                                                                             
+                                                                               PLDDRV.C     */
+                         75 ; plddrv.c   52 /*                                                                               
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                             
+                                                                                                                             
+                                            */
+                         76 ; plddrv.c   53 /* Author:       Kim Engedahl, DEV, 000208                                       
+                                                                                                                             
+                                    */
+                         77 ; plddrv.c   54 /* Revised:      000321, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                         78 ; plddrv.c   55 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                         79 ; plddrv.c   56 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                         80 ; plddrv.c   57 /* Remarks:      CLK period max.10MHz                                            
+                                                                                                                             
+                                                    */
+                         81 ; plddrv.c   58 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                         82 ; plddrv.c   59 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                         83 ; plddrv.c   60 /**************************************************************************/
+                         84 ; plddrv.c   61 void TxByte( UC X)
+                         85 ; plddrv.c   62 {
+000000                   86 PLDDRV_PR       SEGMENT HCODE
+000000                   87         RSEG    PLDDRV_PR
+                         88         ALIGN   1
+                         90         PUBLIC  _TxByte
+000000                   91 _TxByte:
+                         99 ; plddrv.c   63   UI locvar;
+                        100 ; plddrv.c   64 
+                        101 ; plddrv.c   65   for ( locvar = 8; locvar != 0; locvar--)
+000000 99180008         103         MOV.W   R1,#08H
+000004                  105 _7:
+                        106 ; plddrv.c   66   {
+                        107 ; plddrv.c   67     SPGPLDBuf &= ~DCLKMask;                     // Clock line low
+000004 964842rr         109         MOV.B   ES,#SEG( _SPGPLDBuf )
+000008 9928rrrr         110         MOV.W   R2,#SOF( _SPGPLDBuf )
+00000C 8212             111         MOV.B   R0H,[R2]
+00000E 9115FB           112         AND.B   R0H,#0FBH
+000011 964842rr         113         MOV.B   ES,#SEG( _SPGPLDBuf )
+000015 9928rrrr         114         MOV.W   R2,#SOF( _SPGPLDBuf )
+000019 821A             115         MOV.B   [R2],R0H
+                        116 ; plddrv.c   68     SPGPLDPort = SPGPLDBuf;
+00001B 8141             118         MOV.B   R2L,R0H
+00001D B150             119         MOVS.B  R2H,#00H
+00001F 96484206         120         MOV.B   ES,#SEG( _SPGPLDPort )
+000023 9938A01C         121         MOV.W   R3,#SOF( _SPGPLDPort )
+000027 8A2B             122         MOV.W   [R3],R2
+                        123 ; plddrv.c   69 
+                        124 ; plddrv.c   70     if (( X & Bit0) == 0)                               // Output databit
+000029 8140             126         MOV.B   R2L,R0L
+00002B 914501           127         AND.B   R2L,#01H
+00002E F208             128         BNE     _8
+                        129 ; plddrv.c   71       SPGPLDBuf &= ~DATAMask;
+000030 9115FD           131         AND.B   R0H,#0FDH
+000033 964842rr         132         MOV.B   ES,#SEG( _SPGPLDBuf )
+000037 9928rrrr         133         MOV.W   R2,#SOF( _SPGPLDBuf )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+00003B 821A             134         MOV.B   [R2],R0H
+00003D FE0D             135         BR      _9
+00003D FE0D00           135         BR      _9
+000040                  136 _8:
+                        137 ; plddrv.c   72     else
+                        138 ; plddrv.c   73       SPGPLDBuf |= DATAMask;
+000040 964842rr         140         MOV.B   ES,#SEG( _SPGPLDBuf )
+000044 9928rrrr         141         MOV.W   R2,#SOF( _SPGPLDBuf )
+000048 8212             142         MOV.B   R0H,[R2]
+00004A 911602           143         OR.B    R0H,#02H
+00004D 964842rr         144         MOV.B   ES,#SEG( _SPGPLDBuf )
+000051 9928rrrr         145         MOV.W   R2,#SOF( _SPGPLDBuf )
+000055 821A             146         MOV.B   [R2],R0H
+000055 821A00           146         MOV.B   [R2],R0H
+000058                  147 _9:
+                        148 ; plddrv.c   74 
+                        149 ; plddrv.c   75     SPGPLDPort = SPGPLDBuf;
+000058 964842rr         151         MOV.B   ES,#SEG( _SPGPLDBuf )
+00005C 9928rrrr         152         MOV.W   R2,#SOF( _SPGPLDBuf )
+000060 8212             153         MOV.B   R0H,[R2]
+000062 8141             154         MOV.B   R2L,R0H
+000064 B150             155         MOVS.B  R2H,#00H
+000066 96484206         156         MOV.B   ES,#SEG( _SPGPLDPort )
+00006A 9938A01C         157         MOV.W   R3,#SOF( _SPGPLDPort )
+00006E 8A2B             158         MOV.W   [R3],R2
+                        159 ; plddrv.c   76 
+                        160 ; plddrv.c   77     X /= 2;                                     // Get next databit in position 
+000070 D001             162         LSR.B   R0L,#01H
+                        163 ; plddrv.c   78                                                                                  
+                                                    
+                        164 ; plddrv.c   79     SPGPLDBuf |= DCLKMask;              // Clock line high
+000072 911604           166         OR.B    R0H,#04H
+000075 964842rr         167         MOV.B   ES,#SEG( _SPGPLDBuf )
+000079 9928rrrr         168         MOV.W   R2,#SOF( _SPGPLDBuf )
+00007D 821A             169         MOV.B   [R2],R0H
+                        170 ; plddrv.c   80     SPGPLDPort = SPGPLDBuf;
+00007F 8141             172         MOV.B   R2L,R0H
+000081 B150             173         MOVS.B  R2H,#00H
+000083 96484206         174         MOV.B   ES,#SEG( _SPGPLDPort )
+000087 9938A01C         175         MOV.W   R3,#SOF( _SPGPLDPort )
+00008B 8A2B             176         MOV.W   [R3],R2
+00008D A91F             178         ADDS.W  R1,#0FH
+00008F F2BA             181         BNE     _7
+                        182 ; plddrv.c   81   }
+                        183 ; plddrv.c   82 }
+000091 D680             185         RET
+                        188 ; plddrv.c   83 
+                        189 ; plddrv.c   84 /**************************************************************************/
+                        190 ; plddrv.c   85 /* pld_init                                                                      
+                                                                                                                             
+                                                                       PLDDRV.C     */
+                        191 ; plddrv.c   86 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        192 ; plddrv.c   87 /* Author:       Kim Engedahl, DEV, 000208                                       
+                                                                                                                             
+                                    */
+                        193 ; plddrv.c   88 /* Revised:      000401, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        194 ; plddrv.c   89 /*                                                                               
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                             
+                                            */
+                        195 ; plddrv.c   90 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        196 ; plddrv.c   91 /* Remarks:      Set Config LOW                                                  
+                                                                                                            */
+                        197 ; plddrv.c   92 /*           Wait min. 2us                                                       
+                                                                                                                    */
+                        198 ; plddrv.c   93 /*           Set Config HIGH                                                     
+                                                                                                            */
+                        199 ; plddrv.c   94 /*           Wait for nSTATUS HIGH                                               
+                                                                                                                    */
+                        200 ; plddrv.c   95 /*           Ensure that CONF_DONE is LOW                                        
+                                                                                                                    */
+                        201 ; plddrv.c   96 /*                                       The SPG should be reset while downloadin
+                            g to prevent the SPG    */      
+                        202 ; plddrv.c   97 /*                                              to begin executing as it uses the
+                             PLD for ports,latches etc.*/
+                        203 ; plddrv.c   98 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        204 ; plddrv.c   99 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        205 ; plddrv.c  100 /**************************************************************************/
+                        206 ; plddrv.c  101 int pld_init( void)
+                        207 ; plddrv.c  102 {
+000093 00               208         ALIGN   1
+                        210         PUBLIC  _pld_init
+000094                  211 _pld_init:
+000094 0F70             215         PUSH.W  R4, R5, R6
+                        227 ; plddrv.c  103   int i;
+                        228 ; plddrv.c  104         bool result = false;
+000096 B960             230         MOV.W   R6,#00H
+                        232 ; plddrv.c  105                                                                                  
+                                                                                    
+                        233 ; plddrv.c  106         BBSPGReset( true, false, false);                // Reset the SPG ucontrol
+                            ler
+000098 B910             235         MOV.W   R1,#00H
+00009A B920             236         MOV.W   R2,#00H
+00009C 9908FFFF         237         MOV.W   R0,#0FFFFH
+                        238         CALL    _BBSPGReset
+0000A0 C4rrrrrr        +238 ;       FCALL   _BBSPGReset
+                        239 ; plddrv.c  107 
+                        240 ; plddrv.c  108   SPGPLDBuf &= ~DCLKMask;
+0000A4 964842rr         242         MOV.B   ES,#SEG( _SPGPLDBuf )
+0000A8 9908rrrr         243         MOV.W   R0,#SOF( _SPGPLDBuf )
+0000AC 8220             244         MOV.B   R1L,[R0]
+0000AE 9125FB           245         AND.B   R1L,#0FBH
+0000B1 964842rr         246         MOV.B   ES,#SEG( _SPGPLDBuf )
+0000B5 9908rrrr         247         MOV.W   R0,#SOF( _SPGPLDBuf )
+0000B9 8228             248         MOV.B   [R0],R1L
+                        249 ; plddrv.c  109   SPGPLDBuf &= ~nCONFIGMask;
+0000BB 9125FE           251         AND.B   R1L,#0FEH
+0000BE 964842rr         252         MOV.B   ES,#SEG( _SPGPLDBuf )
+0000C2 9908rrrr         253         MOV.W   R0,#SOF( _SPGPLDBuf )
+0000C6 8228             254         MOV.B   [R0],R1L
+                        255 ; plddrv.c  110   SPGPLDPort = SPGPLDBuf;
+0000C8 8102             257         MOV.B   R0L,R1L
+0000CA B110             258         MOVS.B  R0H,#00H
+0000CC 96484206         259         MOV.B   ES,#SEG( _SPGPLDPort )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000D0 9928A01C         260         MOV.W   R2,#SOF( _SPGPLDPort )
+0000D4 8A0A             261         MOV.W   [R2],R0
+                        262 ; plddrv.c  111   
+                        263 ; plddrv.c  112   for ( i = 0; i < 4000; i++)                                   // App. > 2us del
+                            ay.  2000 ORG :JK change 
+0000D6 B900             265         MOV.W   R0,#00H
+0000D8                  267 _10:
+0000D8 A901             268         ADDS.W  R0,#01H
+0000DA 99040FA0         271         CMP.W   R0,#0FA0H
+0000DE FBFC             272         BLT     _10
+                        273 ; plddrv.c  113          ;
+                        274 ; plddrv.c  114 
+                        275 ; plddrv.c  115   SPGPLDBuf |= nCONFIGMask;
+0000E0 912601           277         OR.B    R1L,#01H
+0000E3 964842rr         278         MOV.B   ES,#SEG( _SPGPLDBuf )
+0000E7 9908rrrr         279         MOV.W   R0,#SOF( _SPGPLDBuf )
+0000EB 8228             280         MOV.B   [R0],R1L
+                        281 ; plddrv.c  116   SPGPLDPort = SPGPLDBuf;
+0000ED 964842rr         283         MOV.B   ES,#SEG( _SPGPLDBuf )
+0000F1 9908rrrr         284         MOV.W   R0,#SOF( _SPGPLDBuf )
+0000F5 8200             285         MOV.B   R0L,[R0]
+0000F7 B110             287         MOVS.B  R0H,#00H
+0000F9 96484206         288         MOV.B   ES,#SEG( _SPGPLDPort )
+0000FD 9918A01C         289         MOV.W   R1,#SOF( _SPGPLDPort )
+000101 8A09             290         MOV.W   [R1],R0
+                        291 ; plddrv.c  117 
+                        292 ; plddrv.c  118   while ( !( SPGPLDPort & nSTATUSMask))
+000103 96484206         294         MOV.B   ES,#SEG( _SPGPLDPort )
+000107 9908A01C         295         MOV.W   R0,#SOF( _SPGPLDPort )
+00010B 8A00             296         MOV.W   R0,[R0]
+00010D 99050002         297         AND.W   R0,#02H
+000111 F209             298         BNE     _12
+000111 F20900           298         BNE     _12
+000114                  299 _11:
+000114 96484206         300         MOV.B   ES,#SEG( _SPGPLDPort )
+000118 9908A01C         301         MOV.W   R0,#SOF( _SPGPLDPort )
+00011C 8A00             302         MOV.W   R0,[R0]
+00011E 99050002         303         AND.W   R0,#02H
+000122 F3F8             304         BEQ     _11
+                        305 ; plddrv.c  119          ;
+000124                  307 _12:
+                        308 ; plddrv.c  120 
+                        309 ; plddrv.c  121   for ( i = 0; i < 32500; i++)
+000124 99580004         311         MOV.W   R5,#SEG( _DataArray )
+000128 99480000         312         MOV.W   R4,#SOF( _DataArray )
+00012C                  314 _13:
+                        315 ; plddrv.c  122     TxByte( DataArray[i]);
+00012C 8915             317         MOV.W   R1,R5
+00012E 8904             318         MOV.W   R0,R4
+000130 862C43           319         MOV.B   CS,R1L
+000133 8020             320         MOVC.B  R1L,[R0+]
+000135 8102             321         MOV.B   R0L,R1L
+000137 C5FF63           322         CALL    _TxByte
+00013A 99400001         324         ADD.W   R4,#01H
+00013E 99510000         325         ADDC.W  R5,#00H
+000142 99540004         328         CMP.W   R5,#SEG( _DataArray+32500 )
+000146 F202             329         BNE     _19
+000148 99447EF4         330         CMP.W   R4,#SOF( _DataArray+32500 )
+000148 99447EF4         330         CMP.W   R4,#SOF( _DataArray+32500 )
+00014C                  331 _19:
+00014C F1EF             332         BCS     _13
+                        333 ; plddrv.c  123 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        334 ; plddrv.c  124   if ( SPGPLDPort & CONF_DONEMask)
+00014E 96484206         336         MOV.B   ES,#SEG( _SPGPLDPort )
+000152 9908A01C         337         MOV.W   R0,#SOF( _SPGPLDPort )
+000156 8A00             338         MOV.W   R0,[R0]
+000158 99050004         339         AND.W   R0,#04H
+00015C F302             340         BEQ     _14
+                        341 ; plddrv.c  125                 result = true;
+00015E 9968FFFF         343         MOV.W   R6,#0FFFFH
+000162                  346 _14:
+                        347 ; plddrv.c  126 
+                        348 ; plddrv.c  127         BBSPGReset( false, false, false);               // Release the reset for 
+                            the SPG ucontroller
+000162 B900             350         MOV.W   R0,#00H
+000164 B910             351         MOV.W   R1,#00H
+000166 B920             352         MOV.W   R2,#00H
+                        353         CALL    _BBSPGReset
+000168 C4rrrrrr        +353 ;       FCALL   _BBSPGReset
+                        354 ; plddrv.c  128 
+                        355 ; plddrv.c  129         if ( result)
+00016C 6966             357         OR.W    R6,R6
+00016E F303             358         BEQ     _15
+                        359 ; plddrv.c  130     return( OK);
+000170 9908FFFF         361         MOV.W   R0,#0FFFFH
+000174 FE01             362         BR      _16
+000174 FE01             362         BR      _16
+000176                  363 _15:
+                        364 ; plddrv.c  131 
+                        365 ; plddrv.c  132   return( FAIL);
+000176 B900             367         MOV.W   R0,#00H
+                        368 ; plddrv.c  133 }
+000178                  370 _16:
+000178 2F70             371         POP.W   R4, R5, R6
+00017A D680             373         RET
+                        377 ; plddrv.c  134 
+                        378 ; plddrv.c  135 /**************************************************************************/
+                        379 ; plddrv.c  136 /* pld_version                                                                   
+                                                                                                                             
+                                                       PLDDRV.C     */
+                        380 ; plddrv.c  137 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        381 ; plddrv.c  138 /* Author:       Kim Engedahl, DEV, 000504                                       
+                                                                                                                             
+                                    */
+                        382 ; plddrv.c  139 /* Revised:      000504, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        383 ; plddrv.c  140 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        384 ; plddrv.c  141 /* Function: Returns the HW version of the SPG/AUDIO PLD                         
+                                                                            */
+                        385 ; plddrv.c  142 /* Remarks:      Requires the SPG/AUDIO PLD to be loaded                         
+                                                                                            */
+                        386 ; plddrv.c  143 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        387 ; plddrv.c  144 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        388 ; plddrv.c  145 /**************************************************************************/
+                        389 ; plddrv.c  146 int pld_version( void)
+                        390 ; plddrv.c  147 {
+                        391         ALIGN   1
+                        393         PUBLIC  _pld_version
+00017C                  394 _pld_version:
+                        398 ; plddrv.c  148         return( PLDHWVersionPort);
+00017C 96484207         400         MOV.B   ES,#SEG( _PLDHWVersionPort )
+000180 9908000E         401         MOV.W   R0,#SOF( _PLDHWVersionPort )
+000184 8A00             402         MOV.W   R0,[R0]
+                        403 ; plddrv.c  149 }
+000186 D680             405         RET
+                        407 ; plddrv.c  150 
+                        408 ; plddrv.c  151 /**************************************************************************/
+                        409 ; plddrv.c  152 /* tcxo_status                                                                   
+                                                                                                                             
+                                                       PLDDRV.C     */
+                        410 ; plddrv.c  153 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        411 ; plddrv.c  154 /* Author:       Kim Engedahl, DEV, 000504                                       
+                                                                                                                             
+                                    */
+                        412 ; plddrv.c  155 /* Revised:      000628, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        413 ; plddrv.c  156 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        414 ; plddrv.c  157 /* Function: Returns the status of the TCXO                                      
+                                                                                                                    */
+                        415 ; plddrv.c  158 /* Remarks:      Requires the SPG/AUDIO PLD to be loaded                         
+                                                                                            */
+                        416 ; plddrv.c  159 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        417 ; plddrv.c  160 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        418 ; plddrv.c  161 /**************************************************************************/
+                        419 ; plddrv.c  162 int tcxo_status( void)
+                        420 ; plddrv.c  163 {
+                        421         ALIGN   1
+                        423         PUBLIC  _tcxo_status
+000188                  424 _tcxo_status:
+                        428 ; plddrv.c  164         return( PLDTCXOStatusPort & 0xFFFC);
+000188 96484207         430         MOV.B   ES,#SEG( _PLDTCXOStatusPort )
+00018C 9908000A         431         MOV.W   R0,#SOF( _PLDTCXOStatusPort )
+000190 8A00             432         MOV.W   R0,[R0]
+000192 9905FFFC         433         AND.W   R0,#0FFFCH
+                        434 ; plddrv.c  165 }
+000196 D680             436         RET
+07000A                  442         HSEG AT 07000AH
+                        443         PUBLIC  _PLDTCXOStatusPort
+                        444         ALIGN   1
+07000A                  445 _PLDTCXOStatusPort:     DS      2
+   |  RESERVED             
+07000B
+000000                  447 PLDDRV_CLR_FA   SEGMENT HDATA INSEGMENT CLEAR
+000000                  448         RSEG    PLDDRV_CLR_FA
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+000000 RESERVED         449 _SPGPLDBuf:     DS      1
+000000
+040000                  453         HCSEG AT 040000H
+040000                  453         HCSEG AT 040000H
+                        454         PUBLIC  _DataArray
+040000                  455 _DataArray:     DS      40960
+   |  RESERVED             
+049FFF
+07000E                  458         HSEG AT 07000EH
+                        459         PUBLIC  _PLDHWVersionPort
+                        460         ALIGN   1
+07000E                  461 _PLDHWVersionPort:      DS      2
+   |  RESERVED             
+07000F
+06A01C                  464         HSEG AT 06A01CH
+                        465         PUBLIC  _SPGPLDPort
+                        466         ALIGN   1
+06A01C                  467 _SPGPLDPort:    DS      2
+   |  RESERVED             
+06A01D
+                        470         EXTRN   HCODE(_BBSPGReset)
+                        471         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        472         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        473         CALLS   'pld_init', 'BBSPGReset'
+                        474         CALLS   'pld_init', 'TxByte'
+                        475         CALLS   'pld_init', 'BBSPGReset'

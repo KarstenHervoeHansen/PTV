@@ -1,0 +1,208 @@
+C51 COMPILER V7.10   I2C_SLAVE                                                             06/15/2012 10:12:05 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE I2C_SLAVE
+OBJECT MODULE PLACED IN i2c_slave.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe i2c_slave.c DB OE
+
+line level    source
+
+   1          #include <c8051f320.h>
+   2          #include <string.h>
+   3          #include "i2c_slave.h"
+   4          #include "pt5300_handler.h"
+   5          #include "LTC_handler.h"
+   6          #include "globals.h"
+   7          
+   8          #define WRITE 0x00                      // SMBus WRITE command
+   9          #define READ 0x01                       // SMBus READ command
+  10          #define SLAVE_ADDR 0xA4         // Device addresses (7 bits) //0xA4 = GPS
+  11          #define SMB_SRADD 0x20          // (SR) slave address received
+  12                                                                  // (also could be a lost
+  13                                                                  // arbitration)
+  14          #define SMB_SRSTO 0x10          // (SR) STOP detected while SR or ST,
+  15                                                                  // or lost arbitration
+  16          #define SMB_SRDB 0x00           // (SR) data byte received, or
+  17                                                                  // lost arbitration
+  18          #define SMB_STDB 0x40           // (ST) data byte transmitted
+  19          #define SMB_STSTO 0x50          // (ST) STOP detected during a
+  20                                                                  // transaction; bus error
+  21                                                                  // End status vector definition
+  22          
+  23          //-----------------------------------------------------------------------------
+  24          // Global VARIABLES
+  25          //-----------------------------------------------------------------------------
+  26          unsigned char SMB_DATA; // Global holder for SMBus data.
+  27          
+  28          //in buffer
+  29          unsigned char xdata in_buffer[16];
+  30          unsigned char in_index;
+  31          
+  32          unsigned char out_buffer_select;
+  33          unsigned char out_index;
+  34          
+  35          sbit LED2 = P2^1;
+  36          
+  37          bit i2c_msgupdate = 0; // Set to ‘1’ by the SMBus ISR
+  38          
+  39          
+  40          //interrupt ved overflow af lav SCL
+  41          void timer3_ISR() interrupt 14
+  42          {
+  43   1              SMB0CF &= ~0x80; // Disable SMBus
+  44   1              SMB0CF |= 0x80;  // Re-enable SMBus
+  45   1              TMR3CN &= ~0x80; // Clear Timer3 interrupt-pending flag
+  46   1      }
+  47          
+  48          void SMBus_ISR() interrupt 7
+  49          {
+  50   1              if (ARBLOST == 0)
+  51   1              {               
+  52   2                      // ACK received data
+  53   2      
+  54   2                      switch (SMB0CN & 0xF0) // Decode the SMBus status vector
+  55   2                      {
+C51 COMPILER V7.10   I2C_SLAVE                                                             06/15/2012 10:12:05 PAGE 2   
+
+  56   3                              // Slave Receiver: Start+Address received
+  57   3                              case SMB_SRADD:
+  58   3                                      STA = 0; // Clear STA bit
+  59   3                                      if((SMB0DAT&0xFE) == (SLAVE_ADDR&0xFE)) // Decode address
+  60   3                                      {                                                                               // If the received address matches,
+  61   4                                              if((SMB0DAT&0x01) == READ)                      // If the transfer is a master READ,
+  62   4                                                      SMB0DAT = i2c_putch();                  // Prepare outgoing byte
+  63   4                                              else
+  64   4                                                      in_index=0;                                             // Else reset buffer in_index
+  65   4      
+  66   4                                              ACK = 1;                                                        // ACK the received slave address
+  67   4                                      }
+  68   3                                      else                                    // If received slave address does not match,
+  69   3                                              ACK = 0;                        // NACK received address
+  70   3                              break;
+  71   3      
+  72   3                              // Slave Receiver: Data received
+  73   3                              case SMB_SRDB:
+  74   3                                      SMB_DATA = SMB0DAT;     // Store incoming data
+  75   3      
+  76   3                                      in_buffer[in_index++]=SMB_DATA;
+  77   3                                      
+  78   3                                      //hvis register over 100, skal der læses fra GPS modul
+  79   3                                      if(in_index==1 && SMB_DATA>=100)
+  80   3                                      {       
+  81   4                                              out_index=0;
+  82   4                                              pt5300_out_handle();
+  83   4                                      }
+  84   3      
+  85   3                                      //in_index=in_index&15;
+  86   3      
+  87   3                                      ACK = 1;
+  88   3                              break;
+  89   3      
+  90   3                              // Slave Receiver: Stop received while either a Slave Receiver or
+  91   3                              // Slave Transmitter
+  92   3                              case SMB_SRSTO:
+  93   3                                      i2c_msgupdate = 1;                      // Indicate new data received
+  94   3                                      STO = 0;                                // STO must be cleared by software when
+  95   3                                                                                      // a STOP is detected as a slave
+  96   3                              break;
+  97   3      
+  98   3                              // Slave Transmitter: Data byte transmitted
+  99   3                              case SMB_STDB:
+ 100   3                              // No action required;
+ 101   3                              // one-byte transfers
+ 102   3                              // only for this example
+ 103   3                              break;
+ 104   3                              // Slave Transmitter: Arbitration lost, Stop detected.
+ 105   3                              // This state will only be entered on a bus error condition.
+ 106   3                              // In normal operation, the slave is no longer sending data or has
+ 107   3                              // data pending when a STOP is received from the master, so the TXMODE
+ 108   3                              // bit is cleared and the slave goes to the SRSTO state.
+ 109   3                              case SMB_STSTO:
+ 110   3                                      STO = 0;                // STO must be cleared by software when
+ 111   3                                                                      // a STOP is detected as a slave
+ 112   3                              
+ 113   3                              break;
+ 114   3                              // Default: all other cases undefined
+ 115   3                              default:
+ 116   3                                      SMB0CF &= ~0x80; // Reset communication
+ 117   3                                      SMB0CF |= 0x80;
+C51 COMPILER V7.10   I2C_SLAVE                                                             06/15/2012 10:12:05 PAGE 3   
+
+ 118   3                                      STA = 0;
+ 119   3                                      STO = 0;
+ 120   3                                      ACK = 0;
+ 121   3                              break;
+ 122   3                      }
+ 123   2              }       
+ 124   1      
+ 125   1              // ARBLOST = 1, Abort failed transfer
+ 126   1              else
+ 127   1              {
+ 128   2                      STA = 0;
+ 129   2                      STO = 0;
+ 130   2                      ACK = 0;
+ 131   2              }
+ 132   1              SI = 0; // Clear SMBus interrupt flag
+ 133   1      }
+ 134          
+ 135          char i2c_putch()
+ 136          {       
+ 137   1              char out;
+ 138   1      
+ 139   1              //håndter output strenge
+ 140   1              switch (out_buffer_select)
+ 141   1              {
+ 142   2                      case 0:
+ 143   2                              out=LTC_a_str[out_index++];
+ 144   2                              break;
+ 145   2                      case 1:
+ 146   2                              out=LTC_b_str[out_index++];
+ 147   2                              break;
+ 148   2                      case 5:
+ 149   2                              out=master_status_byte;
+ 150   2                              break;
+ 151   2                      case 6:
+ 152   2                              out=LTC_request;
+ 153   2                              break;
+ 154   2                      case 7:
+ 155   2                              out=LTC_sync_request;
+ 156   2                              break;
+ 157   2                      case 8:
+ 158   2                              out=0;
+ 159   2                              if(LTC_a_daylight_flag)
+ 160   2                                      out+=1;
+ 161   2                              if(LTC_b_daylight_flag)
+ 162   2                                      out+=16;
+ 163   2                              break;
+ 164   2                      case 101:
+ 165   2                              out=current_MCU_sw_version;
+ 166   2                              break;
+ 167   2                      case 102:
+ 168   2                              out=KU_str[out_index++];
+ 169   2                              break;
+ 170   2              }
+ 171   1      
+ 172   1              return (out);
+ 173   1      }
+ 174          
+ 175          void setup_I2C()
+ 176          {
+ 177   1              SMB0CF|=0x89;                           //SMBus enabled, Slave mode, SCL low timeout, Bus free detect, timer 1 bitrate
+ 178   1              EIE1|=0x01;                                     //enable SMBus interrupt
+ 179   1      }
+C51 COMPILER V7.10   I2C_SLAVE                                                             06/15/2012 10:12:05 PAGE 4   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    333    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     16    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

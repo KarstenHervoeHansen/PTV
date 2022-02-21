@@ -1,0 +1,189 @@
+# makefile for RTXCio - Tasking C v2.0
+#
+# makefile format: mkxa
+#
+# invoke as: > mkxa
+#
+#-------------------------------------------------------------
+# RTXC    Version 3.2
+# Copyright (c) 1986-1997.
+# Embedded System Products, Inc.
+# ALL RIGHTS RESERVED
+##############################################################
+.SUFFIXES: .c .i .asm .obj
+
+#TK=e:\compiler\cxa
+TK=c:\cxa
+CC=$(TK)\bin\ccxa
+AR=$(TK)\bin\arxa
+RM=del
+
+INC=..\..\include
+LIB=..\..\lib
+
+# *****************  Steering Program Options  *******************
+#
+# memory models - select one
+#
+#model=t      # tiny
+#model=s      # small
+#model=m      # medium
+model=l      # large
+
+#
+# debug symbols option
+#
+symbols=-gn       # no
+#symbols=-g         # yes
+
+#
+# verbose mode
+#
+#verbose=          # no
+verbose=-v         # yes
+
+#
+# ****************  End of Steering Program Options  ****************
+
+# *****************  Compiler Level Options  *******************
+#
+# optimization
+#
+#Copt=-Wc-O0 # none - broken
+#Copt=-Wc-O1 # default(size) - okay
+Copt=-Wc-O2 # speed - broken
+
+#
+# Merge C-source code with assembly output
+#
+#Csource=              # no
+Csource=-Wc-s         # yes
+
+#
+# Compiler error to output file - produces an *.err file
+#
+#Cerror=               # no
+Cerror=-Wc-err        # yes
+
+#
+#
+# Include compiler INCLUDE directory in search path
+#
+#Cinc=                           # no
+Cinc=-Wc-I$(TK)\\include -Wc-I$(INC)       # yes
+#Cinc=-Wc-I$(TK)\\include -I..\\kernel        # yes
+
+#
+# Use special function register definitions
+#
+#Cspfregs=               # no
+Cspfregs=-Wc-Cxag3         # yes
+
+#
+# ****************  End of Compiler Level Options  ****************
+
+# *****************  Assembly Level Options  *******************
+#
+# optimization options
+# h = Use hardware instructions only
+# H = (DEFAULT) Use hardware and generic instructions
+# j = (DEFAULT) Enable jump and branch optimization. Replace jumps and
+#               branches with shorter or faster functionally equivalent
+#               branches.
+# J = Disable jump and branch optimization.
+#
+Aopt=-Wa-OHj
+
+#
+# error to output file - produces an *.ers file
+#
+#Aerror=                # no
+Aerror=-Wa-err         # yes
+
+#
+# generate assembly listings
+#
+Alist=                      # no
+#Alist=-WaPR($*.lst)         # yes
+
+#
+# ****************  End of Assembly Level Options  ****************
+
+# *****************  Archiver Options  *******************
+#
+# create the library if it does not exist
+#
+ARcreate=c
+
+#
+# replace named objects in the library if they exist
+#
+ARreplace=r
+
+#
+# print the object file in the library
+#
+#ARprint=
+ARprint=ts1
+
+#
+# ****************  End of Archiver Options  ****************
+
+CCFLAGS= -c $(verbose) $(symbols) -M$(model) $(Copt) $(Cerror) \
+	    $(Alist) $(Cinc) $(Csource) $(Cspfregs)
+
+ASFLAGS= -c $(verbose) $(symbols) -M$(model) $(Aopt) $(Aerror) \
+	    $(Alist) -Wm-D_MODEL=$(model)
+
+ARFLAGS= $(ARcreate)$(ARreplace)
+
+CPPFLAGS= -cs -Wc-E $(verbose) $(symbols) -M$(model) $(Copt) $(Cerror) \
+	    $(Cinc)
+
+#
+# default c.obj make rule
+#
+.c.obj:
+	$(CC) $(CCFLAGS) $*.c
+        $(AR) $(ARFLAGS) $(LIB)\librtio.a $*.obj
+
+.c.i:
+	$(CC) $(CPPFLAGS) $*.c > $*.i
+
+#
+# default .as.obj make rule
+#
+.asm.obj:
+	$(CC) $(ASFLAGS) $*.asm
+        $(AR) $(ARFLAGS) $(LIB)\librtio.a $*.obj
+
+target: ..\..\lib\librtio.a
+ 
+..\..\lib\librtio.a: asyn_api.obj sync_api.obj tout_api.obj comn_api.obj \
+		rtio_int.obj rtio_utl.obj
+           $(AR) $(ARprint) $(LIB)\librtio.a
+
+#
+# RTXCio library files
+#
+sync_api.obj: sync_api.c $(INC)\sync_api.h $(INC)\sync_opt.h $(INC)\rtio_opt.h $(INC)\rtio_tdf.h
+
+asyn_api.obj: asyn_api.c $(INC)\asyn_api.h $(INC)\asyn_opt.h $(INC)\rtio_opt.h $(INC)\rtio_tdf.h
+
+tout_api.obj: tout_api.c $(INC)\tout_api.h $(INC)\tout_opt.h $(INC)\rtio_opt.h $(INC)\rtio_tdf.h
+
+comn_api.obj: comn_api.c $(INC)\comn_api.h $(INC)\rtio_opt.h $(INC)\rtio_opt.h $(INC)\rtio_tdf.h
+
+rtio_int.obj: rtio_int.c $(INC)\rtio_api.h $(INC)\rtio_opt.h $(INC)\rtio_tdf.h
+
+rtio_utl.obj: rtio_utl.c $(INC)\rtio_utl.h
+
+clean:
+	$(RM) *.obj
+	$(RM) $(LIB)\librtio.a
+	$(RM) *.lst
+	$(RM) *.sdb
+	$(RM) *.bak
+	$(RM) *.err
+	$(RM) *.ers
+	$(RM) *.src

@@ -1,0 +1,123 @@
+C51 COMPILER V7.05   SERIAL                                                                11/17/2008 14:46:14 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE SERIAL
+OBJECT MODULE PLACED IN serial.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.EXE serial.c DB OE BR
+
+stmt level    source
+
+   1          #include <C8051F320.h>
+   2          #include <string.h>
+   3          #include "serial.h"
+   4          
+   5          //buffers og pointers til seriel indlæsning
+   6          #define RX_SERBUFLEN  32 //90
+   7          unsigned char xdata rx_serbuf[RX_SERBUFLEN];
+   8          unsigned char rx_inptr, rx_outptr;
+   9          
+  10          //header for ub_protokol
+  11          static unsigned char ub_header[2]= {0xb5, 0x62};
+  12          
+  13          void setup_UART()
+  14          {
+  15   1              //UART setup
+  16   1              SCON0 = 0x30;   // 8 bit med interurrupt
+  17   1              PCON = 0x00;    // ikke i idle eller stop-mode
+  18   1      
+  19   1              RI0 = 0;        //clear receive interrupt bit
+  20   1              TI0 = 0;        //clear transmit interrupt bit
+  21   1      
+  22   1              rx_inptr  = 0;
+  23   1              rx_outptr = 0;
+  24   1              ES0=1;                  //Enable serial interrupt
+  25   1      }
+  26          
+  27          void set_UART9600()
+  28          {
+  29   1              rx_inptr  = 0;
+  30   1              rx_outptr = 0;
+  31   1      
+  32   1              CKCON = 0x00;     // Timer1 og timer0 bruger SYSCLK/12
+  33   1              TL1   = 0x00;     // Timer 1 Low Byte
+  34   1          TH1   = 0xd0;     // BaudRate = 9600
+  35   1          TMOD  = 0x21;     // Timer Mode Register
+  36   1          TCON  = 0x45;     // Timer Control Register, timer1 enabled
+  37   1              TR1 = 1;          // Start timer1
+  38   1      }
+  39          
+  40          void set_UART38400()
+  41          {
+  42   1              rx_inptr  = 0;
+  43   1              rx_outptr = 0;
+  44   1      
+  45   1              CKCON = 0x08;     // Timer1 bruger SYSCLK, timer 0 bruger SYSCLK/12
+  46   1              TL1   = 0x00;     // Timer 1 Low Byte
+  47   1          TH1   = 0x70;     // BaudRate = 38400
+  48   1          TMOD  = 0x21;     // Timer Mode Register
+  49   1          TCON  = 0x45;     // Timer Control Register, timer1 enabled
+  50   1              TR1 = 1;          // Start timer1
+  51   1      }
+  52          
+  53          //skriver en byte til seriel-bussen
+  54          void putch(unsigned char c)
+  55          {
+C51 COMPILER V7.05   SERIAL                                                                11/17/2008 14:46:14 PAGE 2   
+
+  56   1        SBUF0 = c;
+  57   1        while (!TI0)
+  58   1          ;
+  59   1        TI0   = 0;
+  60   1      }
+  61          
+  62          //interrupt rutine til indgående seriel bytes
+  63          void serint0(void) interrupt 4 using 1
+  64          {
+  65   1        if (RI0)
+  66   1          {
+  67   2          rx_serbuf[rx_inptr] = SBUF0;
+  68   2          RI0 = 0;
+  69   2          rx_inptr++;
+  70   2          if (rx_inptr == RX_SERBUFLEN)
+  71   2            rx_inptr = 0;
+  72   2          }
+  73   1      }
+  74          
+  75          unsigned char getch(unsigned char * c)
+  76          {
+  77   1        unsigned char timer=0;
+  78   1      
+  79   1        while (rx_inptr == rx_outptr)
+  80   1        {
+  81   2              timer++;
+  82   2          if (timer==255)
+  83   2            {
+  84   3            *c  = 0;   // zero the holder to signal timeout
+  85   3            return (0);
+  86   3            }
+  87   2          }
+  88   1      
+  89   1        ES0 = 0;
+  90   1        *c = rx_serbuf[rx_outptr];
+  91   1        rx_outptr++;
+  92   1        if (rx_outptr == RX_SERBUFLEN)
+  93   1          rx_outptr = 0;
+  94   1        ES0 = 1;
+  95   1        return (1);
+  96   1      }
+  97             
+  98           
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    163    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     32    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

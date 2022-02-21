@@ -1,0 +1,888 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTXCIO\cc71763b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    ASYN_API
+                          6 ; asyn_api.c    1       /************************************************************************
+                            ****/
+                          7 ; asyn_api.c    2       /* MODULE:                                                               
+                               */
+                          8 ; asyn_api.c    3       /*   asyn_api.c - Asynchronous input/output application interface.       
+                               */
+                          9 ; asyn_api.c    4       /************************************************************************
+                            ****/
+                         10 ; asyn_api.c    5       /* FUNCTIONS:                                                            
+                               */
+                         11 ; asyn_api.c    6       
+                         12 ; asyn_api.c    7       #ifdef ASYNCH_IO  /* { */
+                         13 ; asyn_api.c    8       /*   IORC IO_read( CHNLID, BLKNO, BUFFADD, BYTECNT )                     
+                               */
+                         14 ; asyn_api.c    9       /*   IORC IO_write( CHNLID, BLKNO, BUFFADD, BYTECNT )                    
+                               */
+                         15 ; asyn_api.c   10       /*   IORC IO_dev_open( DEVID, void * )                                   
+                               */
+                         16 ; asyn_api.c   11       /*   IORC IO_dev_close( DEVID, void * )                                  
+                               */
+                         17 ; asyn_api.c   12       /*   IORC IO_control( CHNLID, SPFNCID, void * )                          
+                               */
+                         18 ; asyn_api.c   13       /*   IORC IO_dev_wait( CHNLID )                                          
+                               */
+                         19 ; asyn_api.c   14       #endif /* } ASYNCH_IO */
+                         20 ; asyn_api.c   15       /************************************************************************
+                            ****/
+                         21 ; asyn_api.c   16       /*
+                         22 ; asyn_api.c   17        *   RTXCio    
+                         23 ; asyn_api.c   18        *   Copyright (c) 
+                         24 ; asyn_api.c   19        *   Embedded System Products, Inc.
+                         25 ; asyn_api.c   20        *   ALL RIGHTS RESERVED
+                         26 ; asyn_api.c   21       */
+                         27 ; asyn_api.c   22       /************************************************************************
+                            ****/
+                         28 ; asyn_api.c   23       #include "rtxcapi.h"      /* RTXC - kernel types, declarations & prototyp
+                            es */
+                         29 ; asyn_api.c   24       
+                         30 ; asyn_api.c   25       #include "rtio_inc.h"                  /* RTXCio - Header file include fi
+                            le */
+                         31 ; asyn_api.c   26       
+                         32 ; asyn_api.c   27       extern const CHNLID  nchnls;         /* RTXCio - number of channels decla
+                            red */
+                         33 ; asyn_api.c   28       extern const DEVID  nldevs;           /* RTXCio - number of devices decla
+                            red */
+                         34 ; asyn_api.c   29       extern CCB_ENTRY   channel_table[];          /* channel control block tab
+                            le */
+                         35 ; asyn_api.c   30       extern PDU_HEADER * logical_dev_tbl[];  /* logical to physical device tab
+                            le */
+                         36 ; asyn_api.c   31       
+                         37 ; asyn_api.c   32       extern IORC process_io( IOPACK * );
+                         38 ; asyn_api.c   33       
+                         39 ; asyn_api.c   34       /*=======================================================================
+                            ===*/
+                         40 ; asyn_api.c   35       /*                      RTXCio API FUNCTIONS                             
+                               */
+                         41 ; asyn_api.c   36       /*=======================================================================
+                            ===*/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         42 ; asyn_api.c   37       #ifdef ASYNCH_IO   /* { */
+                         43 ; asyn_api.c   38       
+                         44 ; asyn_api.c   39       #ifdef A_READ_IO   /* { */
+                         45 ; asyn_api.c   40       
+                         46 ; asyn_api.c   41       IORC   IO_read(  CHNLID     chnlid,
+                         47 ; asyn_api.c   42                            BLKNO      startblk,
+                         48 ; asyn_api.c   43                            BUFFADD    transfer_buff,
+                         49 ; asyn_api.c   44                            BYTECNT    numbytes )
+                         50 ; asyn_api.c   45       {
+                         51         PUBLIC  _IO_read
+000000                   52 ASYN_API_PR     SEGMENT HCODE
+000000                   53         RSEG    ASYN_API_PR
+000000                   53         RSEG    ASYN_API_PR
+000000                   54 _IO_read:
+000000 0F30              55         PUSH.W  R4, R5
+000002 9972001E          56         SUB.W   R7,#01EH
+000006 8C3F02            57         MOV.W   [R7+2],R3
+000009 8A2F              58         MOV.W   [R7],R2
+                         59 ; asyn_api.c   46               /*---------------------------------------------------------------
+                            ---*/
+                         60 ; asyn_api.c   47               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                         61 ; asyn_api.c   48               /*---------------------------------------------------------------
+                            ---*/
+                         62 ; asyn_api.c   49               struct io_package iopack;
+                         63 ; asyn_api.c   50       
+                         64 ; asyn_api.c   51               /*---------------------------------------------------------------
+                            ---*/
+                         65 ; asyn_api.c   52               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                         66 ; asyn_api.c   53               /* return an invalid channel error                               
+                               */
+                         67 ; asyn_api.c   54               /*---------------------------------------------------------------
+                            ---*/
+                         68 ; asyn_api.c   55               if( (chnlid == 0) || (chnlid > nchnls) ||
+                         69 ; asyn_api.c   56                   (channel_table[chnlid].blink == NULLCCBE) )
+00000B 6900              70         OR.W    R0,R0
+00000D F315              71         BEQ     _4
+00000F 964842rr          72         MOV.B   ES,#SEG( _nchnls )
+000013 9948rrrr          73         MOV.W   R4,#SOF( _nchnls )
+000017 8A44              74         MOV.W   R4,[R4]
+000019 4904              75         CMP.W   R0,R4
+00001B F80E              76         BG      _4
+00001D 99480016          77         MOV.W   R4,#016H
+000021 E440              78         MULU.W  R4,R0
+000023 8924              79         MOV.W   R2,R4
+000025 B930              80         MOVS.W  R3,#00H
+000027 964842rr          81         MOV.B   ES,#SEG( _channel_table+4 )
+00002B 8D32rrrr          82         MOV.W   R3,[R2+SOF( _channel_table+6 )]
+00002F 8D22rrrr          83         MOV.W   R2,[R2+SOF( _channel_table+4 )]
+000033 6932              84         OR.W    R3,R2
+000035 F204              85         BNE     _5
+000035 F20400            85         BNE     _5
+000038                   86 _4:
+                         87 ; asyn_api.c   57                         return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) 
+                            );
+000038 9908F801          88         MOV.W   R0,#0F801H
+00003C FE2B              89         BR      _8
+00003C FE2B              89         BR      _8
+00003E                   90 _5:
+                         91 ; asyn_api.c   58       
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                         92 ; asyn_api.c   59               /*---------------------------------------------------------------
+                            ---*/
+                         93 ; asyn_api.c   60               /* Verify the requested device is setup for reading.             
+                               */
+                         94 ; asyn_api.c   61               /*---------------------------------------------------------------
+                            ---*/
+                         95 ; asyn_api.c   62               if( channel_table[chnlid].io_command == WRITE_IO )
+00003E B950              96         MOVS.W  R5,#00H
+000040 964842rr          97         MOV.B   ES,#SEG( _channel_table+12 )
+000044 8D24rrrr          98         MOV.W   R2,[R4+SOF( _channel_table+12 )]
+000048 99240009          99         CMP.W   R2,#09H
+00004C F203             100         BNE     _6
+                        101 ; asyn_api.c   63                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+                            
+00004E 9908F802         102         MOV.W   R0,#0F802H
+000052 FE20             103         BR      _8
+000052 FE20             103         BR      _8
+000054                  104 _6:
+                        105 ; asyn_api.c   64       
+                        106 ; asyn_api.c   65               /*---------------------------------------------------------------
+                            ---*/
+                        107 ; asyn_api.c   66               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        108 ; asyn_api.c   67               /*---------------------------------------------------------------
+                            ---*/
+                        109 ; asyn_api.c   68               iopack.iofncid = IO_READ;
+000054 BC7008           110         MOV.W   [R7+8],#00H
+                        111 ; asyn_api.c   69               iopack.chnlid = chnlid;
+000057 8C0F06           112         MOV.W   [R7+6],R0
+                        113 ; asyn_api.c   70               iopack.deviceno = channel_table[chnlid].io_deviceno;
+00005A 964842rr         114         MOV.B   ES,#SEG( _channel_table+10 )
+00005E 8D04rrrr         115         MOV.W   R0,[R4+SOF( _channel_table+10 )]
+000062 8C0F04           116         MOV.W   [R7+4],R0
+                        117 ; asyn_api.c   71               iopack.io_duration = IO_NOWAIT;
+000065 BC720C           118         MOV.W   [R7+12],#02H
+                        119 ; asyn_api.c   72               iopack.startblk = startblk;
+000068 8C3702           120         MOV.W   R3,[R7+2]
+00006B 8A27             121         MOV.W   R2,[R7]
+00006D 8C3F10           122         MOV.W   [R7+16],R3
+000070 8C2F0E           123         MOV.W   [R7+14],R2
+                        124 ; asyn_api.c   73               iopack.transfer_buff = transfer_buff;
+000073 8C3728           125         MOV.W   R3,[R7+40]
+000076 8C2726           126         MOV.W   R2,[R7+38]
+000079 8C3F14           127         MOV.W   [R7+20],R3
+00007C 8C2F12           128         MOV.W   [R7+18],R2
+                        129 ; asyn_api.c   74               iopack.numbytes = numbytes;
+00007F 8C1F16           130         MOV.W   [R7+22],R1
+                        131 ; asyn_api.c   75               iopack.otherinfo = NULLIOINFO;
+000082 BC701A           132         MOV.W   [R7+26],#00H
+000085 BC7018           133         MOV.W   [R7+24],#00H
+                        134 ; asyn_api.c   76       
+                        135 ; asyn_api.c   77               /*---------------------------------------------------------------
+                            ---*/
+                        136 ; asyn_api.c   78               /* Process the i/o request.                                      
+                               */
+                        137 ; asyn_api.c   79               /*---------------------------------------------------------------
+                            ---*/
+                        138 ; asyn_api.c   80               return( process_io( &iopack ) );
+000088 9128rr           139         MOV.B   R1L,#SEG( __lc_bs )
+00008B 7133             140         XOR.B   R1H,R1H
+00008D 400704           141         LEA     R0,R7+4
+                        142         CALL    _process_io
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+000090 C4rrrrrr        +142 ;       FCALL   _process_io
+000090 C4rrrrrr        +142 ;       FCALL   _process_io
+                        143 ; asyn_api.c   81       }
+000094                  144 _8:
+000094 9970001E         145         ADD.W   R7,#01EH
+000098 2F30             146         POP.W   R4, R5
+00009A D680             147         RET
+00009A D680             147         RET
+                        148 ; asyn_api.c   82       #endif   /* } A_READ_IO */
+                        149 ; asyn_api.c   83       
+                        150 ; asyn_api.c   84       /*=======================================================================
+                            ===*/
+                        151 ; asyn_api.c   85       #ifdef A_WRITE_IO   /* { */
+                        152 ; asyn_api.c   86       
+                        153 ; asyn_api.c   87       IORC   IO_write( CHNLID     chnlid,
+                        154 ; asyn_api.c   88                            BLKNO      startblk,
+                        155 ; asyn_api.c   89                            BUFFADD    transfer_buff,
+                        156 ; asyn_api.c   90                            BYTECNT    numbytes )
+                        157 ; asyn_api.c   91       {
+                        158         PUBLIC  _IO_write
+00009C                  159 _IO_write:
+00009C 0F30             160         PUSH.W  R4, R5
+00009E 9972001E         161         SUB.W   R7,#01EH
+0000A2 8C3F02           162         MOV.W   [R7+2],R3
+0000A5 8A2F             163         MOV.W   [R7],R2
+                        164 ; asyn_api.c   92               /*---------------------------------------------------------------
+                            ---*/
+                        165 ; asyn_api.c   93               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        166 ; asyn_api.c   94               /*---------------------------------------------------------------
+                            ---*/
+                        167 ; asyn_api.c   95               struct io_package iopack;
+                        168 ; asyn_api.c   96       
+                        169 ; asyn_api.c   97               /*---------------------------------------------------------------
+                            ---*/
+                        170 ; asyn_api.c   98               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        171 ; asyn_api.c   99               /* return an invalid channel error                               
+                               */
+                        172 ; asyn_api.c  100               /*---------------------------------------------------------------
+                            ---*/
+                        173 ; asyn_api.c  101               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        174 ; asyn_api.c  102                   (channel_table[chnlid].blink == NULLCCBE) )
+0000A7 6900             175         OR.W    R0,R0
+0000A9 F315             176         BEQ     _12
+0000AB 964842rr         177         MOV.B   ES,#SEG( _nchnls )
+0000AF 9948rrrr         178         MOV.W   R4,#SOF( _nchnls )
+0000B3 8A44             179         MOV.W   R4,[R4]
+0000B5 4904             180         CMP.W   R0,R4
+0000B7 F80E             181         BG      _12
+0000B9 99480016         182         MOV.W   R4,#016H
+0000BD E440             183         MULU.W  R4,R0
+0000BF 8924             184         MOV.W   R2,R4
+0000C1 B930             185         MOVS.W  R3,#00H
+0000C3 964842rr         186         MOV.B   ES,#SEG( _channel_table+4 )
+0000C7 8D32rrrr         187         MOV.W   R3,[R2+SOF( _channel_table+6 )]
+0000CB 8D22rrrr         188         MOV.W   R2,[R2+SOF( _channel_table+4 )]
+0000CF 6932             189         OR.W    R3,R2
+0000D1 F204             190         BNE     _13
+0000D1 F20400           190         BNE     _13
+0000D4                  191 _12:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        192 ; asyn_api.c  103                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) );
+                            
+0000D4 9908F801         193         MOV.W   R0,#0F801H
+0000D8 FE2B             194         BR      _16
+0000D8 FE2B             194         BR      _16
+0000DA                  195 _13:
+                        196 ; asyn_api.c  104       
+                        197 ; asyn_api.c  105               /*---------------------------------------------------------------
+                            ---*/
+                        198 ; asyn_api.c  106               /* Verify the requested device is setup for writing.             
+                               */
+                        199 ; asyn_api.c  107               /*---------------------------------------------------------------
+                            ---*/
+                        200 ; asyn_api.c  108               if( channel_table[chnlid].io_command == READ_IO )
+0000DA B950             201         MOVS.W  R5,#00H
+0000DC 964842rr         202         MOV.B   ES,#SEG( _channel_table+12 )
+0000E0 8D24rrrr         203         MOV.W   R2,[R4+SOF( _channel_table+12 )]
+0000E4 99240008         204         CMP.W   R2,#08H
+0000E8 F203             205         BNE     _14
+                        206 ; asyn_api.c  109                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+                            
+0000EA 9908F802         207         MOV.W   R0,#0F802H
+0000EE FE20             208         BR      _16
+0000EE FE20             208         BR      _16
+0000F0                  209 _14:
+                        210 ; asyn_api.c  110       
+                        211 ; asyn_api.c  111               /*---------------------------------------------------------------
+                            ---*/
+                        212 ; asyn_api.c  112               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        213 ; asyn_api.c  113               /*---------------------------------------------------------------
+                            ---*/
+                        214 ; asyn_api.c  114               iopack.iofncid = IO_WRITE;
+0000F0 BC7108           215         MOV.W   [R7+8],#01H
+                        216 ; asyn_api.c  115               iopack.chnlid = chnlid;
+0000F3 8C0F06           217         MOV.W   [R7+6],R0
+                        218 ; asyn_api.c  116               iopack.deviceno = channel_table[chnlid].io_deviceno;
+0000F6 964842rr         219         MOV.B   ES,#SEG( _channel_table+10 )
+0000FA 8D04rrrr         220         MOV.W   R0,[R4+SOF( _channel_table+10 )]
+0000FE 8C0F04           221         MOV.W   [R7+4],R0
+                        222 ; asyn_api.c  117               iopack.io_duration = IO_NOWAIT;
+000101 BC720C           223         MOV.W   [R7+12],#02H
+                        224 ; asyn_api.c  118               iopack.startblk = startblk;
+000104 8C3702           225         MOV.W   R3,[R7+2]
+000107 8A27             226         MOV.W   R2,[R7]
+000109 8C3F10           227         MOV.W   [R7+16],R3
+00010C 8C2F0E           228         MOV.W   [R7+14],R2
+                        229 ; asyn_api.c  119               iopack.transfer_buff = transfer_buff;
+00010F 8C3728           230         MOV.W   R3,[R7+40]
+000112 8C2726           231         MOV.W   R2,[R7+38]
+000115 8C3F14           232         MOV.W   [R7+20],R3
+000118 8C2F12           233         MOV.W   [R7+18],R2
+                        234 ; asyn_api.c  120               iopack.numbytes = numbytes;
+00011B 8C1F16           235         MOV.W   [R7+22],R1
+                        236 ; asyn_api.c  121               iopack.otherinfo = NULLIOINFO;
+00011E BC701A           237         MOV.W   [R7+26],#00H
+000121 BC7018           238         MOV.W   [R7+24],#00H
+                        239 ; asyn_api.c  122       
+                        240 ; asyn_api.c  123               /*---------------------------------------------------------------
+                            ---*/
+                        241 ; asyn_api.c  124               /* Process the i/o request.                                      
+                               */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        242 ; asyn_api.c  125               /*---------------------------------------------------------------
+                            ---*/
+                        243 ; asyn_api.c  126               return( process_io( &iopack ) );
+000124 9128rr           244         MOV.B   R1L,#SEG( __lc_bs )
+000127 7133             245         XOR.B   R1H,R1H
+000129 400704           246         LEA     R0,R7+4
+                        247         CALL    _process_io
+00012C C4rrrrrr        +247 ;       FCALL   _process_io
+00012C C4rrrrrr        +247 ;       FCALL   _process_io
+                        248 ; asyn_api.c  127       }
+000130                  249 _16:
+000130 9970001E         250         ADD.W   R7,#01EH
+000134 2F30             251         POP.W   R4, R5
+000136 D680             252         RET
+000136 D680             252         RET
+                        253 ; asyn_api.c  128       #endif  /* } A_WRITE_IO */
+                        254 ; asyn_api.c  129       
+                        255 ; asyn_api.c  130       /*=======================================================================
+                            ===*/
+                        256 ; asyn_api.c  131       #ifdef A_DEV_OPEN_IO   /* { */
+                        257 ; asyn_api.c  132       
+                        258 ; asyn_api.c  133       IORC   IO_dev_open( DEVID  deviceno,
+                        259 ; asyn_api.c  134                               void * otherinfo  )
+                        260 ; asyn_api.c  135       {
+                        261         PUBLIC  _IO_dev_open
+000138                  262 _IO_dev_open:
+000138 9972001A         263         SUB.W   R7,#01AH
+                        264 ; asyn_api.c  136               /*---------------------------------------------------------------
+                            ---*/
+                        265 ; asyn_api.c  137               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        266 ; asyn_api.c  138               /*---------------------------------------------------------------
+                            ---*/
+                        267 ; asyn_api.c  139               struct io_package iopack;
+                        268 ; asyn_api.c  140       
+                        269 ; asyn_api.c  141               /*---------------------------------------------------------------
+                            ---*/
+                        270 ; asyn_api.c  142               /* If the device is not valid then return in error.              
+                               */
+                        271 ; asyn_api.c  143               /*---------------------------------------------------------------
+                            ---*/
+                        272 ; asyn_api.c  144               if( ( deviceno <= 0 ) || ( deviceno > nldevs ) )
+00013C 99040000         273         CMP.W   R0,#00H
+000140 FD07             274         BLE     _19
+000142 964842rr         275         MOV.B   ES,#SEG( _nldevs )
+000146 9918rrrr         276         MOV.W   R1,#SOF( _nldevs )
+00014A 8A11             277         MOV.W   R1,[R1]
+00014C 4901             278         CMP.W   R0,R1
+00014E FD03             279         BLE     _20
+00014E FD03             279         BLE     _20
+000150                  280 _19:
+                        281 ; asyn_api.c  145                    return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+000150 9908F802         282         MOV.W   R0,#0F802H
+000154 FE0D             283         BR      _21
+000154 FE0D             283         BR      _21
+000156                  284 _20:
+                        285 ; asyn_api.c  146       
+                        286 ; asyn_api.c  147               /*---------------------------------------------------------------
+                            ---*/
+                        287 ; asyn_api.c  148               /* Package the I/O argument to send to the physical controller.  
+                               */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        288 ; asyn_api.c  149               /*---------------------------------------------------------------
+                            ---*/
+                        289 ; asyn_api.c  150               iopack.iofncid = IO_DEV_OPEN;
+000156 BC7204           290         MOV.W   [R7+4],#02H
+                        291 ; asyn_api.c  151               iopack.deviceno = deviceno;
+000159 8A0F             292         MOV.W   [R7],R0
+                        293 ; asyn_api.c  152               iopack.io_duration = IO_NOWAIT;
+00015B BC7208           294         MOV.W   [R7+8],#02H
+                        295 ; asyn_api.c  153               iopack.otherinfo = otherinfo;
+00015E 8C3F16           296         MOV.W   [R7+22],R3
+000161 8C2F14           297         MOV.W   [R7+20],R2
+                        298 ; asyn_api.c  154       
+                        299 ; asyn_api.c  155               /*---------------------------------------------------------------
+                            ---*/
+                        300 ; asyn_api.c  156               /* Process the i/o request.                                      
+                               */
+                        301 ; asyn_api.c  157               /*---------------------------------------------------------------
+                            ---*/
+                        302 ; asyn_api.c  158               return( process_io( &iopack ) );
+000164 9128rr           303         MOV.B   R1L,#SEG( __lc_bs )
+000167 7133             304         XOR.B   R1H,R1H
+000169 8907             305         MOV.W   R0,R7
+                        306         CALL    _process_io
+00016B C4rrrrrr        +306 ;       FCALL   _process_io
+00016B C4rrrrrr00      +306 ;       FCALL   _process_io
+                        307 ; asyn_api.c  159       }
+000170                  308 _21:
+000170 9970001A         309         ADD.W   R7,#01AH
+000174 D680             310         RET
+000174 D680             310         RET
+                        311 ; asyn_api.c  160       #endif   /* } A_DEV_OPEN_IO */
+                        312 ; asyn_api.c  161       
+                        313 ; asyn_api.c  162       /*=======================================================================
+                            ===*/
+                        314 ; asyn_api.c  163       #ifdef A_DEV_CLOSE_IO  /* { */
+                        315 ; asyn_api.c  164       
+                        316 ; asyn_api.c  165       IORC   IO_dev_close( DEVID  deviceno,
+                        317 ; asyn_api.c  166                                void * otherinfo )
+                        318 ; asyn_api.c  167       {
+                        319         PUBLIC  _IO_dev_close
+000176                  320 _IO_dev_close:
+000176 9972001A         321         SUB.W   R7,#01AH
+                        322 ; asyn_api.c  168               /*---------------------------------------------------------------
+                            ---*/
+                        323 ; asyn_api.c  169               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        324 ; asyn_api.c  170               /*---------------------------------------------------------------
+                            ---*/
+                        325 ; asyn_api.c  171               struct io_package iopack;
+                        326 ; asyn_api.c  172       
+                        327 ; asyn_api.c  173               /*---------------------------------------------------------------
+                            ---*/
+                        328 ; asyn_api.c  174               /* If the device is not valid then return in error.              
+                               */
+                        329 ; asyn_api.c  175               /*---------------------------------------------------------------
+                            ---*/
+                        330 ; asyn_api.c  176               if( ( deviceno <= 0 ) || ( deviceno > nldevs ) )
+00017A 99040000         331         CMP.W   R0,#00H
+00017E FD07             332         BLE     _24
+000180 964842rr         333         MOV.B   ES,#SEG( _nldevs )
+000184 9918rrrr         334         MOV.W   R1,#SOF( _nldevs )
+000188 8A11             335         MOV.W   R1,[R1]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+00018A 4901             336         CMP.W   R0,R1
+00018C FD03             337         BLE     _25
+00018C FD03             337         BLE     _25
+00018E                  338 _24:
+                        339 ; asyn_api.c  177                     return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+00018E 9908F802         340         MOV.W   R0,#0F802H
+000192 FE0D             341         BR      _26
+000192 FE0D             341         BR      _26
+000194                  342 _25:
+                        343 ; asyn_api.c  178       
+                        344 ; asyn_api.c  179               /*---------------------------------------------------------------
+                            ---*/
+                        345 ; asyn_api.c  180               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        346 ; asyn_api.c  181               /*---------------------------------------------------------------
+                            ---*/
+                        347 ; asyn_api.c  182               iopack.iofncid = IO_DEV_CLOSE;
+000194 BC7304           348         MOV.W   [R7+4],#03H
+                        349 ; asyn_api.c  183               iopack.deviceno = deviceno;
+000197 8A0F             350         MOV.W   [R7],R0
+                        351 ; asyn_api.c  184               iopack.io_duration = IO_NOWAIT;
+000199 BC7208           352         MOV.W   [R7+8],#02H
+                        353 ; asyn_api.c  185               iopack.otherinfo = otherinfo;
+00019C 8C3F16           354         MOV.W   [R7+22],R3
+00019F 8C2F14           355         MOV.W   [R7+20],R2
+                        356 ; asyn_api.c  186       
+                        357 ; asyn_api.c  187               /*---------------------------------------------------------------
+                            ---*/
+                        358 ; asyn_api.c  188               /* Process the i/o request.                                      
+                               */
+                        359 ; asyn_api.c  189               /*---------------------------------------------------------------
+                            ---*/
+                        360 ; asyn_api.c  190               return( process_io( &iopack ) );
+0001A2 9128rr           361         MOV.B   R1L,#SEG( __lc_bs )
+0001A5 7133             362         XOR.B   R1H,R1H
+0001A7 8907             363         MOV.W   R0,R7
+                        364         CALL    _process_io
+0001A9 C4rrrrrr        +364 ;       FCALL   _process_io
+0001A9 C4rrrrrr00      +364 ;       FCALL   _process_io
+                        365 ; asyn_api.c  191       }
+0001AE                  366 _26:
+0001AE 9970001A         367         ADD.W   R7,#01AH
+0001B2 D680             368         RET
+0001B2 D680             368         RET
+                        369 ; asyn_api.c  192       
+                        370 ; asyn_api.c  193       #endif   /* } A_DEV_CLOSE_IO */
+                        371 ; asyn_api.c  194       
+                        372 ; asyn_api.c  195       /*=======================================================================
+                            ===*/
+                        373 ; asyn_api.c  196       #ifdef A_CONTROL_IO   /* { */
+                        374 ; asyn_api.c  197       
+                        375 ; asyn_api.c  198       IORC  IO_control( CHNLID      chnlid,
+                        376 ; asyn_api.c  199                             SPFNCID     spfncid,
+                        377 ; asyn_api.c  200                             void *      otherinfo )
+                        378 ; asyn_api.c  201       {
+                        379         PUBLIC  _IO_control
+0001B4                  380 _IO_control:
+0001B4 0F30             381         PUSH.W  R4, R5
+0001B6 9972001E         382         SUB.W   R7,#01EH
+0001BA 8C3F02           383         MOV.W   [R7+2],R3
+0001BD 8A2F             384         MOV.W   [R7],R2
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        385 ; asyn_api.c  202               /*---------------------------------------------------------------
+                            ---*/
+                        386 ; asyn_api.c  203               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        387 ; asyn_api.c  204               /*---------------------------------------------------------------
+                            ---*/
+                        388 ; asyn_api.c  205               struct io_package iopack;
+                        389 ; asyn_api.c  206       
+                        390 ; asyn_api.c  207               /*---------------------------------------------------------------
+                            ---*/
+                        391 ; asyn_api.c  208               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        392 ; asyn_api.c  209               /* return an invalid channel error                               
+                               */
+                        393 ; asyn_api.c  210               /*---------------------------------------------------------------
+                            ---*/
+                        394 ; asyn_api.c  211               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        395 ; asyn_api.c  212                   (channel_table[chnlid].blink == NULLCCBE) )
+0001BF 6900             396         OR.W    R0,R0
+0001C1 F315             397         BEQ     _30
+0001C3 964842rr         398         MOV.B   ES,#SEG( _nchnls )
+0001C7 9948rrrr         399         MOV.W   R4,#SOF( _nchnls )
+0001CB 8A44             400         MOV.W   R4,[R4]
+0001CD 4904             401         CMP.W   R0,R4
+0001CF F80E             402         BG      _30
+0001D1 99480016         403         MOV.W   R4,#016H
+0001D5 E440             404         MULU.W  R4,R0
+0001D7 8924             405         MOV.W   R2,R4
+0001D9 B930             406         MOVS.W  R3,#00H
+0001DB 964842rr         407         MOV.B   ES,#SEG( _channel_table+4 )
+0001DF 8D32rrrr         408         MOV.W   R3,[R2+SOF( _channel_table+6 )]
+0001E3 8D22rrrr         409         MOV.W   R2,[R2+SOF( _channel_table+4 )]
+0001E7 6932             410         OR.W    R3,R2
+0001E9 F204             411         BNE     _31
+0001E9 F20400           411         BNE     _31
+0001EC                  412 _30:
+                        413 ; asyn_api.c  213                        return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) )
+                            ;
+0001EC 9908F801         414         MOV.W   R0,#0F801H
+0001F0 FE18             415         BR      _32
+0001F0 FE18             415         BR      _32
+0001F2                  416 _31:
+                        417 ; asyn_api.c  214       
+                        418 ; asyn_api.c  215               /*---------------------------------------------------------------
+                            ---*/
+                        419 ; asyn_api.c  216               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        420 ; asyn_api.c  217               /*---------------------------------------------------------------
+                            ---*/
+                        421 ; asyn_api.c  218               iopack.iofncid = IO_CONTROL;
+0001F2 BC7408           422         MOV.W   [R7+8],#04H
+                        423 ; asyn_api.c  219               iopack.chnlid = chnlid;
+0001F5 8C0F06           424         MOV.W   [R7+6],R0
+                        425 ; asyn_api.c  220               iopack.deviceno = channel_table[chnlid].io_deviceno;
+0001F8 B950             426         MOVS.W  R5,#00H
+0001FA 964842rr         427         MOV.B   ES,#SEG( _channel_table+10 )
+0001FE 8D04rrrr         428         MOV.W   R0,[R4+SOF( _channel_table+10 )]
+000202 8C0F04           429         MOV.W   [R7+4],R0
+                        430 ; asyn_api.c  221               iopack.io_duration = IO_NOWAIT;
+000205 BC720C           431         MOV.W   [R7+12],#02H
+                        432 ; asyn_api.c  222               iopack.spfncid = spfncid;
+000208 8C1F0A           433         MOV.W   [R7+10],R1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        434 ; asyn_api.c  223               iopack.otherinfo = otherinfo;
+00020B 8C1702           435         MOV.W   R1,[R7+2]
+00020E 8A07             436         MOV.W   R0,[R7]
+000210 8C1F1A           437         MOV.W   [R7+26],R1
+000213 8C0F18           438         MOV.W   [R7+24],R0
+                        439 ; asyn_api.c  224       
+                        440 ; asyn_api.c  225               /*---------------------------------------------------------------
+                            ---*/
+                        441 ; asyn_api.c  226               /* Process the i/o request.                                      
+                               */
+                        442 ; asyn_api.c  227               /*---------------------------------------------------------------
+                            ---*/
+                        443 ; asyn_api.c  228               return( process_io( &iopack ) );
+000216 9128rr           444         MOV.B   R1L,#SEG( __lc_bs )
+000219 7133             445         XOR.B   R1H,R1H
+00021B 400704           446         LEA     R0,R7+4
+                        447         CALL    _process_io
+00021E C4rrrrrr        +447 ;       FCALL   _process_io
+00021E C4rrrrrr        +447 ;       FCALL   _process_io
+                        448 ; asyn_api.c  229       }
+000222                  449 _32:
+000222 9970001E         450         ADD.W   R7,#01EH
+000226 2F30             451         POP.W   R4, R5
+000228 D680             452         RET
+000228 D680             452         RET
+                        453 ; asyn_api.c  230       #endif   /* } A_CONTROL_IO */
+                        454 ; asyn_api.c  231       
+                        455 ; asyn_api.c  232       /*=======================================================================
+                            ===*/
+                        456 ; asyn_api.c  233       IORC  IO_dev_wait( CHNLID chnlid )
+                        457 ; asyn_api.c  234       {
+                        458         PUBLIC  _IO_dev_wait
+00022A                  459 _IO_dev_wait:
+00022A 0F70             460         PUSH.W  R4, R5, R6
+                        461 ; asyn_api.c  235               DEVID   deviceno;
+                        462 ; asyn_api.c  236                KSRC   ret_val;
+                        463 ; asyn_api.c  237                IORC   ret_code;
+                        464 ; asyn_api.c  238       
+                        465 ; asyn_api.c  239               /*---------------------------------------------------------------
+                            ---*/
+                        466 ; asyn_api.c  240               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        467 ; asyn_api.c  241               /* return an invalid channel error                               
+                               */
+                        468 ; asyn_api.c  242               /*---------------------------------------------------------------
+                            ---*/
+                        469 ; asyn_api.c  243               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        470 ; asyn_api.c  244                   (channel_table[chnlid].blink == NULLCCBE) )
+00022C 8920             471         MOV.W   R2,R0
+00022E 6900             472         OR.W    R0,R0
+000230 F313             473         BEQ     _35
+000232 964842rr         474         MOV.B   ES,#SEG( _nchnls )
+000236 9918rrrr         475         MOV.W   R1,#SOF( _nchnls )
+00023A 8A11             476         MOV.W   R1,[R1]
+00023C 4921             477         CMP.W   R2,R1
+00023E F80C             478         BG      _35
+000240 E9200016         479         MULU.W  R2,#016H
+000244 8902             480         MOV.W   R0,R2
+000246 B910             481         MOVS.W  R1,#00H
+000248 964842rr         482         MOV.B   ES,#SEG( _channel_table+4 )
+00024C 8D10rrrr         483         MOV.W   R1,[R0+SOF( _channel_table+6 )]
+000250 8D00rrrr         484         MOV.W   R0,[R0+SOF( _channel_table+4 )]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+000254 6910             485         OR.W    R1,R0
+000256 F203             486         BNE     _36
+000256 F203             486         BNE     _36
+000258                  487 _35:
+                        488 ; asyn_api.c  245                         return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) 
+                            );
+000258 9908F801         489         MOV.W   R0,#0F801H
+00025C FE6F             490         BR      _46
+00025C FE6F             490         BR      _46
+00025E                  491 _36:
+                        492 ; asyn_api.c  246       
+                        493 ; asyn_api.c  247               deviceno = channel_table[chnlid].io_deviceno;
+00025E B930             494         MOVS.W  R3,#00H
+000260 964842rr         495         MOV.B   ES,#SEG( _channel_table+10 )
+000264 8D62rrrr         496         MOV.W   R6,[R2+SOF( _channel_table+10 )]
+                        497 ; asyn_api.c  248       
+                        498 ; asyn_api.c  249               /*---------------------------------------------------------------
+                            ---*/
+                        499 ; asyn_api.c  250               /* Determine whether the requesting task is the device owner.    
+                               */
+                        500 ; asyn_api.c  251               /*---------------------------------------------------------------
+                            ---*/
+                        501 ; asyn_api.c  252               ret_val = KS_lock( logical_dev_tbl[deviceno]->dev_res );
+000268 8906             502         MOV.W   R0,R6
+00026A D902             503         ASL.W   R0,#02H
+00026C B910             504         MOVS.W  R1,#00H
+00026E 9958rrrr         505         MOV.W   R5,#SEG( _logical_dev_tbl )
+000272 9948rrrr         506         MOV.W   R4,#SOF( _logical_dev_tbl )
+000276 0940             507         ADD.W   R4,R0
+000278 964842rr         508         MOV.B   ES,#SEG( _logical_dev_tbl )
+00027C 8D10rrrr         509         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+000280 8D00rrrr         510         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+000284 862C42           511         MOV.B   ES,R1L
+000287 8200             512         MOV.B   R0L,[R0]
+                        513         CALL    _KS_lock
+000289 C4rrrrrr        +513 ;       FCALL   _KS_lock
+                        514 ; asyn_api.c  253       
+                        515 ; asyn_api.c  254               if( ret_val == RC_BUSY )
+00028D 99040009         516         CMP.W   R0,#09H
+000291 F204             517         BNE     _37
+                        518 ; asyn_api.c  255               {
+                        519 ; asyn_api.c  256                       /*-------------------------------------------------------
+                            ---*/
+                        520 ; asyn_api.c  257                       /* error: the requesting task is not the owner           
+                               */
+                        521 ; asyn_api.c  258                       /*-------------------------------------------------------
+                            ---*/
+                        522 ; asyn_api.c  259                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEV_BUSY) );
+000293 9908F807         523         MOV.W   R0,#0F807H
+000297 FE52             524         BR      _46
+000297 FE5200           524         BR      _46
+                        525 ; asyn_api.c  260               }
+00029A                  526 _37:
+                        527 ; asyn_api.c  261       
+                        528 ; asyn_api.c  262               if( ret_val == RC_GOOD )
+00029A 6900             529         OR.W    R0,R0
+00029C F20C             530         BNE     _38
+                        531 ; asyn_api.c  263               {
+                        532 ; asyn_api.c  264                       /*-------------------------------------------------------
+                            ---*/
+                        533 ; asyn_api.c  265                       /* error: the requesting task has no pending RTXCio calls
+                               */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                        534 ; asyn_api.c  266                       /*-------------------------------------------------------
+                            ---*/
+                        535 ; asyn_api.c  267                       KS_unlock( logical_dev_tbl[deviceno]->dev_res );
+00029E 86AC42           536         MOV.B   ES,R5L
+0002A1 8A04             537         MOV.W   R0,[R4]
+0002A3 8C1402           538         MOV.W   R1,[R4+2]
+0002A6 862C42           539         MOV.B   ES,R1L
+0002A9 8200             540         MOV.B   R0L,[R0]
+                        541         CALL    _KS_unlock
+0002AB C4rrrrrr        +541 ;       FCALL   _KS_unlock
+                        542 ; asyn_api.c  268                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_BAD_WAIT) );
+0002AF 9908F809         543         MOV.W   R0,#0F809H
+0002B3 FE44             544         BR      _46
+0002B3 FE4400           544         BR      _46
+                        545 ; asyn_api.c  269               }
+0002B6                  546 _38:
+                        547 ; asyn_api.c  270       
+                        548 ; asyn_api.c  271               /*---------------------------------------------------------------
+                            ---*/
+                        549 ; asyn_api.c  272               /* The requesting task is indeed the owner so unlock             
+                               */
+                        550 ; asyn_api.c  273               /* the nested lock                                               
+                               */
+                        551 ; asyn_api.c  274               /*---------------------------------------------------------------
+                            ---*/
+                        552 ; asyn_api.c  275               KS_unlock( logical_dev_tbl[deviceno]->dev_res );
+0002B6 86AC42           553         MOV.B   ES,R5L
+0002B9 8A04             554         MOV.W   R0,[R4]
+0002BB 8C1402           555         MOV.W   R1,[R4+2]
+0002BE 862C42           556         MOV.B   ES,R1L
+0002C1 8200             557         MOV.B   R0L,[R0]
+                        558         CALL    _KS_unlock
+0002C3 C4rrrrrr        +558 ;       FCALL   _KS_unlock
+                        559 ; asyn_api.c  276       
+                        560 ; asyn_api.c  277               /*---------------------------------------------------------------
+                            ---*/
+                        561 ; asyn_api.c  278               /* Verify completion of your request on the device.              
+                               */
+                        562 ; asyn_api.c  279               /*---------------------------------------------------------------
+                            ---*/
+                        563 ; asyn_api.c  280               KS_wait(logical_dev_tbl[deviceno]->dev_sema);
+0002C7 86AC42           564         MOV.B   ES,R5L
+0002CA 8A04             565         MOV.W   R0,[R4]
+0002CC 8C1402           566         MOV.W   R1,[R4+2]
+0002CF 862C42           567         MOV.B   ES,R1L
+0002D2 840001           568         MOV.B   R0L,[R0+1]
+                        569         CALL    _KS_wait
+0002D5 C4rrrrrr        +569 ;       FCALL   _KS_wait
+                        570 ; asyn_api.c  281       
+                        571 ; asyn_api.c  282               /*---------------------------------------------------------------
+                            ---*/
+                        572 ; asyn_api.c  283               /* return successful results.                                    
+                               */
+                        573 ; asyn_api.c  284               /*---------------------------------------------------------------
+                            ---*/
+                        574 ; asyn_api.c  285               if( (logical_dev_tbl[deviceno]->last_io_oper == IO_READ) ||
+                        575 ; asyn_api.c  286                   (logical_dev_tbl[deviceno]->last_io_oper == IO_WRITE)    )
+0002D9 86AC42           576         MOV.B   ES,R5L
+0002DC 8C5402           577         MOV.W   R5,[R4+2]
+0002DF 8A44             578         MOV.W   R4,[R4]
+0002E1 86AC42           579         MOV.B   ES,R5L
+0002E4 8C0406           580         MOV.W   R0,[R4+6]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+0002E7 F306             581         BEQ     _39
+0002E9 86AC42           582         MOV.B   ES,R5L
+0002EC 9C44060001       583         CMP.W   [R4+6],#01H
+0002F1 F21D             584         BNE     _41
+0002F1 F21D00           584         BNE     _41
+0002F4                  585 _39:
+                        586 ; asyn_api.c  287               {
+                        587 ; asyn_api.c  288                       if( logical_dev_tbl[deviceno]->lost_data )
+0002F4 86AC42           588         MOV.B   ES,R5L
+0002F7 840408           589         MOV.B   R0L,[R4+8]
+0002FA F314             590         BEQ     _40
+                        591 ; asyn_api.c  289                       {
+                        592 ; asyn_api.c  290                           ret_code = (IORC)SETERROR + ( (IORC)SETCLASS *
+                        593 ; asyn_api.c  291                                (IORC)logical_dev_tbl[deviceno]->dev_cntlr->cntl
+                            r_number) +
+                        594 ; asyn_api.c  292                                ((IORC) SETDEVICE * (IORC)deviceno) +
+                        595 ; asyn_api.c  293                                (IORC)logical_dev_tbl[deviceno]->lost_data;
+0002FC 86AC42           596         MOV.B   ES,R5L
+0002FF 8C240C           597         MOV.W   R2,[R4+12]
+000302 8C340E           598         MOV.W   R3,[R4+14]
+000305 866C42           599         MOV.B   ES,R3L
+000308 8A12             600         MOV.W   R1,[R2]
+00030A D91B             601         ASL.W   R1,#0BH
+00030C D966             602         ASL.W   R6,#06H
+00030E 0916             603         ADD.W   R1,R6
+000310 8100             604         MOV.B   R0L,R0L
+000312 9019             605         SEXT.B  R0H
+000314 0910             606         ADD.W   R1,R0
+000316 99108000         607         ADD.W   R1,#08000H
+00031A 8961             608         MOV.W   R6,R1
+                        609 ; asyn_api.c  294                           logical_dev_tbl[deviceno]->lost_data = NO_LOST_DATA;
+00031C 86AC42           610         MOV.B   ES,R5L
+00031F B44008           611         MOV.B   [R4+8],#00H
+                        612 ; asyn_api.c  295                       }
+000322 FE06             613         BR      _43
+000322 FE06             613         BR      _43
+000324                  614 _40:
+                        615 ; asyn_api.c  296                       else
+                        616 ; asyn_api.c  297                           ret_code = (IORC)logical_dev_tbl[deviceno]->bytes_tra
+                            nsfered;
+000324 86AC42           617         MOV.B   ES,R5L
+000327 8C6410           618         MOV.W   R6,[R4+16]
+                        619 ; asyn_api.c  298               }
+00032A FE02             620         BR      _43
+00032A FE02             620         BR      _43
+00032C                  621 _41:
+                        622 ; asyn_api.c  299               else
+                        623 ; asyn_api.c  300                       ret_code = (IORC)RTXCIO_GOOD + (IORC)IO_DEV_FREED;
+00032C 9968780A         624         MOV.W   R6,#0780AH
+00032C 9968780A         624         MOV.W   R6,#0780AH
+000330                  625 _43:
+                        626 ; asyn_api.c  301       
+                        627 ; asyn_api.c  302               /*---------------------------------------------------------------
+                            ---*/
+                        628 ; asyn_api.c  303               /* Unlock the device's resource to free the device.              
+                               */
+                        629 ; asyn_api.c  304               /*---------------------------------------------------------------
+                            ---*/
+                        630 ; asyn_api.c  305               KS_unlock(logical_dev_tbl[deviceno]->dev_res);
+000330 86AC42           631         MOV.B   ES,R5L
+000333 8204             632         MOV.B   R0L,[R4]
+                        633         CALL    _KS_unlock
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+000335 C4rrrrrr        +633 ;       FCALL   _KS_unlock
+                        634 ; asyn_api.c  306               return( ret_code );
+000339 8906             635         MOV.W   R0,R6
+000339 890600           635         MOV.W   R0,R6
+                        636 ; asyn_api.c  307       }
+00033C                  637 _46:
+00033C 2F70             638         POP.W   R4, R5, R6
+00033E D680             639         RET
+                        640 ; asyn_api.c  308       
+                        641 ; asyn_api.c  309       #endif   /* } ASYNCH_IO */
+                        642 ; asyn_api.c  310       
+                        643 ; asyn_api.c  311       /* End of the ASYN_API.C module */
+                        645         EXTRN   HDATA(_nchnls)
+                        646         EXTRN   HCODE(_KS_wait)
+                        647         EXTRN   HCODE(_KS_lock)
+                        648         EXTRN   HDATA(_channel_table)
+                        649         EXTRN   HDATA(_nldevs)
+                        650         EXTRN   HCODE(_process_io)
+                        651         EXTRN   HCODE(_KS_unlock)
+                        652         EXTRN   IDATA(__lc_bs)
+                        653         EXTRN   HDATA(_logical_dev_tbl)
+                        654         CALLS   'IO_read', 'process_io'
+                        655         CALLS   'IO_write', 'process_io'
+                        656         CALLS   'IO_dev_open', 'process_io'
+                        657         CALLS   'IO_dev_close', 'process_io'
+                        658         CALLS   'IO_control', 'process_io'
+                        659         CALLS   'IO_dev_wait', 'KS_lock'
+                        660         CALLS   'IO_dev_wait', 'KS_unlock'
+                        661         CALLS   'IO_dev_wait', 'KS_wait'
+                        662         CALLS   'IO_dev_wait', 'KS_unlock'

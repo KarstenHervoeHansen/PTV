@@ -1,0 +1,86 @@
+; @(#)udivl.src	1.4 2/23/98
+INCLUDE	'HEAD'
+
+		NAME _UDIVL
+
+DEFINE	_sp	"R7"	; stack pointer
+DEFINE	_a	"R1"	; operand 1 high word
+DEFINE	_b	"R0"	; operand 1 low  word
+DEFINE	_x	"R3"	; operand 2 high word
+DEFINE	_y	"R2"	; operand 2 low  word
+DEFINE	_aa	"_a"	; result high word
+DEFINE	_bb	"_b"	; reslut low word
+DEFINE	_tx	"_x"	; temporary storage x
+DEFINE	_ty	"_y"	; temporary storage y
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+;
+		PUBLIC	__UDIVL
+;************************************************************************
+;*									*
+;*		UDIVL							*
+;*									*
+;*	this routine provides an 32 bit by 32 bit unsigned divide	*
+;*	at entry:	R0D		the dividend (a:b)		*
+;*			R2D		the divisor (x:y)		*
+;*									*
+;*	at exit:	R0D		the 32 bit quotient (aa:bb)	*
+;*									*
+;*	destroys:	R0D,R2D						*
+;*									*
+;************************************************************************
+__UDIVL:				; unsigned long division
+	OR.W	_x,_x			; if( x == 0 )
+	BNE	OP2H			; then a:b / x:y  else a:b / y
+	XCH.W	_a,_y			; exchange divisor low word and dividend high word
+	DIVU.D	_y,_a			; a / y
+					; y is result high word is quotient
+					; x is remainder 
+	XCH.W	_a,_x			; exhange remainder and divisor low word
+	DIVU.D	_b,_x			; remainder.b / y
+					; b is result low word is quotient
+	MOV.W	_a,_y			; a is result high word
+	RET				; and return
+
+OP2H:	PUSH.W	_b			; push b on user stack
+	PUSH.W	_a			; push a on user stack
+	PUSH.W	_y			; push y on user stack
+	PUSH.W	_x			; push x on user stack
+					; divide operands by two until (x) 
+					; high word from operand 2 zero !
+LOOP:	LSR.D	_y,#01H			; shr x:y
+	LSR.D	_b,#01H			; shr a:b
+	OR.W	_x,_x			; if( x != 0 )
+	BNE	LOOP			; then continue shift right
+	DIVU.D	_b,_y			; right shifted ( a:b / y )
+					; bb = quotient and the remainder is 
+					; irrelevant for the precision.
+	POP.W	_x			; pop x from user stack
+	MOV.W	_ty,_bb			; mov _ty, bb
+	MULU.W	_ty,_x			; quotient * x
+	MOV.W	_aa,_ty			; aa is low word multiply
+
+	POP.W	_tx			; pop y from user stack
+	MOV.W	_ty,_bb			; mov _ty, bb
+	MULU.W	_ty,_tx			; quotient * y
+	ADD.W	_aa,_tx			; aa = aa + HIGH_WORD(quotient * y)
+					; if( quotient * x:y > a:b )
+					;  then decrement result low word
+					;  else result low word is ok
+	BCS	DEC_RESLW		; if( carry ) dec result low word
+	MOV.W	_tx,[_sp]		; get a from user stack
+	CMP.W	_aa,_tx			; cmp aa, a
+	BG	DEC_RESLW		; if( aa > a ) dec result low word
+	BCS	RESHW0			; if( aa < a ) result low word ok
+	MOV.W	_tx,[_sp+2]		; get b from user stack
+	CMP.W	_ty,_tx			; cmp bb, b
+	BL	RESHW0			; if( bb <= b ) 
+					;  then result low word ok
+DEC_RESLW:				;  else 
+	SUB.W	_bb,#01H		;    decrement result low word
+RESHW0:	XOR.W	_aa,_aa			; R5 is result high word is 0
+	ADD.W	_sp,#04H		; remove a:b from stack
+	RET				; and return
+
+	END

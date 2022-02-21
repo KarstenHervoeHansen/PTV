@@ -1,0 +1,64 @@
+; @(#)abort.src	1.5 7/22/97 
+;*****************************************************************************
+;*
+;* MODULE	: abort.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: The abort routine abnormal program termination to occur.
+;*		  All open streams with unwritten buffered data are flushed, 
+;*		  all open streams are closed and all files created by the 
+;*		  fuction tmpfile function are remove by the routine __cleanup.
+;*		  This is implementation defined, because it is not dictated
+;*		  by ANSI-C. The unsuccesful termination code returned via R0
+;*		  is also implementation defined. The unsuccesful termination
+;*		  code is 1. Finally, control is returned to the "host
+;*		  environment", by jumping directly to __EXIT in the cstart 
+;*		  routine.
+;*
+;*		  __doexit and __cleanup are clib routines.
+;*
+;* INPUT	: none
+;*
+;* OUTPUT	: R0
+;*
+;* USES		: R0
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+
+INCLUDE 'HEAD'
+
+	NAME	ABORT
+
+IF	MODEL_MEDIUM || MODEL_LARGE
+	IF	DO_FILE_IO
+		EXTRN	HCODE(__cleanup)
+	ENDIF
+		EXTRN	HCODE(__EXIT)
+	LIBC_PR SEGMENT HCODE
+ELSE	
+	IF	DO_FILE_IO
+		EXTRN	CODE(__cleanup)
+	ENDIF
+	EXTRN	CODE(__EXIT)
+	LIBC_PR SEGMENT CODE
+ENDIF
+
+	RSEG	LIBC_PR
+
+	PUBLIC	_abort
+
+;*****************************************************************************
+;* abort
+;*****************************************************************************
+_abort:
+IF	DO_FILE_IO
+	GCALL	__cleanup	; flush open streams and close them and remove
+				; temporary files.
+ENDIF
+	MOV.W	R0,#01H		; set return value unsuccesful termination
+	GJMP	__EXIT		; jump to exit label in cstart module
+
+	END

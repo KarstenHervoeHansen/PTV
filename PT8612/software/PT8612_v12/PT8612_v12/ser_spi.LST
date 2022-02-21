@@ -1,0 +1,701 @@
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE SER_SPI
+OBJECT MODULE PLACED IN ser_spi.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe ser_spi.c DB OE LARGE
+
+line level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2005                                           */
+   3          /*  Project:  PT8641 HDTPG (PT8612), using 8051F320 Cygnal                 */
+   4          /*            processor.                                                   */
+   5          /*  Module:   ser_spi.C                                                    */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     01.03.2006                                                   */
+   8          /*  Status:   Version 2.0                                                  */
+   9          /*  Purpose:  This module implements serial communication routines used to */
+  10          /*            communicate with PT5300 Master.  It also contains two        */
+  11          /*            software SPI functions for communication with the FPGA.      */
+  12          /***************************************************************************/
+  13          #pragma WARNINGLEVEL (1) /* Lists only those warnings which may generate   */
+  14                                   /* incorrect code. Default is 2.                  */
+  15          /***************************************************************************/
+  16          
+  17          #include <C8051F320.h>
+  18          #include "define.h"
+  19          #include <string.h>
+  20          #include "ser_spi.h"
+  21          #include "cmd.h"
+  22          #include "eeprom.h"
+  23          #include "serial.h"
+  24          
+  25          #define IDDLESTATE     0x00
+  26          #define DATASTATE      0x01
+  27          #define QUOTESTATE     0x02    /* MUST be DATASTATE XOR 03H */
+  28          #define DELSTATE       0x03
+  29          
+  30          #define XORValue       0x03
+  31          
+  32          /* use the condition below to allow debugging.  If DefaultHDTPG_addr = 0x13,
+  33             then PT8641 program will work properly without the need to reset the Master
+  34          */
+  35          #if 1
+  36          #define DefaultHDTPG_addr     (UC)0xF5    /* default SLAVE address for PT8641 */
+  37          #else
+              #define DefaultHDTPG_addr     (UC)0x11
+              #endif
+  40          
+  41          #define PT8641_COMMAND_PREFIX  'U'    /* First letter of PT8641 command */
+  42                                                /* set */
+  43          
+  44          enum CommandStates
+  45            { 
+  46            State_0 = 0,
+  47            State_1,
+  48            State_2,
+  49            State_3,
+  50            State_4,
+  51            State_5,
+  52            State_6,
+  53            State_7,
+  54            State_8
+  55            };
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 2   
+
+  56          
+  57          #define NoInASCII     128
+  58          
+  59          /* In the table below:
+  60             D is delimiter and has following values:
+  61                                                     0x0A - LF
+  62                                                     0x0D - CR
+  63                                                     0x24 - $
+  64                                                     0x3B - ;
+  65                                                     0x3F - ?
+  66          
+  67             S is separator                          0x2C - ,
+  68          
+  69             N is ASCII number:
+  70                                                     0x2B - +
+  71                                                     0x2D - -
+  72                                                     0x2E - .
+  73                                                     0x30 - 0
+  74                                                     0x31 - 1
+  75                                                     ........
+  76                                                     0x39 - 9
+  77          
+  78             A is ASCII letter:                      0x41 - 0x4A and
+  79                                                     0x61 - 0x7F
+  80          
+  81             Q is quote                              0x22
+  82          
+  83             R is all the rest, control character.
+  84          
+  85             So, the table below maps all ASCII chars to a set of chartypes.
+  86          */
+  87          code char TypeTable[NoInASCII] =
+  88             {
+  89            /*           0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+  90            /* 0x00 */  'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'D', 'R', 'R', 'D', 'A', 'R',
+  91            /* 0x10 */  'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+  92            /* 0x20 */  'R', 'D', 'Q', 'R', 'D', 'R', 'R', 'R', 'R', 'R', 'R', 'N', 'S', 'N', 'N', 'R',
+  93            /* 0x30 */  'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'R', 'D', 'R', 'R', 'R', 'D',
+  94            /* 0x40 */  'R', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A',
+  95            /* 0x50 */  'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'R', 'R', 'R', 'R', 'R',
+  96            /* 0x60 */  'R', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A',
+  97            /* 0x70 */  'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'
+  98            };
+  99          
+ 100          UC RxState;
+ 101          UC RxChkSum;
+ 102          
+ 103          /* These 2 are out and in pointers to RxBuffer */
+ 104          UC RxOutput;
+ 105          UC RxInput;
+ 106          
+ 107          UC BufState;
+ 108          UC Char;
+ 109          UC CharType;
+ 110          
+ 111          char StrNdx;
+ 112          char ParamNdx;
+ 113          
+ 114          UC   MySlaveAddress;
+ 115          
+ 116          char Cmd[2];
+ 117          char CmdDelimiter;
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 3   
+
+ 118          
+ 119          #define RXRLEN      50
+ 120          
+ 121          char RxBuffer[RXRLEN];
+ 122          char String[10]; /* used to hold string, if sent by master */
+ 123          UL   Parameter[3];
+ 124          
+ 125          UC   Tx_ACK_Buffer;
+ 126          bit  Tx_ACK_Pending;
+ 127          bit  Tx_BUSY;          /* What is the difference between Tx_BUSY and Tx_SBUF_Empty */
+ 128          bit  Tx_SBUF_Empty;
+ 129          
+ 130          bit  Broadcast;
+ 131          
+ 132          bit  transparent;
+ 133          
+ 134          #include "io.c"
+ 135          
+ 136          /***************************************************************************/
+ 137          /*  RS232Init                                                      RS232.C */
+ 138          /*                                                                         */
+ 139          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 140          /* Revised:    980601, KEn                                                 */
+ 141          /*                                                                         */
+ 142          /*  Function:  Initialize the RS232 communication.                         */
+ 143          /*  Remarks:    --                                                         */
+ 144          /*  Returns:    --                                                         */
+ 145          /*  Updates:    --                                                         */
+ 146          /***************************************************************************/
+ 147          void RS232Init()
+ 148            {
+ 149   1        MySlaveAddress   = DefaultHDTPG_addr; /* default SLAVE address for PT8641 */
+ 150   1        CS          = 1;
+ 151   1        RxInput     = 0; 
+ 152   1        RxOutput    = 0;
+ 153   1        RxState     = IDDLESTATE;
+ 154   1        Char        = 0;
+ 155   1        CharType    = 0;
+ 156   1        BufState    = State_0;
+ 157   1        Broadcast   = FALSE;
+ 158   1        Tx_BUSY     = FALSE;
+ 159   1        Tx_ACK_Pending = FALSE;
+ 160   1        Tx_SBUF_Empty  = TRUE;
+ 161   1        transparent    = FALSE;
+ 162   1        }
+ 163          
+ 164          /***************************************************************************/
+ 165          /*  RS232break                                                     RS232.C */
+ 166          /*                                                                         */
+ 167          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 168          /* Revised:   980601, KEn                                                  */
+ 169          /*                                                                         */
+ 170          /*  Function:  Transmitter/receiver interrupt handler.                     */
+ 171          /*  Remarks:   DO NOT CALL THIS FUNCTION!!! IT'S AN INTERRUPT ONLY         */
+ 172          /*  Returns:    --                                                         */
+ 173          /*  Updates:    --                                                         */
+ 174          /*
+ 175          Multiprocessor Communications
+ 176          
+ 177          Modes 2 and 3 support multiprocessor communication 
+ 178          between a master processor and one or more slave 
+ 179          processors by special use of the ninth data bit. 
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 4   
+
+ 180          When a master processor wants to transmit to one 
+ 181          or more slaves, it first sends an address byte to 
+ 182          select the target(s). An address byte differs from
+ 183          a data byte in that its ninth bit is logic 1; 
+ 184          in a data byte, the ninth bit is always set to logic 0.
+ 185          
+ 186          Setting the MCE0 bit (SCON.5) of a slave processor 
+ 187          configures its UART such that when a stop bit is 
+ 188          received, the UART will generate an interrupt only 
+ 189          if the ninth bit is logic one (RB8 = 1) signifying 
+ 190          an address byte has been received. In the UART's
+ 191          interrupt handler, software will compare the received 
+ 192          address with the slave's  assigned 8-bit address. 
+ 193          If the addresses match, the slave will clear its MCE0 bit 
+ 194          to enable interrupts on the reception of the following 
+ 195          data byte(s). 
+ 196          
+ 197          Slaves that weren't addressed leave their MCE0 bits 
+ 198          set and do not generate interrupts on the reception 
+ 199          of the following data bytes, thereby ignoring the data. 
+ 200          Once the entire message is received, the addressed slave 
+ 201          resets its MCE0 bit to ignore all transmissions until it 
+ 202          receives the next address byte.
+ 203          
+ 204          Multiple addresses can be assigned to a single slave 
+ 205          and/or a single address can be assigned to multiple slaves,
+ 206          thereby enabling inbroadcastls transmissions to more than 
+ 207          one slave simultaneously. The master processor can be
+ 208          configured to receive all transmissions or a protocol can 
+ 209          be implemented such that the master/slave role is
+ 210          temporarily reversed to enable half-duplex transmission 
+ 211          between the original master and slave(s).
+ 212          */
+ 213          /***************************************************************************/
+ 214          void RS232break(void) interrupt 4
+ 215            {
+ 216   1        static char RxChar, RxCharType;
+ 217   1      
+ 218   1        if (transparent)
+ 219   1          {
+ 220   2          serint0();
+ 221   2          }
+ 222   1        else
+ 223   1          {
+ 224   2          while (RI0)
+ 225   2            {
+ 226   3            if (MCE0)
+ 227   3              {
+ 228   4              if (SBUF0 == 0x90) /* Broadcast: all slaves listen, 0x90 must be bradcast address */
+ 229   4                {
+ 230   5                Broadcast = TRUE; /* prepare to receive WITHOUT an acknowledge in the end */
+ 231   5        
+ 232   5                MCE0       = 0;
+ 233   5                RxState   = DATASTATE;
+ 234   5                RxChkSum  = 0;
+ 235   5                }
+ 236   4              else
+ 237   4                if (SBUF0 == MySlaveAddress) /* Only this slave listens */
+ 238   4                  {
+ 239   5                  MCE0      = 0;             /* Cancel multiprocessor comms */
+ 240   5                  RxState  = DATASTATE;
+ 241   5                  RxChkSum = 0;
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 5   
+
+ 242   5                  }
+ 243   4              } /* if (MCE0) */
+ 244   3            else
+ 245   3              {
+ 246   4              RxChar = SBUF0;
+ 247   4              if (RxState == DELSTATE)
+ 248   4                {
+ 249   5                MCE0 = 1;                    /* End of data, Enable multiprocessor comms */
+ 250   5                if ((RxChkSum & 0x7F) - RxChar)
+ 251   5                  {
+ 252   6                  Tx_ACK_Buffer = 0x81;  /* checksum error */
+ 253   6                  }
+ 254   5                else
+ 255   5                  {
+ 256   6                  Tx_ACK_Buffer = 0x80;  /* checksum OK    */
+ 257   6                  }
+ 258   5                RxChar = Tx_ACK_Buffer;  /******************/
+ 259   5                if (!Broadcast)      /* DO NOT TRANSMIT ACKNOWLEDGE FOR A BROADCAST MESSAGE!!!!*/
+ 260   5                  {
+ 261   6                  if (Tx_BUSY)
+ 262   6                    Tx_ACK_Pending = TRUE;/* Signal that ACK will be sent later */
+ 263   6                  else
+ 264   6                    {
+ 265   7                    Tx_SBUF_Empty = FALSE;
+ 266   7                    SBUF0 = Tx_ACK_Buffer; /* Send ACK = checksum_state */
+ 267   7                    }
+ 268   6                  }
+ 269   5                else /* Broadcast: do nothing */
+ 270   5                  Broadcast = FALSE;
+ 271   5                } /* if (RxState == DELSTATE) */
+ 272   4              else
+ 273   4                { 
+ 274   5                RxCharType = TypeTable[RxChar];
+ 275   5                if (RxCharType == 'Q')
+ 276   5                  RxState ^= XORValue;
+ 277   5                else
+ 278   5                  {
+ 279   6                  if (RxState != 0x02)     /* ???  (State_2 ?) or (QUOTESTATE = 0x02) */
+ 280   6                    {
+ 281   7                    if (RxCharType == 'D') /* D is delimiter  */
+ 282   7                      RxState = DELSTATE;  /* DELSTATE = 0x03 */
+ 283   7                    }
+ 284   6                  }
+ 285   5                }
+ 286   4              RxBuffer[RxInput = ++RxInput % RXRLEN] = RxChar; /* store char */
+ 287   4              RxChkSum += RxChar;
+ 288   4              } /* if (!MCE0) */
+ 289   3            RI0 = 0;
+ 290   3            }
+ 291   2        
+ 292   2          if (TI0)
+ 293   2            {
+ 294   3            if (Tx_ACK_Pending)
+ 295   3              {
+ 296   4              Tx_ACK_Pending = FALSE;
+ 297   4              SBUF0 = Tx_ACK_Buffer;
+ 298   4              }
+ 299   3            else
+ 300   3              Tx_SBUF_Empty = TRUE;
+ 301   3            TI0 = 0;
+ 302   3            }
+ 303   2          }
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 6   
+
+ 304   1        }
+ 305          
+ 306          /***************************************************************************/
+ 307          /*  TestInputBuffer                                                RS232.C */
+ 308          /*                                                                         */
+ 309          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 310          /* Revised:    980601, KEn                                                 */
+ 311          /*  Function:  Test if any more date in the input buffer.                  */
+ 312          /*  Remarks:    --                                                         */
+ 313          /*  Returns:    TRUE: If any more data, otherwise FALSE.                   */
+ 314          /*  Updates:    --                                                         */
+ 315          /***************************************************************************/
+ 316          bit TestInputBuffer()
+ 317            {
+ 318   1        if (RxInput - RxOutput)
+ 319   1          return(TRUE);
+ 320   1        return(FALSE);
+ 321   1        }
+ 322          
+ 323          /***************************************************************************/
+ 324          /*  WriteChar                                                      RS232.C */
+ 325          /*                                                                         */
+ 326          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 327          /* Revised:    980601, KEn                                                 */
+ 328          /*                                                                         */
+ 329          /*  Function:  Write one character to the RS232 output buffer.             */
+ 330          /*  Remarks:    --                                                         */
+ 331          /*  Returns:    --                                                         */
+ 332          /*  Updates:    --                                                         */
+ 333          /***************************************************************************/
+ 334          void WriteChar(char TxChar)
+ 335            {
+ 336   1        Tx_BUSY = TRUE;
+ 337   1        while (!Tx_SBUF_Empty)
+ 338   1          ;
+ 339   1        Tx_SBUF_Empty = FALSE;
+ 340   1        SBUF0 = TxChar;
+ 341   1        while (!Tx_SBUF_Empty)
+ 342   1          ;
+ 343   1        Tx_BUSY = FALSE;
+ 344   1        }
+ 345          
+ 346          /***************************************************************************/
+ 347          /*  WriteVal                                                       RS232.C */
+ 348          /*                                                                         */
+ 349          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 350          /* Revised:    980601, KEn                                                 */
+ 351          /*                                                                         */
+ 352          /*  Function:  Write a value to the RS232 output buffer.                   */
+ 353          /*  Remarks:    --                                                         */
+ 354          /*  Returns:    --                                                         */
+ 355          /*  Updates:    --                                                         */
+ 356          /***************************************************************************/
+ 357          void WriteVal(UL value)
+ 358            {
+ 359   1        UC checksum, i;
+ 360   1        UC tmp, ValOut;
+ 361   1        UL divider;
+ 362   1      
+ 363   1        ValOut = FALSE;
+ 364   1        checksum = 0;
+ 365   1      
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 7   
+
+ 366   1        divider = 1000000000;
+ 367   1      
+ 368   1        for (i = 0; i < 10; i++)
+ 369   1           {
+ 370   2           if (tmp = (value / divider) % 10)
+ 371   2             ValOut = TRUE;
+ 372   2           if (ValOut || (i == 9))
+ 373   2             {
+ 374   3             tmp += '0';
+ 375   3             WriteChar(tmp);
+ 376   3             checksum += tmp;
+ 377   3             }  
+ 378   2          divider /= 10;
+ 379   2          }
+ 380   1        WriteChar(';');
+ 381   1        WriteChar((checksum + ';') & 0x7F);
+ 382   1        }
+ 383          
+ 384          /******************************************************************
+ 385           * NAME       void WriteString(UC *Str)
+ 386           * PURPOSE    To transmit string to master
+ 387           * 
+ 388           * ARGUMENTS  UC *Str - NULL terminated string
+ 389           *
+ 390           * RETURNS    Nothing
+ 391           *
+ 392           * EXTERNS    None
+ 393           *
+ 394           * NOTES:     Text of the string is transmitted in quotes.
+ 395           *            Checksum includes these quotes.
+ 396           ******************************************************************/
+ 397          void WriteString(UC *Str)
+ 398            {
+ 399   1        UC checksum = 2*'\"';
+ 400   1      
+ 401   1        WriteChar('\"');
+ 402   1        
+ 403   1        while (*Str)
+ 404   1          {
+ 405   2          WriteChar(*Str);
+ 406   2          checksum += *Str++;
+ 407   2          }
+ 408   1        WriteChar('\"');
+ 409   1        WriteChar(';');
+ 410   1        WriteChar((checksum + ';') & 0x7F);
+ 411   1      
+ 412   1        }
+ 413          
+ 414          /***************************************************************************/
+ 415          /*  CharHandler                                                    RS232.C */
+ 416          /*                                                                         */
+ 417          /* Author:     Kim Engedahl, DEV, 970217                                   */
+ 418          /* Revised:    980601, KEn                                                 */
+ 419          /*                                                                         */
+ 420          /*  Function:  RS232 command handler.                                      */
+ 421          /*  Remarks:   NOTE!  The broadcast messages are handled specially.        */
+ 422          /*  Returns:    --                                                         */
+ 423          /*  Updates:    --                                                         */
+ 424          /***************************************************************************/
+ 425          void CharHandler()
+ 426            {
+ 427   1        Char = RxBuffer[RxOutput = ++RxOutput % RXRLEN];
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 8   
+
+ 428   1                          
+ 429   1        CharType = TypeTable[Char];
+ 430   1      
+ 431   1        switch (BufState)
+ 432   1          {
+ 433   2          case State_0:
+ 434   2            if (CharType == 'A') /* Ascii letter */
+ 435   2              {
+ 436   3              BufState++;
+ 437   3              Cmd[0] = Char;
+ 438   3              ParamNdx = 0;
+ 439   3              Parameter[0] = Parameter[1] = Parameter[2] = 0;
+ 440   3              return;
+ 441   3              }
+ 442   2            if (CharType != 'D') /* Delimiter */
+ 443   2              BufState = State_7;
+ 444   2            return;
+ 445   2          case State_1:
+ 446   2            switch (CharType)
+ 447   2              {
+ 448   3              case 'A': /* Ascii letter */
+ 449   3                Cmd[1] = Char;
+ 450   3                return;
+ 451   3              case 'D': /* Delimiter    */
+ 452   3                CmdDelimiter = Char;
+ 453   3                BufState = State_6;
+ 454   3                return;
+ 455   3              case 'Q': /* Quote        */
+ 456   3                StrNdx = -1;
+ 457   3                BufState = State_3;
+ 458   3                return;
+ 459   3              case 'N': /* Number       */
+ 460   3                Parameter[ParamNdx = 0] = Char - '0';
+ 461   3                BufState = State_2;
+ 462   3                return;
+ 463   3              default:
+ 464   3                BufState = State_7;
+ 465   3              }
+ 466   2            break;
+ 467   2          case State_2:
+ 468   2            switch (CharType)
+ 469   2              {
+ 470   3              case 'N': /* Number       */
+ 471   3                Parameter[ParamNdx] = 10*Parameter[ParamNdx] + Char - '0';
+ 472   3                return;
+ 473   3              case 'S': /* Separator    */
+ 474   3                BufState = State_5;
+ 475   3                return;
+ 476   3              case 'D': /* Delimiter    */
+ 477   3                CmdDelimiter = Char;
+ 478   3                BufState = State_6;
+ 479   3                return;
+ 480   3              default:
+ 481   3                BufState = State_7;
+ 482   3              }
+ 483   2            break;
+ 484   2          case State_3:
+ 485   2            if (CharType == 'Q') /* Quote     */
+ 486   2              {
+ 487   3              String[++StrNdx] = '\0';
+ 488   3              BufState++;
+ 489   3              return;
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 9   
+
+ 490   3              }
+ 491   2            String[++StrNdx] = Char;
+ 492   2            break;
+ 493   2          case State_4:
+ 494   2            switch (CharType)
+ 495   2              {
+ 496   3              case 'Q': /* Quote     */
+ 497   3                String[StrNdx] = Char;
+ 498   3                BufState = State_3;
+ 499   3                break;
+ 500   3              case 'S': /* Separator */
+ 501   3                BufState++;
+ 502   3                break;
+ 503   3              case 'D': /* Delimiter */
+ 504   3                CmdDelimiter = Char;
+ 505   3                BufState = State_6;
+ 506   3                break;
+ 507   3              default:
+ 508   3                BufState = State_7;
+ 509   3                return;
+ 510   3              }
+ 511   2            break;
+ 512   2          case State_5:
+ 513   2            switch (CharType)
+ 514   2              {
+ 515   3              case 'Q':  /* Quote     */
+ 516   3                StrNdx = -1;
+ 517   3                BufState = State_3;
+ 518   3                break;
+ 519   3              case 'N': /* Number    */
+ 520   3                Parameter[++ParamNdx] = Char - '0';
+ 521   3                BufState = State_2;
+ 522   3                break;
+ 523   3              default:
+ 524   3                BufState = State_7;
+ 525   3                return;
+ 526   3              }
+ 527   2            break;
+ 528   2          case State_6:
+ 529   2            if (Char == 0x80) /* this means that there was no chksum error */
+ 530   2              {
+ 531   3              if (Cmd[0] == PT8641_COMMAND_PREFIX)  /* if (Cmd[0] == 'U') */
+ 532   3                CommandExecute();
+ 533   3              }
+ 534   2            BufState = State_0;
+ 535   2            return;
+ 536   2          case State_7:
+ 537   2            if (CharType == 'D') /* Delimiter */
+ 538   2              BufState++;
+ 539   2            return;      
+ 540   2          case State_8:
+ 541   2            BufState = State_0;
+ 542   2            return;      
+ 543   2          }
+ 544   1        }
+ 545          
+ 546          /******************************************************************
+ 547           * NAME       UC spi_transfer (UC spi_byte, UC cnt)
+ 548           * PURPOSE    To transfer data bits using SPI protocol
+ 549           * 
+ 550           * ARGUMENTS  UC spi_byte - data byte  to be transferred
+ 551           *            UC cnt      - nr of bits to be transferred
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 10  
+
+ 552           *
+ 553           * RETURNS    byte received simultaneously 
+ 554           *
+ 555           * EXTERNS    None
+ 556           *
+ 557           * NOTES:     This function wil serialize cnt bits of spi_byte
+ 558           *            and send them via MOSI, MSB bit first.
+ 559           *            If cnt is less than 8, make sure that the bits to 
+ 560           *            send are already shifted to the left before 
+ 561           *            calling this function.
+ 562           *            Slave select signals are not handled by this function.
+ 563           ******************************************************************/
+ 564          UC spi_transfer (UC spi_byte, UC cnt)
+ 565            {
+ 566   1        UC i;
+ 567   1      
+ 568   1        for (i = 0; i < cnt; i++)
+ 569   1          {
+ 570   2          SCK = 0x01;
+ 571   2      
+ 572   2          if (spi_byte & 0x80)
+ 573   2            MOSI = 1;
+ 574   2          else
+ 575   2            MOSI = 0;
+ 576   2          spi_byte = spi_byte << 1;
+ 577   2          SCK = 0x00;
+ 578   2          spi_byte |= MISO;
+ 579   2          }
+ 580   1        return (spi_byte);
+ 581   1        }
+ 582          
+ 583          /******************************************************************
+ 584           * NAME       void send(UC gen, UI addr, UC* dat, int cnt)
+ 585           * PURPOSE    To send data packet to FPGA.
+ 586           *
+ 587           * ARGUMENTS  UC gen  - generator number
+ 588           *            ui addr - FPGA chunk RAM storage address
+ 589           *            UC *dat - pointer to data
+ 590           *            int cnt - data length
+ 591           *
+ 592           * RETURNS    Nothing
+ 593           *
+ 594           * EXTERNS    None
+ 595           *
+ 596           * NOTES:     
+ 597           ******************************************************************/
+ 598          void send(UC gen, UI addr, UC* dat, int cnt)
+ 599            {
+ 600   1        UC i;
+ 601   1        ui j;
+ 602   1      
+ 603   1        CS = 0;
+ 604   1        j.intval = addr;
+ 605   1        spi_transfer(gen, 8);          /* generator number */
+ 606   1        spi_transfer(j.bytes[0], 8);   /* address MSB      */
+ 607   1        spi_transfer(j.bytes[1], 8);   /* address LSB      */
+ 608   1      
+ 609   1        for (i = 0; i < cnt; i++)
+ 610   1          {
+ 611   2          spi_transfer(*(dat++), 8);
+ 612   2          }
+ 613   1        CS = 1;
+C51 COMPILER V7.10   SER_SPI                                                               10/11/2010 13:21:59 PAGE 11  
+
+ 614   1        }
+ 615          
+ 616          
+ 617          
+ 618          /******************************************************************
+ 619           * NAME       void receive_byte(UC gen, UI addr, UC* dat)
+ 620           * PURPOSE    To receive data byte from FPGA.
+ 621           *
+ 622           * ARGUMENTS  UC gen  - generator number
+ 623           *            ui addr - FPGA chunk RAM storage address
+ 624           *            UC *dat - pointer to received data
+ 625           *
+ 626           * RETURNS    Nothing
+ 627           *
+ 628           * EXTERNS    None
+ 629           *
+ 630           * NOTES:     This function works with the following addresses only:
+ 631           *
+ 632           *              #define   STAT_CHAN1        128
+ 633           *              #define   STAT_CHAN2        129
+ 634           *              #define   STAT_CHAN3        130
+ 635           *              #define   STAT_CHAN4        131
+ 636           *              #define   STAT_PLL          132
+ 637           *              #define   STAT_GENL         133
+ 638           *            due to such implementation of the communication 
+ 639           *            process in the FPGA.  All other addresses return
+ 640           *            some dummy data.
+ 641           *******************************************************************/
+ 642          void receive_byte(UC gen, UI addr, UC* dat)
+ 643            {
+ 644   1        UC i;
+ 645   1        ui j;
+ 646   1        UC tmp;
+ 647   1      
+ 648   1        tmp = *dat;
+ 649   1      
+ 650   1        CS = 0;
+ 651   1        j.intval = addr;
+ 652   1        spi_transfer(gen, 8);          /* generator number */
+ 653   1        spi_transfer(j.bytes[0], 8);   /* address MSB      */
+ 654   1        spi_transfer(j.bytes[1], 8);   /* address LSB      */
+ 655   1      
+ 656   1        *dat = spi_transfer(tmp, 8);
+ 657   1        CS = 1;
+ 658   1        }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1510    ----
+   CONSTANT SIZE    =    128    ----
+   XDATA SIZE       =     88      30
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      5    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

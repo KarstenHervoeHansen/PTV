@@ -1,0 +1,128 @@
+--lpm_counter DEVICE_FAMILY="Cyclone II" lpm_direction="UP" lpm_width=5 aclr clock q
+--VERSION_BEGIN 4.1 cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_lpm_add_sub 2004:06:23:12:24:04:SJ cbx_lpm_compare 2004:04:12:17:30:12:SJ cbx_lpm_counter 2004:07:12:18:53:30:SJ cbx_lpm_decode 2004:03:10:10:44:06:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_stratix 2004:04:28:15:20:14:SJ cbx_stratixii 2004:05:18:11:28:28:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION cycloneii_lcell_comb (cin, dataa, datab, datac, datad)
+WITH ( 	LUT_MASK,	SUM_LUTC_INPUT) 
+RETURNS ( combout, cout);
+FUNCTION cycloneii_lcell_ff (aclr, clk, datain, ena, sclr, sdata, sload)
+RETURNS ( regout);
+
+--synthesis_resources = cycloneii_lcell_comb 5 cycloneii_lcell_ff 5 
+SUBDESIGN cntr_1i7
+( 
+	aclr	:	input;
+	clock	:	input;
+	q[4..0]	:	output;
+) 
+VARIABLE 
+	counter_comb_bita0 : cycloneii_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_comb_bita1 : cycloneii_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_comb_bita2 : cycloneii_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_comb_bita3 : cycloneii_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_comb_bita4 : cycloneii_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_reg_bit1a[4..0] : cycloneii_lcell_ff;
+	a_val[4..0]	: WIRE;
+	aclr_actual	: WIRE;
+	clk_en	: NODE;
+	cnt_en	: NODE;
+	data[4..0]	: NODE;
+	external_cin	: WIRE;
+	ones[31..0]	: WIRE;
+	s_val[4..0]	: WIRE;
+	safe_q[4..0]	: WIRE;
+	sclr	: NODE;
+	sload	: NODE;
+	sset	: NODE;
+	time_to_clear	: WIRE;
+	updown_dir	: WIRE;
+
+BEGIN 
+	counter_comb_bita[0].cin = external_cin;
+	counter_comb_bita[1].cin = counter_comb_bita[0].cout;
+	counter_comb_bita[2].cin = counter_comb_bita[1].cout;
+	counter_comb_bita[3].cin = counter_comb_bita[2].cout;
+	counter_comb_bita[4].cin = counter_comb_bita[3].cout;
+	counter_comb_bita[0].dataa = counter_reg_bit1a[0].regout;
+	counter_comb_bita[1].dataa = counter_reg_bit1a[1].regout;
+	counter_comb_bita[2].dataa = counter_reg_bit1a[2].regout;
+	counter_comb_bita[3].dataa = counter_reg_bit1a[3].regout;
+	counter_comb_bita[4].dataa = counter_reg_bit1a[4].regout;
+	counter_comb_bita[0].datab = updown_dir;
+	counter_comb_bita[1].datab = updown_dir;
+	counter_comb_bita[2].datab = updown_dir;
+	counter_comb_bita[3].datab = updown_dir;
+	counter_comb_bita[4].datab = updown_dir;
+	counter_comb_bita[0].datad = B"1";
+	counter_comb_bita[1].datad = B"1";
+	counter_comb_bita[2].datad = B"1";
+	counter_comb_bita[3].datad = B"1";
+	counter_comb_bita[4].datad = B"1";
+	counter_reg_bit1a[].aclr = aclr_actual;
+	counter_reg_bit1a[].clk = clock;
+	counter_reg_bit1a[0].datain = counter_comb_bita[0].combout;
+	counter_reg_bit1a[1].datain = counter_comb_bita[1].combout;
+	counter_reg_bit1a[2].datain = counter_comb_bita[2].combout;
+	counter_reg_bit1a[3].datain = counter_comb_bita[3].combout;
+	counter_reg_bit1a[4].datain = counter_comb_bita[4].combout;
+	counter_reg_bit1a[].ena = (clk_en & (((sclr # sset) # sload) # cnt_en));
+	counter_reg_bit1a[].sdata = ((! sclr) & ((sset & s_val[]) # ((! sset) & data[])));
+	counter_reg_bit1a[].sload = ((sclr # sset) # sload);
+	a_val[] = ( ones[4..0]);
+	aclr_actual = aclr;
+	clk_en = VCC;
+	cnt_en = VCC;
+	data[] = GND;
+	external_cin = B"1";
+	ones[] = B"11111111111111111111111111111111";
+	q[] = safe_q[];
+	s_val[] = ( ones[4..0]);
+	safe_q[] = counter_reg_bit1a[].regout;
+	sclr = GND;
+	sload = GND;
+	sset = GND;
+	time_to_clear = B"0";
+	updown_dir = B"1";
+END;
+--VALID FILE

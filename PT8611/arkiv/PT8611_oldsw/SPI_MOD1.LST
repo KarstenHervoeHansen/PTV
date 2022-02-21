@@ -1,0 +1,583 @@
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE SPI_MOD1
+OBJECT MODULE PLACED IN SPI_MOD1.OBJ
+COMPILER INVOKED BY: C:\CYGNAL\IDEfiles\C51\BIN\C51.exe SPI_MOD1.c DB OE CD OPTIMIZE(9,SPEED) SMALL
+
+stmt level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2003                                           */
+   3          /*  Project:  PT8640 Trilevel HDTV generator, using 8051F231 Cygnal        */
+   4          /*            processor.                                                   */
+   5          /*  Module:   SPI_MOD1.c                                                   */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     25.02.2004                                                   */
+   8          /*  Purpose:  This module implements SPI transfer function to transfer     */
+   9          /*            data to SPARTAN FPGA on PT8640 board.                        */
+  10          /***************************************************************************/
+  11          
+  12          
+  13          #include "f200.h"
+  14          #include "define.h"
+  15          #include "spi_mod1.h"
+  16          
+  17          #if 0
+              sbit SCL =  P1^2; /* PT8640 defs (P1^2) for onboard eeprom */
+              sbit SDA =  P1^1;
+              #endif
+  21          
+  22          sbit LED   = P2^4;
+  23          sbit SCK   = P2^0;
+  24          sbit MISO  = P2^1;
+  25          sbit MOSI  = P2^2;
+  26          sbit NSS_0 = P2^3;
+  27          sbit NSS_1 = P2^5;
+  28          sbit NSS_2 = P1^7;
+  29          sbit NSS_3 = P1^6;
+  30          sbit NSS_4 = P1^5;
+  31          sbit NSS_5 = P1^4;
+  32          sbit NSS_6 = P1^3;
+  33          sbit NSS_7 = P0^2;
+  34          
+  35          typedef struct aa
+  36            {
+  37            long   samples_per_line;
+  38            long   lines_per_frame;
+  39            UC   sys_clk;
+  40            UC   scan;
+  41            UC   sync;
+  42            }  TLG_FORMATS;
+  43          
+  44          /*      spl      lpf   clk  scan  sync       */
+  45          code TLG_FORMATS tlg_fmt_table[22] =
+  46            {
+  47              {   1,      1125,   0,   0,    0}, /* -1 */  
+  48              {2200 / 11, 1125,   0,   0,    0}, /*  0 */  
+  49              {2200 / 11, 1125,   1,   0,    3}, /*  1 */
+  50              {2640 / 11, 1125,   0,   0,    2}, /*  2 */
+  51              {4400 / 11, 1125,   0,   1,    0}, /*  3 */
+  52              {4400 / 11, 1125,   1,   1,    3}, /*  4 */
+  53              {5280 / 11, 1125,   0,   1,    2}, /*  5 */
+  54              {4400 / 11, 1125,   0,   0,    0}, /*  6 */
+  55              {4400 / 11, 1125,   1,   0,    3}, /*  7 */
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 2   
+
+  56              {5280 / 11, 1125,   0,   0,    2}, /*  8 */
+  57              {5500 / 11, 1125,   0,   0,    0}, /*  9 */
+  58              {5500 / 11, 1125,   1,   0,    0}, /* 10 */
+  59              {4400 / 11, 1125,   0,   1,    0}, /* 11 */
+  60              {4400 / 11, 1125,   1,   1,    3}, /* 12 */
+  61              {3300 / 10,  750,   0,   0,    0}, /* 13 */
+  62              {3300 / 10,  750,   1,   0,    3}, /* 14 */
+  63              {3960 / 10,  750,   0,   0,    2}, /* 15 */
+  64              {6600 / 10,  750,   0,   0,    0}, /* 16 */
+  65              {6600 / 10,  750,   1,   0,    3}, /* 17 */
+  66              {7920 / 10,  750,   0,   0,    2}, /* 18 */
+  67              {8250 / 10,  750,   0,   0,    0}, /* 19 */
+  68              {8250 / 10,  750,   1,   0,    0}  /* 20 */
+  69            };
+  70          
+  71          /* gen_params: */
+  72          
+  73          extern CURR_PARAMS tlgs[4];
+  74          extern bit         changed;
+  75          extern bit         genlock_changed;
+  76          extern UC          current_generator;
+  77          extern ul          tlg_samples;
+  78          
+  79          /******************************************************************
+  80           * NAME       UC spi_transfer (UC spi_byte, UC cnt)
+  81           * PURPOSE    To transfer data bits using SPI protocol
+  82           * 
+  83           * ARGUMENTS  UC spi_byte - data byte  to be transferred
+  84           *            UC cnt      - nr of bits to be transferred
+  85           *
+  86           * RETURNS    byte received simultaneously 
+  87           *
+  88           * EXTERNS    None
+  89           *
+  90           * NOTES:     This function wil serialize cnt bits of spi_byte
+  91           *            and send them via MOSI, MSB bit first.
+  92           *            If cnt is less than 8, make sure at the bits to 
+  93           *            send are already shifted to the left before 
+  94           *            calling this function.
+  95           *            Slave select signals are not handled by this function.
+  96           ******************************************************************/
+  97          UC spi_transfer (UC spi_byte, UC cnt)
+  98            {
+  99   1        UC i;
+ 100   1      
+ 101   1        for (i = 0; i < cnt; i++)
+ 102   1          {
+ 103   2          SCK = 0x01;
+ 104   2      
+ 105   2          if (spi_byte & 0x80)
+ 106   2            MOSI = 1;
+ 107   2          else
+ 108   2            MOSI = 0;
+ 109   2          spi_byte = spi_byte << 1;
+ 110   2          SCK = 0x00;
+ 111   2          spi_byte |= MISO;
+ 112   2          }
+ 113   1        return (spi_byte);
+ 114   1        }
+ 115          
+ 116          /******************************************************************
+ 117           * NAME       void write_plds(UC ndx)
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 3   
+
+ 118           * PURPOSE    To construct and send data packets for Spartan PLD.
+ 119           *
+ 120           * ARGUMENTS  UC ndx - index into tlg_fmt_table[], i.e. format.
+ 121           *
+ 122           * RETURNS    Nothing
+ 123           *
+ 124           * EXTERNS    None
+ 125           *
+ 126           * NOTES:     
+ 127           *            This function is called each time new delay value is
+ 128           *            received from PT5230 Master.  It uses ndx to extract
+ 129           *            values from tlg_fmt_table[] 
+ 130           *
+ 131           *            The transfer protocol is as follows:
+ 132           *
+ 133           *            Particular generator is selected with its CS (NSS_x)
+ 134           *            - 26 bits of delay (as 4 bytes)
+ 135           *            -  1 bit  of system clock
+ 136           *            -  2 bits of sync mode
+ 137           *            - 10 bits of samples_per_line - 1 (2 bytes)
+ 138           *            and then:
+ 139           *            -  2 bits of generator number // no longer need for, 
+ 140           *               as we use CS for selecting one of 4 generators.
+ 141           *            -  1 bit  of scan method.
+ 142           *            - 12 bits of total lines per frame - 1 (2 bytes)
+ 143           *            Particular generator is deselected with its CS
+ 144           *
+ 145           *            This function is called from main loop as follows:
+ 146           *
+ 147           *            write_plds(tlgs[current_generator].format);
+ 148           *
+ 149           *            See "Kommunikations protokol PT8611 - Tri Level Sync
+ 150           *                 Generator (CPU - FPGA), PCB layout= tsg_rev2.pcb
+ 151           * 
+ 152           *******************************************************************
+ 153           *     Next time you see debugger skipping some of your code......
+ 154           *******************************************************************
+ 155           *  This is due to optimization!  Resulting code does not correspond
+ 156           *  to the code you have written, and there is nothing you can do
+ 157           *  about it!
+ 158           ******************************************************************/
+ 159          void write_plds(UC ndx)
+ 160            {
+ 161   1        UC tmp;
+ 162   1        ui itmp;
+ 163   1      
+ 164   1        tlg_samples.longval = tlgs[current_generator].delay.longval;
+ 165   1      
+ 166   1      #if 1
+ 167   1        if (tlg_fmt_table[ndx].samples_per_line == 1L)
+ 168   1          LED = 1;
+ 169   1        else
+ 170   1          LED = 0;
+ 171   1      #endif
+ 172   1      
+ 173   1        /* set chip selects */
+ 174   1        switch (current_generator)
+ 175   1          {
+ 176   2          case 0:
+ 177   2            NSS_0 = 0;
+ 178   2            break;
+ 179   2          case 1:
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 4   
+
+ 180   2            NSS_1 = 0;
+ 181   2            break;
+ 182   2          case 2:
+ 183   2            NSS_2 = 0;
+ 184   2            break;
+ 185   2          case 3:
+ 186   2            NSS_3 = 0;
+ 187   2            break;
+ 188   2      
+ 189   2          }
+ 190   1      
+ 191   1        spi_transfer(tlg_samples.charval[0], 8); /* 1 */
+ 192   1        spi_transfer(tlg_samples.charval[1], 8); /* 2 */
+ 193   1        spi_transfer(tlg_samples.charval[2], 8); /* 3 */
+ 194   1        spi_transfer(tlg_samples.charval[3], 8); /* 4 */
+ 195   1      
+ 196   1        tmp = tlg_fmt_table[ndx].sync;
+ 197   1        tmp <<= 4;  /* sync bits go to bits 5 and 5 of tmp */
+ 198   1      
+ 199   1        if (tlg_fmt_table[ndx].sys_clk)     /* bit 7 is sysclk */
+ 200   1          tmp |= 0x40;
+ 201   1        else
+ 202   1          tmp &= 0xBF;
+ 203   1      
+ 204   1        itmp.intval = tlg_fmt_table[ndx].samples_per_line;
+ 205   1        itmp.intval--;                      /* we send spl - 1 */
+ 206   1      
+ 207   1        tmp &= 0xFC;                        /* bits 2 and 3 are 0     */
+ 208   1        tmp |= itmp.charv[0];               /* two MSbits of SPL - 1  */
+ 209   1      
+ 210   1        spi_transfer(tmp, 8); /* 5 */
+ 211   1      
+ 212   1        tmp = itmp.charv[1];                /* rest of SPL - 1 */
+ 213   1        spi_transfer(tmp, 8);               /* 6 */
+ 214   1      
+ 215   1      /***/
+ 216   1        /* 'Master' 2 bytes */
+ 217   1        tmp = 0;
+ 218   1      
+ 219   1        if (tlg_fmt_table[ndx].scan) /* Scanmethod is bit 4      */
+ 220   1          tmp |= 0x10;
+ 221   1        else
+ 222   1          tmp &= 0xEF;
+ 223   1      
+ 224   1        itmp.intval = tlg_fmt_table[ndx].lines_per_frame;
+ 225   1        itmp.intval--;
+ 226   1      
+ 227   1        tmp &= 0xF8;                   /* zero bits 0, 1 and 2 of tmp  */
+ 228   1        tmp |= itmp.charv[0];          /* 3 MSbits of LPF - 1 */
+ 229   1        spi_transfer(tmp, 8); /* 7 */
+ 230   1      
+ 231   1        tmp = itmp.charv[1];           /* rest of LPF - 1     */
+ 232   1        spi_transfer(tmp, 8); /* 8 */
+ 233   1      
+ 234   1      /***/
+ 235   1      
+ 236   1        switch (current_generator)
+ 237   1          {
+ 238   2          case 0:
+ 239   2            NSS_0 = 1;
+ 240   2            break;
+ 241   2          case 1:
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 5   
+
+ 242   2            NSS_1 = 1;
+ 243   2            break;
+ 244   2          case 2:
+ 245   2            NSS_2 = 1;
+ 246   2            break;
+ 247   2          case 3:
+ 248   2            NSS_3 = 1;
+ 249   2            break;
+ 250   2          }
+ 251   1        }
+ 252          
+ 253          
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 6   
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION Com001A (BEGIN)
+0000         L?0027:
+0000 FB                MOV     R3,A
+0001         L?0028:
+0001 E500        R     MOV     A,ndx
+0003 75F00B            MOV     B,#0BH
+0006 A4                MUL     AB
+0007 22                RET     
+0008         L?0030:
+0008 F583              MOV     DPH,A
+000A 120000      E     LCALL   ?C?LLDCODE
+000D 8E00        R     MOV     itmp,R6
+000F 8F00        R     MOV     itmp+01H,R7
+0011 E500        R     MOV     A,itmp+01H
+0013 1500        R     DEC     itmp+01H
+0015 22                RET     
+             ; FUNCTION Com001A (END)
+
+             ; FUNCTION L?0029 (BEGIN)
+0000 E500        R     MOV     A,itmp
+0002 4203              ORL     AR3,A
+0004 AF03              MOV     R7,AR3
+0006 7D08              MOV     R5,#08H
+0008 120000      R     LCALL   _spi_transfer
+000B AB00        R     MOV     R3,itmp+01H
+000D AF03              MOV     R7,AR3
+             ; FUNCTION _spi_transfer (BEGIN)
+                                           ; SOURCE LINE # 97
+;---- Variable 'spi_byte' assigned to Register 'R7' ----
+;---- Variable 'cnt' assigned to Register 'R5' ----
+                                           ; SOURCE LINE # 98
+                                           ; SOURCE LINE # 101
+;---- Variable 'i' assigned to Register 'R6' ----
+000F E4                CLR     A
+0010 FE                MOV     R6,A
+0011         ?C0001:
+0011 EE                MOV     A,R6
+0012 C3                CLR     C
+0013 9D                SUBB    A,R5
+0014 501B              JNC     ?C0002
+                                           ; SOURCE LINE # 102
+                                           ; SOURCE LINE # 103
+0016 D2A0              SETB    SCK
+                                           ; SOURCE LINE # 105
+0018 EF                MOV     A,R7
+0019 30E704            JNB     ACC.7,?C0004
+                                           ; SOURCE LINE # 106
+001C D2A2              SETB    MOSI
+001E 8002              SJMP    ?C0005
+0020         ?C0004:
+                                           ; SOURCE LINE # 108
+0020 C2A2              CLR     MOSI
+0022         ?C0005:
+                                           ; SOURCE LINE # 109
+0022 EF                MOV     A,R7
+0023 25E0              ADD     A,ACC
+0025 FF                MOV     R7,A
+                                           ; SOURCE LINE # 110
+0026 C2A0              CLR     SCK
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 7   
+
+                                           ; SOURCE LINE # 111
+0028 A2A1              MOV     C,MISO
+002A E4                CLR     A
+002B 33                RLC     A
+002C 4207              ORL     AR7,A
+                                           ; SOURCE LINE # 112
+002E 0E                INC     R6
+002F 80E0              SJMP    ?C0001
+0031         ?C0002:
+                                           ; SOURCE LINE # 113
+                                           ; SOURCE LINE # 114
+0031         ?C0006:
+0031 22                RET     
+             ; FUNCTION _spi_transfer (END)
+
+             ; FUNCTION _write_plds (BEGIN)
+                                           ; SOURCE LINE # 159
+0000 8F00        R     MOV     ndx,R7
+                                           ; SOURCE LINE # 160
+                                           ; SOURCE LINE # 164
+0002 E500        E     MOV     A,current_generator
+0004 75F005            MOV     B,#05H
+0007 A4                MUL     AB
+0008 2400        E     ADD     A,#LOW tlgs+01H
+000A F8                MOV     R0,A
+000B 120000      E     LCALL   ?C?LLDIDATA
+000E 8F00        E     MOV     tlg_samples+03H,R7
+0010 8E00        E     MOV     tlg_samples+02H,R6
+0012 8D00        E     MOV     tlg_samples+01H,R5
+0014 8C00        E     MOV     tlg_samples,R4
+                                           ; SOURCE LINE # 167
+0016 120000      R     LCALL   L?0028
+0019 2400        R     ADD     A,#LOW tlg_fmt_table
+001B F582              MOV     DPL,A
+001D E4                CLR     A
+001E 3400        R     ADDC    A,#HIGH tlg_fmt_table
+0020 F583              MOV     DPH,A
+0022 120000      E     LCALL   ?C?LLDCODE
+0025 E4                CLR     A
+0026 7B01              MOV     R3,#01H
+0028 FA                MOV     R2,A
+0029 F9                MOV     R1,A
+002A F8                MOV     R0,A
+002B C3                CLR     C
+002C 120000      E     LCALL   ?C?SLCMP
+002F 7004              JNZ     ?C0007
+                                           ; SOURCE LINE # 168
+0031 D2A4              SETB    LED
+0033 8002              SJMP    ?C0008
+0035         ?C0007:
+                                           ; SOURCE LINE # 170
+0035 C2A4              CLR     LED
+0037         ?C0008:
+                                           ; SOURCE LINE # 174
+0037 E500        E     MOV     A,current_generator
+0039 14                DEC     A
+003A 600E              JZ      ?C0011
+003C 14                DEC     A
+003D 600F              JZ      ?C0012
+003F 14                DEC     A
+0040 6010              JZ      ?C0013
+0042 2403              ADD     A,#03H
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 8   
+
+0044 700E              JNZ     ?C0009
+                                           ; SOURCE LINE # 175
+                                           ; SOURCE LINE # 176
+0046         ?C0010:
+                                           ; SOURCE LINE # 177
+0046 C2A3              CLR     NSS_0
+                                           ; SOURCE LINE # 178
+0048 800A              SJMP    ?C0009
+                                           ; SOURCE LINE # 179
+004A         ?C0011:
+                                           ; SOURCE LINE # 180
+004A C2A5              CLR     NSS_1
+                                           ; SOURCE LINE # 181
+004C 8006              SJMP    ?C0009
+                                           ; SOURCE LINE # 182
+004E         ?C0012:
+                                           ; SOURCE LINE # 183
+004E C297              CLR     NSS_2
+                                           ; SOURCE LINE # 184
+0050 8002              SJMP    ?C0009
+                                           ; SOURCE LINE # 185
+0052         ?C0013:
+                                           ; SOURCE LINE # 186
+0052 C296              CLR     NSS_3
+                                           ; SOURCE LINE # 187
+                                           ; SOURCE LINE # 189
+0054         ?C0009:
+                                           ; SOURCE LINE # 191
+0054 7D08              MOV     R5,#08H
+0056 AF00        E     MOV     R7,tlg_samples
+0058 120000      R     LCALL   _spi_transfer
+                                           ; SOURCE LINE # 192
+005B AF00        E     MOV     R7,tlg_samples+01H
+005D 120000      R     LCALL   _spi_transfer
+                                           ; SOURCE LINE # 193
+0060 AF00        E     MOV     R7,tlg_samples+02H
+0062 120000      R     LCALL   _spi_transfer
+                                           ; SOURCE LINE # 194
+0065 AF00        E     MOV     R7,tlg_samples+03H
+0067 120000      R     LCALL   _spi_transfer
+                                           ; SOURCE LINE # 196
+006A 120000      R     LCALL   L?0028
+006D 2400        R     ADD     A,#LOW tlg_fmt_table+0AH
+006F F582              MOV     DPL,A
+0071 E4                CLR     A
+0072 3400        R     ADDC    A,#HIGH tlg_fmt_table+0AH
+0074 F583              MOV     DPH,A
+0076 E4                CLR     A
+0077 93                MOVC    A,@A+DPTR
+;---- Variable 'tmp' assigned to Register 'R3' ----
+                                           ; SOURCE LINE # 197
+0078 C4                SWAP    A
+0079 54F0              ANL     A,#0F0H
+                                           ; SOURCE LINE # 199
+007B 120000      R     LCALL   L?0027
+007E 2400        R     ADD     A,#LOW tlg_fmt_table+08H
+0080 F582              MOV     DPL,A
+0082 E4                CLR     A
+0083 3400        R     ADDC    A,#HIGH tlg_fmt_table+08H
+0085 F583              MOV     DPH,A
+0087 E4                CLR     A
+0088 93                MOVC    A,@A+DPTR
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 9   
+
+0089 6005              JZ      ?C0014
+                                           ; SOURCE LINE # 200
+008B 430340            ORL     AR3,#040H
+008E 8003              SJMP    ?C0015
+0090         ?C0014:
+                                           ; SOURCE LINE # 202
+0090 5303BF            ANL     AR3,#0BFH
+0093         ?C0015:
+                                           ; SOURCE LINE # 204
+0093 120000      R     LCALL   L?0028
+0096 2400        R     ADD     A,#LOW tlg_fmt_table
+0098 F582              MOV     DPL,A
+009A E4                CLR     A
+009B 3400        R     ADDC    A,#HIGH tlg_fmt_table
+                                           ; SOURCE LINE # 205
+009D 120000      R     LCALL   L?0030
+00A0 7002              JNZ     ?C0024
+00A2 1500        R     DEC     itmp
+00A4         ?C0024:
+                                           ; SOURCE LINE # 207
+00A4 5303FC            ANL     AR3,#0FCH
+                                           ; SOURCE LINE # 208
+                                           ; SOURCE LINE # 210
+                                           ; SOURCE LINE # 212
+                                           ; SOURCE LINE # 213
+00A7 120000      R     LCALL   L?0029
+                                           ; SOURCE LINE # 217
+00AA E4                CLR     A
+                                           ; SOURCE LINE # 219
+00AB 120000      R     LCALL   L?0027
+00AE 2400        R     ADD     A,#LOW tlg_fmt_table+09H
+00B0 F582              MOV     DPL,A
+00B2 E4                CLR     A
+00B3 3400        R     ADDC    A,#HIGH tlg_fmt_table+09H
+00B5 F583              MOV     DPH,A
+00B7 E4                CLR     A
+00B8 93                MOVC    A,@A+DPTR
+00B9 6004              JZ      ?C0016
+                                           ; SOURCE LINE # 220
+00BB 7B10              MOV     R3,#010H
+00BD 8003              SJMP    ?C0017
+00BF         ?C0016:
+                                           ; SOURCE LINE # 222
+00BF 5303EF            ANL     AR3,#0EFH
+00C2         ?C0017:
+                                           ; SOURCE LINE # 224
+00C2 120000      R     LCALL   L?0028
+00C5 2400        R     ADD     A,#LOW tlg_fmt_table+04H
+00C7 F582              MOV     DPL,A
+00C9 E4                CLR     A
+00CA 3400        R     ADDC    A,#HIGH tlg_fmt_table+04H
+                                           ; SOURCE LINE # 225
+00CC 120000      R     LCALL   L?0030
+00CF 7002              JNZ     ?C0025
+00D1 1500        R     DEC     itmp
+00D3         ?C0025:
+                                           ; SOURCE LINE # 227
+00D3 5303F8            ANL     AR3,#0F8H
+                                           ; SOURCE LINE # 228
+                                           ; SOURCE LINE # 229
+                                           ; SOURCE LINE # 231
+                                           ; SOURCE LINE # 232
+C51 COMPILER V7.05   SPI_MOD1                                                              06/14/2005 09:41:24 PAGE 10  
+
+00D6 120000      R     LCALL   L?0029
+                                           ; SOURCE LINE # 236
+00D9 E500        E     MOV     A,current_generator
+00DB 14                DEC     A
+00DC 600D              JZ      ?C0020
+00DE 14                DEC     A
+00DF 600D              JZ      ?C0021
+00E1 14                DEC     A
+00E2 600D              JZ      ?C0022
+00E4 2403              ADD     A,#03H
+00E6 700B              JNZ     ?C0023
+                                           ; SOURCE LINE # 237
+                                           ; SOURCE LINE # 238
+00E8         ?C0019:
+                                           ; SOURCE LINE # 239
+00E8 D2A3              SETB    NSS_0
+                                           ; SOURCE LINE # 240
+00EA 22                RET     
+                                           ; SOURCE LINE # 241
+00EB         ?C0020:
+                                           ; SOURCE LINE # 242
+00EB D2A5              SETB    NSS_1
+                                           ; SOURCE LINE # 243
+00ED 22                RET     
+                                           ; SOURCE LINE # 244
+00EE         ?C0021:
+                                           ; SOURCE LINE # 245
+00EE D297              SETB    NSS_2
+                                           ; SOURCE LINE # 246
+00F0 22                RET     
+                                           ; SOURCE LINE # 247
+00F1         ?C0022:
+                                           ; SOURCE LINE # 248
+00F1 D296              SETB    NSS_3
+                                           ; SOURCE LINE # 249
+                                           ; SOURCE LINE # 250
+                                           ; SOURCE LINE # 251
+00F3         ?C0023:
+00F3 22                RET     
+             ; FUNCTION _write_plds (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    316    ----
+   CONSTANT SIZE    =    242    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       3
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1354 @@
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE EEPROM
+OBJECT MODULE PLACED IN eeprom.OBJ
+COMPILER INVOKED BY: C:\CYGNAL\IDEfiles\C51\BIN\C51.exe eeprom.c DB OE CD OPTIMIZE(9,SPEED) SMALL
+
+stmt level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2004                                           */
+   3          /*  Project:  PT8640 Trilevel HDTV generator, using 8051F231 Cygnal        */
+   4          /*            processor.                                                   */
+   5          /*  Module:   eeprom.c                                                     */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     14.04.2004                                                   */
+   8          /*  Purpose:  This module implements functions to read and write onboard   */
+   9          /*            EEPROM memory of 24C08 type.                                 */
+  10          /*  Notes:                                                                 */
+  11          /*            This module implemets read and write functions described in  */
+  12          /*            Atmels                                                       */
+  13          /*                   "2-wire Serial EEPROM"      (1)                       */
+  14          /*            datasheet:                                                   */
+  15          /*            byte write, page write, acknowledge polling, current address */
+  16          /*            read, random read and sequential read.                       */
+  17          /*            Timing is done entirely in software, using NOPs.             */
+  18          /*            For 8051F231 running at 16.6 MHz the clock SCL is approx.    */
+  19          /*            200 kHz, for 16 NOPs in Delay16.  Acknowledge polling        */
+  20          /*            has a software timeout (WAIT_CYCLE), so functions will not   */
+  21          /*            hang in case of hardware failure.                            */
+  22          /*                                                                         */
+  23          /*   In case there is a fault on the bus, for instance, the SDA line is    */
+  24          /*   shorted to ground or pulled down to LOW by the slave device, this     */
+  25          /*   module will generate clock pulses until the line is released with the */
+  26          /*   time-out of 10 ms before returing a "HIGH" value from the I2cInit or  */
+  27          /*   I2cStop. For SCL line, it will monitor until the line is released     */
+  28          /*   with the time-out of 10 ms.                                           */
+  29          /*                                                                         */
+  30          /*   To use all 1 K of 24C08, outside program must control page bits P0    */
+  31          /*   and P1 in the "command" argument to functions in this module.         */
+  32          /*   See Figure 1. Device Address of (1)                                   */
+  33          /***************************************************************************/
+  34          
+  35          #include "define.h"
+  36          #include <f200.h>
+  37          #include <intrins.h>
+  38          #include "eeprom.h"
+  39          
+  40          #if 1
+  41          sbit SCL =  P1^2; /* PT8640 defs (P1^2)*/
+  42          sbit SDA =  P1^1; /* PT8640 defs (P1^1)*/
+  43          #else
+              sbit SCL =  P3^1; /* Test board defs P3^1 */
+              sbit SDA =  P3^0; /* Test board defs P3^0 */
+              #endif
+  47          
+  48          #define NOP _nop_();
+  49          #define Delay1 NOP
+  50          #define Delay16 { NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP NOP}
+  51          
+  52          #define PERIOD     2900   /* 2900 approximately 10 ms time out for bus faulty */
+  53          
+  54          #define WAIT_CYCLE  100   /* 100 org  */
+  55          
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 2   
+
+  56          UI time_out;
+  57          
+  58          void CheckClock(void);
+  59          UC   Check_SCL(void);
+  60          
+  61          #if 0
+              /******************************************************************************/
+              /* Function:    ByteWriteE2prom                                               */
+              /*                                                                            */
+              /* Description: Write data byte to E2PROM                                     */        
+              /*                                                                            */
+              /*              Data format for writing into memory:                          */
+              /*              |ST|  CSW  |As|  EEA  |As|  DB  |As|SP|                       */
+              /*                                                                            */
+              /*              ST=START, CSW= command byte write,                            */
+              /*              As=acknowledge from slave, EEA=EEPROM address                 */
+              /*              DB=data byte to be sent, SP=stop                              */         
+              /*                                                                            */
+              /* Args :       (command) = command byte                                      */
+              /*              (address) = EEPROM address                                    */
+              /*              (*buffer) = location of data byte to be sent                  */
+              /*                                                                            */
+              /* Returns:     "0" - the programming is OK                                   */
+              /*              "1" - the data transfer has no acknowledge from slave         */                       
+              /*                                                                            */
+              /* Notes:       This function is illustrated on Figure 2. Byte Write of (1)   */
+              /******************************************************************************/
+              UC ByteWriteE2prom(UC command, UC address, UC *buffer)
+                {
+                I2cStart();                     /* START condition  */
+                if (I2cMasterWrite(command))    /* command byte CSW (device address) */
+                  {
+                  I2cStop();
+                  return(1);        
+                  }
+                if (I2cMasterWrite(address))    /* EEPROM address */        
+                  {
+                  I2cStop();
+                  return(1);
+                  }
+                if (I2cMasterWrite(*buffer))    /* Data byte to be send */   
+                  {
+                  I2cStop();          
+                  return(1);
+                  }
+                I2cStop();                      /* STOP condition */        
+                return(0);
+                }                
+              #endif
+ 105          
+ 106          #if 1
+ 107          /******************************************************************************/
+ 108          /* Function:     PageWriteE2prom                                              */
+ 109          /*                                                                            */
+ 110          /* Description:  Write number of data bytes to E2PROM                         */        
+ 111          /*                                                                            */
+ 112          /*               Data format for writing into memory:                         */
+ 113          /*               |ST|  CSW  |As|  EEA  |As| DB |As| DB |As|...|SP|            */
+ 114          /*                                                                            */
+ 115          /*               ST=START, CSW= command byte write,                           */
+ 116          /*               As=acknowledge from slave, EEA=EEPROM address                */
+ 117          /*               DB=data byte to be sent, SP=stop                             */         
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 3   
+
+ 118          /*                                                                            */
+ 119          /* Args :        (command) = command byte                                     */
+ 120          /*               (address) = EEPROM address                                   */
+ 121          /*               (*buffer) = location of data byte to be sent                 */
+ 122          /*               (count)   = number of byte to be send                        */
+ 123          /*                                                                            */
+ 124          /* Returns:      "0" - the programming is OK                                  */
+ 125          /*               "1" - the data transfer has no acknowledge from slave        */                       
+ 126          /*                                                                            */
+ 127          /* Notes:        This function is illustrated on Figure 3. Page Write of (1)  */
+ 128          /*               Up to 16 bytes can be written for 24C08                      */
+ 129          /******************************************************************************/
+ 130          UC PageWriteE2prom(UC command, UC address, UC idata *buffer, UC count)
+ 131            {
+ 132   1        UC i;
+ 133   1        
+ 134   1        I2cStart();                    /* START condition  */
+ 135   1        if (I2cMasterWrite(command))   /* command byte CSW  (device address) */
+ 136   1          {
+ 137   2          I2cStop();
+ 138   2          return(1);        
+ 139   2          }
+ 140   1        if (I2cMasterWrite(address))   /* EEPROM address */        
+ 141   1          {
+ 142   2          I2cStop();
+ 143   2          return(1);
+ 144   2          }
+ 145   1        for (i = 0; i < count; i++)    /* bytes of data to be sent */
+ 146   1          {
+ 147   2          if (I2cMasterWrite(*buffer))           
+ 148   2            {
+ 149   3            I2cStop();  
+ 150   3            return(1);
+ 151   3            }
+ 152   2          buffer++;
+ 153   2          }
+ 154   1        I2cStop();                     /* STOP condition */
+ 155   1        Ack_pol_r(command);            /* check for end of programming to E2PROM */
+ 156   1        return(0);
+ 157   1        }                
+ 158          #endif
+ 159          /******************************************************************************/
+ 160          /* Function:     Ack_pol_r                                                    */
+ 161          /*                                                                            */
+ 162          /* Description:  Check for the completion of programming after the            */
+ 163          /*               memory write with a read sequence. If the programming        */
+ 164          /*               is completed, the acknowledge bit will be "0".               */        
+ 165          /*                                                                            */
+ 166          /*               Data format for writing into memory:                         */
+ 167          /*                |ST|  CSR  |ST|  CSR  |......|As|DA|SP|                     */
+ 168          /*                                                                            */
+ 169          /*               ST=START, CSW= command byte write, As=acknowledge            */
+ 170          /*               from slave, DA=data byte to be read, SP=stop                 */
+ 171          /*                                                                            */ 
+ 172          /*                                                                            */
+ 173          /* Args :        (command) = command byte                                     */
+ 174          /*                                                                            */
+ 175          /* Return:        "0" - the programming is finished                           */
+ 176          /*                "1" - the programming is not finished, an error             */
+ 177          /*                      occured                                               */                       
+ 178          /*                                                                            */
+ 179          /******************************************************************************/
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 4   
+
+ 180          UC Ack_pol_r(UC command)
+ 181            {
+ 182   1        UC wait_cycle;        
+ 183   1        
+ 184   1        wait_cycle = WAIT_CYCLE;
+ 185   1      
+ 186   1        while (wait_cycle --)        
+ 187   1          {
+ 188   2          I2cStart();
+ 189   2          if (!I2cMasterWrite(command + 1)) /* wait if SCL is pulled down to LOW by */
+ 190   2            {                               /* slave device */
+ 191   3            I2cMasterRead(1); 
+ 192   3            I2cStop();
+ 193   3            return (0);
+ 194   3            }
+ 195   2          }
+ 196   1        return (1);    /* ERROR: SCL line is stuck to low */
+ 197   1        } 
+ 198          
+ 199          /******************************************************************************/
+ 200          /* Function:     Ack_pol_w                                                    */
+ 201          /*                                                                            */
+ 202          /* Description:  Check for the completion of programming after the            */
+ 203          /*               memory write with a write sequence. If the programming       */
+ 204          /*               is completed, the acknowledge bit will be "0".               */        
+ 205          /*                                                                            */
+ 206          /*               Data format for writing into memory:                         */
+ 207          /*               |ST|  CSW  |ST|  CSW  |......|As|SP|                         */
+ 208          /*                                                                            */
+ 209          /*               ST=START, CSW= command byte write,                           */
+ 210          /*               As=acknowledge from slave, SP=stop                           */
+ 211          /*                                                                            */
+ 212          /* Args :        (command) = command byte                                     */
+ 213          /*                                                                            */
+ 214          /* Return:       "0" - the programming is finished                            */
+ 215          /*               "1" - the programming is not finished, an error              */
+ 216          /*                     occured                                                */                       
+ 217          /*                                                                            */
+ 218          /******************************************************************************/
+ 219          #if 0
+              UC Ack_pol_w(UC command)
+                {
+                UC wait_cycle;
+                
+                wait_cycle = WAIT_CYCLE;  /* wait_cycle at least 10mS */
+              
+                while (wait_cycle --)        
+                  {
+                  I2cStart();
+                  if (!I2cMasterWrite(command)) /* wait if SCL is pulled down to LOW by slave device */
+                    { 
+                    I2cStop();
+                    return (0);
+                    }
+                  }
+                return (1);  /* ERROR: SCL line is stuck to low */
+                } 
+              #endif
+ 238          
+ 239          #if 0
+              /******************************************************************************/
+              /* Function:     RandomReadE2prom                                             */
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 5   
+
+              /*                                                                            */        
+              /* Description:  Read number of data bytes from E2PROM                        */        
+              /*                                                                            */
+              /*               Data format for reading from the memory:                     */
+              /*               |ST| CSW |As| EEA |As|ST| CSR |As| DA |NAm|SP|               */
+              /*                                                                            */
+              /*               ST=START, CSW= command byte write,                           */
+              /*               As=acknowledge from slave, EEA=EEPROM address                */
+              /*               CSR=command byte read, NAm=no aknowledge from master         */
+              /*               DA=data byte to be read, SP=stop                             */
+              /*                                                                            */
+              /*                                                                            */
+              /*                                                                            */
+              /* Args :        (command) = command byte                                     */
+              /*               (address) = EEPROM address                                   */
+              /*               (*buffer) = location of data to be stored                    */
+              /*                                                                            */
+              /*                                                                            */
+              /* Returns:      "0" - the reading of data is OK                              */
+              /*               "1" - the data transfer has no acknowledge from slave        */                       
+              /*                                                                            */
+              /* Notes:        This function is illustrated on Figure 5. Random Read of (1) */
+              /******************************************************************************/
+              UC RandomReadE2prom(UC command, UC  address, UC *buffer)
+                {
+                I2cStart();                    /* START condition  */
+                
+                if (I2cMasterWrite(command))   /* command byte CSW  (device address) */
+                  {
+                  I2cStop();
+                  return(1);
+                  }
+                if (I2cMasterWrite(address))   /* EEPROM address */        
+                  {                            
+                  I2cStop();
+                  return(1);
+                  }
+                I2cStart();                       /* START condition  */
+                if (I2cMasterWrite(command + 1))  /* command byte CSR */
+                  {                                       
+                  I2cStop();
+                  return(1);
+                  }
+                *buffer = I2cMasterRead(1);     /* byte read with "HIGH"/ No acknowlege */
+                I2cStop();                      /* STOP condition */
+                return(0);
+                }
+              #endif
+ 290          
+ 291          #if 0
+              /******************************************************************************/
+              /* Function:     CurrentReadE2prom                                            */
+              /*                                                                            */        
+              /* Description:  Read data byte from E2PROM without setting                   */
+              /*               the address counter                                          */
+              /*                                                                            */
+              /*                                                                            */
+              /*               Data format for reading from the memory:                     */
+              /*               |ST| CSR |As| DA |NAm|SP|                                    */
+              /*                                                                            */
+              /*               ST=START, As=acknowledge from slave,                         */
+              /*               CSR= command byte read, NAm=no aknowledge from master        */
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 6   
+
+              /*               DA=data byte to be read, SP=stop                             */
+              /*                                                                            */
+              /*                                                                            */
+              /*                                                                            */
+              /* Args :        command) = command byte                                      */
+              /*               (*buffer) = location of data to be stored                    */
+              /*                                                                            */
+              /* Returns:     "0" - the reading of data is OK                               */
+              /*              "1" - the data transfer has no acknowledge from slave         */                       
+              /*                                                                            */
+              /* Notes:       This function is illustrated on Figure 4. Current Address     */
+              /*              Read of (1)                                                   */
+              /******************************************************************************/
+              UC CurrentReadE2prom(UC command, UC *buffer)
+                {
+                I2cStart();                       /* START condition  */
+                if (I2cMasterWrite(command + 1))   /* command byte CSW  (device address) */
+                  {                                       
+                  I2cStop();
+                  return(1);
+                  }
+                *buffer = I2cMasterRead(1);     /*  byte read with "HIGH"/No acknowlege */
+                                             
+                I2cStop();                      /* STOP condition */
+                return(0);
+                }
+              #endif 
+ 331          /******************************************************************************/
+ 332          /* Function:     SeqReadE2prom                                                */
+ 333          /*                                                                            */        
+ 334          /* Description:  Read number of data bytes from E2PROM                        */        
+ 335          /*                                                                            */
+ 336          /*                                                                            */
+ 337          /*               Data format for reading from the memory:                     */
+ 338          /*               |ST| CSW |As| EEA |As|ST| CSR |As| DA |Am|...| DA |NAm|SP|   */
+ 339          /*                                                                            */
+ 340          /*               ST=START, CSW= command byte write ,                          */
+ 341          /*               As=acknowledge from slave, EEA=EEPROM address                */
+ 342          /*               CSR= command byte read , Am=aknowledge from master,          */
+ 343          /*               NAm=no aknowledge from master, DA=data byte to be read       */
+ 344          /*               SP=stop                                                      */
+ 345          /* Args :        (command) = command byte                                     */
+ 346          /*               (address) = EEPROM address                                   */
+ 347          /*               (*buffer) = location of data to be stored                    */
+ 348          /*               (count)   = number of byte to be received                    */
+ 349          /*                                                                            */
+ 350          /* Return:       "0" - the reading of data is OK                              */
+ 351          /*               "1" - the data transfer has no acknowledge from slave        */                       
+ 352          /*                                                                            */
+ 353          /* Notes:        This function is illustrated on Figure 6. Seq. Read of (1)   */
+ 354          /******************************************************************************/
+ 355          UC SeqReadE2prom(UC command, UC  address, UC idata *buffer, UC count)
+ 356            {
+ 357   1        UC i;
+ 358   1        
+ 359   1        I2cStart();                    /* START condition  */
+ 360   1        if (I2cMasterWrite(command))   /* command byte CSW  (device address) */
+ 361   1          {
+ 362   2          I2cStop();
+ 363   2          return(1);
+ 364   2          }
+ 365   1        if (I2cMasterWrite(address))         /* EEPROM address */
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 7   
+
+ 366   1          {                            
+ 367   2          I2cStop();
+ 368   2          return(1);
+ 369   2          }
+ 370   1        I2cStart();                          /* START condition  */
+ 371   1          if (I2cMasterWrite(command + 1))   /* command byte CSR (read) */
+ 372   1          {                                       
+ 373   2          I2cStop();
+ 374   2          return(1);
+ 375   2          }
+ 376   1      
+ 377   1        for (i = 0; i < count - 1; i++) /* number of bytes to be read */
+ 378   1          {
+ 379   2          *buffer = I2cMasterRead(0);
+ 380   2          buffer++;
+ 381   2          }
+ 382   1        *buffer = I2cMasterRead(1);     /* last byte read with "HIGH"/No acknowlege */
+ 383   1        I2cStop();                      /* STOP condition */
+ 384   1        return(0);
+ 385   1        }
+ 386          
+ 387          /******************************************************************************/
+ 388          /*                         Low Level Functions                                */
+ 389          /******************************************************************************/
+ 390          
+ 391          /******************************************************************************/
+ 392          /* Function:      CheckClock                                                  */
+ 393          /*                                                                            */
+ 394          /* Description:   Send HIGH and read the SCL line. It will wait until         */
+ 395          /*                the line has been released from slave device for            */
+ 396          /*                every bit of data to be sent or received.                   */
+ 397          /*                                                                            */
+ 398          /*      Args :    None                                                        */
+ 399          /*                                                                            */
+ 400          /*      Return:   None                                                        */
+ 401          /*                                                                            */
+ 402          /******************************************************************************/
+ 403          void CheckClock(void)
+ 404            {
+ 405   1        while (!SCL)  /* check for wait state before sending or receiving any data. */
+ 406   1          SCL = 1;
+ 407   1        }
+ 408          
+ 409          /******************************************************************************/
+ 410          /* Function:      Check_SCL                                                   */
+ 411          /*                                                                            */
+ 412          /* Description:   Send HIGH and read the SCL line. It will wait until         */
+ 413          /*                the line has been released from slave device with the       */
+ 414          /*                time out of approximately 10 ms.                            */        
+ 415          /*                                                                            */
+ 416          /* Args :         None                                                        */
+ 417          /*                                                                            */
+ 418          /* Return:        "0" - SCL line is OK                                        */
+ 419          /*                "1" - SCL line is faulty                                    */
+ 420          /*                                                                            */
+ 421          /******************************************************************************/
+ 422          UC Check_SCL(void)
+ 423            {
+ 424   1        time_out = PERIOD;    
+ 425   1      
+ 426   1        while (time_out--)        
+ 427   1          {
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 8   
+
+ 428   2          if (!SCL)           /* wait if SCL is pulled down to LOW by slave device */
+ 429   2            {
+ 430   3            SCL = 1;          /* set clock to high */
+ 431   3            return (0);
+ 432   3            }
+ 433   2          }
+ 434   1        return (1);           /* ERROR: SCL line is stuck to low */
+ 435   1        }
+ 436          
+ 437          /******************************************************************************/
+ 438          /* Function:        I2cInit                                                   */
+ 439          /*                                                                            */
+ 440          /* Description:     Initialize the I2C bus                                    */        
+ 441          /*                                                                            */
+ 442          /* Args :           None                                                      */
+ 443          /*                                                                            */
+ 444          /* Return:          "0" - bus line is OK                                      */
+ 445          /*                  "1" - bus line is faulty                                  */
+ 446          /*                                                                            */
+ 447          /******************************************************************************/
+ 448          UC I2cInit(void)
+ 449            {
+ 450   1        return (0); /*********************************************/
+ 451   1      
+ 452   1        if (!SDA)          /* if lines are low, set them to high */
+ 453   1          if (I2cStop())
+ 454   1            return (1);
+ 455   1      
+ 456   1        if (!SCL) 
+ 457   1          if (I2cStop())
+ 458   1            return (1);
+ 459   1        
+ 460   1        return (0);
+ 461   1        }
+ 462                          
+ 463          
+ 464          /******************************************************************************/
+ 465          /* Function:       I2cStart                                                   */
+ 466          /*                                                                            */
+ 467          /* Description:    Generate a START condition on I2C bus                      */        
+ 468          /*                                                                            */
+ 469          /* Args :          None                                                       */
+ 470          /*                                                                            */
+ 471          /* Return:         None                                                       */
+ 472          /*                                                                            */
+ 473          /******************************************************************************/
+ 474          void I2cStart(void)
+ 475            {
+ 476   1        SDA = 1;        /* to make sure the SDA and SCL are both high */
+ 477   1        SCL = 1;
+ 478   1        Delay16;
+ 479   1      
+ 480   1        SDA = 0;        /* SDA line go LOW first */
+ 481   1        Delay16;
+ 482   1        SCL = 0;        /* then followed by SCL line with time delay */
+ 483   1        }
+ 484          
+ 485          /******************************************************************************/
+ 486          /* Subroutine:   I2cMasterWrite                                               */
+ 487          /*                                                                            */
+ 488          /* Description:  Output one byte of data to slave device. Check for           */
+ 489          /*               WAIT condition before every bit is sent.                     */ 
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 9   
+
+ 490          /*                                                                            */
+ 491          /* Args :        one byte of data to be sent to slave device.                 */
+ 492          /*                                                                            */
+ 493          /* Return:       acknowledgement from slave:                                  */
+ 494          /*               0 = acknowledge is received                                  */
+ 495          /*               1 = no acknowledge is received                               */                       
+ 496          /*                                                                            */
+ 497          /******************************************************************************/
+ 498          UC I2cMasterWrite(UC input_byte)
+ 499            {
+ 500   1        UC mask, i;
+ 501   1      
+ 502   1        mask = 0x80;                    
+ 503   1      
+ 504   1        for (i = 0; i < 8; i++)     /* send one byte of data */
+ 505   1          {
+ 506   2          if (mask & input_byte)    /* send bit according to data */
+ 507   2            SDA = 1;
+ 508   2          else
+ 509   2            SDA = 0;
+ 510   2          mask = mask >> 1;         /* shift right for the next bit */
+ 511   2          Delay1;
+ 512   2          Check_SCL();             /* check SCL line */
+ 513   2          Delay16;        
+ 514   2          SCL = 0;                  /* clock is low */
+ 515   2          Delay16;
+ 516   2          }
+ 517   1              
+ 518   1        SDA = 1;                /* release SDA line*/
+ 519   1        Delay1;
+ 520   1        SCL = 1;                /* generate 9th clock pulse */
+ 521   1        Delay16;
+ 522   1        mask = SDA;             /* read acknowledge */
+ 523   1        SCL  = 0;               /* clock is low */
+ 524   1        Delay16;                /* to avoid short pulse transition on SDA line */
+ 525   1        return (mask);          /* return acknowledge bit */
+ 526   1        }        
+ 527          
+ 528          /******************************************************************************/
+ 529          /* Function:      I2cMasterRead                                               */
+ 530          /*                                                                            */
+ 531          /* Description:   Read one byte of data from the slave device. Check          */
+ 532          /*                for WAIT condition before every bit is received.            */        
+ 533          /*                                                                            */
+ 534          /* Args :         Acknowledge require:                                        */
+ 535          /*                0 - generate LOW  output after a byte is received           */
+ 536          /*                1 - generate HIGH output after a byte is received           */
+ 537          /*                                                                            */
+ 538          /* Return:        received one byte of data from slave device                 */
+ 539          /*                                                                            */                       
+ 540          /*                                                                            */
+ 541          /******************************************************************************/
+ 542          UC I2cMasterRead(UC ack)
+ 543            {
+ 544   1        UC mask, i, rec_data;
+ 545   1        
+ 546   1        rec_data = 0;        
+ 547   1        mask     = 0x80;
+ 548   1        
+ 549   1        for (i = 0; i < 8; i++)
+ 550   1          {           
+ 551   2          Check_SCL();               /* clock is high */
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 10  
+
+ 552   2          if (SDA)                    /* read data while clock is high */
+ 553   2            rec_data |= mask;
+ 554   2          mask = mask >> 1;
+ 555   2          SCL = 0;                    /* clock is low */
+ 556   2          Delay16;                                                                                      
+ 557   2          } 
+ 558   1        if (ack)                      /* set SDA data first before port direction */        
+ 559   1           SDA = 1;                   /* send acknowledge */
+ 560   1        else
+ 561   1           SDA = 0;
+ 562   1        Delay1;
+ 563   1        SCL = 1;              /* clock is high */
+ 564   1        Delay16;
+ 565   1        SCL = 0;              /* clock is low */
+ 566   1        SDA = 1;
+ 567   1        Delay16;              /* to avoid short pulse transition on SDA line */
+ 568   1        return (rec_data);
+ 569   1        }
+ 570          
+ 571          /******************************************************************************/
+ 572          /* Function:     I2cStop                                                      */
+ 573          /*                                                                            */
+ 574          /* Description:  generate stop condition on the I2C bus                       */        
+ 575          /*                                                                            */
+ 576          /* Args :        none                                                         */
+ 577          /*                                                                            */
+ 578          /* Return:       "0" - the bus line is OK                                     */
+ 579          /*               "1" - the bus line has been pulled down to low               */                       
+ 580          /*                                                                            */
+ 581          /*                                                                            */
+ 582          /******************************************************************************/
+ 583          UC I2cStop(void)
+ 584            {
+ 585   1        time_out = PERIOD;      
+ 586   1        
+ 587   1        while (time_out--)
+ 588   1          {
+ 589   2          if (!SDA)                 /* check SDA line */
+ 590   2            {
+ 591   3            SCL = 1;                /* generate a clock pulse if SDA is pull */
+ 592   3            Delay16;                /* down to low */
+ 593   3            SCL = 0;
+ 594   3            Delay16;
+ 595   3            }
+ 596   2          else                      /* check SCL line  */
+ 597   2            {
+ 598   3            SDA  = 0;
+ 599   3            Delay1;
+ 600   3            if (Check_SCL())        /* to generate STOP condition */
+ 601   3              return (1);           /* ERROR: SCL line is stuck to low */
+ 602   3            Delay16;
+ 603   3            SDA = 1;
+ 604   3            Delay16;
+ 605   3            return (0);
+ 606   3            }
+ 607   2          }
+ 608   1        return (1);                 /* ERROR: SDA line is stuck to low */
+ 609   1        }
+ 610                      
+ 611          /* end of eeprom.c */
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 11  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION _PageWriteE2prom (BEGIN)
+                                           ; SOURCE LINE # 130
+0000 8F00        R     MOV     command,R7
+0002 8D00        R     MOV     address,R5
+0004 8B00        R     MOV     buffer,R3
+                                           ; SOURCE LINE # 131
+                                           ; SOURCE LINE # 134
+0006 120000      R     LCALL   I2cStart
+                                           ; SOURCE LINE # 135
+0009 AF00        R     MOV     R7,command
+000B 120000      R     LCALL   _I2cMasterWrite
+000E EF                MOV     A,R7
+000F 6002              JZ      ?C0001
+                                           ; SOURCE LINE # 136
+                                           ; SOURCE LINE # 137
+                                           ; SOURCE LINE # 138
+0011 801E              SJMP    ?C0054
+                                           ; SOURCE LINE # 139
+0013         ?C0001:
+                                           ; SOURCE LINE # 140
+0013 AF00        R     MOV     R7,address
+0015 120000      R     LCALL   _I2cMasterWrite
+0018 EF                MOV     A,R7
+0019 6002              JZ      ?C0003
+                                           ; SOURCE LINE # 141
+                                           ; SOURCE LINE # 142
+001B         ?C0053:
+                                           ; SOURCE LINE # 143
+001B 8014              SJMP    ?C0054
+                                           ; SOURCE LINE # 144
+001D         ?C0003:
+                                           ; SOURCE LINE # 145
+001D E4                CLR     A
+001E F500        R     MOV     i,A
+0020         ?C0004:
+0020 E500        R     MOV     A,i
+0022 C3                CLR     C
+0023 9500        R     SUBB    A,count
+0025 5016              JNC     ?C0005
+                                           ; SOURCE LINE # 146
+                                           ; SOURCE LINE # 147
+0027 A800        R     MOV     R0,buffer
+0029 E6                MOV     A,@R0
+002A FF                MOV     R7,A
+002B 120000      R     LCALL   _I2cMasterWrite
+002E EF                MOV     A,R7
+002F 6006              JZ      ?C0007
+                                           ; SOURCE LINE # 148
+                                           ; SOURCE LINE # 149
+0031         ?C0054:
+0031 120000      R     LCALL   I2cStop
+                                           ; SOURCE LINE # 150
+0034 7F01              MOV     R7,#01H
+0036 22                RET     
+                                           ; SOURCE LINE # 151
+0037         ?C0007:
+                                           ; SOURCE LINE # 152
+0037 0500        R     INC     buffer
+                                           ; SOURCE LINE # 153
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 12  
+
+0039 0500        R     INC     i
+003B 80E3              SJMP    ?C0004
+003D         ?C0005:
+                                           ; SOURCE LINE # 154
+003D 120000      R     LCALL   I2cStop
+                                           ; SOURCE LINE # 155
+0040 AF00        R     MOV     R7,command
+0042 120000      R     LCALL   _Ack_pol_r
+                                           ; SOURCE LINE # 156
+0045 7F00              MOV     R7,#00H
+                                           ; SOURCE LINE # 157
+0047         ?C0002:
+0047 22                RET     
+             ; FUNCTION _PageWriteE2prom (END)
+
+             ; FUNCTION _Ack_pol_r (BEGIN)
+                                           ; SOURCE LINE # 180
+0000 8F00        R     MOV     command,R7
+                                           ; SOURCE LINE # 181
+                                           ; SOURCE LINE # 184
+0002 750064      R     MOV     wait_cycle,#064H
+0005         ?C0008:
+                                           ; SOURCE LINE # 186
+0005 AF00        R     MOV     R7,wait_cycle
+0007 1500        R     DEC     wait_cycle
+0009 EF                MOV     A,R7
+000A 6018              JZ      ?C0009
+                                           ; SOURCE LINE # 187
+                                           ; SOURCE LINE # 188
+000C 120000      R     LCALL   I2cStart
+                                           ; SOURCE LINE # 189
+000F E500        R     MOV     A,command
+0011 04                INC     A
+0012 FF                MOV     R7,A
+0013 120000      R     LCALL   _I2cMasterWrite
+0016 EF                MOV     A,R7
+0017 70EC              JNZ     ?C0008
+                                           ; SOURCE LINE # 190
+                                           ; SOURCE LINE # 191
+0019 7F01              MOV     R7,#01H
+001B 120000      R     LCALL   _I2cMasterRead
+                                           ; SOURCE LINE # 192
+001E 120000      R     LCALL   I2cStop
+                                           ; SOURCE LINE # 193
+0021 7F00              MOV     R7,#00H
+0023 22                RET     
+                                           ; SOURCE LINE # 194
+                                           ; SOURCE LINE # 195
+0024         ?C0009:
+                                           ; SOURCE LINE # 196
+0024 7F01              MOV     R7,#01H
+                                           ; SOURCE LINE # 197
+0026         ?C0011:
+0026 22                RET     
+             ; FUNCTION _Ack_pol_r (END)
+
+             ; FUNCTION _SeqReadE2prom (BEGIN)
+                                           ; SOURCE LINE # 355
+0000 8F00        R     MOV     command,R7
+0002 8D00        R     MOV     address,R5
+0004 8B00        R     MOV     buffer,R3
+                                           ; SOURCE LINE # 356
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 13  
+
+                                           ; SOURCE LINE # 359
+0006 120000      R     LCALL   I2cStart
+                                           ; SOURCE LINE # 360
+0009 AF00        R     MOV     R7,command
+000B 120000      R     LCALL   _I2cMasterWrite
+000E EF                MOV     A,R7
+000F 6002              JZ      ?C0012
+                                           ; SOURCE LINE # 361
+                                           ; SOURCE LINE # 362
+                                           ; SOURCE LINE # 363
+0011 8017              SJMP    ?C0056
+                                           ; SOURCE LINE # 364
+0013         ?C0012:
+                                           ; SOURCE LINE # 365
+0013 AF00        R     MOV     R7,address
+0015 120000      R     LCALL   _I2cMasterWrite
+0018 EF                MOV     A,R7
+0019 6002              JZ      ?C0014
+                                           ; SOURCE LINE # 366
+                                           ; SOURCE LINE # 367
+001B         ?C0055:
+                                           ; SOURCE LINE # 368
+001B 800D              SJMP    ?C0056
+                                           ; SOURCE LINE # 369
+001D         ?C0014:
+                                           ; SOURCE LINE # 370
+001D 120000      R     LCALL   I2cStart
+                                           ; SOURCE LINE # 371
+0020 E500        R     MOV     A,command
+0022 04                INC     A
+0023 FF                MOV     R7,A
+0024 120000      R     LCALL   _I2cMasterWrite
+0027 EF                MOV     A,R7
+0028 6006              JZ      ?C0015
+                                           ; SOURCE LINE # 372
+                                           ; SOURCE LINE # 373
+002A         ?C0056:
+002A 120000      R     LCALL   I2cStop
+                                           ; SOURCE LINE # 374
+002D 7F01              MOV     R7,#01H
+002F 22                RET     
+                                           ; SOURCE LINE # 375
+0030         ?C0015:
+                                           ; SOURCE LINE # 377
+0030 E4                CLR     A
+0031 F500        R     MOV     i,A
+0033         ?C0016:
+0033 E500        R     MOV     A,count
+0035 14                DEC     A
+0036 FF                MOV     R7,A
+0037 E500        R     MOV     A,i
+0039 C3                CLR     C
+003A 9F                SUBB    A,R7
+003B 500F              JNC     ?C0017
+                                           ; SOURCE LINE # 378
+                                           ; SOURCE LINE # 379
+003D E4                CLR     A
+003E FF                MOV     R7,A
+003F 120000      R     LCALL   _I2cMasterRead
+0042 A800        R     MOV     R0,buffer
+0044 A607              MOV     @R0,AR7
+                                           ; SOURCE LINE # 380
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 14  
+
+0046 0500        R     INC     buffer
+                                           ; SOURCE LINE # 381
+0048 0500        R     INC     i
+004A 80E7              SJMP    ?C0016
+004C         ?C0017:
+                                           ; SOURCE LINE # 382
+004C 7F01              MOV     R7,#01H
+004E 120000      R     LCALL   _I2cMasterRead
+0051 A800        R     MOV     R0,buffer
+0053 A607              MOV     @R0,AR7
+                                           ; SOURCE LINE # 383
+0055 120000      R     LCALL   I2cStop
+                                           ; SOURCE LINE # 384
+0058 7F00              MOV     R7,#00H
+                                           ; SOURCE LINE # 385
+005A         ?C0013:
+005A 22                RET     
+             ; FUNCTION _SeqReadE2prom (END)
+
+             ; FUNCTION CheckClock (BEGIN)
+                                           ; SOURCE LINE # 403
+                                           ; SOURCE LINE # 404
+0000         ?C0019:
+                                           ; SOURCE LINE # 405
+0000 209204            JB      SCL,?C0021
+                                           ; SOURCE LINE # 406
+0003 D292              SETB    SCL
+0005 80F9              SJMP    ?C0019
+                                           ; SOURCE LINE # 407
+0007         ?C0021:
+0007 22                RET     
+             ; FUNCTION CheckClock (END)
+
+             ; FUNCTION Check_SCL (BEGIN)
+                                           ; SOURCE LINE # 422
+                                           ; SOURCE LINE # 423
+                                           ; SOURCE LINE # 424
+0000 75000B      R     MOV     time_out,#0BH
+0003 750054      R     MOV     time_out+01H,#054H
+0006         ?C0022:
+                                           ; SOURCE LINE # 426
+0006 E500        R     MOV     A,time_out+01H
+0008 1500        R     DEC     time_out+01H
+000A AE00        R     MOV     R6,time_out
+000C 7002              JNZ     ?C0051
+000E 1500        R     DEC     time_out
+0010         ?C0051:
+0010 4E                ORL     A,R6
+0011 6008              JZ      ?C0023
+                                           ; SOURCE LINE # 427
+                                           ; SOURCE LINE # 428
+0013 2092F0            JB      SCL,?C0022
+                                           ; SOURCE LINE # 429
+                                           ; SOURCE LINE # 430
+0016 D292              SETB    SCL
+                                           ; SOURCE LINE # 431
+0018 7F00              MOV     R7,#00H
+001A 22                RET     
+                                           ; SOURCE LINE # 432
+                                           ; SOURCE LINE # 433
+001B         ?C0023:
+                                           ; SOURCE LINE # 434
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 15  
+
+001B 7F01              MOV     R7,#01H
+                                           ; SOURCE LINE # 435
+001D         ?C0025:
+001D 22                RET     
+             ; FUNCTION Check_SCL (END)
+
+             ; FUNCTION I2cInit (BEGIN)
+                                           ; SOURCE LINE # 448
+                                           ; SOURCE LINE # 449
+                                           ; SOURCE LINE # 450
+0000 7F00              MOV     R7,#00H
+0002 22                RET     
+                                           ; SOURCE LINE # 452
+                                           ; SOURCE LINE # 453
+                                           ; SOURCE LINE # 454
+                                           ; SOURCE LINE # 457
+                                           ; SOURCE LINE # 458
+             ; FUNCTION I2cInit (END)
+
+             ; FUNCTION I2cStart (BEGIN)
+                                           ; SOURCE LINE # 474
+                                           ; SOURCE LINE # 475
+                                           ; SOURCE LINE # 476
+0000 D291              SETB    SDA
+                                           ; SOURCE LINE # 477
+0002 D292              SETB    SCL
+                                           ; SOURCE LINE # 478
+0004 00                NOP     
+0005 00                NOP     
+0006 00                NOP     
+0007 00                NOP     
+0008 00                NOP     
+0009 00                NOP     
+000A 00                NOP     
+000B 00                NOP     
+000C 00                NOP     
+000D 00                NOP     
+000E 00                NOP     
+000F 00                NOP     
+0010 00                NOP     
+0011 00                NOP     
+0012 00                NOP     
+0013 00                NOP     
+                                           ; SOURCE LINE # 480
+0014 C291              CLR     SDA
+                                           ; SOURCE LINE # 481
+0016 00                NOP     
+0017 00                NOP     
+0018 00                NOP     
+0019 00                NOP     
+001A 00                NOP     
+001B 00                NOP     
+001C 00                NOP     
+001D 00                NOP     
+001E 00                NOP     
+001F 00                NOP     
+0020 00                NOP     
+0021 00                NOP     
+0022 00                NOP     
+0023 00                NOP     
+0024 00                NOP     
+0025 00                NOP     
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 16  
+
+                                           ; SOURCE LINE # 482
+0026 C292              CLR     SCL
+                                           ; SOURCE LINE # 483
+0028 22                RET     
+             ; FUNCTION I2cStart (END)
+
+             ; FUNCTION _I2cMasterWrite (BEGIN)
+                                           ; SOURCE LINE # 498
+;---- Variable 'input_byte' assigned to Register 'R5' ----
+0000 AD07              MOV     R5,AR7
+                                           ; SOURCE LINE # 499
+                                           ; SOURCE LINE # 502
+;---- Variable 'mask' assigned to Register 'R4' ----
+0002 7C80              MOV     R4,#080H
+                                           ; SOURCE LINE # 504
+;---- Variable 'i' assigned to Register 'R3' ----
+0004 E4                CLR     A
+0005 FB                MOV     R3,A
+0006         ?C0032:
+                                           ; SOURCE LINE # 505
+                                           ; SOURCE LINE # 506
+0006 EC                MOV     A,R4
+0007 5D                ANL     A,R5
+0008 6004              JZ      ?C0035
+                                           ; SOURCE LINE # 507
+000A D291              SETB    SDA
+000C 8002              SJMP    ?C0036
+000E         ?C0035:
+                                           ; SOURCE LINE # 509
+000E C291              CLR     SDA
+0010         ?C0036:
+                                           ; SOURCE LINE # 510
+0010 EC                MOV     A,R4
+0011 C3                CLR     C
+0012 13                RRC     A
+0013 FC                MOV     R4,A
+                                           ; SOURCE LINE # 511
+0014 00                NOP     
+                                           ; SOURCE LINE # 512
+0015 120000      R     LCALL   Check_SCL
+                                           ; SOURCE LINE # 513
+0018 00                NOP     
+0019 00                NOP     
+001A 00                NOP     
+001B 00                NOP     
+001C 00                NOP     
+001D 00                NOP     
+001E 00                NOP     
+001F 00                NOP     
+0020 00                NOP     
+0021 00                NOP     
+0022 00                NOP     
+0023 00                NOP     
+0024 00                NOP     
+0025 00                NOP     
+0026 00                NOP     
+0027 00                NOP     
+                                           ; SOURCE LINE # 514
+0028 C292              CLR     SCL
+                                           ; SOURCE LINE # 515
+002A 00                NOP     
+002B 00                NOP     
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 17  
+
+002C 00                NOP     
+002D 00                NOP     
+002E 00                NOP     
+002F 00                NOP     
+0030 00                NOP     
+0031 00                NOP     
+0032 00                NOP     
+0033 00                NOP     
+0034 00                NOP     
+0035 00                NOP     
+0036 00                NOP     
+0037 00                NOP     
+0038 00                NOP     
+0039 00                NOP     
+                                           ; SOURCE LINE # 516
+003A 0B                INC     R3
+003B BB08C8            CJNE    R3,#08H,?C0032
+003E         ?C0033:
+                                           ; SOURCE LINE # 518
+003E D291              SETB    SDA
+                                           ; SOURCE LINE # 519
+0040 00                NOP     
+                                           ; SOURCE LINE # 520
+0041 D292              SETB    SCL
+                                           ; SOURCE LINE # 521
+0043 00                NOP     
+0044 00                NOP     
+0045 00                NOP     
+0046 00                NOP     
+0047 00                NOP     
+0048 00                NOP     
+0049 00                NOP     
+004A 00                NOP     
+004B 00                NOP     
+004C 00                NOP     
+004D 00                NOP     
+004E 00                NOP     
+004F 00                NOP     
+0050 00                NOP     
+0051 00                NOP     
+0052 00                NOP     
+                                           ; SOURCE LINE # 522
+0053 A291              MOV     C,SDA
+0055 E4                CLR     A
+0056 33                RLC     A
+                                           ; SOURCE LINE # 523
+0057 C292              CLR     SCL
+                                           ; SOURCE LINE # 524
+0059 00                NOP     
+005A 00                NOP     
+005B 00                NOP     
+005C 00                NOP     
+005D 00                NOP     
+005E 00                NOP     
+005F 00                NOP     
+0060 00                NOP     
+0061 00                NOP     
+0062 00                NOP     
+0063 00                NOP     
+0064 00                NOP     
+0065 00                NOP     
+0066 00                NOP     
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 18  
+
+0067 00                NOP     
+0068 00                NOP     
+                                           ; SOURCE LINE # 525
+0069 FF                MOV     R7,A
+                                           ; SOURCE LINE # 526
+006A         ?C0037:
+006A 22                RET     
+             ; FUNCTION _I2cMasterWrite (END)
+
+             ; FUNCTION _I2cMasterRead (BEGIN)
+                                           ; SOURCE LINE # 542
+;---- Variable 'ack' assigned to Register 'R5' ----
+0000 AD07              MOV     R5,AR7
+                                           ; SOURCE LINE # 543
+                                           ; SOURCE LINE # 546
+;---- Variable 'rec_data' assigned to Register 'R4' ----
+0002 E4                CLR     A
+0003 FC                MOV     R4,A
+                                           ; SOURCE LINE # 547
+;---- Variable 'mask' assigned to Register 'R3' ----
+0004 7B80              MOV     R3,#080H
+                                           ; SOURCE LINE # 549
+;---- Variable 'i' assigned to Register 'R2' ----
+0006 FA                MOV     R2,A
+0007         ?C0038:
+                                           ; SOURCE LINE # 550
+                                           ; SOURCE LINE # 551
+0007 120000      R     LCALL   Check_SCL
+                                           ; SOURCE LINE # 552
+000A 309103            JNB     SDA,?C0041
+                                           ; SOURCE LINE # 553
+000D EB                MOV     A,R3
+000E 4204              ORL     AR4,A
+0010         ?C0041:
+                                           ; SOURCE LINE # 554
+0010 EB                MOV     A,R3
+0011 C3                CLR     C
+0012 13                RRC     A
+0013 FB                MOV     R3,A
+                                           ; SOURCE LINE # 555
+0014 C292              CLR     SCL
+                                           ; SOURCE LINE # 556
+0016 00                NOP     
+0017 00                NOP     
+0018 00                NOP     
+0019 00                NOP     
+001A 00                NOP     
+001B 00                NOP     
+001C 00                NOP     
+001D 00                NOP     
+001E 00                NOP     
+001F 00                NOP     
+0020 00                NOP     
+0021 00                NOP     
+0022 00                NOP     
+0023 00                NOP     
+0024 00                NOP     
+0025 00                NOP     
+                                           ; SOURCE LINE # 557
+0026 0A                INC     R2
+0027 BA08DD            CJNE    R2,#08H,?C0038
+002A         ?C0039:
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 19  
+
+                                           ; SOURCE LINE # 558
+002A ED                MOV     A,R5
+002B 6004              JZ      ?C0042
+                                           ; SOURCE LINE # 559
+002D D291              SETB    SDA
+002F 8002              SJMP    ?C0043
+0031         ?C0042:
+                                           ; SOURCE LINE # 561
+0031 C291              CLR     SDA
+0033         ?C0043:
+                                           ; SOURCE LINE # 562
+0033 00                NOP     
+                                           ; SOURCE LINE # 563
+0034 D292              SETB    SCL
+                                           ; SOURCE LINE # 564
+0036 00                NOP     
+0037 00                NOP     
+0038 00                NOP     
+0039 00                NOP     
+003A 00                NOP     
+003B 00                NOP     
+003C 00                NOP     
+003D 00                NOP     
+003E 00                NOP     
+003F 00                NOP     
+0040 00                NOP     
+0041 00                NOP     
+0042 00                NOP     
+0043 00                NOP     
+0044 00                NOP     
+0045 00                NOP     
+                                           ; SOURCE LINE # 565
+0046 C292              CLR     SCL
+                                           ; SOURCE LINE # 566
+0048 D291              SETB    SDA
+                                           ; SOURCE LINE # 567
+004A 00                NOP     
+004B 00                NOP     
+004C 00                NOP     
+004D 00                NOP     
+004E 00                NOP     
+004F 00                NOP     
+0050 00                NOP     
+0051 00                NOP     
+0052 00                NOP     
+0053 00                NOP     
+0054 00                NOP     
+0055 00                NOP     
+0056 00                NOP     
+0057 00                NOP     
+0058 00                NOP     
+0059 00                NOP     
+                                           ; SOURCE LINE # 568
+005A AF04              MOV     R7,AR4
+                                           ; SOURCE LINE # 569
+005C         ?C0044:
+005C 22                RET     
+             ; FUNCTION _I2cMasterRead (END)
+
+             ; FUNCTION I2cStop (BEGIN)
+                                           ; SOURCE LINE # 583
+                                           ; SOURCE LINE # 584
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 20  
+
+                                           ; SOURCE LINE # 585
+0000 75000B      R     MOV     time_out,#0BH
+0003 750054      R     MOV     time_out+01H,#054H
+0006         ?C0045:
+                                           ; SOURCE LINE # 587
+0006 E500        R     MOV     A,time_out+01H
+0008 1500        R     DEC     time_out+01H
+000A AE00        R     MOV     R6,time_out
+000C 7002              JNZ     ?C0052
+000E 1500        R     DEC     time_out
+0010         ?C0052:
+0010 4E                ORL     A,R6
+0011 605A              JZ      ?C0046
+                                           ; SOURCE LINE # 588
+                                           ; SOURCE LINE # 589
+0013 209126            JB      SDA,?C0047
+                                           ; SOURCE LINE # 590
+                                           ; SOURCE LINE # 591
+0016 D292              SETB    SCL
+                                           ; SOURCE LINE # 592
+0018 00                NOP     
+0019 00                NOP     
+001A 00                NOP     
+001B 00                NOP     
+001C 00                NOP     
+001D 00                NOP     
+001E 00                NOP     
+001F 00                NOP     
+0020 00                NOP     
+0021 00                NOP     
+0022 00                NOP     
+0023 00                NOP     
+0024 00                NOP     
+0025 00                NOP     
+0026 00                NOP     
+0027 00                NOP     
+                                           ; SOURCE LINE # 593
+0028 C292              CLR     SCL
+                                           ; SOURCE LINE # 594
+002A 00                NOP     
+002B 00                NOP     
+002C 00                NOP     
+002D 00                NOP     
+002E 00                NOP     
+002F 00                NOP     
+0030 00                NOP     
+0031 00                NOP     
+0032 00                NOP     
+0033 00                NOP     
+0034 00                NOP     
+0035 00                NOP     
+0036 00                NOP     
+0037 00                NOP     
+0038 00                NOP     
+0039 00                NOP     
+                                           ; SOURCE LINE # 595
+003A 80CA              SJMP    ?C0045
+003C         ?C0047:
+                                           ; SOURCE LINE # 597
+                                           ; SOURCE LINE # 598
+003C C291              CLR     SDA
+                                           ; SOURCE LINE # 599
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 21  
+
+003E 00                NOP     
+                                           ; SOURCE LINE # 600
+003F 120000      R     LCALL   Check_SCL
+0042 EF                MOV     A,R7
+0043 6003              JZ      ?C0049
+                                           ; SOURCE LINE # 601
+0045 7F01              MOV     R7,#01H
+0047 22                RET     
+0048         ?C0049:
+                                           ; SOURCE LINE # 602
+0048 00                NOP     
+0049 00                NOP     
+004A 00                NOP     
+004B 00                NOP     
+004C 00                NOP     
+004D 00                NOP     
+004E 00                NOP     
+004F 00                NOP     
+0050 00                NOP     
+0051 00                NOP     
+0052 00                NOP     
+0053 00                NOP     
+0054 00                NOP     
+0055 00                NOP     
+0056 00                NOP     
+0057 00                NOP     
+                                           ; SOURCE LINE # 603
+0058 D291              SETB    SDA
+                                           ; SOURCE LINE # 604
+005A 00                NOP     
+005B 00                NOP     
+005C 00                NOP     
+005D 00                NOP     
+005E 00                NOP     
+005F 00                NOP     
+0060 00                NOP     
+0061 00                NOP     
+0062 00                NOP     
+0063 00                NOP     
+0064 00                NOP     
+0065 00                NOP     
+0066 00                NOP     
+0067 00                NOP     
+0068 00                NOP     
+0069 00                NOP     
+                                           ; SOURCE LINE # 605
+006A 7F00              MOV     R7,#00H
+006C 22                RET     
+                                           ; SOURCE LINE # 606
+                                           ; SOURCE LINE # 607
+006D         ?C0046:
+                                           ; SOURCE LINE # 608
+006D 7F01              MOV     R7,#01H
+                                           ; SOURCE LINE # 609
+006F         ?C0050:
+006F 22                RET     
+             ; FUNCTION I2cStop (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    596    ----
+C51 COMPILER V7.05   EEPROM                                                                06/14/2005 09:41:24 PAGE 22  
+
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      2      12
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

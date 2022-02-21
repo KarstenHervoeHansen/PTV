@@ -1,0 +1,623 @@
+############################################## 
+#      BASIC UCF SYNTAX EXAMPLES V2.1.5      # 
+############################################## 
+# 
+#              TIMING SPECIFICATIONS 
+# 
+# Timing specifications can be applied to the entire device (global) or to 
+# specific groups of login in your PLD design (called "time groups'). 
+# The time groups are declared in two basic ways. 
+# 
+# Method 1: Based on a #NET name, where 'my_#NET' is a #NET that touchs all the 
+#           logic to be grouped in to 'logic_grp'. Example: 
+##NET my_#NET TNM_#NET = logic_grp ; 
+# 
+# Method 2: Group uing the key word 'TIMEGRP' and declare using the names of 
+#           logic in your design. Example: 
+#TIMEGRP group_name = FFS ("U1/*"); 
+#           creates a group called 'group_name' for all flip-flops with in 
+#           the hierarchical block called U1. Wildcards are valid. 
+# 
+# Grouping is very important because it lets you tell the software which parts 
+# of a design run at which speeds.  For the majority of the designs with only 
+# one clock the very simple global constraints. 
+# 
+# The type of grouping constraint you use can vary depending on the synthesis 
+# tools you are using.  For example, Synplicity does well with Method 1, while 
+# FPGA Express does beter with Method 2. 
+# 
+# 
+############################################################ 
+# Internal to the device clock speed specifications - Tsys # 
+############################################################ 
+# 
+# data      _________      /^^^^^\       _________   out 
+# ----------| D   Q |-----{ LOGIC } -----| D   Q |------ 
+#           |       |      \vvvvv/       |       | 
+#        ---|> CLK  |                 ---|> CLK  | 
+# clock  |  ---------                 |  --------- 
+# ------------------------------------ 
+# 
+# --------------- 
+# Single Clock 
+# --------------- 
+# 
+# ---------------- 
+# PERIOD TIME-SPEC 
+# ---------------- 
+# The PERIOD spec. covers all timing paths that start or end at a 
+# register, latch, or synchronous RAM which are clocked by the reference 
+# #NET (excluding pad destinations).  Also covered is the setup 
+# requirement of the synchronous element relative to other elements 
+# (ex. flip flops, pads, etc...). 
+# NOTE:  The default unit for time is nanoseconds. 
+# 
+##NET clock PERIOD = 50ns ; 
+# 
+#       -OR- 
+# 
+# ------------------ 
+# FROM:TO TIME-SPECs 
+# ------------------ 
+# FROM:TO style timespecs can be used to constrain paths between time 
+# groups.  NOTE:  Keywords:  RAMS, FFS, PADS, and LATCHES are predefined 
+# time groups used to specify all elements of each type in a design. 
+#TIMEGRP RFFS = RISING FFS ("*");  // creates a rising group called RFFS 
+#TIMEGRP FFFS = FALLING FFS ("*");  // creates a falling group called FFFS 
+#TIMESPEC TSF2F  = FROM : FFS   : TO : FFS   : 50 ns; // Flip-flips with the same edge 
+#TIMESPEC TSR2F  = FROM : RFFS  : TO : FFFS  : 25 ns; // rising edge to falling edge 
+#TIMESPEC TSF2R  = FROM : FFFS  : TO : RFFS  : 25 ns; // falling edge to rising edge 
+# 
+# --------------- 
+# Multiple Clocks 
+# --------------- 
+# Requires a combination of the 'Period' and 'FROM:TO' type time specifications 
+##NET clock1 TNM_#NET = clk1_grp ; 
+##NET clock2 TNM_#NET = clk2_grp ; 
+# 
+#TIMESPEC TS_clk1 = PERIOD : clk1_grp : 50 ; 
+#TIMESPEC TS_clk2 = PERIOD : clk2_grp : 30 ; 
+#TIMESPEC TS_ck1_2_ck2 = FROM : clk1_grp : TO : clk2_grp : 50 ; 
+#TIMESPEC TS_ck2_2_ck1 = FROM : clk2_grp : TO : clk1_grp : 30 ; 
+# 
+# 
+############################################################ 
+# CLOCK TO OUT specifications - Tco                        # 
+############################################################ 
+# 
+# from      _________      /^^^^^\       --------\ 
+# ----------| D   Q |-----{ LOGIC } -----| Pad    > 
+# PLD       |       |      \vvvvv/       --------/ 
+#        ---|> CLK  | 
+# clock  |  --------- 
+# -------- 
+# 
+# ---------------- 
+# OFFSET TIME-SPEC 
+# ---------------- 
+# To automatically include clock buffer/routing delay in your 
+# clock-to-out timing specifications, use OFFSET constraints . 
+# For an output where the maximum clock-to-out (Tco) is 25 ns: 
+##NET out_#NET_name OFFSET = OUT 25 AFTER clock_#NET_name ; 
+# 
+#      -OR- 
+# 
+# ------------------ 
+# FROM:TO TIME-SPECs 
+# ------------------ 
+#TIMESPEC TSF2P  = FROM : FFS   : TO : PADS  : 25 ns; 
+# Note that FROM: FFS : TO: PADS constraints start the delay analysis 
+# at the flip flop itself, and not the clock input pin.  The recommended 
+# method to create a clock-to-out constraint is to use an OFFSET constraint.  
+# 
+# 
+############################################################ 
+# Pad to Flip-Flop speed specifications - Tsu              # 
+############################################################ 
+# 
+# ------\         /^^^^^\       _________   into PLD 
+# |pad   >-------{ LOGIC } -----| D   Q |------ 
+# ------/         \vvvvv/       |       | 
+#                            ---|> CLK  | 
+# clock                      |  --------- 
+# ---------------------------- 
+# 
+# ---------------- 
+# OFFSET TIME-SPEC 
+# ---------------- 
+# To automatically account for clock delay in your input setup timing 
+# specifications, use OFFSET constraints. 
+# For an input where the maximum setup time is 25 ns: 
+##NET in_#NET_name OFFSET = IN 25 BEFORE clock_#NET_name ; 
+# 
+#      -OR- 
+# 
+# ------------------ 
+# FROM:TO TIME-SPECs 
+# ------------------ 
+#TIMESPEC TSP2F  = FROM : PADS  : TO : FFS   : 25 ns; 
+# Note that FROM: PADS : TO: FFS constraints do not take into account any 
+# delay for the clock path.  The recommended method to create an input 
+# setup time constraint is to use an OFFSET constraint. 
+# 
+# 
+############################################################ 
+# Pad to Pad speed specifications - Tpd                    # 
+############################################################ 
+# 
+# ------\         /^^^^^\       -------\ 
+# |pad   >-------{ LOGIC } -----| pad   > 
+# ------/         \vvvvv/       -------/ 
+# 
+# ------------------ 
+# FROM:TO TIME-SPECs 
+# ------------------ 
+#TIMESPEC TSP2P  = FROM : PADS  : TO : PADS  : 125 ns; 
+# 
+# 
+############################################################ 
+# Other timing specifications                              # 
+############################################################ 
+# 
+# ------------- 
+# TIMING IGNORE 
+# ------------- 
+# If you can ignore timing of paths, use Timing Ignore (TIG). NOTE: The 
+# "*" character is a wild-card which can be used for bus names.  A "?" 
+# character can be used to wild-card one character. 
+# Ignore timing of #NET reset_n: 
+##NET : reset_n : TIG ; 
+# 
+# Ignore data_reg(7:0) #NET in instance mux_mem: 
+##NET : mux_mem/data_reg* : TIG ; 
+# 
+# Ignore data_reg(7:0) #NET in instance mux_mem as related to a TIMESPEC 
+# named TS01 only: 
+##NET : mux_mem/data_reg* : TIG = TS01 ; 
+# 
+# Ignore data1_sig and data2_sig #NETs: 
+##NET : data?_sig : TIG ; 
+# 
+# --------------- 
+# PATH EXCEPTIONS 
+# --------------- 
+# If your design has outputs that can be slower than others, you can 
+# create specific timespecs similar to this example for output #NETs 
+# named out_data(7:0) and irq_n: 
+#TIMEGRP slow_outs = PADS(out_data* : irq_n) ; 
+#TIMEGRP fast_outs = PADS : EXCEPT : slow_outs ; 
+#TIMESPEC TS08 = FROM : FFS : TO : fast_outs : 22 ; 
+#TIMESPEC TS09 = FROM : FFS : TO : slow_outs : 75 ; 
+# 
+# If you have multi-cycle FF to FF paths, you can create a time group 
+# using either the TIMEGRP or TNM statements. 
+# 
+# WARNING:  Many VHDL/verilog synthesizers do not predictably name flip 
+# flop Q output #NETs.  Most synthesizers do assign predictable instance 
+# names to flip flops, however. 
+# 
+# TIMEGRP example: 
+#TIMEGRP slowffs = FFS(inst_path/ff_q_output_#NET1* : 
+#inst_path/ff_q_output_#NET2*); 
+# 
+# TNM attached to instance example: 
+#INST inst_path/ff_instance_name1_reg* TNM = slowffs ; 
+#INST inst_path/ff_instance_name2_reg* TNM = slowffs ; 
+# 
+# If a FF clock-enable is used on all flip flops of a multi-cycle path, 
+# you can attach TNM to the clock enable #NET.  NOTE:  TNM attached to a 
+# #NET "forward traces" to any FF, LATCH, RAM, or PAD attached to the 
+# #NET. 
+##NET ff_clock_enable_#NET TNM = slowffs ; 
+# 
+# Example of using "slowffs" timegroup, in a FROM:TO timespec, with 
+# either of the three timegroup methods shown above: 
+#TIMESPEC TS10 = FROM : slowffs : TO : FFS : 100 ; 
+# 
+# Constrain the skew or delay associate with a #NET. 
+##NET any_#NET_name MAXSKEW = 7 ; 
+##NET any_#NET_name MAXDELAY = 20 ns; 
+# 
+# 
+# Constraint priority in your .ucf file is as follows: 
+# 
+#    highest 1.  Timing Ignore (TIG) 
+#                 2.  FROM : THRU : TO specs 
+#             3.  FROM : TO specs 
+#    lowest  4.  PERIOD specs 
+# 
+# See the on-line "Library Reference Guide" document for 
+# additional timespec features and more information. 
+# 
+# 
+############################################################ 
+#                                                                                                                    # 
+#         LOCATION and ATTRIBUTE SPECIFICATIONS                        # 
+#                                                                                                                    # 
+############################################################ 
+# Pin and CLB location locking constraints                 # 
+############################################################ 
+# 
+# ----------------------- 
+# Assign an IO pin number 
+# ----------------------- 
+#INST io_buf_instance_name  LOC = P110 ; 
+##NET io_#NET_name  LOC = P111 ; 
+# 
+# ----------------------- 
+# Assign a signal to a range of I/O pins 
+# ----------------------- 
+##NET "signal_name" LOC=P32, P33, P34; 
+# 
+# ----------------------- 
+# Place a logic element(called a BEL) in a specific CLB location.  BEL = FF, LUT, RAM, etc... 
+# ----------------------- 
+#INST instance_path/BEL_inst_name  LOC = CLB_R17C36 ; 
+# 
+# ----------------------- 
+# Place CLB in rectangular area from CLB R1C1 to CLB R5C7 
+# ----------------------- 
+#INST /U1/U2/reg<0> LOC=clb_r1c1:clb_r5c7; 
+# 
+# ----------------------- 
+# Place Heirarchial logic block in rectangular area from CLB R1C1 to CLB R5C7 
+# ----------------------- 
+#INST /U1* LOC=clb_r1c1:clb_r5c7; 
+# 
+# ----------------------- 
+# Prohibit IO pin P26 or CLBR5C3 from being used: 
+# ----------------------- 
+#CONFIG PROHIBIT = P26 ; 
+#CONFIG PROHIBIT = CLB_R5C3 ; 
+# Config Prohibit is very important for frocing the software to not use critical 
+# configuration pins like INIT or DOUT on the FPGA.  The Mode pins and JTAG 
+# Pins require a special pad so they will not be availabe to this constraint 
+# 
+# ----------------------- 
+# Assign an OBUF to be FAST or SLOW: 
+# ----------------------- 
+#INST obuf_instance_name FAST ; 
+#INST obuf_instance_name SLOW ; 
+# 
+# ----------------------- 
+# FPGAs only:  IOB input Flip-flop delay specifcation 
+# ----------------------- 
+# Declare an IOB input FF delay (default = MAXDELAY). 
+# NOTE:  MEDDELAY/NODELAY can be attached to a CLB FF that is pushed 
+# into an IOB by the "map -pr i" option. 
+#INST input_ff_instance_name MEDDELAY ; 
+#INST input_ff_instance_name NODELAY ; 
+# 
+# ----------------------- 
+# Assign Global Clock Buffers Lower Left Right Side 
+# ----------------------- 
+# INST gbuf1 LOC=SSW 
+# 
+# # 
+
+
+
+#NET "video<0>" LOC = "a2";
+## a2 er en "not connected" pin på fg456 package
+
+
+NET "video<1>" LOC = "a3";
+NET "video<3>" LOC = "a4";
+NET "video<5>" LOC = "a5";
+NET "video<7>" LOC = "a6";
+NET "video<9>" LOC = "a7";
+NET "video<11>" LOC = "a8";
+NET "video<13>"	LOC = "a9";
+NET "video<15>"	LOC = "a10";
+#NET "pclko" LOC = "a11";
+NET "din<0>" LOC = "a12";
+NET "din<2>" LOC = "a13";
+NET "din<4>" LOC = "a14";
+NET "din<6>" LOC = "a15";
+NET "din<8>" LOC = "a16";
+NET "din<10>" LOC = "a17";
+NET "din<12>" LOC = "a18";
+NET "din<14>" LOC = "a19";
+NET "din<16>" LOC = "a20";
+#NET "vohd<18>" LOC = "b1";
+NET "video<2>" LOC = "b3";
+NET "video<4>" LOC = "b4";
+NET "video<6>" LOC = "b5";
+NET "video<8>" LOC = "b6";
+NET "video<10>" LOC = "b7";
+NET "video<12>" LOC = "b8";
+NET "video<14>"	LOC = "b9";
+NET "pclk1532" LOC = "b11";
+NET "din<1>" LOC = "b12";
+NET "din<3>" LOC = "b13";
+NET "din<5>" LOC = "b14";
+NET "din<7>" LOC = "b15";
+NET "din<9>" LOC = "b16";
+NET "din<11>" LOC = "b17";
+NET "din<13>" LOC = "b18";
+NET "din<15>" LOC = "b19";
+NET "cs_f" LOC = "b20";
+#NET "vohd<16>" LOC = "c1";
+#NET "vohd<17>" LOC = "c2";
+#NET "dataerr" LOC = "c4";
+NET "f1560" LOC = "c5";
+NET "h1560" LOC = "c6";
+NET "video<17>" LOC = "c7";
+NET "video<19>" LOC = "c8";
+NET "f1532" LOC = "c9";
+NET "h1532" LOC = "c10";
+NET "pclk1560" LOC = "c11";
+NET "din<17>" LOC = "c12";
+#NET "ckm" LOC = "c13";
+#NET "d2m" LOC = "c14";
+#NET "d1m" LOC = "c15";
+#NET "d0m" LOC = "c16";
+#NET "bb5" LOC = "c17";
+#NET "fhm" LOC = "c18";
+NET "pin74" LOC = "c21";
+#NET "vohd<14>" LOC = "d1";
+#NET "vohd<15>" LOC = "d2";
+#NET "vohd<19>" LOC = "d3";
+#NET "fifold" LOC = "d5";
+NET "v1560" LOC = "d6";
+NET "video<16>" LOC = "d7";
+NET "video<18>" LOC = "d8";
+NET "lock1560" LOC = "d9";
+NET "v1532" LOC = "d10";
+#NET "lock1532" LOC = "d11";
+#NET "d3p_gnd" LOC = "d12";
+#NET "ckp" LOC = "d13";
+#NET "d2p" LOC = "d14";
+#NET "d1p" LOC = "d15";
+#NET "d0p" LOC = "d16";
+#NET "bb6" LOC = "d17";
+#NET "f4m" LOC = "d18";
+#NET "pin67" LOC = "d20";
+#NET "pin70" LOC = "d21";
+#NET "pin72" LOC = "d22";
+#NET "vohd<12>" LOC = "e1";
+#NET "vohd<13>" LOC = "e2";
+#NET "visd<3>" LOC = "e3";
+NET "pclksd" LOC = "e7";
+#NET "ainb" LOC = "e8";
+#NET "aina" LOC = "E9";
+#NET "d3m_gnd" LOC = "e12";
+#NET "fhg" LOC = "e17";
+#NET "pin65" LOC = "e19";
+#NET "pin63" LOC = "e20";
+#NET "pin66" LOC = "e21";
+#NET "pin68" LOC = "e22";
+#NET "vohd<10>" LOC = "f1";
+#NET "vohd<11>" LOC = "f2";
+#NET "visd<1>" LOC = "f3";
+#NET "visd<2>" LOC = "f4";
+#NET "visd<4>" LOC = "f5";
+NET "aouta" LOC = "F9";
+NET "aoutb" LOC = "f10";
+NET "din<18>" LOC = "f13";
+NET "din<19>" LOC = "f14";
+#NET "sdin" LOC = "f18";
+#NET "pin61" LOC = "f19";
+#NET "pin59" LOC = "f20";
+#NET "pin62" LOC = "f21";
+#NET "pin64" LOC = "f22";
+#NET "vohd<8>" LOC = "g1";
+#NET "vohd<9>" LOC = "g2";
+#NET "vosd<0>" LOC = "g3";
+#NET "visd<0>" LOC = "g4";
+#NET "visd<9>" LOC = "g5";
+#NET "sdout" LOC = "g18";
+#NET "pin57" LOC = "g19";
+#NET "pin55" LOC = "g20";
+#NET "pin58" LOC = "g21";
+#NET "pin60" LOC = "g22";
+#NET "vohd<6>" LOC = "h1";
+#NET "vohd<7>" LOC = "h2";
+#NET "vosd<2>" LOC = "h3";
+#NET "vosd<1>" LOC = "h4";
+#NET "visd<8>" LOC = "h5";
+#NET "tp<4>" LOC = "h18";
+#NET "pin45" LOC = "h19";
+#NET "pin47" LOC = "h20";
+#NET "pin50" LOC = "h21";
+#NET "pin56" LOC = "h22";
+#NET "vohd<4>" LOC = "j1";
+#NET "vohd<5>" LOC = "j2";
+#NET "vosd<4>" LOC = "j3";
+#NET "vosd<3>" LOC = "j4";
+#NET "visd<7>" LOC = "j5";
+NET "buferr" LOC = "J6";
+#NET "tp<2>" LOC = "j18";
+#NET "pin45" LOC = "j19";
+#NET "pin43" LOC = "j20";
+#NET "pin46" LOC = "j21";
+#NET "pin48" LOC = "j22";
+#NET "vohd<2>" LOC = "k1";
+#NET "vohd<3>" LOC = "k2";
+#NET "vosd<6>" LOC = "k3";
+#NET "vosd<7>" LOC = "k4";
+#NET "visd<6>" LOC = "k5";
+NET "pclkhd" LOC = "k6";
+#NET "sclk" LOC = "k17";
+#NET "tp<3>" LOC = "k18";
+#NET "pin41" LOC = "k19";
+#NET "pin39" LOC = "k20";
+#NET "pin42" LOC = "k21";
+#NET "pin44" LOC = "k22";
+#NET "vohd<0>" LOC = "l1";
+#NET "vohd<1>" LOC = "l2";
+#NET "vosd<8>" LOC = "l3";
+#NET "vosd<9>" LOC = "l4";
+#NET "vosd<5>" LOC = "l5";
+#NET "visd<5>" LOC = "l6";
+#NET "tp<0>" LOC = "l17";
+#NET "tp<1>" LOC = "l18";
+#NET "pin37" LOC = "l19";
+#NET "pin35" LOC = "l20";
+#NET "pin38" LOC = "l21";
+#NET "pin40" LOC = "l22";
+NET "extf" LOC = "m1";
+NET "vid_det" LOC = "m2";
+#NET "auxen" LOC = "M3";
+NET "vihd<13>" LOC = "m4";
+NET "vihd<17>" LOC = "m5";
+NET "vihd<16>" LOC = "m6";
+#NET "blue4" LOC = "m17";
+NET "pin25" LOC = "m18";
+#NET "pin33" LOC = "m19";
+#NET "pin31" LOC = "m20";
+#NET "pin34" LOC = "m21";
+#NET "pin36" LOC = "m22";
+NET "crc_err" LOC = "n1";
+NET "exth" LOC = "n2";
+NET "vihd<12>" LOC = "n3";
+NET "vihd<11>" LOC = "n4";
+NET "vihd<15>" LOC = "n5";
+NET "vihd<19>" LOC = "n6";
+#NET "blue6" LOC = "n17";
+#NET "blue3" LOC = "n18";
+NET "pin29" LOC = "n19";
+NET "pin27" LOC = "n20";
+NET "pin30" LOC = "n21";
+#NET "pin32" LOC = "n22";
+NET "error" LOC = "p1";
+NET "operate" LOC = "p2";
+NET "vihd<10>" LOC = "p3";
+NET "vihd<9>" LOC = "p4";
+NET "vihd<14>" LOC = "p5";
+NET "vihd<18>" LOC = "p6";
+#NET "blue5" LOC = "p17";
+#NET "green6" LOC = "p18";
+NET "pin21" LOC = "p19";
+NET "pin23" LOC = "p20";
+NET "pin26" LOC = "p21";
+NET "pin28" LOC = "p22";
+NET "ao34" LOC = "r1";
+NET "ao12" LOC = "r2";
+NET "vihd<8>" LOC = "r3";
+NET "vihd<7>" LOC = "r4";
+#NET "tfs1" LOC = "r5";
+#NET "green5" LOC = "r18";
+NET "pin17" LOC = "r19";
+NET "pin19" LOC = "r20";
+NET "pin22" LOC = "r21";
+NET "pin24" LOC = "r22";
+NET "ao78" LOC = "t1";
+NET "ao56" LOC = "t2";
+NET "vihd<6>" LOC = "t3";
+NET "vihd<5>" LOC = "t4";
+#NET "rfs1" LOC = "t5";
+#NET "green4" LOC = "t18";
+NET "pin13" LOC = "t19";
+NET "pin15" LOC = "t20";
+NET "pin18" LOC = "t21";
+NET "pin20" LOC = "t22";
+NET "f_tp3" LOC = "u1";
+NET "f_tp2" LOC = "u2";
+NET "vihd<4>" LOC = "u3";
+NET "vihd<3>" LOC = "u4";
+#NET "tmr1" LOC = "u9";
+#NET "tmr2" LOC = "u10";
+#NET "ppi_clk" LOC = "u11";
+#NET "a<18>" LOC = "u12";
+#NET "d_miso" LOC = "u13";
+#NET "d_mosi" LOC = "u14";
+#NET "green3" LOC = "u18";
+NET "pin9" LOC = "u19";
+NET "pin11" LOC = "u20";
+NET "pin14" LOC = "u21";
+NET "pin16" LOC = "u22";
+#NET "ain12" LOC = "v1";
+#NET "tp_cf" LOC = "v2";
+NET "vihd<2>" LOC = "v3";
+NET "vihd<1>" LOC = "v4";
+#NET "bgh" LOC = "v6";
+#NET "bg" LOC = "v7";
+#NET "br" LOC = "v8";
+#NET "dsp_clk" LOC = "v10";
+#NET "d<4>" LOC = "v11";
+#NET "a<0>" LOC = "v12";
+#NET "a<17>" LOC = "v13";
+#NET "a<16>" LOC = "v14";
+#NET "pp<0>" LOC = "v15";
+#NET "d_reset" LOC = "v16";
+#NET "f8g" LOC = "v17";
+NET "pin5" LOC = "v19";
+NET "pin7" LOC = "v20";
+NET "pin10" LOC = "v21";
+NET "pin12" LOC = "v22";
+#NET "ain56" LOC = "w1";
+#NET "ain34" LOC = "w2";
+NET "vihd<0>" LOC = "w3";
+#NET "d<14>" LOC = "w5";
+#NET "d<12>" LOC = "w6";
+#NET "d<10>" LOC = "w7";
+#NET "d<8>" LOC = "w8";
+#NET "d<6>" LOC = "w9";
+#NET "d<2>" LOC = "w10";
+#NET "d<0>" LOC = "w11";
+#NET "a<15>" LOC = "w12";
+#NET "a<13>" LOC = "w13";
+#NET "a<11>" LOC = "w14";
+#NET "a<9>" LOC = "w15";
+#NET "a<7>" LOC = "w16";
+#NET "a<5>" LOC = "w17";
+#NET "a<3>" LOC = "w18";
+NET "pin8" LOC = "w22";	
+NET "f_tp1" LOC = "y1";	
+#NET "ain78" LOC = "y2";	
+#NET "d<15>" LOC = "y4";	
+#NET "d<13>" LOC = "y5";	
+#NET "d<11>" LOC = "y6";	
+#NET "d<9>" LOC = "y7";	
+#NET "d<7>" LOC = "y8";	
+#NET "d<5>" LOC = "y9";	
+#NET "d<3>" LOC = "y10";	
+#NET "d<1>" LOC = "y11";	
+#NET "a<14>" LOC = "y12";	
+#NET "a<12>" LOC = "y13";	
+#NET "a<10>" LOC = "y14";	
+#NET "a<8>" LOC = "y15";	
+#NET "a<6>" LOC = "y16";	
+#NET "a<4>" LOC = "y17";	
+#NET "a<2>" LOC = "y18";	
+#NET "a<1>" LOC = "y19";	
+NET "pin6" LOC = "y22";	
+#NET "rsclk" LOC = "aa3";	
+#NET "dt1sec" LOC = "aa4";	
+#NET "tsclk" LOC = "aa5";	
+#NET "abe_so1" LOC = "aa6";	
+#NET "aoe" LOC = "aa7";	
+#NET "are" LOC = "aa8";	
+#NET "ams<0>" LOC = "aa9";	
+#NET "ams<2>" LOC = "aa10";	
+#NET "pp<3>" LOC = "aa11";	
+#NET "pp<1>" LOC = "aa12";	
+#NET "pf<0>" LOC = "aa13";	
+#NET "pf<2>" LOC = "aa14";	
+#NET "pf<4>" LOC = "aa15";	
+#NET "pf<6>" LOC = "aa16";	
+#NET "pf<8>" LOC = "aa17";	
+#NET "pf<10>" LOC = "aa18";	
+#NET "pf<12>" LOC = "aa19";	
+#NET "pf<14>" LOC = "aa20";	
+#NET "a_pll" LOC = "aa22";	
+#NET "dr1pri" LOC = "ab3";	
+#NET "dt1pri" LOC = "ab4";	
+#NET "dr1sec" LOC = "ab5";	
+#NET "abe_so0" LOC = "ab6";	
+#NET "awe" LOC = "ab7";	
+#NET "ardy" LOC = "ab8";	
+#NET "ams<1>" LOC = "ab9";	
+#NET "ams<3>" LOC = "ab10";	
+#NET "pp<2>" LOC = "ab11";	
+#NET "e_dsp_clk"	LOC = "ab12";	
+#NET "pf<1>" LOC = "ab13";	
+#NET "pf<3>" LOC = "ab14";	
+#NET "pf<5>" LOC = "ab15";	
+#NET "pf<7>" LOC = "ab16";	
+#NET "pf<9>" LOC = "ab17";	
+#NET "pf<11>" LOC = "ab18";
+#NET "pf<13>" LOC = "ab19";
+#NET "pf<15>" LOC = "ab20";
+#NET "d_sck" LOC = "ab21";

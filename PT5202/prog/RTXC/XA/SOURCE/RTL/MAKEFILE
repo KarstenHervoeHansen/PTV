@@ -1,0 +1,193 @@
+# makefile for kernel - Tasking C v2.0
+#
+# makefile format: mkxa
+#
+# invoke as: > mkxa
+#
+#-------------------------------------------------------------
+# RTXC    
+# Copyright (c) 
+# Embedded System Products, Inc.
+# ALL RIGHTS RESERVED
+##############################################################
+.SUFFIXES: .c .i .asm .obj
+
+#TK=e:\compiler\cxa
+TK=c:\cxa
+CC=$(TK)\bin\ccxa
+AR=$(TK)\bin\arxa
+RM=del
+
+INC=..\..\include
+LIB=..\..\lib
+
+# *****************  Steering Program Options  *******************
+#
+# memory models - select one
+#
+#model=t      # tiny
+#model=s      # small
+#model=m      # medium
+model=l      # large
+
+#
+# debug symbols option
+#
+symbols=-gn       # no
+#symbols=-g         # yes
+
+#
+# verbose mode
+#
+#verbose=          # no
+verbose=-v         # yes
+
+#
+# ****************  End of Steering Program Options  ****************
+
+# *****************  Compiler Level Options  *******************
+#
+# optimization
+#
+#Copt=-Wc-O0 # none
+#Copt=-Wc-O1 # default(size)
+Copt=-Wc-O2 # speed
+
+#
+# Merge C-source code with assembly output
+#
+#Csource=              # no
+Csource=-Wc-s         # yes
+
+#
+# Compiler error to output file - produces an *.err file
+#
+#Cerror=               # no
+Cerror=-Wc-err        # yes
+
+#
+#
+# Include compiler INCLUDE directory in search path
+#
+#Cinc=                                     # no
+Cinc=-Wc-I$(TK)\\include -Wc-I$(INC)       # yes
+
+#
+# Use special function register definitions
+#
+#Cspfregs=               # no
+Cspfregs=-Wc-Cxag3         # yes
+
+#
+# ****************  End of Compiler Level Options  ****************
+
+# *****************  Assembly Level Options  *******************
+#
+# optimization options
+# h = Use hardware instructions only
+# H = (DEFAULT) Use hardware and generic instructions
+# j = (DEFAULT) Enable jump and branch optimization. Replace jumps and
+#               branches with shorter or faster functionally equivalent
+#               branches.
+# J = Disable jump and branch optimization.
+#
+Aopt=-Wa-OHj
+
+#
+# error to output file - produces an *.ers file
+#
+#Aerror=                # no
+Aerror=-Wa-err         # yes
+
+#
+# generate assembly listings - v2.0 listing default
+#
+Alist=                      # no
+#Alist=-WaPR($*.lst)         # yes
+
+#
+#
+# Include compiler INCLUDE directory in search path
+#
+#Ainc=                                     # no
+Ainc=-Wm-I$(INC)                           # yes
+
+#
+# ****************  End of Assembly Level Options  ****************
+
+# *****************  Archiver Options  *******************
+#
+# create the library if it does not exist
+#
+ARcreate=c
+
+#
+# replace named objects in the library if they exist
+#
+ARreplace=r
+
+#
+# print the object file in the library
+#
+#ARprint=
+ARprint=t
+
+#
+# ****************  End of Archiver Options  ****************
+
+CCFLAGS= -c $(verbose) $(symbols) -M$(model) $(Copt) $(Cerror) \
+	    $(Alist) $(Cinc) $(Csource) $(Cspfregs)
+
+ASFLAGS= -c $(verbose) $(symbols) -M$(model) $(Aopt) $(Aerror) \
+	    $(Alist) $(Ainc) -Wm-D_MODEL=$(model)
+
+ARFLAGS= $(ARcreate)$(ARreplace)
+
+CPPFLAGS= -cs -Wc-E $(verbose) $(symbols) -M$(model) $(Copt) $(Cerror) \
+	    $(Cinc)
+
+#
+# default c.obj make rule
+#
+.c.obj:
+	$(CC) $(CCFLAGS) $*.c
+        $(AR) $(ARFLAGS) $(LIB)\librtl.a $*.obj
+
+.c.i:
+	$(CC) $(CPPFLAGS) $*.c > $*.i
+
+#
+# default .as.obj make rule
+#
+.asm.obj:
+        $(CC) $(ASFLAGS) $*.asm
+	$(AR) $(ARFLAGS) $(LIB)\librtl.a $*.obj
+
+
+target: ..\..\lib\librtl.a
+
+..\..\lib\librtl.a: cvtdate.obj format.obj printl.obj uitoa.obj ultoa.obj 
+	   $(AR) $(ARprint) $(LIB)\librtl.a
+
+#
+# rtl library files initialization
+#
+cvtdate.obj: cvtdate.c $(INC)\typedef.h
+
+format.obj: format.c
+
+printl.obj: printl.c
+
+uitoa.obj: uitoa.c
+
+ultoa.obj: ultoa.c
+
+clean:
+	$(RM) *.obj
+	$(RM) $(LIB)\librtl.a
+	$(RM) *.lst
+	$(RM) *.sdb
+	$(RM) *.bak
+	$(RM) *.err
+	$(RM) *.ers
+	$(RM) *.src

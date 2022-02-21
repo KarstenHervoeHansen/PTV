@@ -1,0 +1,502 @@
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE UPDAT
+OBJECT MODULE PLACED IN updat.OBJ
+COMPILER INVOKED BY: c:\Cygnal\IDEfiles\c51\Bin\C51.EXE updat.c DB OE CODE WL(1) OPTIMIZE(9,SPEED) SMALL
+
+stmt level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2005                                           */
+   3          /*  Project:  Programming firmware on HD and DL boards via 5300 Master.    */
+   4          /*                                                                         */
+   5          /*  Module:   updat.C                                                      */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     03.10.2006                                                   */
+   8          /*  Status:   Version 1.0                                                  */
+   9          /*  Purpose:  This module contains function update(), which receives F320  */
+  10          /*            program in form of a bin file and programs the processor by  */
+  11          /*            writing program data into flash program memory.              */
+  12          /*            After programming, FLASH memory is read to calculate checksum*/
+  13          /*            which is then compared to checksum of received data.         */
+  14          /*  Notes:                                                                 */
+  15          /*            The F320 processor has 16 kB of flash memory, organized as   */
+  16          /*            32 pages @ 512 bytes. Before programming, the memory must be */
+  17          /*            erased.  It is possible to only erase 1 page at the time.    */
+  18          /*            Function update() is to reside @0x3C00 (see linker args) and */
+  19          /*            ocupies less than one page.  To load software                */
+  20          /*            including this function, combine program hex file with       */
+  21          /*            update.hex, using a text editor.                             */
+  22          /***************************************************************************/
+  23          #pragma WARNINGLEVEL (1) /* Lists only those warnings which may generate   */
+  24                                   /* incorrect code. Default is 2.                  */
+  25          /***************************************************************************/
+  26          #include <C8051F320.h>
+  27          #include <stdio.h>                     /* printf() and getchar()           */
+  28          #include <stdlib.h>
+  29          #include <ctype.h>                     /* tolower() and toint()            */
+  30          /***************************************************************************/
+  31          
+  32          #define START   (UC) 0x31
+  33          #define STOP    (UC) 0x32
+  34          #define ERR     (UC) 0x20
+  35          #define SUCCESS (UC) 0x1B
+  36          
+  37          #define UC unsigned char
+  38          #define UI unsigned int
+  39          
+  40          /* unions for unsigned long and unsigned int */
+  41          /* to access these data types bytewise       */
+  42          /* Note that for Kiel C compiler, charval[0] */
+  43          /* carries MSB and charval[3] carries LSB.   */
+  44          /* This is the opposite of how TC does it.   */
+  45          
+  46          typedef union yy
+  47              {
+  48              UI   intval;
+  49              UC   bytes[2];
+  50              }  ui;
+  51          
+  52          sbit LED   = P1^2;  /* Test LED on 8612 */
+  53          
+  54          void  update(void);
+  55          void  erase_flash(void);
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 2   
+
+  56          UC    receive_code(void);
+  57          char  fetch (void);
+  58          void  put (UC);
+  59          
+  60          /******************************************************************
+  61          * NAME       void update(void)
+  62          * PURPOSE    To receive program data via UART and program processor
+  63          *            FLASH program memory.
+  64          * 
+  65          * ARGUMENTS  None
+  66          *
+  67          * RETURNS    Nothing
+  68          *
+  69          * EXTERNS    None
+  70          *
+  71          * NOTES:     This function first erases all FLASH memory where the
+  72          *            program is to be.  Then it receives all bytes and 
+  73          *            writes them into FLASH.
+  74          *            It then transmits result code via UART.  The result
+  75          *            code may be SUCCESS or checksum error.
+  76          ******************************************************************/
+  77          void update(void)
+  78            {
+  79   1        UC input;
+  80   1      
+  81   1      
+  82   1        EA = 0;             /* Disable interrupts (precautionary) */
+  83   1        erase_flash();
+  84   1      
+  85   1        LED = 1;
+  86   1      
+  87   1        input = receive_code();
+  88   1        put(input);
+  89   1        LED = 0;
+  90   1        }
+  91          
+  92          /***************************************************************************/
+  93          /* erase_flash                                                             */
+  94          /*                                                                         */
+  95          /* This routine erases the first 30 pages of FLASH (0x0000 to 0x3BFF).     */
+  96          /* Last page erased is from 0x3B00 to 0x3BFF                               */
+  97          /***************************************************************************/
+  98          void erase_flash(void)
+  99            {
+ 100   1        UC xdata* data pagePointer = 0;/* a pointer to xdata located in data space */
+ 101   1                                       /* points to the first FLASH page that      */
+ 102   1                                       /* will be erased                           */
+ 103   1        UC i;
+ 104   1        
+ 105   1        PSCTL = 3;                       /* MOVX erases FLASH   */
+ 106   1         
+ 107   1        /* Erase the first 30 FLASH pages  */
+ 108   1        for (i = 0; i < 30; i++)
+ 109   1          {
+ 110   2          FLKEY = 0xA5;                 /* FLASH lock and key sequence 1  */
+ 111   2          FLKEY = 0xF1;                 /* FLASH lock and key sequence 2  */
+ 112   2          
+ 113   2          *pagePointer = 0;             /* initiate the erase  */
+ 114   2          
+ 115   2          pagePointer += 512;
+ 116   2          }   
+ 117   1      
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 3   
+
+ 118   1        PSCTL = 0;                      /* MOVX writes target XRAM */
+ 119   1        }
+ 120          
+ 121          /********************************************************************************/
+ 122          /* receive_code                                                                 */
+ 123          /* This routine receives the new firmware through the UART as binary data       */
+ 124          /*                                                                              */
+ 125          /* Returns: 0 - on Success                                                      */
+ 126          /*          3 - on checksum fail                                                */
+ 127          /********************************************************************************/
+ 128          UC receive_code(void)
+ 129            {
+ 130   1        UC xdata* data pwrite;              /* pointer used for writing FLASH       */
+ 131   1        UC code* data pread;                /* pointer used for reading FLASH       */
+ 132   1        ui  len;                            /* holds length of data                 */
+ 133   1        UC checksum;                        /* holds checksum of received data      */
+ 134   1        UC flash_checksum;                  /* holds the checksum calculated after  */
+ 135   1                                            /* the FLASH has been programmed        */
+ 136   1        UC c;
+ 137   1        UI i;
+ 138   1      
+ 139   1        /* receive data length */
+ 140   1        len.bytes[1] = fetch(); /* LSB */
+ 141   1        len.bytes[0] = fetch(); /* MSB */
+ 142   1      
+ 143   1      
+ 144   1        PSCTL    = 1;                       /* MOVX writes to FLASH                 */
+ 145   1        pwrite   = (char xdata*) 0;         /* initialize the write pointer         */
+ 146   1        checksum = 0;
+ 147   1      
+ 148   1          /* write the data into FLASH */
+ 149   1          for(i = 0; i < len.intval; i++)
+ 150   1            {
+ 151   2            if (pwrite < 0x3D00)            /* check for valid pointer          */
+ 152   2              {                             /* updater starts at 0x3D00         */
+ 153   3              FLKEY     = 0xA5;             /* FLASH lock and key sequence 1    */
+ 154   3              FLKEY     = 0xF1;             /* FLASH lock and key sequence 2    */
+ 155   3              c         = fetch();
+ 156   3              checksum += c;
+ 157   3              *pwrite   = c;                /* write one byte to FLASH          */
+ 158   3              pwrite++;                     /* increment FLASH write pointer    */
+ 159   3              } 
+ 160   2            }
+ 161   1            
+ 162   1          PSCTL = 0;                             /* MOVX writes target XRAM           */
+ 163   1                
+ 164   1          /* verify the checksum  */
+ 165   1          pread          =  (char code*) 0;      /* initialize the read pointer       */
+ 166   1          flash_checksum = 0;                    /* set the flash_checksum to zero    */
+ 167   1      
+ 168   1          /* add the data field stored in FLASH to the checksum */
+ 169   1          for(i = 0; i < len.intval; i++)
+ 170   1            {
+ 171   2            flash_checksum += *pread++;
+ 172   2            } 
+ 173   1          
+ 174   1          /* verify the checksum (the flash_checksum should equal zero) */
+ 175   1          if (flash_checksum != checksum)
+ 176   1            {
+ 177   2            /*printf("*** checksum failed, try again");  */
+ 178   2            return (3);
+ 179   2            }
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 4   
+
+ 180   1        return (0);                   /* signal SUCCESS */
+ 181   1        }
+ 182          
+ 183          /******************************************************************
+ 184          * NAME       char fetch(void)
+ 185          * PURPOSE    to fetch one char from UART
+ 186          * 
+ 187          * ARGUMENTS  None
+ 188          *
+ 189          * RETURNS    Received char
+ 190          *
+ 191          * EXTERNS    None
+ 192          *
+ 193          * NOTES:     This function first signals to the sender that it is
+ 194          *            ready to receive by sending START.  It then waits 
+ 195          *            for character and when received, returns it.
+ 196          ******************************************************************/
+ 197          char fetch(void)
+ 198            {
+ 199   1        char c;
+ 200   1      
+ 201   1        put(START);
+ 202   1      
+ 203   1        while (!RI0)
+ 204   1          ;
+ 205   1        c   = SBUF0;
+ 206   1        RI0 = 0;
+ 207   1        return (c);
+ 208   1        }
+ 209          
+ 210          #if 0
+              void put (UC c) /* This one is supplied by Silabs. It does not work */
+                {
+                while (!TI0)
+                  ;
+                TI0   = 0;
+                SBUF0 = c;
+                }
+              #else
+ 219          /******************************************************************
+ 220          * NAME       void put(UC c)
+ 221          * PURPOSE    To send one character via UART
+ 222          * 
+ 223          * ARGUMENTS  None
+ 224          *
+ 225          * RETURNS    Nothing
+ 226          *
+ 227          * EXTERNS    None
+ 228          *
+ 229          * NOTES:     
+ 230          ******************************************************************/
+ 231          void put(UC c) /* This one is supplied by JK. It DOES work */
+ 232            {
+ 233   1        SBUF0 = c;
+ 234   1        while (!TI0)
+ 235   1          ;
+ 236   1        TI0   = 0;
+ 237   1        }
+ 238          #endif
+ 239          
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 5   
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION Com0019 (BEGIN)
+0000         L?0026:
+0000 C3                CLR     C
+0001 E500        R     MOV     A,i+01H
+0003 9500        R     SUBB    A,len+01H
+0005 E500        R     MOV     A,i
+0007 9500        R     SUBB    A,len
+0009 22                RET     
+             ; FUNCTION Com0019 (END)
+
+             ; FUNCTION update (BEGIN)
+                                           ; SOURCE LINE # 77
+                                           ; SOURCE LINE # 78
+                                           ; SOURCE LINE # 82
+0000 C2AF              CLR     EA
+                                           ; SOURCE LINE # 83
+0002 120000      R     LCALL   erase_flash
+                                           ; SOURCE LINE # 85
+0005 D292              SETB    LED
+                                           ; SOURCE LINE # 87
+0007 120000      R     LCALL   receive_code
+;---- Variable 'input' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 88
+000A 120000      R     LCALL   _put
+                                           ; SOURCE LINE # 89
+000D C292              CLR     LED
+                                           ; SOURCE LINE # 90
+000F 22                RET     
+             ; FUNCTION update (END)
+
+             ; FUNCTION erase_flash (BEGIN)
+                                           ; SOURCE LINE # 98
+                                           ; SOURCE LINE # 99
+                                           ; SOURCE LINE # 100
+;---- Variable 'pagePointer' assigned to Register 'DPTR' ----
+0000 900000            MOV     DPTR,#00H
+                                           ; SOURCE LINE # 105
+0003 758F03            MOV     PSCTL,#03H
+                                           ; SOURCE LINE # 108
+;---- Variable 'i' assigned to Register 'R7' ----
+0006 E4                CLR     A
+0007 FF                MOV     R7,A
+0008         ?C0002:
+                                           ; SOURCE LINE # 109
+                                           ; SOURCE LINE # 110
+0008 75B7A5            MOV     FLKEY,#0A5H
+                                           ; SOURCE LINE # 111
+000B 75B7F1            MOV     FLKEY,#0F1H
+                                           ; SOURCE LINE # 113
+000E E4                CLR     A
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 115
+0010 2582              ADD     A,DPL
+0012 F582              MOV     DPL,A
+0014 7402              MOV     A,#02H
+0016 3583              ADDC    A,DPH
+0018 F583              MOV     DPH,A
+                                           ; SOURCE LINE # 116
+001A 0F                INC     R7
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 6   
+
+001B BF1EEA            CJNE    R7,#01EH,?C0002
+001E         ?C0003:
+                                           ; SOURCE LINE # 118
+001E E4                CLR     A
+001F F58F              MOV     PSCTL,A
+                                           ; SOURCE LINE # 119
+0021 22                RET     
+             ; FUNCTION erase_flash (END)
+
+             ; FUNCTION receive_code (BEGIN)
+                                           ; SOURCE LINE # 128
+                                           ; SOURCE LINE # 129
+                                           ; SOURCE LINE # 140
+0000 120000      R     LCALL   fetch
+0003 8F00        R     MOV     len+01H,R7
+                                           ; SOURCE LINE # 141
+0005 120000      R     LCALL   fetch
+0008 8F00        R     MOV     len,R7
+                                           ; SOURCE LINE # 144
+000A 758F01            MOV     PSCTL,#01H
+                                           ; SOURCE LINE # 145
+000D E4                CLR     A
+000E F500        R     MOV     pwrite,A
+0010 F500        R     MOV     pwrite+01H,A
+                                           ; SOURCE LINE # 146
+0012 F500        R     MOV     checksum,A
+                                           ; SOURCE LINE # 149
+0014 F500        R     MOV     i,A
+0016 F500        R     MOV     i+01H,A
+0018         ?C0006:
+0018 120000      R     LCALL   L?0026
+001B 502F              JNC     ?C0007
+                                           ; SOURCE LINE # 150
+                                           ; SOURCE LINE # 151
+001D C3                CLR     C
+001E E500        R     MOV     A,pwrite
+0020 943D              SUBB    A,#03DH
+0022 501E              JNC     ?C0008
+                                           ; SOURCE LINE # 152
+                                           ; SOURCE LINE # 153
+0024 75B7A5            MOV     FLKEY,#0A5H
+                                           ; SOURCE LINE # 154
+0027 75B7F1            MOV     FLKEY,#0F1H
+                                           ; SOURCE LINE # 155
+002A 120000      R     LCALL   fetch
+;---- Variable 'c' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 156
+002D EF                MOV     A,R7
+002E 2500        R     ADD     A,checksum
+0030 F500        R     MOV     checksum,A
+                                           ; SOURCE LINE # 157
+0032 850082      R     MOV     DPL,pwrite+01H
+0035 850083      R     MOV     DPH,pwrite
+0038 EF                MOV     A,R7
+0039 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 158
+003A 0500        R     INC     pwrite+01H
+003C E500        R     MOV     A,pwrite+01H
+003E 7002              JNZ     ?C0021
+0040 0500        R     INC     pwrite
+0042         ?C0021:
+                                           ; SOURCE LINE # 159
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 7   
+
+                                           ; SOURCE LINE # 160
+0042         ?C0008:
+0042 0500        R     INC     i+01H
+0044 E500        R     MOV     A,i+01H
+0046 70D0              JNZ     ?C0006
+0048 0500        R     INC     i
+004A         ?C0022:
+004A 80CC              SJMP    ?C0006
+004C         ?C0007:
+                                           ; SOURCE LINE # 162
+004C E4                CLR     A
+004D F58F              MOV     PSCTL,A
+                                           ; SOURCE LINE # 165
+;---- Variable 'pread' assigned to Register 'R6/R7' ----
+004F FF                MOV     R7,A
+0050 FE                MOV     R6,A
+                                           ; SOURCE LINE # 166
+;---- Variable 'flash_checksum' assigned to Register 'R5' ----
+0051 FD                MOV     R5,A
+                                           ; SOURCE LINE # 169
+0052 F500        R     MOV     i,A
+0054 F500        R     MOV     i+01H,A
+0056         ?C0010:
+0056 120000      R     LCALL   L?0026
+0059 501A              JNC     ?C0011
+                                           ; SOURCE LINE # 170
+                                           ; SOURCE LINE # 171
+005B 0F                INC     R7
+005C EF                MOV     A,R7
+005D AA06              MOV     R2,AR6
+005F 7001              JNZ     ?C0023
+0061 0E                INC     R6
+0062         ?C0023:
+0062 14                DEC     A
+0063 F582              MOV     DPL,A
+0065 8A83              MOV     DPH,R2
+0067 E4                CLR     A
+0068 93                MOVC    A,@A+DPTR
+0069 2D                ADD     A,R5
+006A FD                MOV     R5,A
+                                           ; SOURCE LINE # 172
+006B 0500        R     INC     i+01H
+006D E500        R     MOV     A,i+01H
+006F 70E5              JNZ     ?C0010
+0071 0500        R     INC     i
+0073         ?C0024:
+0073 80E1              SJMP    ?C0010
+0075         ?C0011:
+                                           ; SOURCE LINE # 175
+0075 ED                MOV     A,R5
+0076 6500        R     XRL     A,checksum
+0078 6003              JZ      ?C0013
+                                           ; SOURCE LINE # 176
+                                           ; SOURCE LINE # 178
+007A 7F03              MOV     R7,#03H
+007C 22                RET     
+                                           ; SOURCE LINE # 179
+007D         ?C0013:
+                                           ; SOURCE LINE # 180
+007D 7F00              MOV     R7,#00H
+                                           ; SOURCE LINE # 181
+007F         ?C0014:
+C51 COMPILER V7.05   UPDAT                                                                 02/20/2009 13:38:17 PAGE 8   
+
+007F 22                RET     
+             ; FUNCTION receive_code (END)
+
+             ; FUNCTION fetch (BEGIN)
+                                           ; SOURCE LINE # 197
+                                           ; SOURCE LINE # 198
+                                           ; SOURCE LINE # 201
+0000 7F31              MOV     R7,#031H
+0002 120000      R     LCALL   _put
+0005         ?C0015:
+                                           ; SOURCE LINE # 203
+0005 3098FD            JNB     RI0,?C0015
+0008         ?C0016:
+                                           ; SOURCE LINE # 205
+;---- Variable 'c' assigned to Register 'R7' ----
+0008 AF99              MOV     R7,SBUF0
+                                           ; SOURCE LINE # 206
+000A C298              CLR     RI0
+                                           ; SOURCE LINE # 207
+                                           ; SOURCE LINE # 208
+000C         ?C0017:
+000C 22                RET     
+             ; FUNCTION fetch (END)
+
+             ; FUNCTION _put (BEGIN)
+                                           ; SOURCE LINE # 231
+;---- Variable 'c' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 232
+                                           ; SOURCE LINE # 233
+0000 8F99              MOV     SBUF0,R7
+0002         ?C0018:
+                                           ; SOURCE LINE # 234
+0002 3099FD            JNB     TI0,?C0018
+0005         ?C0019:
+                                           ; SOURCE LINE # 236
+0005 C299              CLR     TI0
+                                           ; SOURCE LINE # 237
+0007 22                RET     
+             ; FUNCTION _put (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    209    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       7
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

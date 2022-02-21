@@ -1,0 +1,1450 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+F:\PT5202\prog\work\Ver.4_9\temp\xa\rs232err.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -IcF:\PT5202\prog\include
+                          3 ;          -IF:\PT5202\prog\rtxc\xa\include -I. -Ml -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    RS232ERR
+                         10 ; rs232err.c    1       /************************************************************************
+                            ***/
+                         11 ; rs232err.c    2       /*      Copyright ProTeleVision Technologies A/S, BRONDBY 1998           
+                                                            */
+                         12 ; rs232err.c    3       /*      Project:                PT5230 Digital Video Generator           
+                                                                                            */
+                         13 ; rs232err.c    4       /*      Module:         RS232ERR.C                                       
+                                                                                                                            *
+                            /
+                         14 ; rs232err.c    5       /*      Author:         Kim Engedahl, DEV                                
+                                                                                                                    */
+                         15 ; rs232err.c    6       /*      Org. date:      960713                                           
+                                                                                                                            *
+                            /
+                         16 ; rs232err.c    7       /*      Rev. date:      980616, KEn, DEV                                 
+                                                                                                                    */
+                         17 ; rs232err.c    8       /*      Status:         Version 1.0                                      
+                                                                                                                            *
+                            /
+                         18 ; rs232err.c    9       /*                                                                       
+                                                                                                                             
+                                                            */
+                         19 ; rs232err.c   10       /*      This module contains the following functions:                    
+                                                                            */
+                         20 ; rs232err.c   11       /*                                                                       
+                                                                                                                             
+                                                            */
+                         21 ; rs232err.c   12       /*              void ResetErrorEventQueue();                             
+                                                                                                            */
+                         22 ; rs232err.c   13       /*              bit UpdateQUESTRegister();                               
+                                                                                                                    */
+                         23 ; rs232err.c   14       /*              bit UpdateOPERRegister();                                
+                                                                                                                    */
+                         24 ; rs232err.c   15       /*              UC UpdateESRRegister();                                  
+                                                                                                                    */
+                         25 ; rs232err.c   16       /*              void UpdateSTBRegister();                                
+                                                                                                                    */
+                         26 ; rs232err.c   17       /*              int ReadErrorEventQueue();                               
+                                                                                                                    */
+                         27 ; rs232err.c   18       /*              void SaveErrorEventQueue( int ErrorType);                
+                                                                                            */
+                         28 ; rs232err.c   19       /*                                                                       
+                                                                                                                             
+                                                            */
+                         29 ; rs232err.c   20       /*      Changes:                                                         
+                                                                                                                             
+                                                    */
+                         30 ; rs232err.c   21       /* 980616: Released as 4008 002 06812                                    
+                                                                                            */
+                         31 ; rs232err.c   22       /* 980514: Released as 4008 002 06811                                    
+                                                                                            */
+                         32 ; rs232err.c   23       /************************************************************************
+                            ***/
+                         33 ; rs232err.c   24       
+                         34 ; rs232err.c   25       /************************************************************************
+                            ***/
+                         35 ; rs232err.c   26       // Include files:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         36 ; rs232err.c   27       
+                         37 ; rs232err.c   28       //#include <xa.h>
+                         38 ; rs232err.c   29       #include <string.h>
+                         42 ; rs232err.c   30       #include <stdio.h>
+                         62 ; rs232err.c   31       #include <stdlib.h>
+                         76 ; rs232err.c   32       
+                         77 ; rs232err.c   33       //#include "mas.h"
+                         78 ; rs232err.c   34       
+                         79 ; rs232err.c   35       #include "define.h"
+                         82 ; rs232err.c   36       #include "rs232err.h"
+                         85 ; rs232err.c   37       
+                         86 ; rs232err.c   38       char code NoErrTxt[]                                                    =
+                             "No error";
+000000                   87 RS232ERR_RO     SEGMENT HCODE ROMDATA
+000000                   88         RSEG    RS232ERR_RO
+                         92         PUBLIC  _NoErrTxt
+000000                   93 _NoErrTxt:
+                         94 ; rs232err.c   39       char code CmdErrTxt[]                                           = "Comman
+                            d error";
+000000 4E6F206572726F    95         DB      04EH,06FH,020H,065H,072H,072H,06FH,072H,000H
+       7200                 
+                         98         PUBLIC  _CmdErrTxt
+000009                   99 _CmdErrTxt:
+000009 436F6D6D616E64   100         DB      043H,06FH,06DH,06DH,061H,06EH,064H,020H,065H,072H,072H,06FH
+       206572726F           
+                        101 ; rs232err.c   40       char code InvalidCharTxt[]                                      = "Invali
+                            d character";
+000015 7200             102         DB      072H,000H
+                        105         PUBLIC  _InvalidCharTxt
+000017                  106 _InvalidCharTxt:
+000017 496E76616C6964   107         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,063H,068H,061H,072H
+       2063686172           
+                        108 ; rs232err.c   41       char code SyntaxErrTxt[]                                        = "Syntax
+                             error";
+000023 616374657200     109         DB      061H,063H,074H,065H,072H,000H
+                        112         PUBLIC  _SyntaxErrTxt
+000029                  113 _SyntaxErrTxt:
+000029 53796E74617820   114         DB      053H,079H,06EH,074H,061H,078H,020H,065H,072H,072H,06FH,072H
+       6572726F72           
+                        115 ; rs232err.c   42       char code InvalidSeparatorTxt[]                 = "Invalid separator";
+000035 00               116         DB      000H
+                        119         PUBLIC  _InvalidSeparatorTxt
+000036                  120 _InvalidSeparatorTxt:
+000036 496E76616C6964   121         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,073H,065H,070H,061H
+       2073657061           
+                        122 ; rs232err.c   43       char code DataTypeErrTxt[]                                      = "Data t
+                            ype error";
+000042 7261746F7200     123         DB      072H,061H,074H,06FH,072H,000H
+                        126         PUBLIC  _DataTypeErrTxt
+000048                  127 _DataTypeErrTxt:
+000048 44617461207479   128         DB      044H,061H,074H,061H,020H,074H,079H,070H,065H,020H,065H,072H
+       7065206572           
+                        129 ; rs232err.c   44       char code ParNotAllowedTxt[]                            = "Parameter not 
+                            allowed";
+000054 726F7200         130         DB      072H,06FH,072H,000H
+                        133         PUBLIC  _ParNotAllowedTxt
+000058                  134 _ParNotAllowedTxt:
+000058 506172616D6574   135         DB      050H,061H,072H,061H,06DH,065H,074H,065H,072H,020H,06EH,06FH
+       6572206E6F           
+                        136 ; rs232err.c   45       char code MissingParTxt[]                                       = "Missin
+                            g parameter";
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000064 7420616C6C6F77   137         DB      074H,020H,061H,06CH,06CH,06FH,077H,065H,064H,000H
+       656400               
+                        140         PUBLIC  _MissingParTxt
+00006E                  141 _MissingParTxt:
+00006E 4D697373696E67   142         DB      04DH,069H,073H,073H,069H,06EH,067H,020H,070H,061H,072H,061H
+       2070617261           
+                        143 ; rs232err.c   46       char code CmdHeaderErrTxt[]                             = "Command header
+                             error";
+00007A 6D6574657200     144         DB      06DH,065H,074H,065H,072H,000H
+                        147         PUBLIC  _CmdHeaderErrTxt
+000080                  148 _CmdHeaderErrTxt:
+000080 436F6D6D616E64   149         DB      043H,06FH,06DH,06DH,061H,06EH,064H,020H,068H,065H,061H,064H
+       2068656164           
+                        150 ; rs232err.c   47       char code HdrSeparatorErrTxt[]                  = "Header separator error
+                            ";
+00008C 6572206572726F   151         DB      065H,072H,020H,065H,072H,072H,06FH,072H,000H
+       7200                 
+                        154         PUBLIC  _HdrSeparatorErrTxt
+000095                  155 _HdrSeparatorErrTxt:
+000095 48656164657220   156         DB      048H,065H,061H,064H,065H,072H,020H,073H,065H,070H,061H,072H
+       7365706172           
+                        157 ; rs232err.c   48       char code PrgmMnemonicTooLongTxt[]              = "Program mnemonic too l
+                            ong";
+0000A1 61746F72206572   158         DB      061H,074H,06FH,072H,020H,065H,072H,072H,06FH,072H,000H
+       726F7200             
+                        161         PUBLIC  _PrgmMnemonicTooLongTxt
+0000AC                  162 _PrgmMnemonicTooLongTxt:
+0000AC 50726F6772616D   163         DB      050H,072H,06FH,067H,072H,061H,06DH,020H,06DH,06EH,065H,06DH
+       206D6E656D           
+0000B8 6F6E696320746F   164         DB      06FH,06EH,069H,063H,020H,074H,06FH,06FH,020H,06CH,06FH,06EH
+       6F206C6F6E           
+                        165 ; rs232err.c   49       char code UndefinedHeaderTxt[]                  = "Undefined header";
+0000C4 6700             166         DB      067H,000H
+                        169         PUBLIC  _UndefinedHeaderTxt
+0000C6                  170 _UndefinedHeaderTxt:
+0000C6 556E646566696E   171         DB      055H,06EH,064H,065H,066H,069H,06EH,065H,064H,020H,068H,065H
+       6564206865           
+                        172 ; rs232err.c   50       char code HdrSuffixOutOfRangeTxt[]              = "Header suffix out of r
+                            ange";
+0000D2 6164657200       173         DB      061H,064H,065H,072H,000H
+                        176         PUBLIC  _HdrSuffixOutOfRangeTxt
+0000D7                  177 _HdrSuffixOutOfRangeTxt:
+0000D7 48656164657220   178         DB      048H,065H,061H,064H,065H,072H,020H,073H,075H,066H,066H,069H
+       7375666669           
+0000E3 78206F7574206F   179         DB      078H,020H,06FH,075H,074H,020H,06FH,066H,020H,072H,061H,06EH
+       662072616E           
+                        180 ; rs232err.c   51       
+                        181 ; rs232err.c   52       char code NumericDataErrTxt[]                           = "Numeric data e
+                            rror";
+0000EF 676500           182         DB      067H,065H,000H
+                        185         PUBLIC  _NumericDataErrTxt
+0000F2                  186 _NumericDataErrTxt:
+0000F2 4E756D65726963   187         DB      04EH,075H,06DH,065H,072H,069H,063H,020H,064H,061H,074H,061H
+       2064617461           
+                        188 ; rs232err.c   53       char code InvalidCharInNumberTxt[]              = "Invalid character in n
+                            umber";
+0000FE 206572726F7200   189         DB      020H,065H,072H,072H,06FH,072H,000H
+                        192         PUBLIC  _InvalidCharInNumberTxt
+000105                  193 _InvalidCharInNumberTxt:
+000105 496E76616C6964   194         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,063H,068H,061H,072H
+       2063686172           
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+000111 61637465722069   195         DB      061H,063H,074H,065H,072H,020H,069H,06EH,020H,06EH,075H,06DH
+       6E206E756D           
+                        196 ; rs232err.c   54       char code ExponentTooLargeTxt[]                 = "Exponent too large";
+00011D 62657200         197         DB      062H,065H,072H,000H
+                        200         PUBLIC  _ExponentTooLargeTxt
+000121                  201 _ExponentTooLargeTxt:
+000121 4578706F6E656E   202         DB      045H,078H,070H,06FH,06EH,065H,06EH,074H,020H,074H,06FH,06FH
+       7420746F6F           
+                        203 ; rs232err.c   55       char code TooManyDigitsTxt[]                            = "Too many digit
+                            s";
+00012D 206C6172676500   204         DB      020H,06CH,061H,072H,067H,065H,000H
+                        207         PUBLIC  _TooManyDigitsTxt
+000134                  208 _TooManyDigitsTxt:
+000134 546F6F206D616E   209         DB      054H,06FH,06FH,020H,06DH,061H,06EH,079H,020H,064H,069H,067H
+       7920646967           
+                        210 ; rs232err.c   56       char code NumericDataNotAllowedTxt[]    = "Numeric data not allowed";
+000140 69747300         211         DB      069H,074H,073H,000H
+                        214         PUBLIC  _NumericDataNotAllowedTxt
+000144                  215 _NumericDataNotAllowedTxt:
+000144 4E756D65726963   216         DB      04EH,075H,06DH,065H,072H,069H,063H,020H,064H,061H,074H,061H
+       2064617461           
+000150 206E6F7420616C   217         DB      020H,06EH,06FH,074H,020H,061H,06CH,06CH,06FH,077H,065H,064H
+       6C6F776564           
+                        218 ; rs232err.c   57       char code SuffixErrTxt[]                                        = "Suffix
+                             error";
+00015C 00               219         DB      000H
+                        222         PUBLIC  _SuffixErrTxt
+00015D                  223 _SuffixErrTxt:
+00015D 53756666697820   224         DB      053H,075H,066H,066H,069H,078H,020H,065H,072H,072H,06FH,072H
+       6572726F72           
+                        225 ; rs232err.c   58       char code InvalidSuffixErrTxt[]                 = "Invalid suffix";
+000169 00               226         DB      000H
+                        229         PUBLIC  _InvalidSuffixErrTxt
+00016A                  230 _InvalidSuffixErrTxt:
+00016A 496E76616C6964   231         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,073H,075H,066H,066H
+       2073756666           
+                        232 ; rs232err.c   59       char code SuffixTooLongTxt[]                            = "Suffix too lon
+                            g";
+000176 697800           233         DB      069H,078H,000H
+                        236         PUBLIC  _SuffixTooLongTxt
+000179                  237 _SuffixTooLongTxt:
+000179 53756666697820   238         DB      053H,075H,066H,066H,069H,078H,020H,074H,06FH,06FH,020H,06CH
+       746F6F206C           
+                        239 ; rs232err.c   60       char code SuffixNotAllowedTxt[]                 = "Suffix not allowed";
+000185 6F6E6700         240         DB      06FH,06EH,067H,000H
+                        243         PUBLIC  _SuffixNotAllowedTxt
+000189                  244 _SuffixNotAllowedTxt:
+000189 53756666697820   245         DB      053H,075H,066H,066H,069H,078H,020H,06EH,06FH,074H,020H,061H
+       6E6F742061           
+                        246 ; rs232err.c   61       
+                        247 ; rs232err.c   62       char code CharErrTxt[]                                          = "Charac
+                            ter data error";
+000195 6C6C6F77656400   248         DB      06CH,06CH,06FH,077H,065H,064H,000H
+                        251         PUBLIC  _CharErrTxt
+00019C                  252 _CharErrTxt:
+00019C 43686172616374   253         DB      043H,068H,061H,072H,061H,063H,074H,065H,072H,020H,064H,061H
+       6572206461           
+                        254 ; rs232err.c   63       char code InvalidCharDataTxt[]                  = "Invalid character data
+                            ";
+0001A8 7461206572726F   255         DB      074H,061H,020H,065H,072H,072H,06FH,072H,000H
+       7200                 
+                        258         PUBLIC  _InvalidCharDataTxt
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0001B1                  259 _InvalidCharDataTxt:
+0001B1 496E76616C6964   260         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,063H,068H,061H,072H
+       2063686172           
+                        261 ; rs232err.c   64       char code CharDataTooLongTxt[]                  = "Character data too lon
+                            g";
+0001BD 61637465722064   262         DB      061H,063H,074H,065H,072H,020H,064H,061H,074H,061H,000H
+       61746100             
+                        265         PUBLIC  _CharDataTooLongTxt
+0001C8                  266 _CharDataTooLongTxt:
+0001C8 43686172616374   267         DB      043H,068H,061H,072H,061H,063H,074H,065H,072H,020H,064H,061H
+       6572206461           
+                        268 ; rs232err.c   65       char code CharDataNotAllowedTxt[]               = "Character data not all
+                            owed";
+0001D4 746120746F6F20   269         DB      074H,061H,020H,074H,06FH,06FH,020H,06CH,06FH,06EH,067H,000H
+       6C6F6E6700           
+                        272         PUBLIC  _CharDataNotAllowedTxt
+0001E0                  273 _CharDataNotAllowedTxt:
+0001E0 43686172616374   274         DB      043H,068H,061H,072H,061H,063H,074H,065H,072H,020H,064H,061H
+       6572206461           
+0001EC 7461206E6F7420   275         DB      074H,061H,020H,06EH,06FH,074H,020H,061H,06CH,06CH,06FH,077H
+       616C6C6F77           
+                        276 ; rs232err.c   66       
+                        277 ; rs232err.c   67       char code StringDataErrTxt[]                            = "String data er
+                            ror";
+0001F8 656400           278         DB      065H,064H,000H
+                        281         PUBLIC  _StringDataErrTxt
+0001FB                  282 _StringDataErrTxt:
+0001FB 537472696E6720   283         DB      053H,074H,072H,069H,06EH,067H,020H,064H,061H,074H,061H,020H
+       6461746120           
+                        284 ; rs232err.c   68       char code InvalidStringDataTxt[]                        = "Invalid string
+                             data";
+000207 6572726F7200     285         DB      065H,072H,072H,06FH,072H,000H
+                        288         PUBLIC  _InvalidStringDataTxt
+00020D                  289 _InvalidStringDataTxt:
+00020D 496E76616C6964   290         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,073H,074H,072H,069H
+       2073747269           
+                        291 ; rs232err.c   69       char code StringDataNotAllowedTxt[]             = "String data not allowe
+                            d";
+000219 6E672064617461   292         DB      06EH,067H,020H,064H,061H,074H,061H,000H
+       00                   
+                        295         PUBLIC  _StringDataNotAllowedTxt
+000221                  296 _StringDataNotAllowedTxt:
+000221 537472696E6720   297         DB      053H,074H,072H,069H,06EH,067H,020H,064H,061H,074H,061H,020H
+       6461746120           
+                        298 ; rs232err.c   70       
+                        299 ; rs232err.c   71       char code BlockDataErrTxt[]                             = "Block data err
+                            or";
+00022D 6E6F7420616C6C   300         DB      06EH,06FH,074H,020H,061H,06CH,06CH,06FH,077H,065H,064H,000H
+       6F77656400           
+                        303         PUBLIC  _BlockDataErrTxt
+000239                  304 _BlockDataErrTxt:
+000239 426C6F636B2064   305         DB      042H,06CH,06FH,063H,06BH,020H,064H,061H,074H,061H,020H,065H
+       6174612065           
+                        306 ; rs232err.c   72       char code InvalidBlockDataTxt[]                 = "Invalid block data";
+000245 72726F7200       307         DB      072H,072H,06FH,072H,000H
+                        310         PUBLIC  _InvalidBlockDataTxt
+00024A                  311 _InvalidBlockDataTxt:
+00024A 496E76616C6964   312         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,062H,06CH,06FH,063H
+       20626C6F63           
+                        313 ; rs232err.c   73       char code BlockDataNotAllowedTxt[]              = "Block data not allowed
+                            ";
+000256 6B206461746100   314         DB      06BH,020H,064H,061H,074H,061H,000H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        317         PUBLIC  _BlockDataNotAllowedTxt
+00025D                  318 _BlockDataNotAllowedTxt:
+00025D 426C6F636B2064   319         DB      042H,06CH,06FH,063H,06BH,020H,064H,061H,074H,061H,020H,06EH
+       617461206E           
+                        320 ; rs232err.c   74       
+                        321 ; rs232err.c   75       char code ExpressionErrTxt[]                            = "Expression err
+                            or";
+000269 6F7420616C6C6F   322         DB      06FH,074H,020H,061H,06CH,06CH,06FH,077H,065H,064H,000H
+       77656400             
+                        325         PUBLIC  _ExpressionErrTxt
+000274                  326 _ExpressionErrTxt:
+000274 45787072657373   327         DB      045H,078H,070H,072H,065H,073H,073H,069H,06FH,06EH,020H,065H
+       696F6E2065           
+                        328 ; rs232err.c   76       
+                        329 ; rs232err.c   77       char code ExecErrTxt[]                                          = "Execut
+                            ion error";
+000280 72726F7200       330         DB      072H,072H,06FH,072H,000H
+                        333         PUBLIC  _ExecErrTxt
+000285                  334 _ExecErrTxt:
+000285 45786563757469   335         DB      045H,078H,065H,063H,075H,074H,069H,06FH,06EH,020H,065H,072H
+       6F6E206572           
+                        336 ; rs232err.c   78       char code CmdProtectedTxt[]                             = "Command protec
+                            ted";
+000291 726F7200         337         DB      072H,06FH,072H,000H
+                        340         PUBLIC  _CmdProtectedTxt
+000295                  341 _CmdProtectedTxt:
+000295 436F6D6D616E64   342         DB      043H,06FH,06DH,06DH,061H,06EH,064H,020H,070H,072H,06FH,074H
+       2070726F74           
+                        343 ; rs232err.c   79       
+                        344 ; rs232err.c   80       char code ParErrTxt[]                                           = "Parame
+                            ter error";
+0002A1 656374656400     345         DB      065H,063H,074H,065H,064H,000H
+                        348         PUBLIC  _ParErrTxt
+0002A7                  349 _ParErrTxt:
+0002A7 506172616D6574   350         DB      050H,061H,072H,061H,06DH,065H,074H,065H,072H,020H,065H,072H
+       6572206572           
+                        351 ; rs232err.c   81       char code SettingsErrTxt[]                                      = "Settin
+                            gs conflict";
+0002B3 726F7200         352         DB      072H,06FH,072H,000H
+                        355         PUBLIC  _SettingsErrTxt
+0002B7                  356 _SettingsErrTxt:
+0002B7 53657474696E67   357         DB      053H,065H,074H,074H,069H,06EH,067H,073H,020H,063H,06FH,06EH
+       7320636F6E           
+                        358 ; rs232err.c   82       char code DataOutOfRangeTxt[]                           = "Data out of ra
+                            nge";
+0002C3 666C69637400     359         DB      066H,06CH,069H,063H,074H,000H
+                        362         PUBLIC  _DataOutOfRangeTxt
+0002C9                  363 _DataOutOfRangeTxt:
+0002C9 44617461206F75   364         DB      044H,061H,074H,061H,020H,06FH,075H,074H,020H,06FH,066H,020H
+       74206F6620           
+                        365 ; rs232err.c   83       char code TooMuchDataTxt[]                                      = "Too mu
+                            ch data";
+0002D5 72616E676500     366         DB      072H,061H,06EH,067H,065H,000H
+                        369         PUBLIC  _TooMuchDataTxt
+0002DB                  370 _TooMuchDataTxt:
+0002DB 546F6F206D7563   371         DB      054H,06FH,06FH,020H,06DH,075H,063H,068H,020H,064H,061H,074H
+       6820646174           
+                        372 ; rs232err.c   84       char code IllegalParValueTxt[]                  = "Illegal parameter valu
+                            e";
+0002E7 6100             373         DB      061H,000H
+                        376         PUBLIC  _IllegalParValueTxt
+0002E9                  377 _IllegalParValueTxt:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+0002E9 496C6C6567616C   378         DB      049H,06CH,06CH,065H,067H,061H,06CH,020H,070H,061H,072H,061H
+       2070617261           
+                        379 ; rs232err.c   85       
+                        380 ; rs232err.c   86       char code InvalidVersionTxt[]                           = "Invalid versio
+                            n";
+0002F5 6D657465722076   381         DB      06DH,065H,074H,065H,072H,020H,076H,061H,06CH,075H,065H,000H
+       616C756500           
+                        384         PUBLIC  _InvalidVersionTxt
+000301                  385 _InvalidVersionTxt:
+000301 496E76616C6964   386         DB      049H,06EH,076H,061H,06CH,069H,064H,020H,076H,065H,072H,073H
+       2076657273           
+                        387 ; rs232err.c   87       char code HardwareMissingTxt[]                  = "Hardware Missing";
+00030D 696F6E00         388         DB      069H,06FH,06EH,000H
+                        391         PUBLIC  _HardwareMissingTxt
+000311                  392 _HardwareMissingTxt:
+000311 48617264776172   393         DB      048H,061H,072H,064H,077H,061H,072H,065H,020H,04DH,069H,073H
+       65204D6973           
+                        394 ; rs232err.c   88       
+                        395 ; rs232err.c   89       char code DeviceSpecificErrTxt[]                        = "Device-specifi
+                            c error";
+00031D 73696E6700       396         DB      073H,069H,06EH,067H,000H
+                        399         PUBLIC  _DeviceSpecificErrTxt
+000322                  400 _DeviceSpecificErrTxt:
+000322 4465766963652D   401         DB      044H,065H,076H,069H,063H,065H,02DH,073H,070H,065H,063H,069H
+       7370656369           
+                        402 ; rs232err.c   90       char code QueueOverflowTxt[]                            = "Queue overflow
+                            ";
+00032E 66696320657272   403         DB      066H,069H,063H,020H,065H,072H,072H,06FH,072H,000H
+       6F7200               
+                        406         PUBLIC  _QueueOverflowTxt
+000338                  407 _QueueOverflowTxt:
+000338 5175657565206F   408         DB      051H,075H,065H,075H,065H,020H,06FH,076H,065H,072H,066H,06CH
+       766572666C           
+                        409 ; rs232err.c   91       char code CommunicationErrTxt[]                 = "Communication error";
+000344 6F7700           410         DB      06FH,077H,000H
+                        413         PUBLIC  _CommunicationErrTxt
+000347                  414 _CommunicationErrTxt:
+000347 436F6D6D756E69   415         DB      043H,06FH,06DH,06DH,075H,06EH,069H,063H,061H,074H,069H,06FH
+       636174696F           
+                        416 ; rs232err.c   92       char code ParityErrMessageTxt[]                 = "Parity error in progra
+                            m message";
+000353 6E206572726F72   417         DB      06EH,020H,065H,072H,072H,06FH,072H,000H
+       00                   
+                        420         PUBLIC  _ParityErrMessageTxt
+00035B                  421 _ParityErrMessageTxt:
+00035B 50617269747920   422         DB      050H,061H,072H,069H,074H,079H,020H,065H,072H,072H,06FH,072H
+       6572726F72           
+000367 20696E2070726F   423         DB      020H,069H,06EH,020H,070H,072H,06FH,067H,072H,061H,06DH,020H
+       6772616D20           
+                        424 ; rs232err.c   93       char code FramingErrMessageTxt[]                        = "Framing error 
+                            in program message";
+000373 6D657373616765   425         DB      06DH,065H,073H,073H,061H,067H,065H,000H
+       00                   
+                        428         PUBLIC  _FramingErrMessageTxt
+00037B                  429 _FramingErrMessageTxt:
+00037B 4672616D696E67   430         DB      046H,072H,061H,06DH,069H,06EH,067H,020H,065H,072H,072H,06FH
+       206572726F           
+000387 7220696E207072   431         DB      072H,020H,069H,06EH,020H,070H,072H,06FH,067H,072H,061H,06DH
+       6F6772616D           
+                        432 ; rs232err.c   94       char code InputBufferOverrunTxt[]               = "Input buffer overrun";
+                            
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+000393 206D6573736167   433         DB      020H,06DH,065H,073H,073H,061H,067H,065H,000H
+       6500                 
+                        436         PUBLIC  _InputBufferOverrunTxt
+00039C                  437 _InputBufferOverrunTxt:
+00039C 496E7075742062   438         DB      049H,06EH,070H,075H,074H,020H,062H,075H,066H,066H,065H,072H
+       7566666572           
+                        439 ; rs232err.c   95       
+                        440 ; rs232err.c   96       char code QueryErrTxt[]                                         = "Query 
+                            error";
+0003A8 206F7665727275   441         DB      020H,06FH,076H,065H,072H,072H,075H,06EH,000H
+       6E00                 
+                        444         PUBLIC  _QueryErrTxt
+0003B1                  445 _QueryErrTxt:
+                        446 ; rs232err.c   97       char code QueryInterruptedTxt[]                 = "Query INTERRUPTED";
+0003B1 51756572792065   447         DB      051H,075H,065H,072H,079H,020H,065H,072H,072H,06FH,072H,000H
+       72726F7200           
+                        450         PUBLIC  _QueryInterruptedTxt
+0003BD                  451 _QueryInterruptedTxt:
+0003BD 51756572792049   452         DB      051H,075H,065H,072H,079H,020H,049H,04EH,054H,045H,052H,052H
+       4E54455252           
+                        453 ; rs232err.c   98       char code QueryUnterminatedTxt[]                        = "Query UNTERMIN
+                            ATED";
+0003C9 555054454400     454         DB      055H,050H,054H,045H,044H,000H
+                        457         PUBLIC  _QueryUnterminatedTxt
+0003CF                  458 _QueryUnterminatedTxt:
+0003CF 51756572792055   459         DB      051H,075H,065H,072H,079H,020H,055H,04EH,054H,045H,052H,04DH
+       4E5445524D           
+                        460 ; rs232err.c   99       char code QueryDeadlockedTxt[]                  = "Query DEADLOCKED";
+0003DB 494E4154454400   461         DB      049H,04EH,041H,054H,045H,044H,000H
+                        464         PUBLIC  _QueryDeadlockedTxt
+0003E2                  465 _QueryDeadlockedTxt:
+0003E2 51756572792044   466         DB      051H,075H,065H,072H,079H,020H,044H,045H,041H,044H,04CH,04FH
+       4541444C4F           
+                        467 ; rs232err.c  100       
+                        468 ; rs232err.c  101       
+                        469 ; rs232err.c  102       struct ERROR_STRUCT code ErrorTxt_Array[LastErrorCode] = {
+0003EE 434B454400       470         DB      043H,04BH,045H,044H,000H
+                        479         PUBLIC  _ErrorTxt_Array
+0003F3 RESERVED         480         ALIGN   1
+0003F3
+0003F4                  481 _ErrorTxt_Array:
+0003F4 0000             482         DW      00000H
+0003F6 rrrrrrrrrrrrrr   483         DD      _NoErrTxt
+       rr                   
+0003FA 9CFF             484         DW      0FF9CH
+0003FC rrrrrrrrrrrrrr   485         DD      _CmdErrTxt
+       rr                   
+000400 9BFF             486         DW      0FF9BH
+000402 rrrrrrrrrrrrrr   487         DD      _InvalidCharTxt
+       rr                   
+000406 9AFF             488         DW      0FF9AH
+000408 rrrrrrrrrrrrrr   489         DD      _SyntaxErrTxt
+       rr                   
+00040C 99FF             490         DW      0FF99H
+00040E rrrrrrrrrrrrrr   491         DD      _InvalidSeparatorTxt
+       rr                   
+000412 98FF             492         DW      0FF98H
+000414 rrrrrrrrrrrrrr   493         DD      _DataTypeErrTxt
+       rr                   
+000418 94FF             494         DW      0FF94H
+00041A rrrrrrrrrrrrrr   495         DD      _ParNotAllowedTxt
+       rr                   
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+00041E 93FF             496         DW      0FF93H
+000420 rrrrrrrrrrrrrr   497         DD      _MissingParTxt
+       rr                   
+000424 92FF             498         DW      0FF92H
+000426 rrrrrrrrrrrrrr   499         DD      _CmdHeaderErrTxt
+       rr                   
+00042A 91FF             500         DW      0FF91H
+00042C rrrrrrrrrrrrrr   501         DD      _HdrSeparatorErrTxt
+       rr                   
+000430 90FF             502         DW      0FF90H
+000432 rrrrrrrrrrrrrr   503         DD      _PrgmMnemonicTooLongTxt
+       rr                   
+000436 8FFF             504         DW      0FF8FH
+000438 rrrrrrrrrrrrrr   505         DD      _UndefinedHeaderTxt
+       rr                   
+00043C 8EFF             506         DW      0FF8EH
+00043E rrrrrrrrrrrrrr   507         DD      _HdrSuffixOutOfRangeTxt
+       rr                   
+000442 88FF             508         DW      0FF88H
+000444 rrrrrrrrrrrrrr   509         DD      _NumericDataErrTxt
+       rr                   
+000448 87FF             510         DW      0FF87H
+00044A rrrrrrrrrrrrrr   511         DD      _InvalidCharInNumberTxt
+       rr                   
+00044E 85FF             512         DW      0FF85H
+000450 rrrrrrrrrrrrrr   513         DD      _ExponentTooLargeTxt
+       rr                   
+000454 84FF             514         DW      0FF84H
+000456 rrrrrrrrrrrrrr   515         DD      _TooManyDigitsTxt
+       rr                   
+00045A 83FF             516         DW      0FF83H
+00045C rrrrrrrrrrrrrr   517         DD      _NumericDataNotAllowedTxt
+       rr                   
+000460 7EFF             518         DW      0FF7EH
+000462 rrrrrrrrrrrrrr   519         DD      _SuffixErrTxt
+       rr                   
+000466 7DFF             520         DW      0FF7DH
+000468 rrrrrrrrrrrrrr   521         DD      _InvalidSuffixErrTxt
+       rr                   
+00046C 7AFF             522         DW      0FF7AH
+00046E rrrrrrrrrrrrrr   523         DD      _SuffixTooLongTxt
+       rr                   
+000472 76FF             524         DW      0FF76H
+000474 rrrrrrrrrrrrrr   525         DD      _SuffixNotAllowedTxt
+       rr                   
+000478 74FF             526         DW      0FF74H
+00047A rrrrrrrrrrrrrr   527         DD      _CharErrTxt
+       rr                   
+00047E 6AFF             528         DW      0FF6AH
+000480 rrrrrrrrrrrrrr   529         DD      _StringDataErrTxt
+       rr                   
+000484 69FF             530         DW      0FF69H
+000486 rrrrrrrrrrrrrr   531         DD      _InvalidStringDataTxt
+       rr                   
+00048A 62FF             532         DW      0FF62H
+00048C rrrrrrrrrrrrrr   533         DD      _StringDataNotAllowedTxt
+       rr                   
+000490 60FF             534         DW      0FF60H
+000492 rrrrrrrrrrrrrr   535         DD      _BlockDataErrTxt
+       rr                   
+000496 5FFF             536         DW      0FF5FH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+000498 rrrrrrrrrrrrrr   537         DD      _InvalidBlockDataTxt
+       rr                   
+00049C 56FF             538         DW      0FF56H
+00049E rrrrrrrrrrrrrr   539         DD      _ExpressionErrTxt
+       rr                   
+0004A2 38FF             540         DW      0FF38H
+0004A4 rrrrrrrrrrrrrr   541         DD      _ExecErrTxt
+       rr                   
+0004A8 35FF             542         DW      0FF35H
+0004AA rrrrrrrrrrrrrr   543         DD      _CmdProtectedTxt
+       rr                   
+0004AE 24FF             544         DW      0FF24H
+0004B0 rrrrrrrrrrrrrr   545         DD      _ParErrTxt
+       rr                   
+0004B4 23FF             546         DW      0FF23H
+0004B6 rrrrrrrrrrrrrr   547         DD      _SettingsErrTxt
+       rr                   
+0004BA 22FF             548         DW      0FF22H
+0004BC rrrrrrrrrrrrrr   549         DD      _DataOutOfRangeTxt
+       rr                   
+0004C0 21FF             550         DW      0FF21H
+0004C2 rrrrrrrrrrrrrr   551         DD      _TooMuchDataTxt
+       rr                   
+0004C6 20FF             552         DW      0FF20H
+0004C8 rrrrrrrrrrrrrr   553         DD      _IllegalParValueTxt
+       rr                   
+0004CC 17FF             554         DW      0FF17H
+0004CE rrrrrrrrrrrrrr   555         DD      _InvalidVersionTxt
+       rr                   
+0004D2 0FFF             556         DW      0FF0FH
+0004D4 rrrrrrrrrrrrrr   557         DD      _HardwareMissingTxt
+       rr                   
+0004D8 D4FE             558         DW      0FED4H
+0004DA rrrrrrrrrrrrrr   559         DD      _DeviceSpecificErrTxt
+       rr                   
+0004DE A2FE             560         DW      0FEA2H
+0004E0 rrrrrrrrrrrrrr   561         DD      _QueueOverflowTxt
+       rr                   
+0004E4 98FE             562         DW      0FE98H
+0004E6 rrrrrrrrrrrrrr   563         DD      _CommunicationErrTxt
+       rr                   
+0004EA 97FE             564         DW      0FE97H
+0004EC rrrrrrrrrrrrrr   565         DD      _ParityErrMessageTxt
+       rr                   
+0004F0 96FE             566         DW      0FE96H
+0004F2 rrrrrrrrrrrrrr   567         DD      _FramingErrMessageTxt
+       rr                   
+0004F6 95FE             568         DW      0FE95H
+0004F8 rrrrrrrrrrrrrr   569         DD      _InputBufferOverrunTxt
+       rr                   
+0004FC 70FE             570         DW      0FE70H
+0004FE rrrrrrrrrrrrrr   571         DD      _QueryErrTxt
+       rr                   
+000502 66FE             572         DW      0FE66H
+000504 rrrrrrrrrrrrrr   573         DD      _QueryInterruptedTxt
+       rr                   
+000508 5CFE             574         DW      0FE5CH
+00050A rrrrrrrrrrrrrr   575         DD      _QueryUnterminatedTxt
+       rr                   
+00050E 52FE             576         DW      0FE52H
+                        577 ; rs232err.c  103               {    0, NoErrTxt },                                             /
+                            / NoErr
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        578 ; rs232err.c  104               { -100, CmdErrTxt },                                            /
+                            / CmdErr
+                        579 ; rs232err.c  105               { -101, InvalidCharTxt },                               // Invali
+                            dChar
+                        580 ; rs232err.c  106               { -102, SyntaxErrTxt },                                 // Syntax
+                            Err
+                        581 ; rs232err.c  107               { -103, InvalidSeparatorTxt },          // InvalidSeparator
+                        582 ; rs232err.c  108               { -104, DataTypeErrTxt },                               // DataTy
+                            peErr
+                        583 ; rs232err.c  109               { -108, ParNotAllowedTxt },                     // ParNotAllowed
+                        584 ; rs232err.c  110               { -109, MissingParTxt },                                // Missin
+                            gpar
+                        585 ; rs232err.c  111               { -110, CmdHeaderErrTxt },                              // CmdHea
+                            derErr
+                        586 ; rs232err.c  112               { -111, HdrSeparatorErrTxt },                   // HdrSeparatorEr
+                            r
+                        587 ; rs232err.c  113               { -112, PrgmMnemonicTooLongTxt },       // PrgmMnemonicTooLong
+                        588 ; rs232err.c  114               { -113, UndefinedHeaderTxt },                   // UndefinedHeade
+                            r
+                        589 ; rs232err.c  115               { -114, HdrSuffixOutOfRangeTxt },       // HdrSufficOutOfrange
+                        590 ; rs232err.c  116       
+                        591 ; rs232err.c  117               { -120, NumericDataErrTxt },                    // NumericDataErr
+                            
+                        592 ; rs232err.c  118               { -121, InvalidCharInNumberTxt },       //      InvalidCharinNUmb
+                            er
+                        593 ; rs232err.c  119               { -123, ExponentTooLargeTxt },          // ExponentTooLarge
+                        594 ; rs232err.c  120               { -124, TooManyDigitsTxt },                     // TooManyDigits
+                        595 ; rs232err.c  121               { -125, NumericDataNotAllowedTxt },     // NumericDataNotAllowed
+                        596 ; rs232err.c  122               { -130, SuffixErrTxt },                                 // Suffix
+                            Err
+                        597 ; rs232err.c  123               { -131, InvalidSuffixErrTxt },          // InvalidSuffixErr
+                        598 ; rs232err.c  124               { -134, SuffixTooLongTxt },                     // SuffixTooLong
+                        599 ; rs232err.c  125               { -138, SuffixNotAllowedTxt },          // SuffixNotAllowed
+                        600 ; rs232err.c  126       
+                        601 ; rs232err.c  127               { -140, CharErrTxt },                                   // CharEr
+                            r
+                        602 ; rs232err.c  128       
+                        603 ; rs232err.c  129               { -150, StringDataErrTxt },                     // StringDataErr
+                        604 ; rs232err.c  130               { -151, InvalidStringDataTxt },         // InvalidStringData
+                        605 ; rs232err.c  131               { -158, StringDataNotAllowedTxt },      // StringDataNotAllowed
+                        606 ; rs232err.c  132       
+                        607 ; rs232err.c  133               { -160, BlockDataErrTxt },                              // BlockD
+                            ataErr
+                        608 ; rs232err.c  134               { -161, InvalidBlockDataTxt },          // InvalidBlockData
+                        609 ; rs232err.c  135       
+                        610 ; rs232err.c  136               { -170, ExpressionErrTxt },                     // ExpressionErr
+                        611 ; rs232err.c  137       
+                        612 ; rs232err.c  138               { -200, ExecErrTxt },                                   // ExecEr
+                            r
+                        613 ; rs232err.c  139               { -203, CmdProtectedTxt },                              // CmdPro
+                            tected
+                        614 ; rs232err.c  140       
+                        615 ; rs232err.c  141               { -220, ParErrTxt },                                            /
+                            / ParErr
+                        616 ; rs232err.c  142               { -221, SettingsErrTxt },                                        
+                                    // SettingsErr
+                        617 ; rs232err.c  143               { -222, DataOutOfRangeTxt },                    // DataOutOfRange
+                            
+                        618 ; rs232err.c  144               { -223, TooMuchDataTxt },                               // TooMuc
+                            hData
+                        619 ; rs232err.c  145               { -224, IllegalParValueTxt },                   // IllegalParValu
+                            e
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                        620 ; rs232err.c  146       
+                        621 ; rs232err.c  147               { -233, InvalidVersionTxt },                    // InvalidVersion
+                            
+                        622 ; rs232err.c  148       
+                        623 ; rs232err.c  149               { -241, HardwareMissingTxt },                   // HardwareMissin
+                            g
+                        624 ; rs232err.c  150       
+                        625 ; rs232err.c  151               { -300, DeviceSpecificErrTxt },         // DeviceSpecificErr
+                        626 ; rs232err.c  152               { -350, QueueOverflowTxt },                     // QueueOverflow
+                        627 ; rs232err.c  153               { -360, CommunicationErrTxt },          // CommunicationErr
+                        628 ; rs232err.c  154               { -361, ParityErrMessageTxt },          // ParityErrMessage
+                        629 ; rs232err.c  155               { -362, FramingErrMessageTxt },         // FramingErrMessage
+                        630 ; rs232err.c  156               { -363, InputBufferOverrunTxt },                // InputBufferOve
+                            rrunErr
+                        631 ; rs232err.c  157               { -400, QueryErrTxt },                                  // QueryE
+                            rr
+                        632 ; rs232err.c  158               { -410, QueryInterruptedTxt },          // QueryInterrupted
+                        633 ; rs232err.c  159               { -420, QueryUnterminatedTxt },         // QueryUnterminated
+                        634 ; rs232err.c  160               { -430, QueryDeadlockedTxt }                    // QueryDeadlocke
+                            d
+                        635 ; rs232err.c  161       };
+                        636 ; rs232err.c  162       
+                        637 ; rs232err.c  163       UC STBReg;                                                               
+                                            // Status Byte
+                        638 ; rs232err.c  164       UC SREReg;                                                               
+                                            // Service Request Enable Register
+                        639 ; rs232err.c  165       
+                        640 ; rs232err.c  166       UC ESRReg;                                                               
+                                            // Event Status Register
+                        641 ; rs232err.c  167       UC ESEReg;                                                               
+                                            // Event Status Enable Register
+                        642 ; rs232err.c  168       
+                        643 ; rs232err.c  169       UI QuestConditionReg;                                           // Questi
+                            onable Condition Register
+                        644 ; rs232err.c  170       UI QuestNtransReg;                                                      /
+                            / Questionable NTransition Register
+                        645 ; rs232err.c  171       UI QuestPtransReg;                                                      /
+                            / Questionable PTransition Register
+                        646 ; rs232err.c  172       UI QuestEventReg;                                                        
+                                    // Questionable Event Register
+                        647 ; rs232err.c  173       UI QuestEnableReg;                                                      /
+                            / Questionable Enable Register
+                        648 ; rs232err.c  174       
+                        649 ; rs232err.c  175       UI OperConditionReg;                                                    /
+                            / Operation Condition Register
+                        650 ; rs232err.c  176       UI OperNtransReg;                                                        
+                                    // Operation NTransition Register
+                        651 ; rs232err.c  177       UI OperPtransReg;                                                        
+                                    // Operation PTransition Register
+                        652 ; rs232err.c  178       UI OperEventReg;                                                         
+                                    // Operation Event Register
+                        653 ; rs232err.c  179       UI OperEnableReg;                                                        
+                                    // Operation Enable Register
+                        654 ; rs232err.c  180       
+                        655 ; rs232err.c  181       int SCPIError;                                                           
+                                    // Current SCPI error
+                        656 ; rs232err.c  182       
+                        657 ; rs232err.c  183       static int ErrorEventQueue[QUEUE_SIZE];
+                        658 ; rs232err.c  184       
+                        659 ; rs232err.c  185       static int QueueHead = 0;
+000510 rrrrrrrrrrrrrr   660         DD      _QueryDeadlockedTxt
+       rr                   
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+000000                  661 RS232ERR_INI_FA SEGMENT HDATA INSEGMENT INIT
+000000                  662         RSEG    RS232ERR_INI_FA
+                        664         ALIGN   1
+000000                  665 _QueueHead:
+                        666 ; rs232err.c  186       static int QueueTail = 0;
+000000 0000             667         DW      00000H
+                        669         ALIGN   1
+000002                  670 _QueueTail:
+                        671 ; rs232err.c  187       
+                        672 ; rs232err.c  188       /************************************************************************
+                            ***/
+                        673 ; rs232err.c  189       /*      ResetErrorEventQueue                                             
+                                                                                        RS232ERR.C  */
+                        674 ; rs232err.c  190       /*                                                                       
+                                                                                                                             
+                                                            */
+                        675 ; rs232err.c  191       /* Author:              Kim Engedahl, DEV, 941124                        
+                                                                                            */
+                        676 ; rs232err.c  192       /* Revised:             970630                                           
+                                                                                                                    */
+                        677 ; rs232err.c  193       /*                                                                       
+                                                                                                                             
+                                                            */
+                        678 ; rs232err.c  194       /*      Function:       Clear all entries in the error/event queue       
+                                                                    */
+                        679 ; rs232err.c  195       /*      Remarks:                Note! It is only the pointers which is re
+                            set                                             */
+                        680 ; rs232err.c  196       /*      Returns:                -                                        
+                                                                                                                             
+                                                    */
+                        681 ; rs232err.c  197       /*      Updates:                -                                        
+                                                                                                                             
+                                                    */
+                        682 ; rs232err.c  198       /************************************************************************
+                            ***/
+                        683 ; rs232err.c  199       void ResetErrorEventQueue() {
+000002 0000             684         DW      00000H
+000000                  685 RS232ERR_PR     SEGMENT HCODE
+000000                  686         RSEG    RS232ERR_PR
+                        687         ALIGN   1
+                        689         PUBLIC  _ResetErrorEventQueue
+000000                  690 _ResetErrorEventQueue:
+                        694 ; rs232err.c  200       
+                        695 ; rs232err.c  201               QueueHead = QueueTail = 0;
+000000 964842rr         697         MOV.B   ES,#SEG( _QueueTail )
+000004 9908rrrr         698         MOV.W   R0,#SOF( _QueueTail )
+000008 BA00             699         MOV.W   [R0],#00H
+00000A 964842rr         700         MOV.B   ES,#SEG( _QueueHead )
+00000E 9908rrrr         701         MOV.W   R0,#SOF( _QueueHead )
+000012 BA00             702         MOV.W   [R0],#00H
+                        703 ; rs232err.c  202       
+                        704 ; rs232err.c  203               UpdateSTBRegister();
+000014 C500A0           706         CALL    _UpdateSTBRegister
+                        707 ; rs232err.c  204       }
+000017 D680             709         RET
+                        711 ; rs232err.c  205       
+                        712 ; rs232err.c  206       /************************************************************************
+                            ***/
+                        713 ; rs232err.c  207       /*      ReadErrorEventQueue                                              
+                                                                                        RS232ERR.C  */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+                        714 ; rs232err.c  208       /*                                                                       
+                                                                                                                             
+                                                            */
+                        715 ; rs232err.c  209       /* Author:              Kim Engedahl, DEV, 941124                        
+                                                                                            */
+                        716 ; rs232err.c  210       /* Revised:             970630                                           
+                                                                                                                    */
+                        717 ; rs232err.c  211       /*                                                                       
+                                                                                                                             
+                                                            */
+                        718 ; rs232err.c  212       /*      Function:       Read the OLDEST entry in the error queue         
+                                                                            */
+                        719 ; rs232err.c  213       /*      Remarks:                -                                        
+                                                                                                                             
+                                                    */
+                        720 ; rs232err.c  214       /*      Returns:                Error code if queue > 0, otherwise 0, ie.
+                             No error                               */
+                        721 ; rs232err.c  215       /*      Updates:                -                                        
+                                                                                                                             
+                                                    */
+                        722 ; rs232err.c  216       /************************************************************************
+                            ***/
+                        723 ; rs232err.c  217       int ReadErrorEventQueue() {
+000019 00               724         ALIGN   1
+                        726         PUBLIC  _ReadErrorEventQueue
+00001A                  727 _ReadErrorEventQueue:
+00001A 0F10             731         PUSH.W  R4
+                        735 ; rs232err.c  218       
+                        736 ; rs232err.c  219               register int tmp = NoErr;
+00001C B940             738         MOV.W   R4,#00H
+                        740 ; rs232err.c  220       
+                        741 ; rs232err.c  221               if ( QueueHead != QueueTail) {                                  /
+                            / If Queue is not empty
+00001E 964842rr         743         MOV.B   ES,#SEG( _QueueHead )
+000022 9918rrrr         744         MOV.W   R1,#SOF( _QueueHead )
+000026 8A11             745         MOV.W   R1,[R1]
+000028 964842rr         746         MOV.B   ES,#SEG( _QueueTail )
+00002C 9908rrrr         747         MOV.W   R0,#SOF( _QueueTail )
+000030 8A00             748         MOV.W   R0,[R0]
+000032 4910             749         CMP.W   R1,R0
+000034 F312             750         BEQ     _3
+                        751 ; rs232err.c  222       
+                        752 ; rs232err.c  223                       QueueTail = ( QueueTail+1) % QUEUE_SIZE;
+000036 A901             754         ADDS.W  R0,#01H
+000038 8910             755         MOV.W   R1,R0
+00003A 9819             756         SEXT.W  R1
+00003C E9090020         757         DIV.D   R0,#020H
+000040 964842rr         758         MOV.B   ES,#SEG( _QueueTail )
+000044 9908rrrr         759         MOV.W   R0,#SOF( _QueueTail )
+000048 8A18             760         MOV.W   [R0],R1
+                        761 ; rs232err.c  224       
+                        762 ; rs232err.c  225                       tmp = ErrorEventQueue[QueueTail];
+00004A D911             764         ASL.W   R1,#01H
+00004C 8901             765         MOV.W   R0,R1
+00004E B910             766         MOVS.W  R1,#00H
+000050 964842rr         767         MOV.B   ES,#SEG( _ErrorEventQueue )
+000054 8D00rrrr         768         MOV.W   R0,[R0+SOF( _ErrorEventQueue )]
+000058 8940             769         MOV.W   R4,R0
+                        772 ; rs232err.c  226               }
+00005A                  774 _3:
+                        775 ; rs232err.c  227       
+                        776 ; rs232err.c  228               UpdateSTBRegister();
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+00005A C5007D           778         CALL    _UpdateSTBRegister
+                        779 ; rs232err.c  229       
+                        780 ; rs232err.c  230               return( tmp);
+00005D 8904             782         MOV.W   R0,R4
+                        785 ; rs232err.c  231       }
+00005F 2F10             787         POP.W   R4
+000061 D680             789         RET
+                        792 ; rs232err.c  232       
+                        793 ; rs232err.c  233       /************************************************************************
+                            ***/
+                        794 ; rs232err.c  234       /*      SaveErrorEventQueue                                              
+                                                                                        RS232ERR.C  */
+                        795 ; rs232err.c  235       /*                                                                       
+                                                                                                                             
+                                                            */
+                        796 ; rs232err.c  236       /* Author:              Kim Engedahl, DEV, 941124                        
+                                                                                            */
+                        797 ; rs232err.c  237       /* Revised:             970630                                           
+                                                                                                                    */
+                        798 ; rs232err.c  238       /*                                                                       
+                                                                                                                             
+                                                            */
+                        799 ; rs232err.c  239       /*      Function:       Save the new error code in the error queue       
+                                                                    */
+                        800 ; rs232err.c  240       /*      Remarks:                -                                        
+                                                                                                                             
+                                                    */
+                        801 ; rs232err.c  241       /*      Returns:                -                                        
+                                                                                                                             
+                                                    */
+                        802 ; rs232err.c  242       /*      Updates:                -                                        
+                                                                                                                             
+                                                    */
+                        803 ; rs232err.c  243       /************************************************************************
+                            ***/
+                        804 ; rs232err.c  244       void SaveErrorEventQueue( int ErrorType) {
+000063 00               805         ALIGN   1
+                        807         PUBLIC  _SaveErrorEventQueue
+000064                  808 _SaveErrorEventQueue:
+000064 0F30             812         PUSH.W  R4, R5
+                        816 ; rs232err.c  245       
+                        817 ; rs232err.c  246               if ((( QueueHead+1) % QUEUE_SIZE) != QueueTail) { // If queue not
+                             full
+000066 964842rr         819         MOV.B   ES,#SEG( _QueueHead )
+00006A 9918rrrr         820         MOV.W   R1,#SOF( _QueueHead )
+00006E 8A11             821         MOV.W   R1,[R1]
+000070 A911             822         ADDS.W  R1,#01H
+000072 8921             823         MOV.W   R2,R1
+000074 8932             824         MOV.W   R3,R2
+000076 9839             825         SEXT.W  R3
+000078 E9290020         826         DIV.D   R2,#020H
+00007C 964842rr         827         MOV.B   ES,#SEG( _QueueTail )
+000080 9928rrrr         828         MOV.W   R2,#SOF( _QueueTail )
+000084 8A22             829         MOV.W   R2,[R2]
+000086 4932             830         CMP.W   R3,R2
+000088 F318             831         BEQ     _5
+                        832 ; rs232err.c  247       
+                        833 ; rs232err.c  248                       QueueHead = ( ++QueueHead) % QUEUE_SIZE;
+00008A 8921             835         MOV.W   R2,R1
+00008C 8942             836         MOV.W   R4,R2
+00008E 8954             837         MOV.W   R5,R4
+000090 9859             838         SEXT.W  R5
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+000092 E9490020         839         DIV.D   R4,#020H
+000096 964842rr         840         MOV.B   ES,#SEG( _QueueHead )
+00009A 9918rrrr         841         MOV.W   R1,#SOF( _QueueHead )
+00009E 8A29             842         MOV.W   [R1],R2
+0000A0 964842rr         843         MOV.B   ES,#SEG( _QueueHead )
+0000A4 9918rrrr         844         MOV.W   R1,#SOF( _QueueHead )
+0000A8 8A59             845         MOV.W   [R1],R5
+                        846 ; rs232err.c  249       
+                        847 ; rs232err.c  250                       ErrorEventQueue[QueueHead] = ErrorType;
+0000AA D951             849         ASL.W   R5,#01H
+0000AC 8945             850         MOV.W   R4,R5
+0000AE B950             851         MOVS.W  R5,#00H
+0000B0 964842rr         852         MOV.B   ES,#SEG( _ErrorEventQueue )
+0000B4 8D0Crrrr         853         MOV.W   [R4+SOF( _ErrorEventQueue )],R0
+                        854 ; rs232err.c  251               }
+0000B8 FE0C             856         BR      _6
+0000B8 FE0C             856         BR      _6
+0000BA                  857 _5:
+                        858 ; rs232err.c  252               else
+                        859 ; rs232err.c  253                       ErrorEventQueue[QueueHead] = QueueOverflow;
+0000BA 964842rr         861         MOV.B   ES,#SEG( _QueueHead )
+0000BE 9908rrrr         862         MOV.W   R0,#SOF( _QueueHead )
+0000C2 8A00             863         MOV.W   R0,[R0]
+0000C4 D901             865         ASL.W   R0,#01H
+0000C6 B910             866         MOVS.W  R1,#00H
+0000C8 964842rr         867         MOV.B   ES,#SEG( _ErrorEventQueue )
+0000CC 9D08rrrr0027     868         MOV.W   [R0+SOF( _ErrorEventQueue )],#027H
+0000CC 9D08rrrr0027     868         MOV.W   [R0+SOF( _ErrorEventQueue )],#027H
+0000D2                  869 _6:
+                        870 ; rs232err.c  254       
+                        871 ; rs232err.c  255               UpdateSTBRegister();
+0000D2 C50041           873         CALL    _UpdateSTBRegister
+                        874 ; rs232err.c  256       }
+0000D5 2F30             876         POP.W   R4, R5
+0000D7 D680             878         RET
+                        880 ; rs232err.c  257       
+                        881 ; rs232err.c  258       /************************************************************************
+                            ***/
+                        882 ; rs232err.c  259       /*      UpdateQUESTRegister                                              
+                                                                                        RS232ERR.C  */
+                        883 ; rs232err.c  260       /*                                                                       
+                                                                                                                             
+                                                            */
+                        884 ; rs232err.c  261       /* Author:              Kim Engedahl, DEV, 970630                        
+                                                                                            */
+                        885 ; rs232err.c  262       /* Revised:             970630                                           
+                                                                                                                    */
+                        886 ; rs232err.c  263       /*                                                                       
+                                                                                                                             
+                                                            */
+                        887 ; rs232err.c  264       /*      Function:       Update the content of the Questionable status reg
+                            ister           */
+                        888 ; rs232err.c  265       /*      Remarks:                -                                        
+                                                                                                                             
+                                                    */
+                        889 ; rs232err.c  266       /*      Returns:                A sum bit                                
+                                                                                                                             
+                                    */
+                        890 ; rs232err.c  267       /*      Updates:                -                                        
+                                                                                                                             
+                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+                        891 ; rs232err.c  268       /************************************************************************
+                            ***/
+                        892 ; rs232err.c  269       bit UpdateQUESTRegister() {
+0000D9 00               893         ALIGN   1
+                        895         PUBLIC  _UpdateQUESTRegister
+0000DA                  896 _UpdateQUESTRegister:
+                        900 ; rs232err.c  270       
+                        901 ; rs232err.c  271               QuestConditionReg=0;                            // 1. Condition, 
+                            ie. directly hardware etc.
+0000DA 964842rr         903         MOV.B   ES,#SEG( _QuestConditionReg )
+0000DE 9908rrrr         904         MOV.W   R0,#SOF( _QuestConditionReg )
+0000E2 BA00             905         MOV.W   [R0],#00H
+                        906 ; rs232err.c  272               QuestPtransReg=0;                                       // 2. Pos
+                            itive transition
+0000E4 964842rr         908         MOV.B   ES,#SEG( _QuestPtransReg )
+0000E8 9908rrrr         909         MOV.W   R0,#SOF( _QuestPtransReg )
+0000EC BA00             910         MOV.W   [R0],#00H
+                        911 ; rs232err.c  273               QuestNtransReg=0;                                       // 3. Neg
+                            ative transition
+0000EE 964842rr         913         MOV.B   ES,#SEG( _QuestNtransReg )
+0000F2 9908rrrr         914         MOV.W   R0,#SOF( _QuestNtransReg )
+0000F6 BA00             915         MOV.W   [R0],#00H
+                        916 ; rs232err.c  274               QuestEventReg=0;                                        // 4. Eve
+                            nt section
+0000F8 964842rr         918         MOV.B   ES,#SEG( _QuestEventReg )
+0000FC 9908rrrr         919         MOV.W   R0,#SOF( _QuestEventReg )
+000100 BA00             920         MOV.W   [R0],#00H
+                        921 ; rs232err.c  275               QuestEnableReg=0;                                       // 5. Ena
+                            ble section
+000102 964842rr         923         MOV.B   ES,#SEG( _QuestEnableReg )
+000106 9908rrrr         924         MOV.W   R0,#SOF( _QuestEnableReg )
+00010A BA00             925         MOV.W   [R0],#00H
+                        926 ; rs232err.c  276       
+                        927 ; rs232err.c  277               return( FALSE);
+00010C 910800           929         MOV.B   R0L,#00H
+                        930 ; rs232err.c  278       }
+00010F D680             932         RET
+                        934 ; rs232err.c  279       
+                        935 ; rs232err.c  280       /************************************************************************
+                            ***/
+                        936 ; rs232err.c  281       /*      UpdateOPERRegister                                               
+                                                                                        RS232ERR.C  */
+                        937 ; rs232err.c  282       /*                                                                       
+                                                                                                                             
+                                                            */
+                        938 ; rs232err.c  283       /* Author:              Kim Engedahl, DEV, 970630                        
+                                                                                            */
+                        939 ; rs232err.c  284       /* Revised:             970630                                           
+                                                                                                                    */
+                        940 ; rs232err.c  285       /*                                                                       
+                                                                                                                             
+                                                            */
+                        941 ; rs232err.c  286       /*      Function:       Update the content of the Operation status regist
+                            er                      */
+                        942 ; rs232err.c  287       /*      Remarks:                -                                        
+                                                                                                                             
+                                                    */
+                        943 ; rs232err.c  288       /*      Returns:                A sum bit                                
+                                                                                                                             
+                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+                        944 ; rs232err.c  289       /*      Updates:                -                                        
+                                                                                                                             
+                                                    */
+                        945 ; rs232err.c  290       /************************************************************************
+                            ***/
+                        946 ; rs232err.c  291       bit UpdateOPERRegister() {
+000111 00               947         ALIGN   1
+                        949         PUBLIC  _UpdateOPERRegister
+000112                  950 _UpdateOPERRegister:
+                        954 ; rs232err.c  292       
+                        955 ; rs232err.c  293               OperConditionReg=0;                             // 1. Condition, 
+                            ie. directly hardware etc.
+000112 964842rr         957         MOV.B   ES,#SEG( _OperConditionReg )
+000116 9908rrrr         958         MOV.W   R0,#SOF( _OperConditionReg )
+00011A BA00             959         MOV.W   [R0],#00H
+                        960 ; rs232err.c  294               OperPtransReg=0;                                        // 2. Pos
+                            itive transition
+00011C 964842rr         962         MOV.B   ES,#SEG( _OperPtransReg )
+000120 9908rrrr         963         MOV.W   R0,#SOF( _OperPtransReg )
+000124 BA00             964         MOV.W   [R0],#00H
+                        965 ; rs232err.c  295               OperNtransReg=0;                                        // 3. Neg
+                            ative transition
+000126 964842rr         967         MOV.B   ES,#SEG( _OperNtransReg )
+00012A 9908rrrr         968         MOV.W   R0,#SOF( _OperNtransReg )
+00012E BA00             969         MOV.W   [R0],#00H
+                        970 ; rs232err.c  296               OperEventReg=0;                                 // 4. Event secti
+                            on
+000130 964842rr         972         MOV.B   ES,#SEG( _OperEventReg )
+000134 9908rrrr         973         MOV.W   R0,#SOF( _OperEventReg )
+000138 BA00             974         MOV.W   [R0],#00H
+                        975 ; rs232err.c  297               OperEnableReg=0;                                        // 5. Ena
+                            ble section
+00013A 964842rr         977         MOV.B   ES,#SEG( _OperEnableReg )
+00013E 9908rrrr         978         MOV.W   R0,#SOF( _OperEnableReg )
+000142 BA00             979         MOV.W   [R0],#00H
+                        980 ; rs232err.c  298       
+                        981 ; rs232err.c  299               return( FALSE);
+000144 910800           983         MOV.B   R0L,#00H
+                        984 ; rs232err.c  300       }
+000147 D680             986         RET
+                        988 ; rs232err.c  301       
+                        989 ; rs232err.c  302       /************************************************************************
+                            ***/
+                        990 ; rs232err.c  303       /*      UpdateESRRegister                                                
+                                                                                                RS232ERR.C  */
+                        991 ; rs232err.c  304       /*                                                                       
+                                                                                                                             
+                                                            */
+                        992 ; rs232err.c  305       /* Author:              Kim Engedahl, DEV, 970630                        
+                                                                                            */
+                        993 ; rs232err.c  306       /* Revised:             970630                                           
+                                                                                                                    */
+                        994 ; rs232err.c  307       /*                                                                       
+                                                                                                                             
+                                                            */
+                        995 ; rs232err.c  308       /*      Function:       Update the content of the ESR register           
+                                                                            */
+                        996 ; rs232err.c  309       /*      Remarks:                -                                        
+                                                                                                                             
+                                                    */
+                        997 ; rs232err.c  310       /*      Returns:                The content of the ESR register          
+                                                                                            */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+                        998 ; rs232err.c  311       /*      Updates:                -                                        
+                                                                                                                             
+                                                    */
+                        999 ; rs232err.c  312       /************************************************************************
+                            ***/
+                       1000 ; rs232err.c  313       UC UpdateESRRegister() {
+000149 00              1001         ALIGN   1
+                       1003         PUBLIC  _UpdateESRRegister
+00014A                 1004 _UpdateESRRegister:
+                       1008 ; rs232err.c  314                                                                                
+                                    // Bit 7: Power On
+                       1009 ; rs232err.c  315                                                                                
+                                    // Bit 6: User request
+                       1010 ; rs232err.c  316                                                                                
+                                    // Bit 5: Command error
+                       1011 ; rs232err.c  317                                                                                
+                                    // Bit 4: Execution error
+                       1012 ; rs232err.c  318                                                                                
+                                    // Bit 3: Device dependent error
+                       1013 ; rs232err.c  319                                                                                
+                                    // Bit 2: Queue error
+                       1014 ; rs232err.c  320                                                                                
+                                    // Bit 1: Request control
+                       1015 ; rs232err.c  321                                                                                
+                                    // Bit 0: Operation complete
+                       1016 ; rs232err.c  322               return( ESRReg);
+00014A 964842rr        1018         MOV.B   ES,#SEG( _ESRReg )
+00014E 9908rrrr        1019         MOV.W   R0,#SOF( _ESRReg )
+000152 8200            1020         MOV.B   R0L,[R0]
+                       1021 ; rs232err.c  323       }
+000154 D680            1023         RET
+                       1025 ; rs232err.c  324       
+                       1026 ; rs232err.c  325       /************************************************************************
+                            ***/
+                       1027 ; rs232err.c  326       /*      UpdateSTBRegister                                                
+                                                                                                RS232ERR.C  */
+                       1028 ; rs232err.c  327       /*                                                                       
+                                                                                                                             
+                                                            */
+                       1029 ; rs232err.c  328       /* Author:              Kim Engedahl, DEV, 970630                        
+                                                                                            */
+                       1030 ; rs232err.c  329       /* Revised:             970630                                           
+                                                                                                                    */
+                       1031 ; rs232err.c  330       /*                                                                       
+                                                                                                                             
+                                                            */
+                       1032 ; rs232err.c  331       /*      Function:       Update the content of the Status Byte register   
+                                                            */
+                       1033 ; rs232err.c  332       /*      Remarks:                This command also updates the ESR registe
+                            r, the  operation-      */
+                       1034 ; rs232err.c  333       /*                                      register and the questionable reg
+                            ister.                                                  */
+                       1035 ; rs232err.c  334       /*      Returns:                -                                        
+                                                                                                                             
+                                                    */
+                       1036 ; rs232err.c  335       /*      Updates:                STBReg, ESRReg, QUESTReg & OPERReg       
+                                                                                            */
+                       1037 ; rs232err.c  336       /************************************************************************
+                            ***/
+                       1038 ; rs232err.c  337       void UpdateSTBRegister() {
+                       1039         ALIGN   1
+                       1041         PUBLIC  _UpdateSTBRegister
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+000156                 1042 _UpdateSTBRegister:
+                       1046 ; rs232err.c  338       
+                       1047 ; rs232err.c  339               STBReg &= 0x07;                                                 /
+                            / Clear the MSS-, ESR- & MAV-bit &
+000156 964842rr        1049         MOV.B   ES,#SEG( _STBReg )
+00015A 9908rrrr        1050         MOV.W   R0,#SOF( _STBReg )
+00015E 8200            1051         MOV.B   R0L,[R0]
+000160 910507          1052         AND.B   R0L,#07H
+000163 964842rr        1053         MOV.B   ES,#SEG( _STBReg )
+000167 9918rrrr        1054         MOV.W   R1,#SOF( _STBReg )
+00016B 8209            1055         MOV.B   [R1],R0L
+                       1056 ; rs232err.c  340                                                                                
+                                                            //  operation & questionable bits
+                       1057 ; rs232err.c  341               if ( UpdateOPERRegister())
+00016D C5FFD1          1059         CALL    _UpdateOPERRegister
+000170 6100            1060         OR.B    R0L,R0L
+000172 F30C            1061         BEQ     _8
+                       1062 ; rs232err.c  342                       STBReg |= 0x80;
+000174 964842rr        1064         MOV.B   ES,#SEG( _STBReg )
+000178 9908rrrr        1065         MOV.W   R0,#SOF( _STBReg )
+00017C 8200            1066         MOV.B   R0L,[R0]
+00017E 910680          1067         OR.B    R0L,#080H
+000181 964842rr        1068         MOV.B   ES,#SEG( _STBReg )
+000185 9918rrrr        1069         MOV.W   R1,#SOF( _STBReg )
+000189 8209            1070         MOV.B   [R1],R0L
+000189 820900          1070         MOV.B   [R1],R0L
+00018C                 1071 _8:
+                       1072 ; rs232err.c  343       
+                       1073 ; rs232err.c  344               if ( STBReg & SREReg & 0xBF)                    //      Calculate
+                             the MSS bit(6) in STB
+00018C 964842rr        1075         MOV.B   ES,#SEG( _STBReg )
+000190 9908rrrr        1076         MOV.W   R0,#SOF( _STBReg )
+000194 8200            1077         MOV.B   R0L,[R0]
+000196 964842rr        1078         MOV.B   ES,#SEG( _SREReg )
+00019A 9918rrrr        1079         MOV.W   R1,#SOF( _SREReg )
+00019E 8211            1080         MOV.B   R0H,[R1]
+0001A0 5110            1081         AND.B   R0H,R0L
+0001A2 964842rr        1082         MOV.B   ES,#SEG( _STBReg )
+0001A6 9918rrrr        1083         MOV.W   R1,#SOF( _STBReg )
+0001AA 8209            1084         MOV.B   [R1],R0L
+0001AC 9115BF          1085         AND.B   R0H,#0BFH
+0001AF F307            1086         BEQ     _9
+                       1087 ; rs232err.c  345                       STBReg |= 0x40;
+0001B1 910640          1089         OR.B    R0L,#040H
+0001B4 964842rr        1090         MOV.B   ES,#SEG( _STBReg )
+0001B8 9918rrrr        1091         MOV.W   R1,#SOF( _STBReg )
+0001BC 8209            1092         MOV.B   [R1],R0L
+0001BC 8209            1092         MOV.B   [R1],R0L
+0001BE                 1093 _9:
+                       1094 ; rs232err.c  346       
+                       1095 ; rs232err.c  347               if ( UpdateESRRegister() & ESEReg)      //      Calculate the ESB
+                             bit(5) in STB
+0001BE C5FFC5          1097         CALL    _UpdateESRRegister
+0001C1 964842rr        1098         MOV.B   ES,#SEG( _ESEReg )
+0001C5 9918rrrr        1099         MOV.W   R1,#SOF( _ESEReg )
+0001C9 8211            1100         MOV.B   R0H,[R1]
+0001CB 5101            1101         AND.B   R0L,R0H
+0001CD F30C            1102         BEQ     _10
+                       1103 ; rs232err.c  348                       STBReg |= 0x20;
+0001CF 964842rr        1105         MOV.B   ES,#SEG( _STBReg )
+0001D3 9908rrrr        1106         MOV.W   R0,#SOF( _STBReg )
+0001D7 8200            1107         MOV.B   R0L,[R0]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+0001D9 910620          1108         OR.B    R0L,#020H
+0001DC 964842rr        1109         MOV.B   ES,#SEG( _STBReg )
+0001E0 9918rrrr        1110         MOV.W   R1,#SOF( _STBReg )
+0001E4 8209            1111         MOV.B   [R1],R0L
+0001E4 8209            1111         MOV.B   [R1],R0L
+0001E6                 1112 _10:
+                       1113 ; rs232err.c  349       
+                       1114 ; rs232err.c  350               if ( QueueHead != QueueTail)                    //      Calculate
+                             the MAV bit(4) in STB
+0001E6 964842rr        1116         MOV.B   ES,#SEG( _QueueHead )
+0001EA 9908rrrr        1117         MOV.W   R0,#SOF( _QueueHead )
+0001EE 8A00            1118         MOV.W   R0,[R0]
+0001F0 964842rr        1119         MOV.B   ES,#SEG( _QueueTail )
+0001F4 9918rrrr        1120         MOV.W   R1,#SOF( _QueueTail )
+0001F8 8A11            1121         MOV.W   R1,[R1]
+0001FA 4901            1122         CMP.W   R0,R1
+0001FC F30C            1123         BEQ     _11
+                       1124 ; rs232err.c  351                       STBReg |= 0x10;
+0001FE 964842rr        1126         MOV.B   ES,#SEG( _STBReg )
+000202 9908rrrr        1127         MOV.W   R0,#SOF( _STBReg )
+000206 8200            1128         MOV.B   R0L,[R0]
+000208 910610          1129         OR.B    R0L,#010H
+00020B 964842rr        1130         MOV.B   ES,#SEG( _STBReg )
+00020F 9918rrrr        1131         MOV.W   R1,#SOF( _STBReg )
+000213 8209            1132         MOV.B   [R1],R0L
+000213 820900          1132         MOV.B   [R1],R0L
+000216                 1133 _11:
+                       1134 ; rs232err.c  352       
+                       1135 ; rs232err.c  353               if ( UpdateQUESTRegister())
+000216 C5FF61          1137         CALL    _UpdateQUESTRegister
+000219 6100            1138         OR.B    R0L,R0L
+00021B F30C            1139         BEQ     _12
+                       1140 ; rs232err.c  354                       STBReg |= 0x08;
+00021D 964842rr        1142         MOV.B   ES,#SEG( _STBReg )
+000221 9908rrrr        1143         MOV.W   R0,#SOF( _STBReg )
+000225 8200            1144         MOV.B   R0L,[R0]
+000227 910608          1145         OR.B    R0L,#08H
+00022A 964842rr        1146         MOV.B   ES,#SEG( _STBReg )
+00022E 9918rrrr        1147         MOV.W   R1,#SOF( _STBReg )
+000232 8209            1148         MOV.B   [R1],R0L
+000232 8209            1148         MOV.B   [R1],R0L
+000234                 1149 _12:
+                       1150 ; rs232err.c  355       }
+000234 D680            1152         RET
+000000                 1158 RS232ERR_CLR_FA SEGMENT HDATA INSEGMENT CLEAR
+000000                 1159         RSEG    RS232ERR_CLR_FA
+                       1160         PUBLIC  _QuestPtransReg
+                       1161         ALIGN   1
+000000                 1162 _QuestPtransReg:        DS      2
+   |  RESERVED             
+000001
+                       1165         PUBLIC  _OperEnableReg
+                       1166         ALIGN   1
+000002                 1167 _OperEnableReg: DS      2
+   |  RESERVED             
+000003
+                       1170         PUBLIC  _OperPtransReg
+                       1171         ALIGN   1
+000004                 1172 _OperPtransReg: DS      2
+   |  RESERVED             
+000005
+                       1175         PUBLIC  _ESRReg
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+000006 RESERVED        1176 _ESRReg:        DS      1
+000006
+                       1179         PUBLIC  _STBReg
+000007 RESERVED        1180 _STBReg:        DS      1
+000007
+                       1183         PUBLIC  _ESEReg
+000008 RESERVED        1184 _ESEReg:        DS      1
+000008
+                       1187         PUBLIC  _OperEventReg
+000009 RESERVED        1188         ALIGN   1
+000009
+00000A                 1189 _OperEventReg:  DS      2
+   |  RESERVED             
+00000B
+                       1192         PUBLIC  _SREReg
+00000C RESERVED        1193 _SREReg:        DS      1
+00000C
+                       1196         PUBLIC  _OperNtransReg
+00000D RESERVED        1197         ALIGN   1
+00000D
+00000E                 1198 _OperNtransReg: DS      2
+   |  RESERVED             
+00000F
+                       1201         PUBLIC  _QuestNtransReg
+                       1202         ALIGN   1
+000010                 1203 _QuestNtransReg:        DS      2
+   |  RESERVED             
+000011
+                       1206         PUBLIC  _QuestEnableReg
+                       1207         ALIGN   1
+000012                 1208 _QuestEnableReg:        DS      2
+   |  RESERVED             
+000013
+                       1211         ALIGN   1
+000014                 1212 _ErrorEventQueue:       DS      64
+   |  RESERVED             
+000053
+                       1215         PUBLIC  _QuestConditionReg
+                       1216         ALIGN   1
+000054                 1217 _QuestConditionReg:     DS      2
+   |  RESERVED             
+000055
+                       1220         PUBLIC  _OperConditionReg
+                       1221         ALIGN   1
+000056                 1222 _OperConditionReg:      DS      2
+   |  RESERVED             
+000057
+                       1225         PUBLIC  _SCPIError
+                       1226         ALIGN   1
+000058                 1227 _SCPIError:     DS      2
+   |  RESERVED             
+000059
+                       1230         PUBLIC  _QuestEventReg
+                       1231         ALIGN   1
+00005A                 1232 _QuestEventReg: DS      2
+   |  RESERVED             
+00005B
+                       1233         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1234         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1235         CALLS   'ResetErrorEventQueue', 'UpdateSTBRegister'
+                       1236         CALLS   'ReadErrorEventQueue', 'UpdateSTBRegister'
+                       1237         CALLS   'SaveErrorEventQueue', 'UpdateSTBRegister'
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  23
+
+ADDR   CODE            LINE SOURCELINE
+                       1238         CALLS   'UpdateSTBRegister', 'UpdateOPERRegister'
+                       1239         CALLS   'UpdateSTBRegister', 'UpdateESRRegister'
+                       1240         CALLS   'UpdateSTBRegister', 'UpdateQUESTRegister'

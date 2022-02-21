@@ -1,0 +1,56 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_SIGNED.ALL;
+
+entity digital_phase_loop is
+    Port ( --rst_i : in STD_LOGIC;
+			  clk_i : in STD_LOGIC;
+			  phase_diff_i : in  STD_LOGIC_VECTOR (9 downto 0);
+			  update_tick_i : in  STD_LOGIC;
+			  dac_word_o : out  STD_LOGIC_VECTOR (15 downto 0)
+			  );
+end digital_phase_loop;
+
+architecture Behavioral of digital_phase_loop is
+
+signal integrator : std_logic_vector (25 downto 0):=(others => '0'); 
+signal out_sum : std_logic_vector (17 downto 0):=(others => '0');
+
+begin
+	-- output digital styreværdi til DAC
+	dac_word_o <= out_sum(17 downto 2);
+		
+	-- opdater udsum
+	update_out_sum : process(clk_i)
+	begin
+		if clk_i'event and clk_i = '1' then
+			if update_tick_i = '1' then
+				--proportional del
+				if phase_diff_i(9) = '0' then --hvis positiv fasefejl
+					out_sum <= integrator(25 downto 8) + ( "00" & phase_diff_i & "000000");	--beta 32
+				else 									--hvis negativ fasefejl
+					out_sum <= integrator(25 downto 8) + ( "11" & phase_diff_i & "000000");
+				end if;
+			end if;
+		end if;
+	end process;
+
+	-- integrator
+	integrator_update : process(clk_i)
+	begin
+		if clk_i'event and clk_i = '1' then
+			if update_tick_i = '1' then								
+				--integrator
+				if phase_diff_i(9) = '0' then --hvis positiv fasefejl
+					integrator <= integrator + ("00000000000000" & phase_diff_i & "00"); 
+				else 									--hvis negativ fasefejl
+					integrator <= integrator + ("11111111111111" & phase_diff_i & "00");
+				end if;
+			end if;
+		end if;
+	end process;
+
+	
+end Behavioral;
+

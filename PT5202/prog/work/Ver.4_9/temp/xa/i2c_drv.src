@@ -1,0 +1,2603 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -A1 -Cxag3 -e -g -IcF:\PT5202\prog\include
+;          -IF:\PT5202\prog\rtxc\xa\include -I. -Ml -O2 -s
+$CASE
+$NOZPAGE
+	NAME	I2C_DRV
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "i2c_drv.c"
+; i2c_drv.c    1	/* Generic iic module */
+; i2c_drv.c    2	
+; i2c_drv.c    3	/* History Rev 0_1 introduced in PT5765 pilot production */
+; i2c_drv.c    4	
+; i2c_drv.c    5	/* Rev 1_1 has changes required for PT5765 production and for use in PT5201 project     */
+; i2c_drv.c    6	/* Rev 1_1 Modify 15. Jan 2000 SAA                                                      */
+; i2c_drv.c    7	/* Rev 1_1 Remove access to eventlog from this level                                    */
+; i2c_drv.c    8	/* Rev 1_1 Add support for more busses                                                  */
+; i2c_drv.c    9	/* Rev 1_1 Add support for enable/disable support for each individual bus               */
+; i2c_drv.c   10	
+; i2c_drv.c   11	
+; i2c_drv.c   12	#include <stdio.h>       /* Using sprintf() */
+	SYMB	FILE, "F:\\PT5202\\prog\\include\\stdio.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\include\\stdarg.h"
+	SYMB	ENDF
+	SYMB	TYPE, 257, 'n', #2, 130
+	SYMB	TYPE, 258, 'P', #257
+	SYMB	TYPE, 259, "_iobuf", 'S', 14,\
+		 "_ptr", #258, 0,\
+		 "_cnt", #16, 4,\
+		 "_base", #258, 6,\
+		 "_flag", #2, 10,\
+		 "_file", #2, 11,\
+		 "_bufsiz", #16, 12
+	SYMB	TYPE, 260, "FILE", 'T', #259
+	SYMB	TYPE, 261, 'n', #1, 130
+	SYMB	TYPE, 262, 'P', #261
+	SYMB	TYPE, 263, 'Z', #262, 0
+	SYMB	TYPE, 265, "va_list", 'T', #263
+	SYMB	TYPE, 266, "size_t", 'T', #18
+	SYMB	TYPE, 267, "fpos_t", 'T', #7
+	SYMB	ENDF
+; i2c_drv.c   13	
+; i2c_drv.c   14	#include "reg8051.h"
+	SYMB	FILE, "reg8051.h"
+	SYMB	ENDF
+; i2c_drv.c   15	#include "define.h"     /* Standard PTV definitions */
+	SYMB	FILE, "define.h"
+	SYMB	ENDF
+; i2c_drv.c   16	#include "rtxcobj.h"    /* Kernal objects */
+	SYMB	FILE, "rtxcobj.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxcapi.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\typedef.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxcopts.h"
+	SYMB	ENDF
+	SYMB	TYPE, 268, "KOBJNUM", 'T', #3
+	SYMB	TYPE, 269, "TASK", 'T', #2
+	SYMB	ENDF
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxstruc.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxcopts.h"
+	SYMB	ENDF
+	SYMB	TYPE, 270, "KSNUM", 'T', #3
+	SYMB	TYPE, 271, "PRIORITY", 'T', #269
+	SYMB	TYPE, 272, "TSTATE", 'T', #5
+	SYMB	TYPE, 273, "TSLICE", 'T', #3
+	SYMB	TYPE, 275, 'n', #274, 130
+	SYMB	TYPE, 276, 'P', #275
+	SYMB	TYPE, 278, 'n', #277, 130
+	SYMB	TYPE, 279, 'P', #278
+	SYMB	TYPE, 280, 'n', #270, 130
+	SYMB	TYPE, 281, 'P', #280
+	SYMB	TYPE, 282, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 283, 'n', #282, 129
+	SYMB	TYPE, 284, 'P', #283
+	SYMB	TYPE, 285, "frame", 'S', 24,\
+		 "es", #3, 0,\
+		 "cs", #3, 1,\
+		 "ssel", #3, 2,\
+		 "ds", #3, 3,\
+		 "pksnum", #281, 4,\
+		 "R2", #18, 8,\
+		 "R3", #18, 10,\
+		 "R4", #18, 12,\
+		 "R5", #18, 14,\
+		 "R6", #18, 16,\
+		 "psw", #18, 18,\
+		 "pc", #284, 20
+	SYMB	TYPE, 286, 'n', #285, 130
+	SYMB	TYPE, 287, 'P', #286
+	SYMB	TYPE, 288, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 289, 'n', #288, 129
+	SYMB	TYPE, 290, 'P', #289
+	SYMB	TYPE, 274, "tcb", 'S', 36,\
+		 "flink", #276, 0,\
+		 "blink", #276, 4,\
+		 "pclkblk", #279, 8,\
+		 "task", #269, 12,\
+		 "priority", #271, 13,\
+		 "sp", #287, 14,\
+		 "status", #272, 18,\
+		 "pc_t0", #290, 20,\
+		 "stackbase", #258, 24,\
+		 "stacksize", #266, 28,\
+		 "tslice", #273, 30,\
+		 "newslice", #273, 31,\
+		 "arg", #262, 32
+	SYMB	TYPE, 291, "TCB", 'T', #274
+	SYMB	TYPE, 292, "SEMA", 'T', #268
+	SYMB	TYPE, 293, "MAP", 'T', #268
+	SYMB	TYPE, 295, 'n', #294, 130
+	SYMB	TYPE, 296, 'P', #295
+	SYMB	TYPE, 294, "rtxcmsg", 'S', 8,\
+		 "link", #296, 0,\
+		 "task", #269, 4,\
+		 "priority", #271, 5,\
+		 "sema", #292, 6
+	SYMB	TYPE, 297, "RTXCMSG", 'T', #294
+	SYMB	TYPE, 298, "TICKS", 'T', #16
+	SYMB	TYPE, 299, 'N',\
+		 "DELAY_OBJ", 0,\
+		 "SEMAPHORE_OBJ", 1,\
+		 "PARTITION_OBJ", 2,\
+		 "QUEUE_OBJ", 3,\
+		 "RESOURCE_OBJ", 4,\
+		 "MAILBOX_OBJ", 5,\
+		 "TIMER_OBJ", 6
+	SYMB	TYPE, 300, "OBJTYPE", 'T', #299
+	SYMB	TYPE, 277, "clkblk", 'S', 18,\
+		 "flink", #279, 0,\
+		 "blink", #279, 4,\
+		 "remain", #298, 8,\
+		 "recycle", #298, 10,\
+		 "task", #269, 12,\
+		 "state", #2, 13,\
+		 "objtype", #300, 14,\
+		 "objid", #268, 16
+	SYMB	TYPE, 301, 'N',\
+		 "PRIORITY_INVERSION_OFF", 0,\
+		 "PRIORITY_INVERSION_ON", 1
+	SYMB	TYPE, 302, "RESATTR", 'T', #301
+	SYMB	ENDF
+	SYMB	TYPE, 303, 'N',\
+		 "RC_GOOD", 0,\
+		 "RC_WAIT_CONFLICT", 1,\
+		 "RC_NO_TIMERS", 2,\
+		 "RC_TIMER_INACTIVE", 3,\
+		 "RC_TIMER_ILLEGAL", 4,\
+		 "RC_TIMEOUT", 5,\
+		 "RC_QUEUE_FULL", 6,\
+		 "RC_QUEUE_EMPTY", 7,\
+		 "RC_ILLEGAL_QUEUE_SIZE", 8,\
+		 "RC_BUSY", 9,\
+		 "RC_NESTED", 10,\
+		 "RC_ILLEGAL_TASK", 11,\
+		 "RC_ACTIVE_TASK", 12,\
+		 "RC_NO_YIELD", 13,\
+		 "RC_MISSED_EVENT", 14
+	SYMB	TYPE, 304, "KSRC", 'T', #303
+	SYMB	TYPE, 305, "SSTATE", 'T', #269
+	SYMB	TYPE, 306, "MBOX", 'T', #268
+	SYMB	TYPE, 307, "QUEUE", 'T', #268
+	SYMB	TYPE, 308, 'N',\
+		 "QNE", 0,\
+		 "QNF", 1,\
+		 "QF", 2,\
+		 "QE", 3
+	SYMB	TYPE, 309, "QCOND", 'T', #308
+	SYMB	TYPE, 310, "RESOURCE", 'T', #268
+	SYMB	TYPE, 311, "CLKBLK", 'T', #277
+	SYMB	TYPE, 312, "time_t", 'T', #6
+	SYMB	TYPE, 313, "FRAME", 'T', #285
+	SYMB	ENDF
+	SYMB	FILE, "ctask.h"
+	SYMB	ENDF
+	SYMB	FILE, "csema.h"
+	SYMB	ENDF
+	SYMB	FILE, "cres.h"
+	SYMB	ENDF
+	SYMB	FILE, "cqueue.h"
+	SYMB	ENDF
+	SYMB	FILE, "cpart.h"
+	SYMB	ENDF
+	SYMB	FILE, "cmbox.h"
+	SYMB	ENDF
+	SYMB	FILE, "cclock.h"
+	SYMB	ENDF
+	SYMB	TYPE, 315, 'n', #314, 130
+	SYMB	TYPE, 316, 'P', #315
+	SYMB	TYPE, 314, 'X', 12, #1, 30, 2, #316, #258
+	SYMB	TYPE, 318, 'n', #317, 129
+	SYMB	TYPE, 319, 'P', #318
+	SYMB	TYPE, 320, 'X', 12, #1, 30, 1, #316
+	SYMB	TYPE, 321, 'n', #320, 129
+	SYMB	TYPE, 322, 'P', #321
+	SYMB	TYPE, 323, 'n', #6, 130
+	SYMB	TYPE, 324, 'P', #323
+	SYMB	TYPE, 323, 'X', 12, #16, 30, 2, #316, #324
+	SYMB	TYPE, 326, 'n', #325, 129
+	SYMB	TYPE, 327, 'P', #326
+	SYMB	TYPE, 328, 'X', 12, #1, 30, 1, #316
+	SYMB	TYPE, 329, 'n', #328, 129
+	SYMB	TYPE, 330, 'P', #329
+	SYMB	TYPE, 331, 'X', 12, #1, 30, 1, #316
+	SYMB	TYPE, 332, 'n', #331, 129
+	SYMB	TYPE, 333, 'P', #332
+	SYMB	TYPE, 334, 'X', 12, #16, 30, 1, #316
+	SYMB	TYPE, 335, 'n', #334, 129
+	SYMB	TYPE, 336, 'P', #335
+	SYMB	TYPE, 314, "TEvent", 'S', 32,\
+		 "ObjectID", #16, 0,\
+		 "TEvent", #319, 2,\
+		 "_TEvent", #322, 6,\
+		 "Wait", #327, 10,\
+		 "Set", #330, 14,\
+		 "Clear", #333, 18,\
+		 "IsSet", #336, 22,\
+		 "ID", #292, 26,\
+		 "Name", #258, 28
+	SYMB	TYPE, 337, "TEvent", 'T', #314
+	SYMB	TYPE, 339, 'n', #338, 130
+	SYMB	TYPE, 340, 'P', #339
+	SYMB	TYPE, 338, 'X', 12, #1, 30, 1, #340
+	SYMB	TYPE, 342, 'n', #341, 129
+	SYMB	TYPE, 343, 'P', #342
+	SYMB	TYPE, 344, 'X', 12, #1, 30, 1, #340
+	SYMB	TYPE, 345, 'n', #344, 129
+	SYMB	TYPE, 346, 'P', #345
+	SYMB	TYPE, 347, 'n', #337, 130
+	SYMB	TYPE, 348, 'P', #347
+	SYMB	TYPE, 347, 'X', 12, #16, 30, 2, #340, #348
+	SYMB	TYPE, 350, 'n', #349, 129
+	SYMB	TYPE, 351, 'P', #350
+	SYMB	TYPE, 352, 'X', 12, #1, 30, 2, #340, #348
+	SYMB	TYPE, 353, 'n', #352, 129
+	SYMB	TYPE, 354, 'P', #353
+	SYMB	TYPE, 355, 'X', 12, #16, 30, 2, #340, #348
+	SYMB	TYPE, 356, 'n', #355, 129
+	SYMB	TYPE, 357, 'P', #356
+	SYMB	TYPE, 358, 'X', 12, #348, 30, 2, #340, #324
+	SYMB	TYPE, 359, 'n', #358, 129
+	SYMB	TYPE, 360, 'P', #359
+	SYMB	TYPE, 361, 'Z', #2, 95
+	SYMB	TYPE, 338, "TEventList", 'S', 122,\
+		 "ObjectID", #16, 0,\
+		 "TEventList", #343, 2,\
+		 "_TEventList", #346, 6,\
+		 "Append", #351, 10,\
+		 "Clear", #354, 14,\
+		 "InList", #357, 18,\
+		 "Wait", #360, 22,\
+		 "Align", #361, 26
+	SYMB	TYPE, 363, "TEventList", 'T', #338
+	SYMB	TYPE, 365, 'n', #364, 130
+	SYMB	TYPE, 366, 'P', #365
+	SYMB	TYPE, 364, 'X', 12, #1, 30, 2, #366, #258
+	SYMB	TYPE, 368, 'n', #367, 129
+	SYMB	TYPE, 369, 'P', #368
+	SYMB	TYPE, 370, 'X', 12, #1, 30, 1, #366
+	SYMB	TYPE, 371, 'n', #370, 129
+	SYMB	TYPE, 372, 'P', #371
+	SYMB	TYPE, 373, 'X', 12, #1, 30, 1, #366
+	SYMB	TYPE, 374, 'n', #373, 129
+	SYMB	TYPE, 375, 'P', #374
+	SYMB	TYPE, 376, 'X', 12, #1, 30, 1, #366
+	SYMB	TYPE, 377, 'n', #376, 129
+	SYMB	TYPE, 378, 'P', #377
+	SYMB	TYPE, 379, 'X', 12, #16, 30, 1, #366
+	SYMB	TYPE, 380, 'n', #379, 129
+	SYMB	TYPE, 381, 'P', #380
+	SYMB	TYPE, 364, "TResource", 'S', 28,\
+		 "ObjectID", #16, 0,\
+		 "TResource", #369, 2,\
+		 "_TResource", #372, 6,\
+		 "Lock", #375, 10,\
+		 "Unlock", #378, 14,\
+		 "Owner", #381, 18,\
+		 "ID", #310, 22,\
+		 "Name", #258, 24
+	SYMB	TYPE, 382, "TResource", 'T', #364
+	SYMB	TYPE, 383, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 384, 'n', #383, 129
+	SYMB	TYPE, 385, 'P', #384
+	SYMB	TYPE, 387, 'n', #386, 130
+	SYMB	TYPE, 388, 'P', #387
+	SYMB	TYPE, 383, 'X', 12, #1, 30, 3, #388, #16, #385
+	SYMB	TYPE, 390, 'n', #389, 129
+	SYMB	TYPE, 391, 'P', #390
+	SYMB	TYPE, 392, 'X', 12, #1, 30, 1, #388
+	SYMB	TYPE, 393, 'n', #392, 129
+	SYMB	TYPE, 394, 'P', #393
+	SYMB	TYPE, 395, 'X', 12, #1, 30, 1, #388
+	SYMB	TYPE, 396, 'n', #395, 129
+	SYMB	TYPE, 397, 'P', #396
+	SYMB	TYPE, 398, 'X', 12, #1, 30, 2, #388, #16
+	SYMB	TYPE, 399, 'n', #398, 129
+	SYMB	TYPE, 400, 'P', #399
+	SYMB	TYPE, 401, 'X', 12, #1, 30, 1, #388
+	SYMB	TYPE, 402, 'n', #401, 129
+	SYMB	TYPE, 403, 'P', #402
+	SYMB	TYPE, 404, 'X', 12, #16, 30, 1, #388
+	SYMB	TYPE, 405, 'n', #404, 129
+	SYMB	TYPE, 406, 'P', #405
+	SYMB	TYPE, 407, 'X', 12, #1, 30, 2, #388, #16
+	SYMB	TYPE, 408, 'n', #407, 129
+	SYMB	TYPE, 409, 'P', #408
+	SYMB	TYPE, 386, "TThread", 'S', 36,\
+		 "ObjectID", #16, 0,\
+		 "TThread", #391, 2,\
+		 "Execute", #394, 6,\
+		 "Terminate", #397, 10,\
+		 "Suspend", #400, 14,\
+		 "Resume", #403, 18,\
+		 "GetPriority", #406, 22,\
+		 "SetPriority", #409, 26,\
+		 "ID", #269, 30,\
+		 "Status", #2, 31,\
+		 "Stack", #258, 32
+	SYMB	TYPE, 410, "TThread", 'T', #386
+	SYMB	TYPE, 412, 'n', #411, 130
+	SYMB	TYPE, 413, 'P', #412
+	SYMB	TYPE, 411, 'X', 12, #1, 30, 1, #413
+	SYMB	TYPE, 415, 'n', #414, 129
+	SYMB	TYPE, 416, 'P', #415
+	SYMB	TYPE, 417, 'X', 12, #1, 30, 1, #413
+	SYMB	TYPE, 418, 'n', #417, 129
+	SYMB	TYPE, 419, 'P', #418
+	SYMB	TYPE, 420, 'X', 12, #1, 30, 2, #413, #16
+	SYMB	TYPE, 421, 'n', #420, 129
+	SYMB	TYPE, 422, 'P', #421
+	SYMB	TYPE, 423, 'X', 12, #16, 30, 1, #413
+	SYMB	TYPE, 424, 'n', #423, 129
+	SYMB	TYPE, 425, 'P', #424
+	SYMB	TYPE, 426, 'X', 12, #1, 30, 2, #413, #16
+	SYMB	TYPE, 427, 'n', #426, 129
+	SYMB	TYPE, 428, 'P', #427
+	SYMB	TYPE, 429, 'n', #311, 130
+	SYMB	TYPE, 430, 'P', #429
+	SYMB	TYPE, 411, "TTimer", 'S', 32,\
+		 "ObjectID", #16, 0,\
+		 "TTimer", #416, 2,\
+		 "_TTimer", #419, 6,\
+		 "SetPeriod", #422, 10,\
+		 "GetPeriod", #425, 14,\
+		 "Tick", #428, 18,\
+		 "TimeOut", #348, 22,\
+		 "Period", #4, 26,\
+		 "Handle", #430, 28
+	SYMB	TYPE, 431, "TTimer", 'T', #411
+	SYMB	TYPE, 433, 'n', #432, 130
+	SYMB	TYPE, 434, 'P', #433
+	SYMB	TYPE, 432, 'X', 12, #1, 30, 3, #434, #16, #16
+	SYMB	TYPE, 436, 'n', #435, 129
+	SYMB	TYPE, 437, 'P', #436
+	SYMB	TYPE, 438, 'X', 12, #1, 30, 1, #434
+	SYMB	TYPE, 439, 'n', #438, 129
+	SYMB	TYPE, 440, 'P', #439
+	SYMB	TYPE, 441, 'X', 12, #258, 30, 2, #434, #262
+	SYMB	TYPE, 442, 'n', #441, 129
+	SYMB	TYPE, 443, 'P', #442
+	SYMB	TYPE, 444, 'X', 12, #1, 30, 2, #434, #262
+	SYMB	TYPE, 445, 'n', #444, 129
+	SYMB	TYPE, 446, 'P', #445
+	SYMB	TYPE, 432, "TStream", 'S', 28,\
+		 "ObjectID", #16, 0,\
+		 "TStream", #437, 2,\
+		 "_TStream", #440, 6,\
+		 "Get", #443, 10,\
+		 "Put", #446, 14,\
+		 "ID", #307, 18,\
+		 "Width", #16, 20,\
+		 "Depth", #16, 22,\
+		 "Handle", #258, 24
+	SYMB	TYPE, 447, "TStream", 'T', #432
+	SYMB	ENDF
+; i2c_drv.c   17	
+; i2c_drv.c   18	#include "config.h"     /* Include project specifics , Number of IIC-busses */
+	SYMB	FILE, "config.h"
+	SYMB	ENDF
+; i2c_drv.c   19	
+; i2c_drv.c   20	#include "i2c_drv.h"    /* Own h file */
+	SYMB	FILE, "i2c_drv.h"
+	SYMB	ENDF
+; i2c_drv.c   21	
+; i2c_drv.c   22	// In file 'config.h' the specific project can define the number of busses supported
+; i2c_drv.c   23	// By using only #define NiicBus either 1 (system) 4 or 7 busses are define
+; i2c_drv.c   24	// if only a few selected busses should be included, then add a #define IicBusX for each bus
+; i2c_drv.c   25	
+; i2c_drv.c   26	
+; i2c_drv.c   27	#if (NiicBus==0)
+; i2c_drv.c   28	#compiletime error : This module should not be included if iic-busses not are used
+; i2c_drv.c   29	
+; i2c_drv.c   30	#elif (NiicBus==1) //Include only system bus
+; i2c_drv.c   31	
+; i2c_drv.c   32	#elif (NiicBus<=4) //Include 3 instrument busses
+; i2c_drv.c   33	#define IicBus1
+; i2c_drv.c   34	#define IicBus2
+; i2c_drv.c   35	#define IicBus3
+; i2c_drv.c   36	
+; i2c_drv.c   37	#else              // Include all supported busses
+; i2c_drv.c   38	
+; i2c_drv.c   39	#define IicBus1
+; i2c_drv.c   40	#define IicBus2
+; i2c_drv.c   41	#define IicBus3
+; i2c_drv.c   42	#define IicBus4
+; i2c_drv.c   43	#define IicBus5
+; i2c_drv.c   44	#define IicBus6
+; i2c_drv.c   45	
+; i2c_drv.c   46	#endif
+; i2c_drv.c   47	
+; i2c_drv.c   48	
+; i2c_drv.c   49	
+; i2c_drv.c   50	
+; i2c_drv.c   51	
+; i2c_drv.c   52	// Rev 1_1 Remove eventlog reference
+; i2c_drv.c   53	// #include "EvLog.h"      /* Event (error) reporting funtions */
+; i2c_drv.c   54	
+; i2c_drv.c   55	#include "EventDef.h"   /* Defines event IDs, used for error / status reporting */
+	SYMB	FILE, "EventDef.h"
+	SYMB	ENDF
+; i2c_drv.c   56	
+; i2c_drv.c   57	/*  Module supports 4 busses : _ptv , _1, _2 and _3
+; i2c_drv.c   58	    bus _ptv is the  local iic bus on the controller
+; i2c_drv.c   59	    while busses _1, _2 and _3 are available for use on
+; i2c_drv.c   60	    any instrument connector */
+; i2c_drv.c   61	
+; i2c_drv.c   62	
+; i2c_drv.c   63	/* Define local PTV bus as direct pin or via FPGA */
+; i2c_drv.c   64	#define FPGA 1
+; i2c_drv.c   65	#define Direct 2
+; i2c_drv.c   66	#define BusPTV Direct
+; i2c_drv.c   67	
+; i2c_drv.c   68	
+; i2c_drv.c   69	/* Functions to support external :
+; i2c_drv.c   70	   InitBus(UC bus)
+; i2c_drv.c   71	   TransmitIIC(UC Address ,UC num ,UC *data ,UC bus )
+; i2c_drv.c   72	   ReceiveIIC(UC Address ,UC num ,UC *data ,UC bus )
+; i2c_drv.c   73	   */
+; i2c_drv.c   74	
+; i2c_drv.c   75	/* Hardware dependent definitions for the BIT version */
+; i2c_drv.c   76	/* Includes functions : */
+; i2c_drv.c   77	/* Read SDA */
+; i2c_drv.c   78	/* Read SCL */
+; i2c_drv.c   79	/* Set SDA high or low */
+; i2c_drv.c   80	/* Set SCL high or low */
+; i2c_drv.c   81	
+; i2c_drv.c   82	/* Prototypes of local procedures */
+; i2c_drv.c   83	//static void Delay(int usec);
+; i2c_drv.c   84	static int SDA_get(UC bus);
+; i2c_drv.c   85	static int SCL_get(UC bus);
+; i2c_drv.c   86	static int SCL_set(UC level, UC bus);
+; i2c_drv.c   87	static int SCL_set_wait(UC bus);
+; i2c_drv.c   88	static int SDA_set(UC level, UC bus);
+; i2c_drv.c   89	static int Start_IIC(UC bus);
+; i2c_drv.c   90	static int Stop_IIC(UC bus);
+; i2c_drv.c   91	static UC RxByte(int Last,UC bus);
+; i2c_drv.c   92	static int TxByte(UC X,UC bus);
+; i2c_drv.c   93	
+; i2c_drv.c   94	
+; i2c_drv.c   95	/* Delay of 1 to 5 microseconds */
+; i2c_drv.c   96	/* Processor dependent delay of 5 usec */
+; i2c_drv.c   97	/* XA controller running at 29.xx MHz  */
+; i2c_drv.c   98	#define lopru 7        /* Number of loops executed each microsecond */
+; i2c_drv.c   99	
+; i2c_drv.c  100	#define Delay(x)
+; i2c_drv.c  101	
+; i2c_drv.c  102	//static void Delay(int usec)
+; i2c_drv.c  103	//{
+; i2c_drv.c  104	//    usec *= lopru;
+; i2c_drv.c  105	//    while ( usec-- > 0 );
+; i2c_drv.c  106	//}
+; i2c_drv.c  107	
+; i2c_drv.c  108	/* Local defines */
+; i2c_drv.c  109	
+; i2c_drv.c  110	#define High 1
+; i2c_drv.c  111	#define Low  0
+; i2c_drv.c  112	#define Bit7 0x80
+; i2c_drv.c  113	
+; i2c_drv.c  114	#define IICtimeout 10    // Timeout in usec
+; i2c_drv.c  115	
+; i2c_drv.c  116	
+; i2c_drv.c  117	/* Define 1+6 busses for IIC ports in FPGA  */
+; i2c_drv.c  118	
+; i2c_drv.c  119	#if (BusPTV==FPGA)
+; i2c_drv.c  120	volatile UC IICbit_0 _at(0x90012); /* For controller if via FPGA */
+; i2c_drv.c  121	static UC   IICmir0;
+; i2c_drv.c  122	#endif
+; i2c_drv.c  123	
+; i2c_drv.c  124	#ifdef IicBus1
+; i2c_drv.c  125	volatile UC IICbit_1 _at(0x90312); /* Instrument busses */
+; i2c_drv.c  126	static UC   IICmir1;
+; i2c_drv.c  127	#endif
+; i2c_drv.c  128	
+; i2c_drv.c  129	#ifdef IicBus2
+; i2c_drv.c  130	volatile UC IICbit_2 _at(0x90322);
+; i2c_drv.c  131	static UC   IICmir2;
+; i2c_drv.c  132	#endif
+; i2c_drv.c  133	
+; i2c_drv.c  134	#ifdef IicBus3
+; i2c_drv.c  135	volatile UC IICbit_3 _at(0x90332);
+; i2c_drv.c  136	static UC   IICmir3;
+; i2c_drv.c  137	#endif
+; i2c_drv.c  138	
+; i2c_drv.c  139	#ifdef IicBus4
+; i2c_drv.c  140	volatile UC IICbit_4 _at(0x90342);
+; i2c_drv.c  141	static UC   IICmir4;
+; i2c_drv.c  142	#endif
+; i2c_drv.c  143	
+; i2c_drv.c  144	#ifdef IicBus5
+; i2c_drv.c  145	volatile UC IICbit_5 _at(0x90352);
+; i2c_drv.c  146	static UC   IICmir5;
+; i2c_drv.c  147	#endif
+; i2c_drv.c  148	
+; i2c_drv.c  149	#ifdef IicBus6
+; i2c_drv.c  150	volatile UC IICbit_6 _at(0x90362);
+; i2c_drv.c  151	static UC   IICmir6;
+; i2c_drv.c  152	#endif
+; i2c_drv.c  153	
+; i2c_drv.c  154	
+; i2c_drv.c  155	#define SDA_mask 0x02
+; i2c_drv.c  156	#define SCL_mask 0x01
+; i2c_drv.c  157	
+; i2c_drv.c  158	/* Define direct pins used for local (PTV) IIC */
+; i2c_drv.c  159	_sfrbit    SCLpin  _atbit(P1,7);   // P1^7
+; i2c_drv.c  160	_sfrbit    SDApin  _atbit(P1,6);   // P1^6
+; i2c_drv.c  161	
+; i2c_drv.c  162	/* Functions for Reading SDA line */
+; i2c_drv.c  163	/* Internal use only              */
+; i2c_drv.c  164	
+; i2c_drv.c  165	static int SDA_get(UC bus)
+; i2c_drv.c  166	{
+I2C_DRV_PR	SEGMENT	HCODE
+	RSEG	I2C_DRV_PR
+	ALIGN	1
+	SYMB	LINE, 166
+_SDA_get:
+	SYMB	TYPE, 448, 'X', 12, #16, 30, 1, #3
+	SYMB	LFUN, "SDA_get", _SDA_get, #448, 0, 0, 0
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	IDEN, "bus", 0, #3, 0, 2061
+	SYMB	IDEN, "locvar", -1, #3, 130, 5
+	SYMB	LTIM, "locvar", -1, 0, 69
+; i2c_drv.c  167	   UC locvar;
+; i2c_drv.c  168	   switch (bus)
+; i2c_drv.c  169	   {
+; i2c_drv.c  170	   default:
+; i2c_drv.c  171	   case 0:
+; i2c_drv.c  172	
+; i2c_drv.c  173	#if (BusPTV==FPGA)
+; i2c_drv.c  174	      locvar = ( (IICbit_0 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  175	#elif (BusPTV==Direct)
+; i2c_drv.c  176	      locvar = (SDApin == 0 ? Low : High);    /*pin reading on XA*/
+	SYMB	LINE, 176
+	MOV	C,0431H.6
+	BCS	_3
+	MOV.B	R0L,#00H
+	SYMB	LTIM, "bus", 0, 0, 2125
+	BR	_4
+_3:
+	MOV.B	R0L,#01H
+_4:
+	SYMB	LTIM, "locvar", 0, 0, 205
+; i2c_drv.c  177	#else /* Error : local bus not defined */
+; i2c_drv.c  178	#compiletime error : Local bus not defined
+; i2c_drv.c  179	#endif
+; i2c_drv.c  180	
+; i2c_drv.c  181	   break;
+; i2c_drv.c  182	
+; i2c_drv.c  183	#ifdef IicBus1
+; i2c_drv.c  184	   case 1:
+; i2c_drv.c  185	      locvar = ( (IICbit_1 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  186	   break;
+; i2c_drv.c  187	#endif
+; i2c_drv.c  188	
+; i2c_drv.c  189	#ifdef IicBus2
+; i2c_drv.c  190	   case 2:
+; i2c_drv.c  191	      locvar = ( (IICbit_2 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  192	   break;
+; i2c_drv.c  193	#endif
+; i2c_drv.c  194	
+; i2c_drv.c  195	#ifdef IicBus3
+; i2c_drv.c  196	   case 3:
+; i2c_drv.c  197	      locvar = ( (IICbit_3 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  198	   break;
+; i2c_drv.c  199	#endif
+; i2c_drv.c  200	
+; i2c_drv.c  201	#ifdef IicBus4
+; i2c_drv.c  202	   case 4:
+; i2c_drv.c  203	      locvar = ( (IICbit_4 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  204	   break;
+; i2c_drv.c  205	#endif
+; i2c_drv.c  206	
+; i2c_drv.c  207	#ifdef IicBus5
+; i2c_drv.c  208	   case 5:
+; i2c_drv.c  209	      locvar = ( (IICbit_5 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  210	   break;
+; i2c_drv.c  211	#endif
+; i2c_drv.c  212	
+; i2c_drv.c  213	#ifdef IicBus6
+; i2c_drv.c  214	   case 6:
+; i2c_drv.c  215	      locvar = ( (IICbit_6 & SDA_mask) == 0 ? Low : High);
+; i2c_drv.c  216	   break;
+; i2c_drv.c  217	#endif
+; i2c_drv.c  218	
+; i2c_drv.c  219	
+; i2c_drv.c  220	   }
+; i2c_drv.c  221	   return(locvar);
+	SYMB	LINE, 221
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "locvar", 0, 0, 77
+; i2c_drv.c  222	}
+	SYMB	LINE, 222
+	RET
+	SYMB	EFUN
+; i2c_drv.c  223	
+; i2c_drv.c  224	static int SCL_get(UC bus)
+; i2c_drv.c  225	{
+	ALIGN	1
+	SYMB	LINE, 225
+_SCL_get:
+	SYMB	TYPE, 449, 'X', 12, #16, 30, 1, #3
+	SYMB	LFUN, "SCL_get", _SCL_get, #449, 0, 0, 0
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	IDEN, "bus", 0, #3, 0, 2061
+	SYMB	IDEN, "locvar", -1, #3, 130, 5
+	SYMB	LTIM, "locvar", -1, 0, 69
+; i2c_drv.c  226	   UC locvar;
+; i2c_drv.c  227	   switch (bus)
+; i2c_drv.c  228	   {
+; i2c_drv.c  229	   default:
+; i2c_drv.c  230	   case 0:
+; i2c_drv.c  231	
+; i2c_drv.c  232	#if (BusPTV==FPGA)
+; i2c_drv.c  233	      locvar = ( (IICbit_0 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  234	#elif (BusPTV==Direct)
+; i2c_drv.c  235	      locvar = (SCLpin == 0 ? Low : High);    /*pin reading on XA*/
+	SYMB	LINE, 235
+	MOV	C,0431H.7
+	BCS	_5
+	MOV.B	R0L,#00H
+	SYMB	LTIM, "bus", 0, 0, 2125
+	BR	_6
+_5:
+	MOV.B	R0L,#01H
+_6:
+	SYMB	LTIM, "locvar", 0, 0, 205
+; i2c_drv.c  236	#else /* Error : local bus not defined */
+; i2c_drv.c  237	#compiletime error : Local bus not defined
+; i2c_drv.c  238	#endif
+; i2c_drv.c  239	
+; i2c_drv.c  240	   break;
+; i2c_drv.c  241	
+; i2c_drv.c  242	#ifdef IicBus1
+; i2c_drv.c  243	   case 1:
+; i2c_drv.c  244	      locvar = ( (IICbit_1 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  245	   break;
+; i2c_drv.c  246	#endif
+; i2c_drv.c  247	#ifdef IicBus2
+; i2c_drv.c  248	   case 2:
+; i2c_drv.c  249	      locvar = ( (IICbit_2 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  250	   break;
+; i2c_drv.c  251	#endif
+; i2c_drv.c  252	#ifdef IicBus3
+; i2c_drv.c  253	   case 3:
+; i2c_drv.c  254	      locvar = ( (IICbit_3 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  255	   break;
+; i2c_drv.c  256	#endif
+; i2c_drv.c  257	#ifdef IicBus4
+; i2c_drv.c  258	   case 4:
+; i2c_drv.c  259	      locvar = ( (IICbit_4 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  260	   break;
+; i2c_drv.c  261	#endif
+; i2c_drv.c  262	#ifdef IicBus5
+; i2c_drv.c  263	   case 5:
+; i2c_drv.c  264	      locvar = ( (IICbit_5 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  265	   break;
+; i2c_drv.c  266	#endif
+; i2c_drv.c  267	#ifdef IicBus6
+; i2c_drv.c  268	   case 6:
+; i2c_drv.c  269	      locvar = ( (IICbit_6 & SCL_mask) == 0 ? Low : High);
+; i2c_drv.c  270	   break;
+; i2c_drv.c  271	#endif
+; i2c_drv.c  272	
+; i2c_drv.c  273	   }
+; i2c_drv.c  274	   return(locvar);
+	SYMB	LINE, 274
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "locvar", 0, 0, 77
+; i2c_drv.c  275	}
+	SYMB	LINE, 275
+	RET
+	SYMB	EFUN
+; i2c_drv.c  276	
+; i2c_drv.c  277	
+; i2c_drv.c  278	
+; i2c_drv.c  279	
+; i2c_drv.c  280	static int SCL_set(UC level, UC bus)
+; i2c_drv.c  281	{
+	ALIGN	1
+	SYMB	LINE, 281
+_SCL_set:
+	SYMB	TYPE, 450, 'X', 12, #16, 30, 2, #3, #3
+	SYMB	LFUN, "SCL_set", _SCL_set, #450, 0, 0, 0
+	SYMB	LTIM, "level", 0, 0, 2253
+	SYMB	LTIM, "bus", 1, 0, 2253
+	SYMB	IDEN, "level", 0, #3, 0, 2061
+	SYMB	IDEN, "bus", 1, #3, 0, 2061
+; i2c_drv.c  282	   switch (bus)
+; i2c_drv.c  283	   {
+; i2c_drv.c  284	   default:
+; i2c_drv.c  285	   case 0:
+; i2c_drv.c  286	
+; i2c_drv.c  287	#if (BusPTV==FPGA)
+; i2c_drv.c  288	      if (level == High)
+; i2c_drv.c  289	      {
+; i2c_drv.c  290	         IICmir0   |=  SCL_mask;
+; i2c_drv.c  291	         IICbit_0     = IICmir0;
+; i2c_drv.c  292	      }
+; i2c_drv.c  293	      else
+; i2c_drv.c  294	      {
+; i2c_drv.c  295	         IICmir0   &= ~SCL_mask;
+; i2c_drv.c  296	         IICbit_0     = IICmir0;
+; i2c_drv.c  297	      }
+; i2c_drv.c  298	
+; i2c_drv.c  299	#elif (BusPTV==Direct)
+; i2c_drv.c  300	      if (level == High)
+	SYMB	LINE, 300
+	CMP.B	R0L,#01H
+	BNE	_7
+; i2c_drv.c  301	          SCLpin = 1;
+	SYMB	LINE, 301
+	SETB	0431H.7
+	BR	_8
+_7:
+; i2c_drv.c  302	      else
+; i2c_drv.c  303	          SCLpin = 0;
+	SYMB	LINE, 303
+	CLR	0431H.7
+; i2c_drv.c  304	#else /* Error : local bus not defined */
+; i2c_drv.c  305	#compiletime error : Local bus not defined
+; i2c_drv.c  306	#endif
+; i2c_drv.c  307	
+; i2c_drv.c  308	   break;
+; i2c_drv.c  309	
+; i2c_drv.c  310	#ifdef IicBus1
+; i2c_drv.c  311	   case 1:
+; i2c_drv.c  312	      if (level == High)
+; i2c_drv.c  313	      {
+; i2c_drv.c  314	         IICmir1   |=  SCL_mask;
+; i2c_drv.c  315	         IICbit_1     = IICmir1;
+; i2c_drv.c  316	      }
+; i2c_drv.c  317	      else
+; i2c_drv.c  318	      {
+; i2c_drv.c  319	         IICmir1   &= ~SCL_mask;
+; i2c_drv.c  320	         IICbit_1     = IICmir1;
+; i2c_drv.c  321	      }
+; i2c_drv.c  322	   break;
+; i2c_drv.c  323	#endif
+; i2c_drv.c  324	#ifdef IicBus2
+; i2c_drv.c  325	   case 2:
+; i2c_drv.c  326	      if (level == High)
+; i2c_drv.c  327	      {
+; i2c_drv.c  328	         IICmir2   |=  SCL_mask;
+; i2c_drv.c  329	         IICbit_2     = IICmir2;
+; i2c_drv.c  330	      }
+; i2c_drv.c  331	      else
+; i2c_drv.c  332	      {
+; i2c_drv.c  333	         IICmir2   &= ~SCL_mask;
+; i2c_drv.c  334	         IICbit_2     = IICmir2;
+; i2c_drv.c  335	      }
+; i2c_drv.c  336	   break;
+; i2c_drv.c  337	#endif
+; i2c_drv.c  338	#ifdef IicBus3
+; i2c_drv.c  339	   case 3:
+; i2c_drv.c  340	      if (level == High)
+; i2c_drv.c  341	      {
+; i2c_drv.c  342	         IICmir3   |=  SCL_mask;
+; i2c_drv.c  343	         IICbit_3     = IICmir3;
+; i2c_drv.c  344	      }
+; i2c_drv.c  345	      else
+; i2c_drv.c  346	      {
+; i2c_drv.c  347	         IICmir3   &= ~SCL_mask;
+; i2c_drv.c  348	         IICbit_3     = IICmir3;
+; i2c_drv.c  349	      }
+; i2c_drv.c  350	   break;
+; i2c_drv.c  351	#endif
+; i2c_drv.c  352	#ifdef IicBus4
+; i2c_drv.c  353	   case 4:
+; i2c_drv.c  354	      if (level == High)
+; i2c_drv.c  355	      {
+; i2c_drv.c  356	         IICmir4   |=  SCL_mask;
+; i2c_drv.c  357	         IICbit_4     = IICmir4;
+; i2c_drv.c  358	      }
+; i2c_drv.c  359	      else
+; i2c_drv.c  360	      {
+; i2c_drv.c  361	         IICmir4   &= ~SCL_mask;
+; i2c_drv.c  362	         IICbit_4     = IICmir4;
+; i2c_drv.c  363	      }
+; i2c_drv.c  364	   break;
+; i2c_drv.c  365	#endif
+; i2c_drv.c  366	#ifdef IicBus5
+; i2c_drv.c  367	   case 5:
+; i2c_drv.c  368	      if (level == High)
+; i2c_drv.c  369	      {
+; i2c_drv.c  370	         IICmir5   |=  SCL_mask;
+; i2c_drv.c  371	         IICbit_5     = IICmir5;
+; i2c_drv.c  372	      }
+; i2c_drv.c  373	      else
+; i2c_drv.c  374	      {
+; i2c_drv.c  375	         IICmir5   &= ~SCL_mask;
+; i2c_drv.c  376	         IICbit_5     = IICmir5;
+; i2c_drv.c  377	      }
+; i2c_drv.c  378	   break;
+; i2c_drv.c  379	#endif
+; i2c_drv.c  380	#ifdef IicBus6
+; i2c_drv.c  381	   case 6:
+; i2c_drv.c  382	      if (level == High)
+; i2c_drv.c  383	      {
+; i2c_drv.c  384	         IICmir6   |=  SCL_mask;
+; i2c_drv.c  385	         IICbit_6     = IICmir6;
+; i2c_drv.c  386	      }
+; i2c_drv.c  387	      else
+; i2c_drv.c  388	      {
+; i2c_drv.c  389	         IICmir6   &= ~SCL_mask;
+; i2c_drv.c  390	         IICbit_6     = IICmir6;
+; i2c_drv.c  391	      }
+; i2c_drv.c  392	   break;
+; i2c_drv.c  393	#endif
+; i2c_drv.c  394	   }
+	SYMB	LINE, 394
+_8:
+; i2c_drv.c  395	   return(OK);  /* No errors possible */
+	SYMB	LINE, 395
+	MOV.W	R0,#0FFFFH
+	SYMB	LTIM, "level", 0, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2125
+; i2c_drv.c  396	}
+	SYMB	LINE, 396
+	RET
+	SYMB	EFUN
+; i2c_drv.c  397	
+; i2c_drv.c  398	static int SCL_set_wait(UC bus)
+; i2c_drv.c  399	{
+	ALIGN	1
+	SYMB	LINE, 399
+_SCL_set_wait:
+	SYMB	TYPE, 451, 'X', 12, #16, 30, 1, #3
+	SYMB	LFUN, "SCL_set_wait", _SCL_set_wait, #451, 0, 0, 48
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	IDEN, "bus", 0, #3, 0, 2061
+	SYMB	IDEN, "i", -1, #18, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+; i2c_drv.c  400		UI i;
+; i2c_drv.c  401		SCL_set(High,bus);      /* Release clockline and */
+	SYMB	LINE, 401
+	MOV.B	R5L,R0L
+	MOV.B	R0H,R0L
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#01H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+; i2c_drv.c  402		i = 0;              /* wait for physical line to go high */
+	SYMB	LINE, 402
+	MOV.W	R4,#00H
+	SYMB	LTIM, "i", 18, 0, 205
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  403	
+; i2c_drv.c  404		while ( (SCL_get(bus) == Low) && (i++ < IICtimeout) );
+	SYMB	LINE, 404
+	CALL	_SCL_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	OR.W	R0,R0
+	BNE	_13
+	MOV.W	R4,#01H
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "i", 18, 0, 205
+	MOV.W	R0,#00H
+	CMP.W	R0,#0AH
+	BCC	_13
+_10:
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+	CALL	_SCL_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	OR.W	R0,R0
+	BNE	_13
+	MOV.W	R0,R4
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	ADDS.W	R4,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 18, 0, 205
+	CMP.W	R0,#0AH
+	BCS	_10
+_13:
+; i2c_drv.c  405	
+; i2c_drv.c  406		if(i < IICtimeout)
+	SYMB	LINE, 406
+	CMP.W	R4,#0AH
+	BCC	_14
+; i2c_drv.c  407			return(OK);
+	SYMB	LINE, 407
+	MOV.W	R0,#0FFFFH
+	BR	_15
+_14:
+; i2c_drv.c  408		else
+; i2c_drv.c  409			return(EventIICTimeout);
+	SYMB	LINE, 409
+	MOV.W	R0,#0CE6H
+; i2c_drv.c  410	}
+	SYMB	LINE, 410
+_15:
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	EFUN
+; i2c_drv.c  411	
+; i2c_drv.c  412	
+; i2c_drv.c  413	
+; i2c_drv.c  414	
+; i2c_drv.c  415	
+; i2c_drv.c  416	
+; i2c_drv.c  417	
+; i2c_drv.c  418	
+; i2c_drv.c  419	static int SDA_set(UC level, UC bus)
+; i2c_drv.c  420	{
+	ALIGN	1
+	SYMB	LINE, 420
+_SDA_set:
+	SYMB	TYPE, 452, 'X', 12, #16, 30, 2, #3, #3
+	SYMB	LFUN, "SDA_set", _SDA_set, #452, 0, 0, 0
+	SYMB	LTIM, "level", 0, 0, 2253
+	SYMB	LTIM, "bus", 1, 0, 2253
+	SYMB	IDEN, "level", 0, #3, 0, 2061
+	SYMB	IDEN, "bus", 1, #3, 0, 2061
+; i2c_drv.c  421	   switch (bus)
+; i2c_drv.c  422	   {
+; i2c_drv.c  423	   default:
+; i2c_drv.c  424	   case 0:
+; i2c_drv.c  425	
+; i2c_drv.c  426	#if (BusPTV==FPGA)
+; i2c_drv.c  427	      if (level == High)
+; i2c_drv.c  428	      {
+; i2c_drv.c  429	         IICmir0   |=  SDA_mask;
+; i2c_drv.c  430	         IICbit_0     = IICmir0;
+; i2c_drv.c  431	      }
+; i2c_drv.c  432	      else
+; i2c_drv.c  433	      {
+; i2c_drv.c  434	         IICmir0   &= ~SDA_mask;
+; i2c_drv.c  435	         IICbit_0     = IICmir0;
+; i2c_drv.c  436	      }
+; i2c_drv.c  437	
+; i2c_drv.c  438	#elif (BusPTV==Direct)
+; i2c_drv.c  439	      if (level == High)
+	SYMB	LINE, 439
+	CMP.B	R0L,#01H
+	BNE	_19
+; i2c_drv.c  440	          SDApin = 1;
+	SYMB	LINE, 440
+	SETB	0431H.6
+	BR	_20
+_19:
+; i2c_drv.c  441	      else
+; i2c_drv.c  442	          SDApin = 0;
+	SYMB	LINE, 442
+	CLR	0431H.6
+; i2c_drv.c  443	#else /* Error : local bus not defined */
+; i2c_drv.c  444	#compiletime error : Local bus not defined
+; i2c_drv.c  445	#endif
+; i2c_drv.c  446	
+; i2c_drv.c  447	
+; i2c_drv.c  448	
+; i2c_drv.c  449	   break;
+; i2c_drv.c  450	
+; i2c_drv.c  451	#ifdef IicBus6
+; i2c_drv.c  452	   case 1:
+; i2c_drv.c  453	      if (level == High)
+; i2c_drv.c  454	      {
+; i2c_drv.c  455	         IICmir1   |=  SDA_mask;
+; i2c_drv.c  456	         IICbit_1     = IICmir1;
+; i2c_drv.c  457	      }
+; i2c_drv.c  458	      else
+; i2c_drv.c  459	      {
+; i2c_drv.c  460	         IICmir1   &= ~SDA_mask;
+; i2c_drv.c  461	         IICbit_1     = IICmir1;
+; i2c_drv.c  462	      }
+; i2c_drv.c  463	   break;
+; i2c_drv.c  464	#endif
+; i2c_drv.c  465	#ifdef IicBus2
+; i2c_drv.c  466	   case 2:
+; i2c_drv.c  467	      if (level == High)
+; i2c_drv.c  468	      {
+; i2c_drv.c  469	         IICmir2   |=  SDA_mask;
+; i2c_drv.c  470	         IICbit_2     = IICmir2;
+; i2c_drv.c  471	      }
+; i2c_drv.c  472	      else
+; i2c_drv.c  473	      {
+; i2c_drv.c  474	         IICmir2   &= ~SDA_mask;
+; i2c_drv.c  475	         IICbit_2     = IICmir2;
+; i2c_drv.c  476	      }
+; i2c_drv.c  477	   break;
+; i2c_drv.c  478	#endif
+; i2c_drv.c  479	#ifdef IicBus3
+; i2c_drv.c  480	   case 3:
+; i2c_drv.c  481	      if (level == High)
+; i2c_drv.c  482	      {
+; i2c_drv.c  483	         IICmir3   |=  SDA_mask;
+; i2c_drv.c  484	         IICbit_3     = IICmir3;
+; i2c_drv.c  485	      }
+; i2c_drv.c  486	      else
+; i2c_drv.c  487	      {
+; i2c_drv.c  488	         IICmir3   &= ~SDA_mask;
+; i2c_drv.c  489	         IICbit_3     = IICmir3;
+; i2c_drv.c  490	      }
+; i2c_drv.c  491	   break;
+; i2c_drv.c  492	#endif
+; i2c_drv.c  493	#ifdef IicBus4
+; i2c_drv.c  494	   case 4:
+; i2c_drv.c  495	      if (level == High)
+; i2c_drv.c  496	      {
+; i2c_drv.c  497	         IICmir4   |=  SDA_mask;
+; i2c_drv.c  498	         IICbit_4     = IICmir4;
+; i2c_drv.c  499	      }
+; i2c_drv.c  500	      else
+; i2c_drv.c  501	      {
+; i2c_drv.c  502	         IICmir4   &= ~SDA_mask;
+; i2c_drv.c  503	         IICbit_4     = IICmir4;
+; i2c_drv.c  504	      }
+; i2c_drv.c  505	   break;
+; i2c_drv.c  506	#endif
+; i2c_drv.c  507	#ifdef IicBus5
+; i2c_drv.c  508	   case 5:
+; i2c_drv.c  509	      if (level == High)
+; i2c_drv.c  510	      {
+; i2c_drv.c  511	         IICmir5   |=  SDA_mask;
+; i2c_drv.c  512	         IICbit_5     = IICmir5;
+; i2c_drv.c  513	      }
+; i2c_drv.c  514	      else
+; i2c_drv.c  515	      {
+; i2c_drv.c  516	         IICmir5   &= ~SDA_mask;
+; i2c_drv.c  517	         IICbit_5     = IICmir5;
+; i2c_drv.c  518	      }
+; i2c_drv.c  519	   break;
+; i2c_drv.c  520	#endif
+; i2c_drv.c  521	#ifdef IicBus6
+; i2c_drv.c  522	   case 6:
+; i2c_drv.c  523	      if (level == High)
+; i2c_drv.c  524	      {
+; i2c_drv.c  525	         IICmir6   |=  SDA_mask;
+; i2c_drv.c  526	         IICbit_6     = IICmir6;
+; i2c_drv.c  527	      }
+; i2c_drv.c  528	      else
+; i2c_drv.c  529	      {
+; i2c_drv.c  530	         IICmir6   &= ~SDA_mask;
+; i2c_drv.c  531	         IICbit_6     = IICmir6;
+; i2c_drv.c  532	      }
+; i2c_drv.c  533	   break;
+; i2c_drv.c  534	#endif
+; i2c_drv.c  535	   }
+	SYMB	LINE, 535
+_20:
+; i2c_drv.c  536	   return(OK);  /* No errors possible */
+	SYMB	LINE, 536
+	MOV.W	R0,#0FFFFH
+	SYMB	LTIM, "level", 0, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2125
+; i2c_drv.c  537	
+; i2c_drv.c  538	}
+	SYMB	LINE, 538
+	RET
+	SYMB	EFUN
+; i2c_drv.c  539	
+; i2c_drv.c  540	
+; i2c_drv.c  541	static int Start_IIC(UC bus)
+; i2c_drv.c  542	{
+	ALIGN	1
+	SYMB	LINE, 542
+_Start_IIC:
+	SYMB	TYPE, 453, 'X', 12, #16, 30, 1, #3
+	SYMB	LFUN, "Start_IIC", _Start_IIC, #453, 0, 0, 16
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	IDEN, "bus", 0, #3, 0, 2061
+	MOV.B	R4L,R0L
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  543	   /* Test for bus ready ( both lines high ) */
+; i2c_drv.c  544	   if ((SCL_get(bus) == High) && (SDA_get(bus) == High))
+	SYMB	LINE, 544
+	CALL	_SCL_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	CMP.W	R0,#01H
+	BNE	_22
+	MOV.B	R0L,R4L
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+	CALL	_SDA_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	CMP.W	R0,#01H
+	BEQ	_23
+; i2c_drv.c  545	   {
+; i2c_drv.c  546	      SDA_set(Low,bus);
+; i2c_drv.c  547	      Delay(5);
+; i2c_drv.c  548	      SCL_set(Low,bus);
+; i2c_drv.c  549	   }
+	SYMB	LINE, 549
+_22:
+; i2c_drv.c  550	   else /* Bus not ready => Start condition not generated */
+; i2c_drv.c  551	   {
+; i2c_drv.c  552	      return(EventIICBusError);
+	SYMB	LINE, 552
+	MOV.W	R0,#0CE7H
+	BR	_24
+	SYMB	LINE, 546
+_23:
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	MOV.B	R0H,R4L
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	SYMB	LINE, 548
+	MOV.B	R0H,R4L
+	MOV.B	R0L,#00H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	SYMB	LTIM, "bus", 1, 0, 2125
+; i2c_drv.c  553	   }
+; i2c_drv.c  554	   return(OK);
+	SYMB	LINE, 554
+	MOV.W	R0,#0FFFFH
+; i2c_drv.c  555	}
+	SYMB	LINE, 555
+_24:
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; i2c_drv.c  556	
+; i2c_drv.c  557	static int Stop_IIC(UC bus)
+; i2c_drv.c  558	{
+	ALIGN	1
+	SYMB	LINE, 558
+_Stop_IIC:
+	SYMB	TYPE, 454, 'X', 12, #16, 30, 1, #3
+	SYMB	LFUN, "Stop_IIC", _Stop_IIC, #454, 0, 0, 16
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	IDEN, "bus", 0, #3, 0, 2061
+; i2c_drv.c  559	   Delay(2);                      /* prepare by setting dataline low */
+; i2c_drv.c  560	   SDA_set(Low,bus);
+	SYMB	LINE, 560
+	MOV.B	R4L,R0L
+	MOV.B	R0H,R0L
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+	MOV.B	R0L,R4L
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  561	   Delay(3);
+; i2c_drv.c  562	
+; i2c_drv.c  563	   SCL_set_wait(bus);
+	SYMB	LINE, 563
+	CALL	_SCL_set_wait
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 16, 0, 2253
+; i2c_drv.c  564	
+; i2c_drv.c  565	   Delay(5);                     /* Setup time to stopcondition */
+; i2c_drv.c  566	
+; i2c_drv.c  567	   SDA_set(High,bus);
+	SYMB	LINE, 567
+	MOV.B	R0L,#01H
+	MOV.B	R0H,R4L
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 16, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	SYMB	LTIM, "bus", 1, 0, 2125
+; i2c_drv.c  568	   return(OK);
+	SYMB	LINE, 568
+	MOV.W	R0,#0FFFFH
+; i2c_drv.c  569	}
+	SYMB	LINE, 569
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; i2c_drv.c  570	
+; i2c_drv.c  571	static int TxByte(UC X,UC bus) {
+	ALIGN	1
+	SYMB	LINE, 571
+_TxByte:
+	SYMB	TYPE, 455, 'X', 12, #16, 30, 2, #3, #3
+	SYMB	LFUN, "TxByte", _TxByte, #455, 0, 0, 112
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R5L,R0H
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	MOV.B	R6L,R0L
+	SYMB	IDEN, "X", -1, #3, 130, 2053
+	SYMB	LTIM, "X", -1, 0, 2117
+	SYMB	IDEN, "bus", 20, #3, 0, 2061
+	SYMB	IDEN, "locvar", -1, #16, 130, 5
+	SYMB	LTIM, "locvar", -1, 0, 69
+; i2c_drv.c  572	
+; i2c_drv.c  573	   int locvar;
+; i2c_drv.c  574	   for (locvar = 8;locvar != 0; locvar-- )
+	SYMB	LINE, 574
+	MOV.W	R4,#08H
+	SYMB	LTIM, "locvar", 18, 0, 205
+_33:
+; i2c_drv.c  575	   {
+; i2c_drv.c  576	      SCL_set(Low,bus);            /* Clock line low */
+	SYMB	LINE, 576
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+; i2c_drv.c  577	      Delay(2);                   /* Small delay before changing data */
+; i2c_drv.c  578	
+; i2c_drv.c  579	      if ((X & Bit7) == 0 )       /* Output databit */
+	SYMB	LINE, 579
+	MOV.B	R5H,R6L
+	AND.B	R5H,#080H
+	BNE	_34
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  580	         SDA_set(Low,bus);
+	SYMB	LINE, 580
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	BR	_35
+_34:
+; i2c_drv.c  581	      else
+; i2c_drv.c  582	         SDA_set(High,bus);
+	SYMB	LINE, 582
+	MOV.B	R0L,#01H
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+_35:
+; i2c_drv.c  583	
+; i2c_drv.c  584	      X += X;                     /* Get next databit in position   */
+	SYMB	LINE, 584
+	ADD.B	R6L,R6L
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  585	                                  /* Rotate left by adding to itself*/
+; i2c_drv.c  586	
+; i2c_drv.c  587	      Delay(3);                   /* Data setup time to clock high */
+; i2c_drv.c  588	
+; i2c_drv.c  589	      SCL_set_wait(bus);
+	SYMB	LINE, 589
+	CALL	_SCL_set_wait
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	SYMB	LINE, 574
+	ADDS.W	R4,#0FH
+	SYMB	LTIM, "locvar", 18, 0, 77
+	SYMB	LTIM, "locvar", 18, 0, 205
+	BNE	_33
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  590	
+; i2c_drv.c  591	      Delay(5);                   /* 5 usec clock high time */
+; i2c_drv.c  592	
+; i2c_drv.c  593	   }
+; i2c_drv.c  594	                        /* 8 bits are now out , get ready for acknowledge */
+; i2c_drv.c  595	
+; i2c_drv.c  596	   SCL_set(Low,bus);            /* Clock line low */
+	SYMB	LINE, 596
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+; i2c_drv.c  597	   Delay(2);                   /* Small delay before changing data */
+; i2c_drv.c  598	   SDA_set(High,bus);           /* Data line high : ready for input */
+	SYMB	LINE, 598
+	MOV.B	R0L,#01H
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  599	   Delay(3);                   /* Data setup time to clock high */
+; i2c_drv.c  600	
+; i2c_drv.c  601	   SCL_set_wait(bus);
+	SYMB	LINE, 601
+	CALL	_SCL_set_wait
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  602	
+; i2c_drv.c  603	   if (SDA_get(bus) == Low)
+	SYMB	LINE, 603
+	CALL	_SDA_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	OR.W	R0,R0
+	BNE	_36
+; i2c_drv.c  604	   {                          /* Acknowledge OK */
+; i2c_drv.c  605	      locvar = OK;
+	SYMB	LINE, 605
+	MOV.W	R4,#0FFFFH
+	SYMB	LTIM, "locvar", 18, 0, 77
+	SYMB	LTIM, "locvar", 18, 0, 205
+; i2c_drv.c  606	   }
+	SYMB	LINE, 606
+	BR	_37
+_36:
+; i2c_drv.c  607	   else
+; i2c_drv.c  608	   {                          /* Acknowledge FAIL */
+; i2c_drv.c  609	      locvar = FAIL;
+	SYMB	LINE, 609
+	MOV.W	R4,#00H
+	SYMB	LTIM, "locvar", 18, 0, 77
+	SYMB	LTIM, "locvar", 18, 0, 205
+; i2c_drv.c  610	   }
+	SYMB	LINE, 610
+_37:
+; i2c_drv.c  611	
+; i2c_drv.c  612	   Delay(5);                   /* 5 usec clock high time */
+; i2c_drv.c  613	   SCL_set(Low,bus);            /* Clock line low */
+	SYMB	LINE, 613
+	MOV.B	R0H,R5L
+	MOV.B	R0L,#00H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	SYMB	LTIM, "bus", 1, 0, 2125
+; i2c_drv.c  614	
+; i2c_drv.c  615	   return(locvar);
+	SYMB	LINE, 615
+	MOV.W	R0,R4
+	SYMB	LTIM, "locvar", 18, 0, 77
+	SYMB	LTIM, "locvar", 2, 0, 205
+; i2c_drv.c  616	
+; i2c_drv.c  617	}
+	SYMB	LINE, 617
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "locvar", 2, 0, 77
+	SYMB	EFUN
+; i2c_drv.c  618	
+; i2c_drv.c  619	static UC RxByte(int Last,UC bus) {
+	ALIGN	1
+	SYMB	LINE, 619
+_RxByte:
+	SYMB	TYPE, 456, 'X', 12, #3, 30, 2, #16, #3
+	SYMB	LFUN, "RxByte", _RxByte, #456, 0, 0, 112
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SYMB	LTIM, "Last", 2, 0, 2253
+	SYMB	LTIM, "bus", 4, 0, 2253
+	MOV.B	R5L,R1L
+	SYMB	LTIM, "bus", 4, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	MOV.W	R6,R0
+	SYMB	LTIM, "Last", 2, 0, 2125
+	SYMB	LTIM, "Last", 26, 0, 2253
+	SYMB	IDEN, "Last", 26, #16, 0, 2061
+	SYMB	IDEN, "bus", 20, #3, 0, 2061
+	SYMB	IDEN, "locvar", -1, #16, 130, 5
+	SYMB	LTIM, "locvar", -1, 0, 69
+	SYMB	IDEN, "datarx", -1, #3, 130, 5
+	SYMB	LTIM, "datarx", -1, 0, 69
+; i2c_drv.c  620	
+; i2c_drv.c  621	   int locvar;
+; i2c_drv.c  622	   UC  datarx = 0;   /* Initialise datashifter */
+	SYMB	LINE, 622
+	MOV.B	R5H,#00H
+	SYMB	LTIM, "datarx", 21, 0, 205
+; i2c_drv.c  623	
+; i2c_drv.c  624	   for (locvar = 8;locvar != 0; locvar-- )
+	SYMB	LINE, 624
+	MOV.W	R4,#08H
+	SYMB	LTIM, "locvar", 18, 0, 205
+_42:
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  625	   {
+; i2c_drv.c  626	      Delay(5);
+; i2c_drv.c  627	
+; i2c_drv.c  628	      SCL_set_wait(bus);
+	SYMB	LINE, 628
+	CALL	_SCL_set_wait
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+; i2c_drv.c  629	
+; i2c_drv.c  630	      datarx += datarx + SDA_get(bus);    /* Shift and input databit  */
+	SYMB	LINE, 630
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+	CALL	_SDA_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	ADD.B	R0L,R5H
+	ADD.B	R5H,R0L
+	SYMB	LTIM, "datarx", 21, 0, 77
+	SYMB	LTIM, "datarx", 21, 0, 205
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  631	      Delay(5);                      /* Clock high >= 5 microseconds */
+; i2c_drv.c  632	
+; i2c_drv.c  633	      SCL_set(Low,bus);            /* Clock line low */
+	SYMB	LINE, 633
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	SYMB	LINE, 624
+	ADDS.W	R4,#0FH
+	SYMB	LTIM, "locvar", 18, 0, 77
+	SYMB	LTIM, "locvar", 18, 0, 205
+	BNE	_42
+; i2c_drv.c  634	   }
+; i2c_drv.c  635	   Delay(2);
+; i2c_drv.c  636	   /* Acknowledge bit has to be set low if NOT last byte */
+; i2c_drv.c  637	   /* and high if last byte */
+; i2c_drv.c  638	   if(Last == TRUE)
+	SYMB	LINE, 638
+	CMP.W	R6,#0FFFFH
+	BNE	_43
+; i2c_drv.c  639	      SDA_set(High,bus);
+	SYMB	LINE, 639
+	MOV.B	R0L,#01H
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	BR	_44
+_43:
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  640	   else
+; i2c_drv.c  641	      SDA_set(Low,bus);
+	SYMB	LINE, 641
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+_44:
+	MOV.B	R0L,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  642	
+; i2c_drv.c  643	   Delay(3);
+; i2c_drv.c  644	
+; i2c_drv.c  645	   SCL_set_wait(bus);
+	SYMB	LINE, 645
+	CALL	_SCL_set_wait
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+	MOV.B	R0H,R5L
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+; i2c_drv.c  646	
+; i2c_drv.c  647	   Delay(5);                   /* 5 usec clock high time */
+; i2c_drv.c  648	   SCL_set(Low,bus);            /* Clock line low */
+	SYMB	LINE, 648
+	MOV.B	R0L,#00H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 20, 0, 2253
+; i2c_drv.c  649	
+; i2c_drv.c  650	   Delay(2);                   /* Allways leave dataline high */
+; i2c_drv.c  651	   SDA_set(High,bus);
+	SYMB	LINE, 651
+	MOV.B	R0L,#01H
+	MOV.B	R0H,R5L
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 20, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	SYMB	LTIM, "bus", 1, 0, 2125
+; i2c_drv.c  652	
+; i2c_drv.c  653	   return(datarx);             /* Return the received byte */
+	SYMB	LINE, 653
+	MOV.B	R0L,R5H
+	SYMB	LTIM, "datarx", 21, 0, 77
+	SYMB	LTIM, "datarx", 0, 0, 205
+; i2c_drv.c  654	}
+	SYMB	LINE, 654
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "datarx", 0, 0, 77
+	SYMB	LTIM, "Last", 26, 0, 2125
+	SYMB	LTIM, "locvar", 18, 0, 77
+	SYMB	EFUN
+; i2c_drv.c  655	
+; i2c_drv.c  656	/**********************/
+; i2c_drv.c  657	/* External functions */
+; i2c_drv.c  658	/* Bus initialisation */
+; i2c_drv.c  659	/* Required before access to other functions */
+; i2c_drv.c  660	// Arrays need to be sized after the highest number active
+; i2c_drv.c  661	
+; i2c_drv.c  662	#define HighestBus 0
+; i2c_drv.c  663	#define b0i FALSE
+; i2c_drv.c  664	
+; i2c_drv.c  665	#ifdef IicBus1
+; i2c_drv.c  666	#define b1i FALSE
+; i2c_drv.c  667	#undef  HighestBus
+; i2c_drv.c  668	#define HighestBus 1
+; i2c_drv.c  669	#else
+; i2c_drv.c  670	#define b1i EventIICNoBus
+; i2c_drv.c  671	#endif
+; i2c_drv.c  672	
+; i2c_drv.c  673	#ifdef IicBus2
+; i2c_drv.c  674	#define b2i FALSE
+; i2c_drv.c  675	#undef  HighestBus
+; i2c_drv.c  676	#define HighestBus 2
+; i2c_drv.c  677	#else
+; i2c_drv.c  678	#define b2i EventIICNoBus
+; i2c_drv.c  679	#endif
+; i2c_drv.c  680	
+; i2c_drv.c  681	#ifdef IicBus3
+; i2c_drv.c  682	#define b3i FALSE
+; i2c_drv.c  683	#undef  HighestBus
+; i2c_drv.c  684	#define HighestBus 3
+; i2c_drv.c  685	#else
+; i2c_drv.c  686	#define b3i EventIICNoBus
+; i2c_drv.c  687	#endif
+; i2c_drv.c  688	
+; i2c_drv.c  689	#ifdef IicBus4
+; i2c_drv.c  690	#define b4i FALSE
+; i2c_drv.c  691	#undef  HighestBus
+; i2c_drv.c  692	#define HighestBus 4
+; i2c_drv.c  693	#else
+; i2c_drv.c  694	#define b4i EventIICNoBus
+; i2c_drv.c  695	#endif
+; i2c_drv.c  696	
+; i2c_drv.c  697	#ifdef IicBus5
+; i2c_drv.c  698	#define b5i FALSE
+; i2c_drv.c  699	#undef  HighestBus
+; i2c_drv.c  700	#define HighestBus 5
+; i2c_drv.c  701	#else
+; i2c_drv.c  702	#define b5i EventIICNoBus
+; i2c_drv.c  703	#endif
+; i2c_drv.c  704	
+; i2c_drv.c  705	#ifdef IicBus6
+; i2c_drv.c  706	#define b6i FALSE
+; i2c_drv.c  707	#undef  HighestBus
+; i2c_drv.c  708	#define HighestBus 6
+; i2c_drv.c  709	#else
+; i2c_drv.c  710	#define b6i EventIICNoBus
+; i2c_drv.c  711	#endif
+; i2c_drv.c  712	
+; i2c_drv.c  713	
+; i2c_drv.c  714	static int BusInitialised[7] = 
+I2C_DRV_INI_FA	SEGMENT	HDATA INSEGMENT INIT
+	RSEG	I2C_DRV_INI_FA
+	SYMB	TYPE, 457, 'Z', #16, 6
+	SYMB	IDEN, "BusInitialised", _BusInitialised, #457, 130, 4
+	ALIGN	1
+_BusInitialised:
+; i2c_drv.c  715	{b0i,b1i,b2i,b3i,b4i,b5i,b6i};
+; i2c_drv.c  716	
+; i2c_drv.c  717	static   TResource *Res[HighestBus+1];
+; i2c_drv.c  718	
+; i2c_drv.c  719	int InitBus(UC bus)
+; i2c_drv.c  720	{
+	DW	00000H,00CEDH,00CEDH,00CEDH,00CEDH,00CEDH,00CEDH
+	RSEG	I2C_DRV_PR
+	ALIGN	1
+	SYMB	LINE, 720
+	PUBLIC	_InitBus
+_InitBus:
+	SYMB	TYPE, 459, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "InitBus", _InitBus, #459, 0, 0, 112
+	SYMB	ALAB, _InitBus, #459
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	ADDS.W	R7,#0AH
+	SYMB	SOFF, 12
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	IDEN, "bus", 0, #3, 0, 2061
+	SYMB	IDEN, "i", -1, #3, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+; i2c_drv.c  721		UC i;
+; i2c_drv.c  722	//	char report[16];
+; i2c_drv.c  723	
+; i2c_drv.c  724	
+; i2c_drv.c  725	// Check for valid bus number :
+; i2c_drv.c  726	   switch (bus)
+	SYMB	LINE, 726
+	CMP.B	R0L,#00H
+	BEQ	_62
+	BR	_61
+; i2c_drv.c  727	   {
+; i2c_drv.c  728	   case 0: // Bus 0 allways defined
+; i2c_drv.c  729	   break;
+; i2c_drv.c  730	#ifdef IicBus1
+; i2c_drv.c  731	   case 1:
+; i2c_drv.c  732	   break;
+; i2c_drv.c  733	#endif
+; i2c_drv.c  734	#ifdef IicBus2
+; i2c_drv.c  735	   case 2:
+; i2c_drv.c  736	   break;
+; i2c_drv.c  737	#endif
+; i2c_drv.c  738	#ifdef IicBus3
+; i2c_drv.c  739	   case 3:
+; i2c_drv.c  740	   break;
+; i2c_drv.c  741	#endif
+; i2c_drv.c  742	#ifdef IicBus4
+; i2c_drv.c  743	   case 4:
+; i2c_drv.c  744	   break;
+; i2c_drv.c  745	#endif
+; i2c_drv.c  746	#ifdef IicBus5
+; i2c_drv.c  747	   case 5:
+; i2c_drv.c  748	   break;
+; i2c_drv.c  749	#endif
+; i2c_drv.c  750	#ifdef IicBus6
+; i2c_drv.c  751	   case 6:
+; i2c_drv.c  752	   break;
+; i2c_drv.c  753	#endif
+; i2c_drv.c  754	   default:   // Undefined busses will end here
+	SYMB	LINE, 754
+_61:
+; i2c_drv.c  755	      return(EventIICNoBus+10*bus);
+	SYMB	LINE, 755
+	MULU.B	R0L,#0AH
+	SYMB	LTIM, "bus", 0, 0, 2125
+	ADD.W	R0,#0CEDH
+	BR	_74
+; i2c_drv.c  756	//   break;
+; i2c_drv.c  757	   }
+	SYMB	LINE, 757
+_62:
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  758	
+; i2c_drv.c  759	
+; i2c_drv.c  760	//Allocate resources for bus locking only first time 
+; i2c_drv.c  761	// Try ignoring initial value :
+; i2c_drv.c  762	   if (BusInitialised[bus] == FALSE)
+	SYMB	LINE, 762
+	MOV.B	[R7+4],R0L
+	MOV.B	R6L,R0L
+	MOVS.B	R6H,#00H
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.W	R0,R6
+	ASL.W	R0,#01H
+	MOV.W	R4,R0
+	MOVS.W	R5,#00H
+	MOV.W	R1,#SEG( _BusInitialised )
+	MOV.W	R0,#SOF( _BusInitialised )
+	ADD.W	R0,R4
+	MOV.W	[R7+2],R1
+	MOV.W	[R7],R0
+	MOV.B	ES,#SEG( _BusInitialised )
+	MOV.W	R0,[R4+SOF( _BusInitialised )]
+	BNE	_65
+; i2c_drv.c  763	//   if (BusInitialised[bus] !=EventNoMoreResources)
+; i2c_drv.c  764	   {
+; i2c_drv.c  765	      Res[bus] = newTResource(0);
+	SYMB	LINE, 765
+	MOV.W	R1,#00H
+	MOV.W	R0,#00H
+	CALL	_newTResource
+	ASL.W	R6,#02H
+	MOV.W	R2,R6
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _Res )
+	MOV.W	[R2+SOF( _Res )],R0
+	MOV.W	[R2+SOF( _Res+2 )],R1
+; i2c_drv.c  766	      if (Res[bus]== NULL)
+	SYMB	LINE, 766
+	OR.W	R1,R0
+	BEQ	_63
+; i2c_drv.c  767	      {
+; i2c_drv.c  768	         /* Error : No more resources , bus cannot initialise */
+; i2c_drv.c  769	//Rev1_1 removed eventlogging from lowest level
+; i2c_drv.c  770	//         LogEvent(EventNoMoreResources,NULL);
+; i2c_drv.c  771	         BusInitialised[bus] = EventNoMoreResources;
+; i2c_drv.c  772	      }
+; i2c_drv.c  773	      else
+; i2c_drv.c  774	      {
+; i2c_drv.c  775	         BusInitialised[bus] = OK;
+	SYMB	LINE, 775
+	MOV.B	ES,#SEG( _BusInitialised )
+	MOV.W	[R4+SOF( _BusInitialised )],#0FFFFH
+; i2c_drv.c  776	      }
+; i2c_drv.c  777	
+; i2c_drv.c  778	   }
+	SYMB	LINE, 778
+	BR	_65
+	SYMB	LINE, 771
+_63:
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	MOV.B	ES,R1L
+	MOV.W	[R0],#017DFH
+; i2c_drv.c  779	   else
+; i2c_drv.c  780	   {  /* Repeated initialising */
+; i2c_drv.c  781	//Rev1_1 removed eventlogging from lowest level
+; i2c_drv.c  782	//      LogEvent(EventRepeatedInit,NULL);
+; i2c_drv.c  783	   }
+	SYMB	LINE, 783
+_65:
+; i2c_drv.c  784	
+; i2c_drv.c  785	   if (BusInitialised[bus]==OK)
+	SYMB	LINE, 785
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	MOV.B	ES,R1L
+	CMP.W	[R0],#0FFFFH
+	BNE	_73
+; i2c_drv.c  786	   {
+; i2c_drv.c  787	   	 /* Release bus by setting SDA high and toggling SCL */
+; i2c_drv.c  788	   	SDA_set(High,bus);
+	SYMB	LINE, 788
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#01H
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+; i2c_drv.c  789	   	Delay(5);
+; i2c_drv.c  790	
+; i2c_drv.c  791	   	for( i = 9 ; i != 0 ; i--  )
+	SYMB	LINE, 791
+	MOV.B	R4L,#09H
+	SYMB	LTIM, "i", 16, 0, 205
+_66:
+; i2c_drv.c  792	   	{
+; i2c_drv.c  793	   		 SCL_set(Low,bus);
+	SYMB	LINE, 793
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#01H
+; i2c_drv.c  794	   		 Delay(5);
+; i2c_drv.c  795	   		 SCL_set(High,bus);
+	SYMB	LINE, 795
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	SYMB	LINE, 791
+	ADDS.B	R4L,#0FH
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	LTIM, "i", 16, 0, 205
+	BNE	_66
+	MOV.B	R0L,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  796	   		 Delay(5);
+; i2c_drv.c  797	   	}
+; i2c_drv.c  798	
+; i2c_drv.c  799	   /* Test for actual high level on SCL then SDA */
+; i2c_drv.c  800	   	 if ( SCL_get(bus) == Low ) {
+	SYMB	LINE, 800
+	CALL	_SCL_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	OR.W	R0,R0
+	BNE	_67
+; i2c_drv.c  801	   		  /* SCL Short to gnd */
+; i2c_drv.c  802	   		  i |= 0x01;
+	SYMB	LINE, 802
+	OR.B	R4L,#01H
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	LTIM, "i", 16, 0, 205
+; i2c_drv.c  803	   	 }
+	SYMB	LINE, 803
+_67:
+	MOV.B	R0L,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  804	   	 if ( SDA_get(bus) == Low  ) {
+	SYMB	LINE, 804
+	CALL	_SDA_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	OR.W	R0,R0
+	BNE	_68
+; i2c_drv.c  805	   		  /* SDA Short to gnd */
+; i2c_drv.c  806	   		  i |= 0x02;
+	SYMB	LINE, 806
+	OR.B	R4L,#02H
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	LTIM, "i", 16, 0, 205
+; i2c_drv.c  807	   	 }
+	SYMB	LINE, 807
+_68:
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  808	
+; i2c_drv.c  809	   /* Set SCL low and test for actual low level on SCL */
+; i2c_drv.c  810	   	 SCL_set(Low,bus);
+	SYMB	LINE, 810
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0L,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  811	   	 if ( SCL_get(bus) == High ) {
+	SYMB	LINE, 811
+	CALL	_SCL_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	CMP.W	R0,#01H
+	BNE	_69
+; i2c_drv.c  812	   		  /* SCL Short to vcc */
+; i2c_drv.c  813	   		  i |= 0x04;
+	SYMB	LINE, 813
+	OR.B	R4L,#04H
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	LTIM, "i", 16, 0, 205
+; i2c_drv.c  814	   	 }
+	SYMB	LINE, 814
+_69:
+	MOV.B	R0L,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  815	   	 /* Test for SDA low after setting SCL low (Short-circ. SDA-SCL) */
+; i2c_drv.c  816	   	 if ( SDA_get(bus) == Low  ) {
+	SYMB	LINE, 816
+	CALL	_SDA_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	OR.W	R0,R0
+	BNE	_70
+; i2c_drv.c  817	   		  /* SDA Short to SCL */
+; i2c_drv.c  818	   		  i |= 0x10;
+	SYMB	LINE, 818
+	OR.B	R4L,#010H
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	LTIM, "i", 16, 0, 205
+; i2c_drv.c  819	   	 }
+	SYMB	LINE, 819
+_70:
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  820	   	 /* Set SDA low and test for actual low level on SDA */
+; i2c_drv.c  821	
+; i2c_drv.c  822	   	 SDA_set(Low,bus);
+	SYMB	LINE, 822
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#01H
+; i2c_drv.c  823	   	 SCL_set(High,bus);
+	SYMB	LINE, 823
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0L,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  824	       if ( SDA_get(bus) == High ) {
+	SYMB	LINE, 824
+	CALL	_SDA_get
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	CMP.W	R0,#01H
+	BNE	_71
+; i2c_drv.c  825	           /* SDA Short to vcc */
+; i2c_drv.c  826	           i |= 0x08;
+	SYMB	LINE, 826
+	OR.B	R4L,#08H
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	LTIM, "i", 16, 0, 205
+; i2c_drv.c  827	   	 }
+	SYMB	LINE, 827
+_71:
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#01H
+; i2c_drv.c  828	
+; i2c_drv.c  829	   	 /* Release bus by setting SDA high and toggling SCL */
+; i2c_drv.c  830	   	SDA_set(High,bus);
+	SYMB	LINE, 830
+	CALL	_SDA_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#00H
+; i2c_drv.c  831	      Delay(5);
+; i2c_drv.c  832	
+; i2c_drv.c  833	      SCL_set(Low,bus);
+	SYMB	LINE, 833
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,#01H
+; i2c_drv.c  834	      Delay(5);
+; i2c_drv.c  835	   	SCL_set(High,bus);
+	SYMB	LINE, 835
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+; i2c_drv.c  836	      Delay(5);
+; i2c_drv.c  837	
+; i2c_drv.c  838	      SCL_set(Low,bus);
+	SYMB	LINE, 838
+	MOV.B	R0L,#00H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+	MOV.B	R0H,[R7+4]
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 1, 0, 2253
+; i2c_drv.c  839	      Delay(5);
+; i2c_drv.c  840	      SCL_set(High,bus);
+	SYMB	LINE, 840
+	MOV.B	R0L,#01H
+	CALL	_SCL_set
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", -8, 130, 2245
+; i2c_drv.c  841	      Delay(5);
+; i2c_drv.c  842	
+; i2c_drv.c  843	   	Stop_IIC(bus);
+	SYMB	LINE, 843
+	MOV.B	R0L,[R7+4]
+	CALL	_Stop_IIC
+	SYMB	LTIM, "bus", -8, 130, 2117
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	LTIM, "bus", 0, 0, 2125
+; i2c_drv.c  844	      
+; i2c_drv.c  845	      if(i != 0)
+	SYMB	LINE, 845
+	OR.B	R4L,R4L
+	BEQ	_73
+; i2c_drv.c  846	      {
+; i2c_drv.c  847	//Rev1_1 removed eventlogging from lowest level
+; i2c_drv.c  848	//         sprintf(report,"%u,%u",bus,i);
+; i2c_drv.c  849	//         LogEvent(EventIICBusError,report);
+; i2c_drv.c  850	         BusInitialised[bus] = EventIICBusError;
+	SYMB	LINE, 850
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	MOV.B	ES,R1L
+	MOV.W	[R0],#0CE7H
+; i2c_drv.c  851	      }
+; i2c_drv.c  852	      
+; i2c_drv.c  853	   }
+	SYMB	LINE, 853
+_73:
+; i2c_drv.c  854		return(BusInitialised[bus]);
+	SYMB	LINE, 854
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	MOV.B	ES,R1L
+	MOV.W	R0,[R0]
+; i2c_drv.c  855	}
+	SYMB	LINE, 855
+_74:
+	ADDS.W	R7,#06H
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "i", 16, 0, 77
+	SYMB	EFUN
+; i2c_drv.c  856	
+; i2c_drv.c  857	
+; i2c_drv.c  858	
+; i2c_drv.c  859	
+; i2c_drv.c  860	
+; i2c_drv.c  861	int InitBusses(void)
+; i2c_drv.c  862	{
+	ALIGN	1
+	SYMB	LINE, 862
+	PUBLIC	_InitBusses
+_InitBusses:
+	SYMB	TYPE, 460, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "InitBusses", _InitBusses, #460, 0, 0, 16
+	SYMB	ALAB, _InitBusses, #460
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	SYMB	IDEN, "Result", -1, #16, 130, 5
+	SYMB	LTIM, "Result", -1, 0, 69
+; i2c_drv.c  863	        
+; i2c_drv.c  864	   int Result=OK;
+	SYMB	LINE, 864
+	MOV.W	R4,#0FFFFH
+	SYMB	LTIM, "Result", 18, 0, 205
+; i2c_drv.c  865	
+; i2c_drv.c  866	   if (InitBus(IIC_PTV) != OK)
+	SYMB	LINE, 866
+	MOV.B	R0L,#00H
+	CALL	_InitBus
+	CMP.W	R0,#0FFFFH
+	BEQ	_78
+; i2c_drv.c  867	      Result = FAIL;
+	SYMB	LINE, 867
+	MOV.W	R4,#00H
+	SYMB	LTIM, "Result", 18, 0, 77
+	SYMB	LTIM, "Result", 18, 0, 205
+_78:
+; i2c_drv.c  868	
+; i2c_drv.c  869	// Instrument iic busses
+; i2c_drv.c  870	
+; i2c_drv.c  871	#ifdef IicBus1
+; i2c_drv.c  872	   if (InitBus(IIC_1)!= OK)
+; i2c_drv.c  873	      Result = FAIL;
+; i2c_drv.c  874	#endif
+; i2c_drv.c  875	#ifdef IicBus2
+; i2c_drv.c  876	   if (InitBus(IIC_2)!= OK)
+; i2c_drv.c  877	      Result = FAIL;
+; i2c_drv.c  878	#endif
+; i2c_drv.c  879	#ifdef IicBus3
+; i2c_drv.c  880	   if (InitBus(IIC_3)!= OK)
+; i2c_drv.c  881	      Result = FAIL;
+; i2c_drv.c  882	#endif
+; i2c_drv.c  883	#ifdef IicBus4
+; i2c_drv.c  884	   if (InitBus(IIC_4)!= OK)
+; i2c_drv.c  885	      Result = FAIL;
+; i2c_drv.c  886	#endif
+; i2c_drv.c  887	#ifdef IicBus5
+; i2c_drv.c  888	   if (InitBus(IIC_5)!= OK)
+; i2c_drv.c  889	      Result = FAIL;
+; i2c_drv.c  890	#endif
+; i2c_drv.c  891	#ifdef IicBus6
+; i2c_drv.c  892	   if (InitBus(IIC_6)!= OK)
+; i2c_drv.c  893	      Result = FAIL;
+; i2c_drv.c  894	#endif
+; i2c_drv.c  895	
+; i2c_drv.c  896	   return(Result);
+	SYMB	LINE, 896
+	MOV.W	R0,R4
+	SYMB	LTIM, "Result", 18, 0, 77
+	SYMB	LTIM, "Result", 2, 0, 205
+; i2c_drv.c  897	}   
+	SYMB	LINE, 897
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "Result", 2, 0, 77
+	SYMB	EFUN
+; i2c_drv.c  898	
+; i2c_drv.c  899	
+; i2c_drv.c  900	
+; i2c_drv.c  901	
+; i2c_drv.c  902	
+; i2c_drv.c  903	
+; i2c_drv.c  904	
+; i2c_drv.c  905	
+; i2c_drv.c  906	
+; i2c_drv.c  907	int TransmitIIC(UC Address ,UC num ,UC *data ,UC bus )
+; i2c_drv.c  908	{
+	ALIGN	1
+	SYMB	LINE, 908
+	PUBLIC	_TransmitIIC
+_TransmitIIC:
+	SYMB	TYPE, 462, 'n', #3, 130
+	SYMB	TYPE, 463, 'P', #462
+	SYMB	TYPE, 461, 'X', 12, #16, 30, 4, #3, #3, #463, #3
+	SYMB	GFUN, "TransmitIIC", _TransmitIIC, #461, 0, 0, 112
+	SYMB	ALAB, _TransmitIIC, #461
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#0CH
+	SYMB	SOFF, 18
+	SYMB	LTIM, "Address", 0, 0, 2253
+	SYMB	LTIM, "num", 1, 0, 2253
+	SYMB	LTIM, "data", 11, 0, 2253
+	SYMB	LTIM, "bus", 4, 0, 2253
+	MOV.W	[R7+8],R3
+	MOV.W	[R7+6],R2
+	SYMB	LTIM, "data", 11, 0, 2125
+	SYMB	LTIM, "data", -12, 130, 2245
+	MOV.B	[R7+10],R0H
+	SYMB	LTIM, "num", 1, 0, 2125
+	SYMB	LTIM, "num", -8, 130, 2245
+	MOV.B	R6L,R0L
+	SYMB	LTIM, "Address", 0, 0, 2125
+	SYMB	LTIM, "Address", 24, 0, 2253
+	SYMB	IDEN, "Address", 24, #3, 0, 2061
+	SYMB	IDEN, "num", -7, #3, 130, 2053
+	SYMB	IDEN, "data", -7, #463, 130, 2053
+	SYMB	IDEN, "bus", 4, #3, 0, 2061
+	SYMB	IDEN, "i", -1, #3, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+	SYMB	IDEN, "status", -1, #16, 130, 5
+	SYMB	LTIM, "status", -1, 0, 69
+	SYMB	IDEN, "__#STR0005S", -1, #463, 130, 5
+	SYMB	LTIM, "__#STR0005S", -1, 0, 69
+; i2c_drv.c  909	UC i;
+; i2c_drv.c  910	int status=EventNotInitialised;
+	SYMB	LINE, 910
+	MOV.W	[R7+4],#017D5H
+	SYMB	LTIM, "status", -14, 130, 197
+; i2c_drv.c  911		if (BusInitialised[bus] == OK) 
+	SYMB	LINE, 911
+	MOV.B	R6H,R1L
+	MOV.B	R0L,R6H
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "bus", 4, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	MOV.W	R1,R0
+	ASL.W	R1,#01H
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _BusInitialised )
+	MOV.W	R1,[R2+SOF( _BusInitialised )]
+	CMP.W	R1,#0FFFFH
+	BNE	_86
+; i2c_drv.c  912		{
+; i2c_drv.c  913	      Res[bus]->Lock(Res[bus]);
+	SYMB	LINE, 913
+	ASL.W	R0,#02H
+	MOV.W	R2,R0
+	MOVS.W	R3,#00H
+	MOV.W	R1,#SEG( _Res )
+	MOV.W	R0,#SOF( _Res )
+	ADD.W	R0,R2
+	MOV.W	[R7+2],R1
+	MOV.W	[R7],R0
+	MOV.B	ES,#SEG( _Res )
+	MOV.W	R0,[R2+SOF( _Res )]
+	MOV.W	R1,[R2+SOF( _Res+2 )]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	FCALL	__ICALL
+	MOV.B	R0L,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  914	    	if( status = Start_IIC(bus) )
+	SYMB	LINE, 914
+	CALL	_Start_IIC
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	SYMB	LTIM, "status", -14, 130, 69
+	SYMB	LTIM, "status", 2, 0, 205
+	MOV.W	[R7+4],R0
+	OR.W	R0,R0
+	SYMB	LTIM, "status", 2, 0, 77
+	SYMB	LTIM, "status", -14, 130, 197
+	BEQ	_85
+; i2c_drv.c  915	    	{
+; i2c_drv.c  916	       	status = TxByte(Address & ~0x01,bus);
+	SYMB	LINE, 916
+	AND.B	R6L,#0FEH
+	SYMB	LTIM, "Address", 24, 0, 2125
+	MOV.B	R0H,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,R6L
+	CALL	_TxByte
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	MOV.W	[R7+4],R0
+	SYMB	LTIM, "status", -14, 130, 69
+	SYMB	LTIM, "status", -14, 130, 197
+; i2c_drv.c  917	
+; i2c_drv.c  918	         if (status == EventIICNoAck )
+	SYMB	LINE, 918
+	CMP.W	R0,#0CE5H
+	BNE	_80
+; i2c_drv.c  919	            status = EventIICNoAdrAck;
+	SYMB	LINE, 919
+	MOV.W	[R7+4],#0CE8H
+	SYMB	LTIM, "status", -14, 130, 69
+	SYMB	LTIM, "status", -14, 130, 197
+_80:
+; i2c_drv.c  920	     
+; i2c_drv.c  921	       	for (i=0;i<num;i++)
+	SYMB	LINE, 921
+	MOV.B	R6L,#00H
+	SYMB	LTIM, "i", 24, 0, 205
+	MOV.W	R5,[R7+8]
+	MOV.W	R4,[R7+6]
+	SYMB	LTIM, "data", -12, 130, 2117
+	SYMB	LTIM, "data", 19, 0, 2253
+	SYMB	LTIM, "data", 19, 0, 2125
+	SYMB	LTIM, "__#STR0005S", 19, 0, 205
+	CMP.B	[R7+10],#00H
+	BL	_84
+_81:
+; i2c_drv.c  922	       	{
+; i2c_drv.c  923	         if (status == OK)
+	SYMB	LINE, 923
+	CMP.W	[R7+4],#0FFFFH
+	BNE	_82
+; i2c_drv.c  924	         	 status = TxByte(data[i],bus);
+	SYMB	LINE, 924
+	MOV.B	ES,R5L
+	MOV.B	R0L,[R4]
+	MOV.B	R0H,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	CALL	_TxByte
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	MOV.W	[R7+4],R0
+	SYMB	LTIM, "status", -14, 130, 69
+	SYMB	LTIM, "status", -14, 130, 197
+	BR	_83
+_82:
+; i2c_drv.c  925	         else
+; i2c_drv.c  926	             TxByte(data[i],bus);
+	SYMB	LINE, 926
+	MOV.B	ES,R5L
+	MOV.B	R0L,[R4]
+	MOV.B	R0H,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	CALL	_TxByte
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+_83:
+	SYMB	LINE, 921
+	ADD.W	R4,#01H
+	SYMB	LTIM, "__#STR0005S", 19, 0, 77
+	SYMB	LTIM, "__#STR0005S", 19, 0, 205
+	ADDS.B	R6L,#01H
+	SYMB	LTIM, "i", 24, 0, 77
+	SYMB	LTIM, "i", 24, 0, 205
+	CMP.B	R6L,[R7+10]
+	BCS	_81
+; i2c_drv.c  927	       	}
+	SYMB	LINE, 927
+_84:
+; i2c_drv.c  928	       	Stop_IIC(bus);
+	SYMB	LINE, 928
+	MOV.B	R0L,R6H
+	CALL	_Stop_IIC
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	LTIM, "bus", 0, 0, 2125
+; i2c_drv.c  929	    	}
+; i2c_drv.c  930	      else
+; i2c_drv.c  931	      {
+; i2c_drv.c  932	//Rev1_1 removed eventlogging from lowest level
+; i2c_drv.c  933	//          LogEvent(status,NULL);
+; i2c_drv.c  934	      }
+	SYMB	LINE, 934
+_85:
+; i2c_drv.c  935	      Res[bus]->Unlock(Res[bus]);
+	SYMB	LINE, 935
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	MOV.B	ES,R1L
+	MOV.W	R1,[R0+2]
+	MOV.W	R0,[R0]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	SYMB	LTIM, "__#STR0005S", 19, 0, 77
+	FCALL	__ICALL
+; i2c_drv.c  936		}
+	SYMB	LINE, 936
+_86:
+; i2c_drv.c  937	   return(status);
+	SYMB	LINE, 937
+	MOV.W	R0,[R7+4]
+	SYMB	LTIM, "status", -14, 130, 69
+	SYMB	LTIM, "status", 2, 0, 205
+; i2c_drv.c  938	}
+	SYMB	LINE, 938
+	ADD.W	R7,#0CH
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "status", 2, 0, 77
+	SYMB	LTIM, "i", 24, 0, 77
+	SYMB	LTIM, "num", -8, 130, 2117
+	SYMB	EFUN
+; i2c_drv.c  939	
+; i2c_drv.c  940	
+; i2c_drv.c  941	int ReceiveIIC(UC Address ,UC num ,UC *data ,UC bus )
+; i2c_drv.c  942	{
+	ALIGN	1
+	SYMB	LINE, 942
+	PUBLIC	_ReceiveIIC
+_ReceiveIIC:
+	SYMB	TYPE, 464, 'X', 12, #16, 30, 4, #3, #3, #463, #3
+	SYMB	GFUN, "ReceiveIIC", _ReceiveIIC, #464, 0, 0, 112
+	SYMB	ALAB, _ReceiveIIC, #464
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#0EH
+	SYMB	SOFF, 20
+	SYMB	LTIM, "Address", 0, 0, 2253
+	SYMB	LTIM, "num", 1, 0, 2253
+	SYMB	LTIM, "data", 11, 0, 2253
+	SYMB	LTIM, "bus", 4, 0, 2253
+	MOV.W	[R7+10],R3
+	MOV.W	[R7+8],R2
+	SYMB	LTIM, "data", 11, 0, 2125
+	SYMB	LTIM, "data", -12, 130, 2245
+	MOV.B	[R7+12],R0H
+	SYMB	LTIM, "num", 1, 0, 2125
+	SYMB	LTIM, "num", -8, 130, 2245
+	MOV.B	R6L,R0L
+	SYMB	LTIM, "Address", 0, 0, 2125
+	SYMB	LTIM, "Address", 24, 0, 2253
+	SYMB	IDEN, "Address", 24, #3, 0, 2061
+	SYMB	IDEN, "num", -7, #3, 130, 2053
+	SYMB	IDEN, "data", -7, #463, 130, 2053
+	SYMB	IDEN, "bus", 4, #3, 0, 2061
+	SYMB	IDEN, "i", -1, #3, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+	SYMB	IDEN, "__#STR0019S", -1, #463, 130, 5
+	SYMB	LTIM, "__#STR0019S", -1, 0, 69
+; i2c_drv.c  943	UC i;
+; i2c_drv.c  944		if (BusInitialised[bus] == OK) 
+	SYMB	LINE, 944
+	MOV.B	R6H,R1L
+	MOV.B	R0L,R6H
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "bus", 4, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	MOV.W	R1,R0
+	ASL.W	R1,#01H
+	MOV.W	R4,R1
+	MOVS.W	R5,#00H
+	MOV.W	R3,#SEG( _BusInitialised )
+	MOV.W	R2,#SOF( _BusInitialised )
+	ADD.W	R2,R4
+	MOV.W	[R7+6],R3
+	MOV.W	[R7+4],R2
+	MOV.B	ES,#SEG( _BusInitialised )
+	MOV.W	R1,[R4+SOF( _BusInitialised )]
+	CMP.W	R1,#0FFFFH
+	BNE	_94
+; i2c_drv.c  945		{
+; i2c_drv.c  946	      Res[bus]->Lock(Res[bus]);
+	SYMB	LINE, 946
+	ASL.W	R0,#02H
+	MOV.W	R2,R0
+	MOVS.W	R3,#00H
+	MOV.W	R1,#SEG( _Res )
+	MOV.W	R0,#SOF( _Res )
+	ADD.W	R0,R2
+	MOV.W	[R7+2],R1
+	MOV.W	[R7],R0
+	MOV.B	ES,#SEG( _Res )
+	MOV.W	R0,[R2+SOF( _Res )]
+	MOV.W	R1,[R2+SOF( _Res+2 )]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+10]
+	MOV.W	R5,[R0+12]
+	FCALL	__ICALL
+	MOV.B	R0L,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+; i2c_drv.c  947	   	Start_IIC(bus);
+	SYMB	LINE, 947
+	CALL	_Start_IIC
+	SYMB	LTIM, "bus", 0, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+; i2c_drv.c  948	   	TxByte(Address | 0x01,bus);
+	SYMB	LINE, 948
+	OR.B	R6L,#01H
+	SYMB	LTIM, "Address", 24, 0, 2125
+	MOV.B	R0H,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 1, 0, 2253
+	MOV.B	R0L,R6L
+	CALL	_TxByte
+	SYMB	LTIM, "bus", 1, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+; i2c_drv.c  949	   	for (i=0;i<num-1;i++)
+	SYMB	LINE, 949
+	MOV.B	R6L,#00H
+	SYMB	LTIM, "i", 24, 0, 205
+	MOV.W	R5,[R7+10]
+	MOV.W	R4,[R7+8]
+	SYMB	LTIM, "__#STR0019S", 19, 0, 205
+	MOV.B	R0L,[R7+12]
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "num", -8, 130, 2117
+	SYMB	LTIM, "num", 0, 0, 2253
+	SYMB	LTIM, "num", 0, 0, 2125
+	ADDS.W	R0,#0FH
+	MOV.W	[R7+12],R0
+	CMP.W	R0,#00H
+	BLE	_93
+_92:
+; i2c_drv.c  950	   	{
+; i2c_drv.c  951	   		data[i] = RxByte(FALSE,bus);
+	SYMB	LINE, 951
+	MOV.W	R0,#00H
+	MOV.B	R1L,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 4, 0, 2253
+	CALL	_RxByte
+	SYMB	LTIM, "bus", 4, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	MOV.B	ES,R5L
+	MOV.B	[R4],R0L
+	SYMB	LINE, 949
+	ADD.W	R4,#01H
+	SYMB	LTIM, "__#STR0019S", 19, 0, 77
+	SYMB	LTIM, "__#STR0019S", 19, 0, 205
+	ADDS.B	R6L,#01H
+	SYMB	LTIM, "i", 24, 0, 77
+	SYMB	LTIM, "i", 24, 0, 205
+	MOV.B	R0L,R6L
+	MOVS.B	R0H,#00H
+	CMP.W	R0,[R7+12]
+	BLT	_92
+; i2c_drv.c  952	   	}
+	SYMB	LINE, 952
+_93:
+; i2c_drv.c  953	   	data[i] = RxByte(TRUE,bus);
+	SYMB	LINE, 953
+	MOV.W	R0,#0FFFFH
+	MOV.B	R1L,R6H
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 4, 0, 2253
+	CALL	_RxByte
+	SYMB	LTIM, "bus", 4, 0, 2125
+	SYMB	LTIM, "bus", 25, 0, 2253
+	MOV.B	R2L,R6L
+	MOVS.B	R2H,#00H
+	MOVS.W	R3,#00H
+	MOV.W	R5,[R7+10]
+	MOV.W	R4,[R7+8]
+	ADD.W	R4,R2
+	SYMB	LTIM, "__#STR0019S", 19, 0, 77
+	SYMB	LTIM, "data", -12, 130, 2117
+	SYMB	LTIM, "data", 19, 0, 2253
+	SYMB	LTIM, "data", 19, 0, 2125
+	MOV.B	ES,R5L
+	MOV.B	[R4],R0L
+; i2c_drv.c  954	   	Stop_IIC(bus);
+	SYMB	LINE, 954
+	MOV.B	R0L,R6H
+	CALL	_Stop_IIC
+	SYMB	LTIM, "bus", 25, 0, 2125
+	SYMB	LTIM, "bus", 0, 0, 2253
+	SYMB	LTIM, "bus", 0, 0, 2125
+; i2c_drv.c  955	      Res[bus]->Unlock(Res[bus]);
+	SYMB	LINE, 955
+	MOV.W	R1,[R7+2]
+	MOV.W	R0,[R7]
+	MOV.B	ES,R1L
+	MOV.W	R1,[R0+2]
+	MOV.W	R0,[R0]
+	MOV.B	ES,R1L
+	MOV.W	R4,[R0+14]
+	MOV.W	R5,[R0+16]
+	FCALL	__ICALL
+; i2c_drv.c  956		}
+	SYMB	LINE, 956
+_94:
+; i2c_drv.c  957	   return(BusInitialised[bus]);
+	SYMB	LINE, 957
+	MOV.W	R1,[R7+6]
+	MOV.W	R0,[R7+4]
+	MOV.B	ES,R1L
+	MOV.W	R0,[R0]
+; i2c_drv.c  958	}
+	SYMB	LINE, 958
+	ADD.W	R7,#0EH
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "i", 24, 0, 77
+	SYMB	EFUN
+; i2c_drv.c  959	
+; i2c_drv.c  960	//  If uninterrupted writing / reading is required on the IIC bus
+; i2c_drv.c  961	//  then the following functions could be implemented.
+; i2c_drv.c  962	//  Normally this is done by the devicedriver by protecting each
+; i2c_drv.c  963	//  device with the required resources.
+; i2c_drv.c  964	//   TxAndRx(UC Address,UC rxnum, UC *rxdat,UC txnum, UC *txdat, UC bus)
+; i2c_drv.c  965	//   RxAndTx(UC Address,UC rxnum, UC *rxdat,UC txnum, UC *txdat, UC bus)
+	SYMB	ENDF
+
+	SYMB	TYPE, 465, 'n', #382, 130
+	SYMB	TYPE, 466, 'P', #465
+	SYMB	TYPE, 467, 'X', 12, #466, 30, 1, #258
+	SYMB	ALAB, _newTResource, #467
+	EXTRN	HCODE(_newTResource)
+	SYMB	TYPE, 468, 'Z', #466, 0
+	SYMB	IDEN, "Res", _Res, #468, 130, 4
+I2C_DRV_CLR_FA	SEGMENT	HDATA INSEGMENT CLEAR
+	RSEG	I2C_DRV_CLR_FA
+	ALIGN	1
+_Res:	DS	4
+	EXTRN	HCODE(__ICALL)
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'I2C_DRV?SCL_set_wait', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?SCL_set_wait', 'I2C_DRV?SCL_get'
+	CALLS	'I2C_DRV?Start_IIC', 'I2C_DRV?SCL_get'
+	CALLS	'I2C_DRV?Start_IIC', 'I2C_DRV?SDA_get'
+	CALLS	'I2C_DRV?Start_IIC', 'I2C_DRV?SDA_set'
+	CALLS	'I2C_DRV?Start_IIC', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?Stop_IIC', 'I2C_DRV?SDA_set'
+	CALLS	'I2C_DRV?Stop_IIC', 'I2C_DRV?SCL_set_wait'
+	CALLS	'I2C_DRV?Stop_IIC', 'I2C_DRV?SDA_set'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SDA_set'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SCL_set_wait'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SDA_set'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SCL_set_wait'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SDA_get'
+	CALLS	'I2C_DRV?TxByte', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SCL_set_wait'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SDA_get'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SDA_set'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SCL_set_wait'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SCL_set'
+	CALLS	'I2C_DRV?RxByte', 'I2C_DRV?SDA_set'
+	CALLS	'InitBus', 'newTResource'
+	CALLS	'InitBus', 'I2C_DRV?SDA_set'
+	CALLS	'InitBus', 'I2C_DRV?SCL_set'
+	CALLS	'InitBus', 'I2C_DRV?SCL_get'
+	CALLS	'InitBus', 'I2C_DRV?SDA_get'
+	CALLS	'InitBus', 'I2C_DRV?SCL_set'
+	CALLS	'InitBus', 'I2C_DRV?SCL_get'
+	CALLS	'InitBus', 'I2C_DRV?SDA_get'
+	CALLS	'InitBus', 'I2C_DRV?SDA_set'
+	CALLS	'InitBus', 'I2C_DRV?SCL_set'
+	CALLS	'InitBus', 'I2C_DRV?SDA_get'
+	CALLS	'InitBus', 'I2C_DRV?SDA_set'
+	CALLS	'InitBus', 'I2C_DRV?SCL_set'
+	CALLS	'InitBus', 'I2C_DRV?Stop_IIC'
+	CALLS	'InitBusses', 'InitBus'
+	CALLS	'TransmitIIC', 'I2C_DRV?Start_IIC'
+	CALLS	'TransmitIIC', 'I2C_DRV?TxByte'
+	CALLS	'TransmitIIC', 'I2C_DRV?Stop_IIC'
+	CALLS	'ReceiveIIC', 'I2C_DRV?Start_IIC'
+	CALLS	'ReceiveIIC', 'I2C_DRV?TxByte'
+	CALLS	'ReceiveIIC', 'I2C_DRV?RxByte'
+	CALLS	'ReceiveIIC', 'I2C_DRV?Stop_IIC'
+	END

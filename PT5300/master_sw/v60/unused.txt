@@ -1,0 +1,513 @@
+#if 0
+/***************************************************************************/
+/* HDTPGTimeAdjust                                                 MENU.C  */
+/*                                                                         */
+/* Author:    Janusz Kuzminski, 03.10.03                                   */
+/* Revised:   03.10.03                                                     */
+/*                                                                         */
+/*  Function: Update the delay in the HDTPG generators.                    */
+/*  Args:     UC item:    generator nuber                                  */
+/*            UC system:  current format for item generator                */
+/*                        system must be offset by 4 before calling this   */
+/*                        function, as system = 0 for HDTPG is system = 4  */
+/*                        for hdtpg_fmt_table.                             */
+/*            long delay: current delay item generator,                    */
+/*                      *************************************************  */
+/*                      *  is used only to                                 */
+/*                      *  check if recalculated value of tlg_samples is   */
+/*                      *  the same as delay in curreent HDTPGConfig, in   */
+/*                      *  order to control the SAVE/ESC text              */
+/*                      *************************************************  */
+/*            UC which:   0 - HDTPG                                        */
+/*                        1 - DLTPG                                        */
+/*                        It is used here to select right format table:    */
+/*                        hdtpg_fmt_table or dltpg_fmt_table.              */
+/*  Notes:                                                                 */
+/*            This function recalculates current tlg_samples               */
+/*            according to what user has increased/decreased (T,H or V)    */
+/*            and converts new tlg_samples value into new T, H and V to    */
+/*            be displayed on LCD with the HDTPGSamplesToFLT() function.   */
+/*  Returns:  Nothing.                                                     */
+/***************************************************************************/
+void HDTPGTimeAdjust(UC item, UC system, long delay, UC which)
+  {
+  UC    board;
+  int   line;
+  char  field, sign;
+  float time;
+  int   lines_over_field;
+  long  spl;      // tlg_samples per line
+  long  lpf;      // lines per frame
+  int   tmp_lines;
+  code  HDPARAMS * formptr;
+
+  if (!which)
+    formptr = hdtpg_fmt_table;
+  else
+    formptr = dltpg_fmt_table;
+
+  spl = formptr[system].samples_per_line;
+  lpf = formptr[system].lines_per_frame;
+
+  tmp_lines = (lpf - 3) / 2;
+
+  if (T_STEP_ZOOM)              // If time ie T, is being updated.. in step choose....
+    {                           // If button pressed is RIGHT/LEFT..
+    if (T_STEP_ZOOM_L)
+      {                         // If button pressed is LEFT..
+      if (stepNdx++ == stepNdxTLGMax)
+        stepNdx = stepNdxTLGMin;
+      }
+    else
+      {                         // ..button pressed is RIGHT
+      if (stepNdx-- == stepNdxTLGMin)
+        stepNdx = stepNdxTLGMax;
+      }
+    stepVal = stepsizeTLGTable[formptr[system].sys_clk][stepNdx];
+    }
+
+  if (T_SEL)
+    {                        // If button pressed is UP/DOWN..
+    if (T_UP)                // If button pressed is UP ..
+      tlg_samples += stepVal;
+    else
+      tlg_samples -= stepVal;
+    }
+  if (H_SEL)                      // Line, ie. H, adjstement..
+    {                             // If button pressed is UP/DOWN..
+    if (H_UP)                     // If button pressed is UP..
+      tlg_samples += (long) spl;
+    else
+      tlg_samples -= (long) spl;
+    }
+
+  if (V_SEL)                          // Field, ie. V, adjustement ..
+    {
+    if (formptr[system].scan) // if interlaced....
+      {
+      lines_over_field = (tlg_samples / ((long) spl)) % lpf;
+      if (V_UP)
+        {                           // If button pressed is UP..
+        if (lines_over_field < (tmp_lines + 1))
+          tlg_samples += (long) ((tmp_lines + 1) * spl);
+        else
+          tlg_samples += (long) ((tmp_lines + 2) * spl);
+        }
+      else
+        {
+        if (lines_over_field < (tmp_lines + 1))
+          tlg_samples -= (long) ((tmp_lines + 2) * spl);
+        else
+          tlg_samples -= (long) ((tmp_lines + 1) * spl);
+        }
+      }
+    else // if NOT interlaced...
+      {
+      if (V_UP)
+        tlg_samples += (long) (lpf * spl);
+      else
+        tlg_samples -= (long) (lpf * spl);
+      }
+    }
+  
+  if (T_OR_H_OR_V) // if T or V  or H......
+    {
+    /*********   Here is the adjustment algorithm   ********************/
+    /* The algor below is taken from similar routine for SDI           */
+    /* If tlg_samples are negative, they are increased by spf          */
+    /* Otherwise, they are are adjusted to be between 0 and spf        */
+    /* So there is roll over:                                          */
+
+      if (tlg_samples < 0)
+        tlg_samples += (long) (spl * lpf);
+      else
+        tlg_samples %= (long) (spl * lpf);
+
+    /*********   Here ends the adjustment algorithm   *******************/
+
+  /***************************************************************/
+  /*    TrxHDTPGSystem it is where def_del is added to tlg delay.   */
+  /***************************************************************/
+  if (!which)
+    {
+    ErrorCode = TrxHDTPGSystem(item, 
+                               HDTPGConfig[item].System,
+                               tlg_samples,
+                               GenlockConfig[ActiveGenlockNo].Delay);
+    if (ErrorCode)
+      {
+      board = FindHDTPGBoard(item);
+  
+      GotoErrorStatus(256*board + ErrorCode);
+      return;
+      }
+    }
+  else
+    {
+    ErrorCode = TrxDLTPGSystem(item, 
+                               DLTPGConfig[item].System,
+                               tlg_samples,
+                               GenlockConfig[ActiveGenlockNo].Delay);
+    if (ErrorCode)
+      {
+      board = FindDLTPGBoard(item);
+  
+      GotoErrorStatus(256*board + ErrorCode);
+      return;
+      }
+    }
+
+
+    if (delay == tlg_samples)
+      {
+      if (FuncState == 11)  // 11 means in T, step choose, bilnk, UP or DOWN...
+        FuncState--;
+      else
+        {                   // when SAVE is removed, transmit it to TLG
+        FuncState -= 4;
+        }
+      }
+    }
+  TLGSamplesToFLT(system, tlg_samples, &sign, &field, &line, &time, formptr);
+  //HDTPGSamplesToFLT(system, tlg_samples, &sign, &field, &line, &time, which);
+
+  WriteTimingFLTTLG(sign, field, line, time);
+  WriteType6_SAVE_ESC(FuncState);
+
+  switch (FuncState)
+    {
+    case 1:
+    case 5:
+      WriteItemArrows(3, 2);
+      break;
+    case 2:
+    case 6:
+      WriteItemArrows(10, 5);
+      break;
+    case 3:
+    case 7:
+      WriteItemArrows(20, 8);
+      CharBlinkLN2(0, OFF);        // Switch on blinking at
+                                   // Reset step index and stepVal
+
+      /*   Potential error: should be stepsizeTLGTable[formpt[system].sys_clk]... */
+
+      stepVal = stepsizeTLGTable[hdtpg_fmt_table[system].sys_clk][stepNdx = stepNdxTLGMin];
+      break;
+    case 10:
+    case 11:
+      WriteItemBrackets(20, 8);           // WriteItemBrackets(UC start, UC length)
+      if (stepNdx == stepNdxTLGMin)
+        CharBlinkLN2(25 - stepNdx, ON);  // Switch on blinking 26
+      else
+        CharBlinkLN2(25-stepNdx, ON);
+      break;
+    }
+  }
+#endif
+#if 0
+void TLGTimeAdjust(UC item, UC format, long delay, UC which)
+  {
+  UC    board;
+  int   line;
+  char  field, sign;
+  float time;
+  int   lines_over_field;
+  long  spl;
+  long  lpf;
+  code  HDPARAMS * table;
+
+  switch (which)
+    {
+    case 0:
+      table = hdtpg_fmt_table;
+      break;
+    case 1:
+      table = dltpg_fmt_table;
+      break;
+    case 2:
+      table = tlg_fmt_table;
+      break;
+    }
+
+  spl = table[format].samples_per_line;
+  lpf = table[format].lines_per_frame;
+
+  if (T_STEP_ZOOM)              // If time ie T, is being updated.. in step choose....
+    {                           // If button pressed is RIGHT/LEFT..
+    if (T_STEP_ZOOM_L)
+      {                         // If button pressed is LEFT..
+      if (stepNdx++ == stepNdxTLGMax)
+        stepNdx = stepNdxTLGMin;
+      }
+    else
+      {                         // ..button pressed is RIGHT
+      if (stepNdx-- == stepNdxTLGMin)
+        stepNdx = stepNdxTLGMax;
+      }
+    stepVal = stepsizeTLGTable[table[format].sys_clk][stepNdx];
+    }
+
+  if (T_SEL)
+    {                        // If button pressed is UP/DOWN..
+    if (T_UP)                // If button pressed is UP ..
+      tlg_samples += stepVal;
+    else
+      tlg_samples -= stepVal;
+    }
+  if (H_SEL)                      // Line, ie. H, adjstement..
+    {                             // If button pressed is UP/DOWN..
+    if (H_UP)                     // If button pressed is UP..
+      tlg_samples += (long) spl;
+    else
+      tlg_samples -= (long) spl;
+    }
+
+  if (V_SEL)                          // Field, ie. V, adjustement ..
+    {
+    if (table[format].scan) // if interlaced....Only interlaced have 1125 lines...
+      {
+      lines_over_field = (tlg_samples / ((long) spl)) % lpf;
+      if (V_UP)
+        {                           // If button pressed is UP..
+        if (lines_over_field < 562)
+          tlg_samples += (long) (562 * spl);
+        else
+          tlg_samples += (long) (563 * spl);
+        }
+      else
+        {
+        if (lines_over_field < 562)
+          tlg_samples -= (long) (563 * spl);
+        else
+          tlg_samples -= (long) (562 * spl);
+        }
+      }
+    else // if NOT interlaced...
+      {
+      if (V_UP)
+        tlg_samples += (long) (lpf * spl);
+      else
+        tlg_samples -= (long) (lpf * spl);
+      }
+    }
+  
+  if (T_OR_H_OR_V) // if T or V or H......
+    {
+    /*********   Here is the adjustment algorithm   ********************/
+    /* The algor below is taken from similar routine for SDI           */
+    /* If tlg_samples are negative, they are increased by spf          */
+    /* Otherwise, they are are adjusted to be between 0 and spf        */
+    /* So there is roll over:                                          */
+
+      if (tlg_samples < 0)
+        tlg_samples += (long) (spl * lpf);
+      else
+        tlg_samples %= (long) (spl * lpf);
+
+    /*********   Here ends the adjustment algorithm   ******************/
+
+    /***************************************************************/
+    /*    TrxTLGDelay it is where def_del is added to tlg delay.   */
+    /***************************************************************/
+
+    switch (which)
+      {
+      case 0:
+        ErrorCode = TrxHDTPGSystem(item, 
+                                   format,
+                                   tlg_samples,
+                                   GenlockConfig[ActiveGenlockNo].Delay);
+        if (ErrorCode)
+          {
+          board = FindHDTPGBoard(item);
+      
+          GotoErrorStatus(256*board + ErrorCode);
+          return;
+          }
+        break;
+      case 1:
+        ErrorCode = TrxDLTPGSystem(item, 
+                                   format,
+                                   tlg_samples,
+                                   GenlockConfig[ActiveGenlockNo].Delay);
+        if (ErrorCode)
+          {
+          board = FindDLTPGBoard(item);
+      
+          GotoErrorStatus(256*board + ErrorCode);
+          return;
+          }
+        break;
+      case 2:
+        ErrorCode = TrxTLGDelay(item,
+                                format,
+                                tlg_samples,
+                                GenlockConfig[ActiveGenlockNo].Delay);
+        if (ErrorCode)
+          {
+          board = FindTLGBoard(item);
+      
+          GotoErrorStatus(256*board + ErrorCode);
+          return;
+          }
+      break;
+      }
+
+    if (delay == tlg_samples)
+      {
+      if (FuncState == 11)  // 11 means in T, step choose, bilnk, UP or DOWN...
+        FuncState--;
+      else
+        {                   // when SAVE is removed, transmit it to TLG
+        FuncState -= 4;
+        }
+      }
+    }
+  TLGSamplesToFLT(format, tlg_samples, &sign, &field, &line, &time, table);
+  //HDTPGSamplesToFLT(format, tlg_samples, &sign, &field, &line, &time, 2);
+
+  WriteTimingFLTTLG(sign, field, line, time);
+  WriteType6_SAVE_ESC(FuncState);      // Write the SAVE ESC text
+
+  switch (FuncState)
+    {
+    case 1:
+    case 5:
+      WriteItemArrows(3, 2);        // Highlight selection
+      break;
+    case 2:
+    case 6:
+      WriteItemArrows(10, 5);      // Highlight selection
+      break;
+    case 3:
+    case 7:
+      WriteItemArrows(20, 8);      // Highlight selection
+      CharBlinkLN2(0, OFF);        // Switch on blinking at
+                                   // Reset step index and stepVal
+      stepVal = stepsizeTLGTable[table[format].sys_clk][stepNdx = stepNdxTLGMin];
+      break;
+    case 10:
+    case 11:
+      WriteItemBrackets(20, 8);           // WriteItemBrackets(UC start, UC length)
+      if (stepNdx == stepNdxTLGMin)
+        CharBlinkLN2(25 - stepNdx, ON);  // Switch on blinking 26
+      else
+        CharBlinkLN2(25 - stepNdx, ON);
+      break;
+    }
+  }
+
+#endif
+#if 0
+/***************************************************************************/
+/* void HDTPGSamplesToFLT(void)                                    MENU.C  */
+/*                                                                         */
+/* Author:  Janusz Kuzminski                                               */
+/* Revised: 14.10.2003                                                     */
+/*                                                                         */
+/* Function: To convert tlg_samples to 3 components:                       */
+/*           V - number of frames                                          */
+/*           H - number of lines                                           */
+/*           T - number of nanoseconds                                     */
+/*            UC which:   0 - HDTPG                                        */
+/*                        1 - DLTPG                                        */
+/* Remarks: When calculating timing in nanoseconds, sysclk is taken into   */
+/*          consideration, as it is different for different formats        */
+/*          Variable clock is used to determine scaling factor for         */
+/*          nanoseconds.                                                   */
+/*                                                                         */
+/*                                                                         */
+/* Returns:  Nothing                                                       */
+/* Updates:     TBD                                                        */
+/***************************************************************************/
+void HDTPGSamplesToFLT(UC frmt, long samps, char* sign, char* F, int* L, float* T, UC which)
+  {
+  float clock;
+  char  field;
+  int   line;
+  long  spl;      // tlg_samples per line
+  long  lpf;      // lines per frame
+  int   tmp_lines;
+
+  code  HDPARAMS * formptr;
+
+  switch (which)
+    {
+    case 0:
+      formptr = hdtpg_fmt_table;
+      break;
+    case 1:
+      formptr = dltpg_fmt_table;
+      break;
+    case 2:
+      formptr = tlg_fmt_table;
+      break;
+    }
+
+  *sign = '+';
+
+  if (!formptr[frmt].scan) // if not interlaced....
+    {
+    spl = formptr[frmt].samples_per_line;
+    lpf = formptr[frmt].lines_per_frame;
+
+    tmp_lines = (lpf - 3) / 2;
+
+    field =  samps / (lpf * spl);
+    line  = (samps % (lpf * spl)) / (spl);
+    samps = (samps % (lpf * spl)) % (spl);
+    }
+  else
+    {                                    // if interlaced....
+    spl = formptr[frmt].samples_per_line;
+    lpf = formptr[frmt].lines_per_frame;
+
+    tmp_lines = (lpf - 3) / 2;
+
+    if (samps >=  ((long) ((tmp_lines + 1) * spl))) //(562);
+      {
+      samps--;
+      line  = (samps % ((long) lpf*spl)) / ((long) spl);
+      samps = (samps % ((long) lpf*spl)) % ((long) spl);
+      field = 0;
+      if (line > tmp_lines) // 561 /* (lpf - 3) / 2 */
+
+        {
+        field++;
+        line = lpf - 1 - line;
+        }
+      else
+        line  = tmp_lines - line;
+      samps = (long) spl - 1 - samps;
+      field   = 1 - field;
+      if (field != 1)
+        *sign = '-';
+      }
+    else
+      {
+      line  = (samps % ((long) lpf*spl)) / ((long) spl);
+      samps = (samps % ((long) lpf*spl)) % ((long) spl);
+      field = 0;
+      if (line > tmp_lines)
+        {
+        field++;
+        line -= tmp_lines + 1; //(562);
+        }
+      }
+    }
+
+  *F = abs(field);
+  *L = abs(line);
+
+  /* Timing resolution depends on sysclk, which is dependent on format */
+  /* If sysclk is 0, then sysclk is 148.500                            */
+  /* If sysclk is 1, then sysclk is 148.352                            */
+  if (formptr[frmt].sys_clk)
+    clock = 148352.0;   /* if sysclk == 1 */
+  else
+    clock = 148500.0;   /* clock = 148500; */
+  *T = (((float)samps * 1000000.0) / clock);
+  }
+#endif
+

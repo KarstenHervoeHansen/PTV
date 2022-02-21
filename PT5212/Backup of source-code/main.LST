@@ -1,0 +1,119 @@
+C51 COMPILER V7.05   MAIN                                                                  03/20/2007 15:25:42 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe main.c DB OE
+
+stmt level    source
+
+   1          #include <C8051F320.h>  // Register definition file.
+   2          
+   3          //leds
+   4          sbit fault1_LED = P2^0;
+   5          sbit fault2_LED = P2^1;
+   6          sbit sync_1_2_LED_sel = P2^2;
+   7          sbit man_auto_LED_sel = P2^3;
+   8          sbit onair_1_2_LED_sel = P2^4;
+   9          
+  10          //relay + remote en sel
+  11          sbit remote_en_sel = P2^5;
+  12          sbit auto_sel   = P2^6;
+  13          sbit manual_sel = P2^7;
+  14          sbit sync1_sel = P1^6;
+  15          sbit sync2_sel = P1^7;
+  16          
+  17          //remote in
+  18          sbit fault1 = P0^2;
+  19          sbit fault2 = P0^1;
+  20          sbit on_air = P0^0;
+  21          unsigned char fault1_line=0;
+  22          unsigned char fault2_line=0;
+  23          unsigned char on_air_line=0;
+  24          
+  25          //switch in
+  26          sbit auto_sel_sw = P0^3;
+  27          sbit manual_sel_sw = P0^4;
+  28          sbit sync1_sw = P0^5;
+  29          sbit sync2_sw = P0^6;
+  30          sbit remote_en_sw = P0^7;
+  31          unsigned char auto_sel_line=0;
+  32          unsigned char manual_sel_line=0;
+  33          unsigned char sync1_line=0;
+  34          unsigned char sync2_line=0;
+  35          unsigned char remote_en_line=0;
+  36          
+  37          
+  38          //debouncing in line
+  39          void timer_0() interrupt 3
+  40          {
+  41   1              auto_sel_line = auto_sel_line << 1;
+  42   1              auto_sel_line |= auto_sel_sw;
+  43   1      
+  44   1              manual_sel_line = manual_sel_line << 1;
+  45   1              manual_sel_line |= manual_sel_sw;
+  46   1      
+  47   1              sync1_line = sync1_line << 1;
+  48   1              sync1_line |= sync1_sw;
+  49   1      
+  50   1              sync2_line = sync2_line << 1;
+  51   1              sync2_line |= sync2_sw;
+  52   1      
+  53   1              remote_en_line = remote_en_line << 1;
+  54   1              remote_en_line |= remote_en_sw;
+  55   1                      
+C51 COMPILER V7.05   MAIN                                                                  03/20/2007 15:25:42 PAGE 2   
+
+  56   1              fault1_line = fault1_line << 1;
+  57   1              fault1_line |= fault1;
+  58   1      
+  59   1              fault2_line = fault2_line << 1;
+  60   1              fault2_line |= fault2;
+  61   1      
+  62   1              on_air_line = on_air_line << 1;
+  63   1              on_air_line |= on_air;
+  64   1      }
+  65          
+  66          void main()
+  67          {
+  68   1              PCA0MD &= ~0x40;   
+  69   1              OSCXCN = 0x00;  // EXTERNAL Oscillator Control Register 
+  70   1          CLKSEL = 0x00;  // Oscillator Clock Select Register
+  71   1              OSCICN = 0x80;  // Internal Oscillator Control Register
+  72   1      
+  73   1              CKCON = 0x08;     // Timer1 bruger SYSCLK
+  74   1              TL1   = 0x00;     // Timer 1 Low Byte
+  75   1          TH1   = 0x00;     // BaudRate = 38400
+  76   1          TMOD  = 0x20;     // Timer Mode Register
+  77   1          TCON  = 0x45;     // Timer Control Register, timer1 enabled
+  78   1              TR1 = 1;          // Start timer1
+  79   1      
+  80   1              XBR0 = 0x00;    // Crossbar Register 1
+  81   1              XBR1 = 0x40;    // Crossbar Register 2
+  82   1      
+  83   1              P2MDOUT = 0xFF; // Output configuration for P
+  84   1      
+  85   1              IE=0x08;
+  86   1              EA=1;
+  87   1      
+  88   1              remote_en_sel = 1;
+  89   1      
+  90   1              while(1)
+  91   1              {
+  92   2                      //remote_en_sel = remote_en_sw;         
+  93   2              }
+  94   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    148    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,70 @@
+--altshift_taps CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEVICE_FAMILY="Cyclone" NUMBER_OF_TAPS=1 TAP_DISTANCE=3 WIDTH=11 clock shiftin taps CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=48
+--VERSION_BEGIN 4.1 cbx_altdpram 2004:05:14:13:10:08:SJ cbx_altshift_taps 2003:08:19:18:09:06:SJ cbx_altsyncram 2004:07:08:11:16:08:SJ cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_lpm_add_sub 2004:06:23:12:24:04:SJ cbx_lpm_compare 2004:04:12:17:30:12:SJ cbx_lpm_counter 2004:07:12:18:53:30:SJ cbx_lpm_decode 2004:03:10:10:44:06:SJ cbx_lpm_mux 2004:03:10:10:50:34:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_stratix 2004:04:28:15:20:14:SJ cbx_stratixii 2004:05:18:11:28:28:SJ cbx_util 2004:03:29:17:03:30:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION altsyncram_94q (address_a[1..0], address_b[1..0], clock0, clock1, clocken0, clocken1, data_a[10..0], wren_a)
+RETURNS ( q_b[10..0]);
+FUNCTION add_sub_und (dataa[1..0], datab[1..0])
+RETURNS ( result[1..0]);
+FUNCTION cntr_0fc (clk_en, clock)
+RETURNS ( q[1..0]);
+
+--synthesis_resources = lut 8 ram_bits (auto) 33 
+SUBDESIGN shift_taps_6kg
+( 
+	clock	:	input;
+	shiftin[10..0]	:	input;
+	shiftout[10..0]	:	output;
+	taps[10..0]	:	output;
+) 
+VARIABLE 
+	altsyncram4 : altsyncram_94q;
+	dffe3a[1..0] : dffe;
+	add_sub2 : add_sub_und;
+	cntr1 : cntr_0fc;
+	clken	: NODE;
+	rdaddress[1..0]	: WIRE;
+
+BEGIN 
+	altsyncram4.address_a[] = cntr1.q[];
+	altsyncram4.address_b[] = rdaddress[];
+	altsyncram4.clock0 = clock;
+	altsyncram4.clock1 = clock;
+	altsyncram4.clocken0 = clken;
+	altsyncram4.clocken1 = clken;
+	altsyncram4.data_a[] = ( shiftin[]);
+	altsyncram4.wren_a = B"1";
+	dffe3a[].CLK = clock;
+	dffe3a[].D = ( (! add_sub2.result[1..1]), add_sub2.result[0..0]);
+	dffe3a[].ENA = clken;
+	add_sub2.dataa[] = cntr1.q[];
+	add_sub2.datab[] = B"00";
+	cntr1.clk_en = clken;
+	cntr1.clock = clock;
+	clken = VCC;
+	rdaddress[] = ( (! dffe3a[1..1].Q), dffe3a[0..0].Q);
+	shiftout[10..0] = altsyncram4.q_b[10..0];
+	taps[] = altsyncram4.q_b[];
+END;
+--VALID FILE

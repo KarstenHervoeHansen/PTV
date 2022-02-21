@@ -1,0 +1,2078 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+C:\LT428\work\ver.4_9\temp\xa\audio.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\LT428\rtxc\xa\include -I. -Ml
+                          3 ;          -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    AUDIO
+                         10 ; audio.c     1 /****************************************************************************/
+                         11 ; audio.c     2 /* MODULE:                                                                  */
+                         12 ; audio.c     3 /*  audio.c - Audio                                                              
+                                                                                */
+                         13 ; audio.c     4 /****************************************************************************/
+                         14 ; audio.c     5 /* FUNCTIONS:                                                               */
+                         15 ; audio.c     6 /*                                                                          */
+                         16 ; audio.c     7 /* TASKS:                                                                   */
+                         17 ; audio.c     8 /*                                                                          */
+                         18 ; audio.c     9 /* NOTES: Audio-Defaults: Levels changed to -18 (PAL) and -20 (NTSC)        */
+                         19 ; audio.c    10 /*                                                                          */
+                         20 ; audio.c    11 /****************************************************************************/
+                         21 ; audio.c    12 /*
+                         22 ; audio.c    13  *   PTV software for PT5201
+                         23 ; audio.c    14  *   Copyright (c) 
+                         24 ; audio.c    15  *   ProTeleVision Technologies A/S.
+                         25 ; audio.c    16  *   ALL RIGHTS RESERVED
+                         26 ; audio.c    17 */
+                         27 ; audio.c    18 /****************************************************************************/
+                         28 ; audio.c    19 
+                         29 ; audio.c    20 #include "reg8051.h"
+                         32 ; audio.c    21 #include "define.h"
+                         35 ; audio.c    22 #include "rtxcobj.h"
+                        365 ; audio.c    23 #include "audio.h"
+                        376 ; audio.c    24 #include "led_hw.h"
+                        383 ; audio.c    25 #include "tables.h"
+                        386 ; audio.c    26 #include "instru.h"
+                        482 ; audio.c    27                                                                                  
+                                                    
+                        483 ; audio.c    28 /**************************************************************************/
+                        484 ; audio.c    29 // The following definitions are based upon the document be PF:
+                        485 ; audio.c    30 //  "I/O-ports for controlling the audio generator in PT5201."
+                        486 ; audio.c    31 
+                        487 ; audio.c    32 // Audio Mode Select Port
+                        488 ; audio.c    33 #define AUDIOMODE                       0x000F
+                        489 ; audio.c    34 #define CLICKPERIOD             0x0100
+                        490 ; audio.c    35 
+                        491 ; audio.c    36 #define AESEBU500HZ48KHZ                                        0
+                        492 ; audio.c    37 #define AESEBU1000HZ48KHZ                                       1
+                        493 ; audio.c    38 #define AESEBU1000HZCLICK48KHZ          2
+                        494 ; audio.c    39 #define AESEBU8000HZ48KHZ                                       3
+                        495 ; audio.c    40  
+                        496 ; audio.c    41 #define AESEBU500HZ441KHZ                                       4
+                        497 ; audio.c    42 #define AESEBU1000HZ441KHZ                              5
+                        498 ; audio.c    43 #define AESEBU1000HZCLICK441KHZ         6
+                        499 ; audio.c    44 #define AESEBU8000HZ441KHZ                              7
+                        500 ; audio.c    45 
+                        501 ; audio.c    46 #define ANALOG500HZ                                                             8
+                            
+                        502 ; audio.c    47 #define ANALOG1000HZ                                                    9
+                        503 ; audio.c    48 #define ANALOG1000HZCLICK                                       10
+                        504 ; audio.c    49 #define ANALOG8000HZ                                                    11
+                        505 ; audio.c    50 
+                        506 ; audio.c    51 #define AESEBUF48KHZOFFSET                              0
+                        507 ; audio.c    52 #define AESEBUF441KHZOFFSET                             4
+                        508 ; audio.c    53 #define ANALOGAUDIOOFFSET                                       8
+                        509 ; audio.c    54 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        510 ; audio.c    55 // Audio Level Select Port
+                        511 ; audio.c    56 #define AESEBULEVEL             0x0007
+                        512 ; audio.c    57 #define ANALOGLEVEL             0x001F
+                        513 ; audio.c    58 #define AUDIOLEVEL              AESEBULEVEL | ANALOGLEVEL
+                        514 ; audio.c    59 
+                        515 ; audio.c    60 // Audio Control Select Port
+                        516 ; audio.c    61 #define POTMETERS                       0x000F
+                        517 ; audio.c    62 #define POT_CLK                         0x0001
+                        518 ; audio.c    63 #define POT_SDI                         0x0002
+                        519 ; audio.c    64 #define POT_CSAU                        0x0004
+                        520 ; audio.c    65 #define POT_CSCB                        0x0008
+                        521 ; audio.c    66 #define SELAESEBU                       0x0010
+                        522 ; audio.c    67 #define SELANALOG                       0x0020
+                        523 ; audio.c    68 #define NTSCPHASE                       0x0040
+                        524 ; audio.c    69 #define RELAYTYPE                       0x0080
+                        525 ; audio.c    70 #define PLLLOCK                         0x0100
+                        526 ; audio.c    71 #define VIDEOLOCK                       0x0200
+                        527 ; audio.c    72 
+                        528 ; audio.c    73 // End of definitions
+                        529 ; audio.c    74 /**************************************************************************/
+                        530 ; audio.c    75 
+                        531 ; audio.c    76 code UI TimingValues[] = {
+000000                  532 AUDIO_RO        SEGMENT HCODE ROMDATA
+000000                  533         RSEG    AUDIO_RO
+                        537         PUBLIC  _TimingValues
+                        538         ALIGN   1
+000000                  539 _TimingValues:
+000000 010016002B0041   540         DW      00001H,00016H,0002BH,00041H,00056H,0006CH,00082H,00097H
+       0056006C008200       
+       9700                 
+000010 AD00C200D800EE   541         DW      000ADH,000C2H,000D8H,000EEH,00103H,00119H,0012EH,00144H
+       00030119012E01       
+       4401                 
+000020 5A016F0185019A   542         DW      0015AH,0016FH,00185H,0019AH,001B0H,001C6H,001DBH,001F1H
+       01B001C601DB01       
+       F101                 
+                        543 ; audio.c    77         0x001,  // 0.0us
+                        544 ; audio.c    78         0x016,  // 0.8us
+                        545 ; audio.c    79         0x02B,  // 1.6us
+                        546 ; audio.c    80         0x041,  // 2.4us
+                        547 ; audio.c    81         0x056,  // 3.2us
+                        548 ; audio.c    82         0x06C,  // 4.0us
+                        549 ; audio.c    83         0x082,  // 4.8us
+                        550 ; audio.c    84         0x097,  // 5.6us
+                        551 ; audio.c    85         0x0AD,  // 6.4us
+                        552 ; audio.c    86         0x0C2,  // 7.2us
+                        553 ; audio.c    87         0x0D8,  // 8.0us
+                        554 ; audio.c    88         0x0EE,  // 8.8us
+                        555 ; audio.c    89         0x103,  // 9.6us
+                        556 ; audio.c    90         0x119,  // 10.4us
+                        557 ; audio.c    91         0x12E,  // 11.2us
+                        558 ; audio.c    92         0x144,  // 12.0us
+                        559 ; audio.c    93         0x15A,  // 12.8us
+                        560 ; audio.c    94         0x16F,  // 13.6us
+                        561 ; audio.c    95         0x185,  // 14.4us
+                        562 ; audio.c    96         0x19A,  // 15.2us
+                        563 ; audio.c    97         0x1B0,  // 16.0us
+                        564 ; audio.c    98         0x1C6,  // 16.8us
+                        565 ; audio.c    99         0x1DB,  // 17.6us
+                        566 ; audio.c   100         0x1F1,  // 18.4us
+                        567 ; audio.c   101         0x206,  // 19.2us
+                        568 ; audio.c   102         0x21C           // 20.0us
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        569 ; audio.c   103 };
+                        570 ; audio.c   104 
+                        571 ; audio.c   105 int AudioOutput;
+                        572 ; audio.c   106 AudioObject AudioSetup[NoOfAudioOutputs];
+                        573 ; audio.c   107 
+                        574 ; audio.c   108 volatile int AudioModePort _at(0x70000);                                // Port d
+                            efined in PLD
+                        575 ; audio.c   109 volatile int AudioLevelPort _at(0x70002);                       // Port defined i
+                            n PLD
+                        576 ; audio.c   110 volatile int AudioTimingPort _at(0x70004);                      // Port defined i
+                            n PLD
+                        577 ; audio.c   111 volatile int AudioControlPort _at(0x70006);             // Port defined in PLD
+                        578 ; audio.c   112 
+                        579 ; audio.c   113 static int AudioMode;
+                        580 ; audio.c   114 static int AudioLevel;
+                        581 ; audio.c   115 static int AudioTiming;
+                        582 ; audio.c   116 static int AudioControl;
+                        583 ; audio.c   117 
+                        584 ; audio.c   118 /**************************************************************************/
+                        585 ; audio.c   119 /* Write_AD8402                                                                  
+                                                                                                                             
+                                                              AUDIO.C */
+                        586 ; audio.c   120 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        587 ; audio.c   121 /* Author:       Peter Frederiksen/Kim Engedahl, DEV, 000329                     
+                                                                            */
+                        588 ; audio.c   122 /* Revised:      000603, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        589 ; audio.c   123 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        590 ; audio.c   124 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        591 ; audio.c   125 /* Remarks:      The Altera PLD V8 should be loaded before calling this          
+                                            */
+                        592 ; audio.c   126 /*                                       function.                               
+                                                                                                                             
+                                                                                                            */
+                        593 ; audio.c   127 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        594 ; audio.c   128 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        595 ; audio.c   129 /**************************************************************************/
+                        596 ; audio.c   130 int Write_AD8402( UC potmeter, UC channel, UC data)
+                        597 ; audio.c   131 {
+000030 06021C02         598         DW      00206H,0021CH
+000000                  599 AUDIO_PR        SEGMENT HCODE
+000000                  600         RSEG    AUDIO_PR
+                        601         ALIGN   1
+                        603         PUBLIC  _Write_AD8402
+000000                  604 _Write_AD8402:
+                        618 ; audio.c   132         UI d, n;
+                        619 ; audio.c   133 
+                        620 ; audio.c   134         if ( channel > 1)
+000000 911401           622         CMP.B   R0H,#01H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+000003 F903             623         BL      _3
+                        624 ; audio.c   135                 return( FAIL);
+000005 B900             626         MOV.W   R0,#00H
+000007 D680             629         RET
+000007 D68000           629         RET
+00000A                  630 _3:
+                        635 ; audio.c   136 
+                        636 ; audio.c   137         switch ( potmeter)
+00000A 910400           638         CMP.B   R0L,#00H
+00000D F313             639         BEQ     _6
+00000F 910401           640         CMP.B   R0L,#01H
+000012 F301             641         BEQ     _4
+000014 FE0D             642         BR      _5
+                        643 ; audio.c   138         {
+                        644 ; audio.c   139                 case CBPotMeter:
+                        645 ; audio.c   140                         AudioControl &= ~POT_CSCB;
+                        646 ; audio.c   141                         break;
+                        647 ; audio.c   142 
+                        648 ; audio.c   143                 case AudioPotMeter:
+000016                  650 _4:
+                        651 ; audio.c   144                         AudioControl &= ~POT_CSAU;
+000016 964842rr         653         MOV.B   ES,#SEG( _AudioControl )
+00001A 9928rrrr         654         MOV.W   R2,#SOF( _AudioControl )
+00001E 8A22             655         MOV.W   R2,[R2]
+000020 9925FFFB         656         AND.W   R2,#0FFFBH
+000024 964842rr         657         MOV.B   ES,#SEG( _AudioControl )
+000028 9938rrrr         658         MOV.W   R3,#SOF( _AudioControl )
+00002C 8A2B             659         MOV.W   [R3],R2
+                        660 ; audio.c   145                         break;
+00002E FE0E             662         BR      _7
+                        663 ; audio.c   146 
+                        664 ; audio.c   147                 default:
+000030                  666 _5:
+                        667 ; audio.c   148                         return( FAIL);
+000030 B900             669         MOV.W   R0,#00H
+000032 D680             672         RET
+000034                  674 _6:
+000034 964842rr         679         MOV.B   ES,#SEG( _AudioControl )
+000038 9928rrrr         680         MOV.W   R2,#SOF( _AudioControl )
+00003C 8A22             681         MOV.W   R2,[R2]
+00003E 9925FFF7         682         AND.W   R2,#0FFF7H
+000042 964842rr         683         MOV.B   ES,#SEG( _AudioControl )
+000046 9938rrrr         684         MOV.W   R3,#SOF( _AudioControl )
+00004A 8A2B             685         MOV.W   [R3],R2
+                        686 ; audio.c   149         }
+00004C                  688 _7:
+                        689 ; audio.c   150 
+                        690 ; audio.c   151         AudioControlPort = AudioControl;
+00004C 964842rr         692         MOV.B   ES,#SEG( _AudioControl )
+000050 9928rrrr         693         MOV.W   R2,#SOF( _AudioControl )
+000054 8A22             694         MOV.W   R2,[R2]
+000056 96484207         695         MOV.B   ES,#SEG( _AudioControlPort )
+00005A 99380006         696         MOV.W   R3,#SOF( _AudioControlPort )
+00005E 8A2B             697         MOV.W   [R3],R2
+                        698 ; audio.c   152 
+                        699 ; audio.c   153         d = ( channel * 0x100) + data;
+000060 8141             701         MOV.B   R2L,R0H
+000062 B150             702         MOVS.B  R2H,#00H
+000064 D928             703         ASL.W   R2,#08H
+000066 8102             704         MOV.B   R0L,R1L
+000068 B110             705         MOVS.B  R0H,#00H
+00006A 0920             707         ADD.W   R2,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        709 ; audio.c   154 
+                        710 ; audio.c   155         for ( n = 0x200; n > 0; n /= 2)
+00006C 99180200         712         MOV.W   R1,#0200H
+000070                  715 _8:
+                        716 ; audio.c   156         {
+                        717 ; audio.c   157                 AudioControl  &= ~POT_CLK;
+000070 964842rr         719         MOV.B   ES,#SEG( _AudioControl )
+000074 9908rrrr         720         MOV.W   R0,#SOF( _AudioControl )
+000078 8A00             721         MOV.W   R0,[R0]
+00007A 9905FFFE         722         AND.W   R0,#0FFFEH
+00007E 964842rr         723         MOV.B   ES,#SEG( _AudioControl )
+000082 9938rrrr         724         MOV.W   R3,#SOF( _AudioControl )
+000086 8A0B             725         MOV.W   [R3],R0
+                        726 ; audio.c   158                 AudioControlPort = AudioControl;
+000088 96484207         728         MOV.B   ES,#SEG( _AudioControlPort )
+00008C 99380006         729         MOV.W   R3,#SOF( _AudioControlPort )
+000090 8A0B             730         MOV.W   [R3],R0
+                        731 ; audio.c   159                 
+                        732 ; audio.c   160                 if ( d & n)
+000092 8932             734         MOV.W   R3,R2
+000094 5931             735         AND.W   R3,R1
+000096 F308             736         BEQ     _9
+                        737 ; audio.c   161                         AudioControl |= POT_SDI;
+000098 99060002         739         OR.W    R0,#02H
+00009C 964842rr         740         MOV.B   ES,#SEG( _AudioControl )
+0000A0 9938rrrr         741         MOV.W   R3,#SOF( _AudioControl )
+0000A4 8A0B             742         MOV.W   [R3],R0
+0000A6 FE0C             743         BR      _10
+0000A6 FE0C             743         BR      _10
+0000A8                  744 _9:
+                        745 ; audio.c   162                 else
+                        746 ; audio.c   163                         AudioControl &= ~POT_SDI;
+0000A8 964842rr         748         MOV.B   ES,#SEG( _AudioControl )
+0000AC 9908rrrr         749         MOV.W   R0,#SOF( _AudioControl )
+0000B0 8A00             750         MOV.W   R0,[R0]
+0000B2 9905FFFD         751         AND.W   R0,#0FFFDH
+0000B6 964842rr         752         MOV.B   ES,#SEG( _AudioControl )
+0000BA 9938rrrr         753         MOV.W   R3,#SOF( _AudioControl )
+0000BE 8A0B             754         MOV.W   [R3],R0
+0000BE 8A0B             754         MOV.W   [R3],R0
+0000C0                  755 _10:
+                        756 ; audio.c   164 
+                        757 ; audio.c   165                 AudioControlPort = AudioControl;
+0000C0 964842rr         759         MOV.B   ES,#SEG( _AudioControl )
+0000C4 9908rrrr         760         MOV.W   R0,#SOF( _AudioControl )
+0000C8 8A00             761         MOV.W   R0,[R0]
+0000CA 96484207         762         MOV.B   ES,#SEG( _AudioControlPort )
+0000CE 99380006         763         MOV.W   R3,#SOF( _AudioControlPort )
+0000D2 8A0B             764         MOV.W   [R3],R0
+                        765 ; audio.c   166 
+                        766 ; audio.c   167                 AudioControl |= POT_CLK;
+0000D4 99060001         768         OR.W    R0,#01H
+0000D8 964842rr         769         MOV.B   ES,#SEG( _AudioControl )
+0000DC 9938rrrr         770         MOV.W   R3,#SOF( _AudioControl )
+0000E0 8A0B             771         MOV.W   [R3],R0
+                        772 ; audio.c   168                 AudioControlPort = AudioControl;
+0000E2 96484207         774         MOV.B   ES,#SEG( _AudioControlPort )
+0000E6 99380006         775         MOV.W   R3,#SOF( _AudioControlPort )
+0000EA 8A0B             776         MOV.W   [R3],R0
+0000EC D811             778         LSR.W   R1,#01H
+0000EE 99140000         781         CMP.W   R1,#00H
+0000F2 F8BE             782         BG      _8
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        783 ; audio.c   169         }
+                        784 ; audio.c   170 
+                        785 ; audio.c   171         AudioControl |= ( POT_CLK | POT_SDI | POT_CSAU | POT_CSCB);
+0000F4 9906000F         787         OR.W    R0,#0FH
+0000F8 964842rr         788         MOV.B   ES,#SEG( _AudioControl )
+0000FC 9918rrrr         789         MOV.W   R1,#SOF( _AudioControl )
+000100 8A09             790         MOV.W   [R1],R0
+                        791 ; audio.c   172         AudioControlPort = AudioControl;
+000102 96484207         793         MOV.B   ES,#SEG( _AudioControlPort )
+000106 99180006         794         MOV.W   R1,#SOF( _AudioControlPort )
+00010A 8A09             795         MOV.W   [R1],R0
+                        796 ; audio.c   173 
+                        797 ; audio.c   174         return( OK);
+00010C 9908FFFF         799         MOV.W   R0,#0FFFFH
+                        800 ; audio.c   175 }
+000110                  802 _12:
+000110 D680             803         RET
+                        807 ; audio.c   176 
+                        808 ; audio.c   177 /**************************************************************************/
+                        809 ; audio.c   178 /* WriteAnlAudioDACLevel                                                         
+                                                                                                                             
+                                      AUDIO.C */
+                        810 ; audio.c   179 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        811 ; audio.c   180 /* Author:       Kim Engedahl, DEV, 000504                                       
+                                                                                                                             
+                                    */
+                        812 ; audio.c   181 /* Revised:      000603, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        813 ; audio.c   182 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        814 ; audio.c   183 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        815 ; audio.c   184 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        816 ; audio.c   185 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        817 ; audio.c   186 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        818 ; audio.c   187 /**************************************************************************/
+                        819 ; audio.c   188 int WriteAnlAudioDACLevel( UC left, UC right)
+                        820 ; audio.c   189 {       
+                        821         ALIGN   1
+                        823         PUBLIC  _WriteAnlAudioDACLevel
+000112                  824 _WriteAnlAudioDACLevel:
+000112 0F10             828         PUSH.W  R4
+000114 A97E             830         ADDS.W  R7,#0EH
+000116 8181             834         MOV.B   R4L,R0H
+                        839 ; audio.c   190         Write_AD8402( AudioPotMeter, AnlAudioLeftChannel, left);
+000118 911800           841         MOV.B   R0H,#00H
+00011B 912801           842         MOV.B   R1L,#01H
+00011E 820F             843         MOV.B   [R7],R0L
+000120 8102             846         MOV.B   R0L,R1L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+000122 8227             847         MOV.B   R1L,[R7]
+000124 C5FF6D           848         CALL    _Write_AD8402
+                        852 ; audio.c   191         Write_AD8402( AudioPotMeter, AnlAudioRightChannel, right);
+000127 910801           854         MOV.B   R0L,#01H
+00012A 8128             855         MOV.B   R1L,R4L
+00012C 911801           856         MOV.B   R0H,#01H
+00012F C5FF67           857         CALL    _Write_AD8402
+                        861 ; audio.c   192 
+                        862 ; audio.c   193         return( OK);
+000132 9908FFFF         864         MOV.W   R0,#0FFFFH
+                        865 ; audio.c   194 }
+000136 A972             867         ADDS.W  R7,#02H
+000138 2F10             869         POP.W   R4
+00013A D680             871         RET
+                        873 ; audio.c   195 
+                        874 ; audio.c   196 /**************************************************************************/
+                        875 ; audio.c   197 /* AudioDefaults                                                                 
+                                                                                                                             
+                                                              AUDIO.C */
+                        876 ; audio.c   198 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        877 ; audio.c   199 /* Author:       Kim Engedahl, DEV, 000526                                       
+                                                                                                                             
+                                    */
+                        878 ; audio.c   200 /* Revised:      000617, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        879 ; audio.c   201 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        880 ; audio.c   202 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        881 ; audio.c   203 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        882 ; audio.c   204 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        883 ; audio.c   205 /* Updates:  Level on Analog and AES Audio changed to SILENCE: JK         */
+                        884 ; audio.c   206 /* Updates:  Level on Analog and AES Audio changed to -20dBFS and 0dBu: JK*/
+                        885 ; audio.c   207 /* Updates:  level is -18 for PAL and -20 for NTSC                        */
+                        886 ; audio.c   208 /**************************************************************************/
+                        887 ; audio.c   209 void AudioDefaults( void)
+                        888 ; audio.c   210   {     
+                        889         ALIGN   1
+                        891         PUBLIC  _AudioDefaults
+00013C                  892 _AudioDefaults:
+00013C 0F70             896         PUSH.W  R4, R5, R6
+                        898 ; audio.c   211         Settings.AudioOutput = AudioOutput = AESEBUAudio;
+00013E 964842rr         900         MOV.B   ES,#SEG( _AudioOutput )
+000142 9908rrrr         901         MOV.W   R0,#SOF( _AudioOutput )
+000146 BA01             902         MOV.W   [R0],#01H
+000148 964842rr         903         MOV.B   ES,#SEG( _Settings+44 )
+00014C 9908rrrr         904         MOV.W   R0,#SOF( _Settings+44 )
+000150 BA01             905         MOV.W   [R0],#01H
+                        906 ; audio.c   212 
+                        907 ; audio.c   213         if ( Calibration.ResetSystem < NTSC_US)
+000152 964842rr         909         MOV.B   ES,#SEG( _Calibration+97 )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+000156 9908rrrr         910         MOV.W   R0,#SOF( _Calibration+97 )
+00015A 8200             911         MOV.B   R0L,[R0]
+00015C 910402           912         CMP.B   R0L,#02H
+00015F F016             913         BCC     _15
+                        914 ; audio.c   214           {
+                        915 ; audio.c   215                 Settings.AudioSetup[AESEBUAudio].System = AudioSetup[AESEBUAudio]
+                            .System = AudioPAL;
+000161 964842rr         917         MOV.B   ES,#SEG( _AudioSetup+14 )
+000165 9908rrrr         918         MOV.W   R0,#SOF( _AudioSetup+14 )
+000169 BA00             919         MOV.W   [R0],#00H
+00016B 964842rr         920         MOV.B   ES,#SEG( _Settings+60 )
+00016F 9908rrrr         921         MOV.W   R0,#SOF( _Settings+60 )
+000173 BA00             922         MOV.W   [R0],#00H
+                        923 ; audio.c   216           Settings.AudioSetup[AESEBUAudio].Level = AudioSetup[AESEBUAudio].Level 
+                            = M18dBFS;
+000175 964842rr         925         MOV.B   ES,#SEG( _AudioSetup+18 )
+000179 9908rrrr         926         MOV.W   R0,#SOF( _AudioSetup+18 )
+00017D BA05             927         MOV.W   [R0],#05H
+00017F 964842rr         928         MOV.B   ES,#SEG( _Settings+64 )
+000183 9908rrrr         929         MOV.W   R0,#SOF( _Settings+64 )
+000187 BA05             930         MOV.W   [R0],#05H
+                        931 ; audio.c   217                 }
+000189 FE15             933         BR      _16
+000189 FE1500           933         BR      _16
+00018C                  934 _15:
+                        935 ; audio.c   218         else
+                        936 ; audio.c   219           {
+                        937 ; audio.c   220                 Settings.AudioSetup[AESEBUAudio].System = AudioSetup[AESEBUAudio]
+                            .System = AudioNTSC;
+00018C 964842rr         939         MOV.B   ES,#SEG( _AudioSetup+14 )
+000190 9908rrrr         940         MOV.W   R0,#SOF( _AudioSetup+14 )
+000194 BA01             941         MOV.W   [R0],#01H
+000196 964842rr         942         MOV.B   ES,#SEG( _Settings+60 )
+00019A 9908rrrr         943         MOV.W   R0,#SOF( _Settings+60 )
+00019E BA01             944         MOV.W   [R0],#01H
+                        945 ; audio.c   221           Settings.AudioSetup[AESEBUAudio].Level = AudioSetup[AESEBUAudio].Level 
+                            = M20dBFS;
+0001A0 964842rr         947         MOV.B   ES,#SEG( _AudioSetup+18 )
+0001A4 9908rrrr         948         MOV.W   R0,#SOF( _AudioSetup+18 )
+0001A8 BA06             949         MOV.W   [R0],#06H
+0001AA 964842rr         950         MOV.B   ES,#SEG( _Settings+64 )
+0001AE 9908rrrr         951         MOV.W   R0,#SOF( _Settings+64 )
+0001B2 BA06             952         MOV.W   [R0],#06H
+                        953 ; audio.c   222                 }
+0001B4                  955 _16:
+                        956 ; audio.c   223 
+                        957 ; audio.c   224         Settings.AudioSetup[AESEBUAudio].Signal = AudioSetup[AESEBUAudio].Signal 
+                            = S1kHz;
+0001B4 964842rr         959         MOV.B   ES,#SEG( _AudioSetup+16 )
+0001B8 9908rrrr         960         MOV.W   R0,#SOF( _AudioSetup+16 )
+0001BC BA01             961         MOV.W   [R0],#01H
+0001BE 964842rr         962         MOV.B   ES,#SEG( _Settings+62 )
+0001C2 9908rrrr         963         MOV.W   R0,#SOF( _Settings+62 )
+0001C6 BA01             964         MOV.W   [R0],#01H
+                        965 ; audio.c   225         Settings.AudioSetup[AESEBUAudio].Timing = AudioSetup[AESEBUAudio].Timing 
+                            = TimingValues[0];
+0001C8 964843rr         967         MOV.B   CS,#SEG( _TimingValues )
+0001CC 9918rrrr         968         MOV.W   R1,#SOF( _TimingValues )
+0001D0 8801             969         MOVC.W  R0,[R1+]
+0001D2 C4rrrrrr         970         FCALL   __US2SPF
+0001D6 964842rr         971         MOV.B   ES,#SEG( _AudioSetup+20 )
+0001DA 9928rrrr         972         MOV.W   R2,#SOF( _AudioSetup+20 )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+0001DE 8B0A             973         MOV.W   [R2+],R0
+0001E0 8A1A             974         MOV.W   [R2],R1
+0001E2 964842rr         975         MOV.B   ES,#SEG( _Settings+66 )
+0001E6 9928rrrr         976         MOV.W   R2,#SOF( _Settings+66 )
+0001EA 8B0A             977         MOV.W   [R2+],R0
+0001EC 8A1A             978         MOV.W   [R2],R1
+                        979 ; audio.c   226         Settings.AudioSetup[AESEBUAudio].Click = AudioSetup[AESEBUAudio].Click = 
+                            click3s;
+0001EE 964842rr         981         MOV.B   ES,#SEG( _AudioSetup+26 )
+0001F2 9908rrrr         982         MOV.W   R0,#SOF( _AudioSetup+26 )
+0001F6 BA03             983         MOV.W   [R0],#03H
+0001F8 964842rr         984         MOV.B   ES,#SEG( _Settings+72 )
+0001FC 9908rrrr         985         MOV.W   R0,#SOF( _Settings+72 )
+000200 BA03             986         MOV.W   [R0],#03H
+                        987 ; audio.c   227         Settings.AudioSetup[AESEBUAudio].Frequency = AudioSetup[AESEBUAudio].Freq
+                            uency = f48kHz;
+000202 964842rr         989         MOV.B   ES,#SEG( _AudioSetup+24 )
+000206 9908rrrr         990         MOV.W   R0,#SOF( _AudioSetup+24 )
+00020A BA01             991         MOV.W   [R0],#01H
+00020C 964842rr         992         MOV.B   ES,#SEG( _Settings+70 )
+000210 9908rrrr         993         MOV.W   R0,#SOF( _Settings+70 )
+000214 BA01             994         MOV.W   [R0],#01H
+                        995 ; audio.c   228 
+                        996 ; audio.c   229         Settings.AudioSetup[AnalogAudio].Signal = AudioSetup[AnalogAudio].Signal 
+                            = S1kHz;
+000216 964842rr         998         MOV.B   ES,#SEG( _AudioSetup+2 )
+00021A 9908rrrr         999         MOV.W   R0,#SOF( _AudioSetup+2 )
+00021E BA01            1000         MOV.W   [R0],#01H
+000220 964842rr        1001         MOV.B   ES,#SEG( _Settings+48 )
+000224 9908rrrr        1002         MOV.W   R0,#SOF( _Settings+48 )
+000228 BA01            1003         MOV.W   [R0],#01H
+                       1004 ; audio.c   230         Settings.AudioSetup[AnalogAudio].Level = AudioSetup[AnalogAudio].Level = 
+                            M0dBm; 
+00022A 964842rr        1006         MOV.B   ES,#SEG( _AudioSetup+4 )
+00022E 9908rrrr        1007         MOV.W   R0,#SOF( _AudioSetup+4 )
+000232 9A08000A        1008         MOV.W   [R0],#0AH
+000236 964842rr        1009         MOV.B   ES,#SEG( _Settings+50 )
+00023A 9908rrrr        1010         MOV.W   R0,#SOF( _Settings+50 )
+00023E 9A08000A        1011         MOV.W   [R0],#0AH
+                       1012 ; audio.c   231         Settings.AudioSetup[AnalogAudio].Click = AudioSetup[AnalogAudio].Click = 
+                            click3s;
+000242 964842rr        1014         MOV.B   ES,#SEG( _AudioSetup+12 )
+000246 9908rrrr        1015         MOV.W   R0,#SOF( _AudioSetup+12 )
+00024A BA03            1016         MOV.W   [R0],#03H
+00024C 964842rr        1017         MOV.B   ES,#SEG( _Settings+58 )
+000250 9908rrrr        1018         MOV.W   R0,#SOF( _Settings+58 )
+000254 BA03            1019         MOV.W   [R0],#03H
+                       1020 ; audio.c   232 
+                       1021 ; audio.c   233         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000256 9918rrrr        1023         MOV.W   R1,#SEG( _Settings )
+00025A 9908rrrr        1024         MOV.W   R0,#SOF( _Settings )
+00025E 964842rr        1025         MOV.B   ES,#SEG( _SettingsPtr )
+000262 9928rrrr        1026         MOV.W   R2,#SOF( _SettingsPtr )
+000266 8A22            1027         MOV.W   R2,[R2]
+000268 9938004A        1028         MOV.W   R3,#04AH
+                       1029         CALL    _NV_Store
+00026C C4rrrrrr       +1029 ;       FCALL   _NV_Store
+                       1030 ; audio.c   234 }
+000270 2F70            1032         POP.W   R4, R5, R6
+000272 D680            1034         RET
+                       1036 ; audio.c   235 
+                       1037 ; audio.c   236 /**************************************************************************/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                       1038 ; audio.c   237 /* AudioInit                                                                     
+                                                                                                                             
+                                                                      AUDIO.C */
+                       1039 ; audio.c   238 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1040 ; audio.c   239 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1041 ; audio.c   240 /* Revised:      000617, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1042 ; audio.c   241 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1043 ; audio.c   242 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1044 ; audio.c   243 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1045 ; audio.c   244 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1046 ; audio.c   245 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1047 ; audio.c   246 /**************************************************************************/
+                       1048 ; audio.c   247 int AudioInit( void)
+                       1049 ; audio.c   248   {     
+                       1050         ALIGN   1
+                       1052         PUBLIC  _AudioInit
+000274                 1053 _AudioInit:
+                       1057 ; audio.c   249         WriteAnlAudioDACLevel(Calibration.AudioCalibration.AnalogLeftChannel,
+                       1058 ; audio.c   250                                                                                  
+                               Calibration.AudioCalibration.AnalogRightChannel);
+000274 964842rr        1060         MOV.B   ES,#SEG( _Calibration+224 )
+000278 9908rrrr        1061         MOV.W   R0,#SOF( _Calibration+224 )
+00027C 8200            1062         MOV.B   R0L,[R0]
+00027E 964842rr        1063         MOV.B   ES,#SEG( _Calibration+225 )
+000282 9918rrrr        1064         MOV.W   R1,#SOF( _Calibration+225 )
+000286 8211            1065         MOV.B   R0H,[R1]
+000288 C5FF44          1066         CALL    _WriteAnlAudioDACLevel
+                       1067 ; audio.c   251 
+                       1068 ; audio.c   252         AudioSetup[AESEBUAudio].System = Settings.AudioSetup[AESEBUAudio].System;
+                            
+00028B 964842rr        1070         MOV.B   ES,#SEG( _Settings+60 )
+00028F 9908rrrr        1071         MOV.W   R0,#SOF( _Settings+60 )
+000293 8A00            1072         MOV.W   R0,[R0]
+000295 964842rr        1073         MOV.B   ES,#SEG( _AudioSetup+14 )
+000299 9918rrrr        1074         MOV.W   R1,#SOF( _AudioSetup+14 )
+00029D 8A09            1075         MOV.W   [R1],R0
+                       1076 ; audio.c   253         AudioSetup[AESEBUAudio].Signal = Settings.AudioSetup[AESEBUAudio].Signal;
+                            
+00029F 964842rr        1078         MOV.B   ES,#SEG( _Settings+62 )
+0002A3 9908rrrr        1079         MOV.W   R0,#SOF( _Settings+62 )
+0002A7 8A00            1080         MOV.W   R0,[R0]
+0002A9 964842rr        1081         MOV.B   ES,#SEG( _AudioSetup+16 )
+0002AD 9918rrrr        1082         MOV.W   R1,#SOF( _AudioSetup+16 )
+0002B1 8A09            1083         MOV.W   [R1],R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                       1084 ; audio.c   254         AudioSetup[AESEBUAudio].Level = Settings.AudioSetup[AESEBUAudio].Level;
+0002B3 964842rr        1086         MOV.B   ES,#SEG( _Settings+64 )
+0002B7 9908rrrr        1087         MOV.W   R0,#SOF( _Settings+64 )
+0002BB 8A00            1088         MOV.W   R0,[R0]
+0002BD 964842rr        1089         MOV.B   ES,#SEG( _AudioSetup+18 )
+0002C1 9918rrrr        1090         MOV.W   R1,#SOF( _AudioSetup+18 )
+0002C5 8A09            1091         MOV.W   [R1],R0
+                       1092 ; audio.c   255         AudioSetup[AESEBUAudio].Timing = Settings.AudioSetup[AESEBUAudio].Timing;
+                            
+0002C7 964842rr        1094         MOV.B   ES,#SEG( _Settings+66 )
+0002CB 9918rrrr        1095         MOV.W   R1,#SOF( _Settings+66 )
+0002CF 8B01            1096         MOV.W   R0,[R1+]
+0002D1 8A11            1097         MOV.W   R1,[R1]
+0002D3 964842rr        1098         MOV.B   ES,#SEG( _AudioSetup+20 )
+0002D7 9928rrrr        1099         MOV.W   R2,#SOF( _AudioSetup+20 )
+0002DB 8B0A            1100         MOV.W   [R2+],R0
+0002DD 8A1A            1101         MOV.W   [R2],R1
+                       1102 ; audio.c   256         AudioSetup[AESEBUAudio].Click = Settings.AudioSetup[AESEBUAudio].Click;
+0002DF 964842rr        1104         MOV.B   ES,#SEG( _Settings+72 )
+0002E3 9908rrrr        1105         MOV.W   R0,#SOF( _Settings+72 )
+0002E7 8A00            1106         MOV.W   R0,[R0]
+0002E9 964842rr        1107         MOV.B   ES,#SEG( _AudioSetup+26 )
+0002ED 9918rrrr        1108         MOV.W   R1,#SOF( _AudioSetup+26 )
+0002F1 8A09            1109         MOV.W   [R1],R0
+                       1110 ; audio.c   257         AudioSetup[AESEBUAudio].Frequency = Settings.AudioSetup[AESEBUAudio].Freq
+                            uency;
+0002F3 964842rr        1112         MOV.B   ES,#SEG( _Settings+70 )
+0002F7 9908rrrr        1113         MOV.W   R0,#SOF( _Settings+70 )
+0002FB 8A00            1114         MOV.W   R0,[R0]
+0002FD 964842rr        1115         MOV.B   ES,#SEG( _AudioSetup+24 )
+000301 9918rrrr        1116         MOV.W   R1,#SOF( _AudioSetup+24 )
+000305 8A09            1117         MOV.W   [R1],R0
+                       1118 ; audio.c   258 
+                       1119 ; audio.c   259         AudioSetup[AnalogAudio].Signal = Settings.AudioSetup[AnalogAudio].Signal;
+                            
+000307 964842rr        1121         MOV.B   ES,#SEG( _Settings+48 )
+00030B 9908rrrr        1122         MOV.W   R0,#SOF( _Settings+48 )
+00030F 8A00            1123         MOV.W   R0,[R0]
+000311 964842rr        1124         MOV.B   ES,#SEG( _AudioSetup+2 )
+000315 9918rrrr        1125         MOV.W   R1,#SOF( _AudioSetup+2 )
+000319 8A09            1126         MOV.W   [R1],R0
+                       1127 ; audio.c   260         AudioSetup[AnalogAudio].Level = Settings.AudioSetup[AnalogAudio].Level;
+00031B 964842rr        1129         MOV.B   ES,#SEG( _Settings+50 )
+00031F 9908rrrr        1130         MOV.W   R0,#SOF( _Settings+50 )
+000323 8A00            1131         MOV.W   R0,[R0]
+000325 964842rr        1132         MOV.B   ES,#SEG( _AudioSetup+4 )
+000329 9918rrrr        1133         MOV.W   R1,#SOF( _AudioSetup+4 )
+00032D 8A09            1134         MOV.W   [R1],R0
+                       1135 ; audio.c   261         AudioSetup[AnalogAudio].Click = Settings.AudioSetup[AnalogAudio].Click;
+00032F 964842rr        1137         MOV.B   ES,#SEG( _Settings+58 )
+000333 9908rrrr        1138         MOV.W   R0,#SOF( _Settings+58 )
+000337 8A00            1139         MOV.W   R0,[R0]
+000339 964842rr        1140         MOV.B   ES,#SEG( _AudioSetup+12 )
+00033D 9918rrrr        1141         MOV.W   R1,#SOF( _AudioSetup+12 )
+000341 8A09            1142         MOV.W   [R1],R0
+                       1143 ; audio.c   262 
+                       1144 ; audio.c   263         // NOTE!! WordClock is NOT defined for the analog audio, hence it is nece
+                            ssary
+                       1145 ; audio.c   264         //  to ensure that either of the front WordClock LEDs is switched on if
+                       1146 ; audio.c   265         //  the PT5201 is to start in analog audio mode, i.e. the wordclock LEDs 
+                            is
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                       1147 ; audio.c   266         //  updated with the state of the AESEBU audio wordclock even though anal
+                            og audio
+                       1148 ; audio.c   267         //  is selected.
+                       1149 ; audio.c   268         LEDSet(WordClk441LED, AudioSetup[AESEBUAudio].Frequency == f441kHz);    
+000343 99081000        1151         MOV.W   R0,#01000H
+000347 964842rr        1152         MOV.B   ES,#SEG( _AudioSetup+24 )
+00034B 9918rrrr        1153         MOV.W   R1,#SOF( _AudioSetup+24 )
+00034F 8A11            1154         MOV.W   R1,[R1]
+000351 F203            1155         BNE     _18
+000353 B911            1156         MOVS.W  R1,#01H
+000355 FE02            1157         BR      _19
+000355 FE0200          1157         BR      _19
+000358                 1158 _18:
+000358 B910            1159         MOVS.W  R1,#00H
+000358 B910            1159         MOVS.W  R1,#00H
+00035A                 1160 _19:
+                       1161         CALL    _LEDSet
+00035A C4rrrrrr       +1161 ;       FCALL   _LEDSet
+                       1162 ; audio.c   269         LEDSet(WordClk48LED, AudioSetup[AESEBUAudio].Frequency == f48kHz);
+00035E 99082000        1164         MOV.W   R0,#02000H
+000362 964842rr        1165         MOV.B   ES,#SEG( _AudioSetup+24 )
+000366 9918rrrr        1166         MOV.W   R1,#SOF( _AudioSetup+24 )
+00036A 8A11            1167         MOV.W   R1,[R1]
+00036C 99140001        1168         CMP.W   R1,#01H
+000370 F202            1169         BNE     _20
+000372 B911            1170         MOVS.W  R1,#01H
+000374 FE01            1171         BR      _22
+000374 FE01            1171         BR      _22
+000376                 1172 _20:
+000376 B910            1173         MOVS.W  R1,#00H
+000376 B910            1173         MOVS.W  R1,#00H
+000378                 1174 _22:
+                       1175         CALL    _LEDSet
+000378 C4rrrrrr       +1175 ;       FCALL   _LEDSet
+                       1176 ; audio.c   270 
+                       1177 ; audio.c   271         return(0);
+00037C B900            1179         MOV.W   R0,#00H
+                       1180 ; audio.c   272   }
+00037E D680            1182         RET
+                       1184 ; audio.c   273 
+                       1185 ; audio.c   274 /**************************************************************************/
+                       1186 ; audio.c   275 /* AudioUpdate                                                                   
+                                                                                                                             
+                                                              AUDIO.C */
+                       1187 ; audio.c   276 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1188 ; audio.c   277 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1189 ; audio.c   278 /* Revised:      000628, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1190 ; audio.c   279 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1191 ; audio.c   280 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                       1192 ; audio.c   281 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1193 ; audio.c   282 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1194 ; audio.c   283 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1195 ; audio.c   284 /**************************************************************************/
+                       1196 ; audio.c   285 int AudioUpdate( void)
+                       1197 ; audio.c   286   {
+                       1198         ALIGN   1
+                       1200         PUBLIC  _AudioUpdate
+000380                 1201 _AudioUpdate:
+                       1205 ; audio.c   287         SetAudioOutput( Settings.AudioOutput);
+000380 964842rr        1207         MOV.B   ES,#SEG( _Settings+44 )
+000384 9908rrrr        1208         MOV.W   R0,#SOF( _Settings+44 )
+000388 8A00            1209         MOV.W   R0,[R0]
+00038A C50013          1210         CALL    _SetAudioOutput
+                       1211 ; audio.c   288 
+                       1212 ; audio.c   289         return( OK);
+00038D 9908FFFF        1214         MOV.W   R0,#0FFFFH
+                       1215 ; audio.c   290   }
+000391 D680            1217         RET
+                       1219 ; audio.c   291 
+                       1220 ; audio.c   292 /**************************************************************************/
+                       1221 ; audio.c   293 /* AudioStatus                                                                   
+                                                                                                                             
+                                                              AUDIO.C */
+                       1222 ; audio.c   294 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1223 ; audio.c   295 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1224 ; audio.c   296 /* Revised:      000628, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1225 ; audio.c   297 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1226 ; audio.c   298 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1227 ; audio.c   299 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1228 ; audio.c   300 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1229 ; audio.c   301 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1230 ; audio.c   302 /**************************************************************************/
+                       1231 ; audio.c   303 UC AudioStatus( void)
+                       1232 ; audio.c   304 {
+000393 00              1233         ALIGN   1
+                       1235         PUBLIC  _AudioStatus
+000394                 1236 _AudioStatus:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+                       1240 ; audio.c   305         return(( AudioControlPort >> 8) && 0xFC);
+000394 96484207        1242         MOV.B   ES,#SEG( _AudioControlPort )
+000398 99080006        1243         MOV.W   R0,#SOF( _AudioControlPort )
+00039C 8A00            1244         MOV.W   R0,[R0]
+00039E DA08            1245         ASR.W   R0,#08H
+0003A0 6900            1246         OR.W    R0,R0
+0003A2 F302            1247         BEQ     _23
+0003A4 9108FC          1248         MOV.B   R0L,#0FCH
+0003A4 9108FC00        1248         MOV.B   R0L,#0FCH
+0003A8                 1249 _23:
+0003A8 F302            1250         BEQ     _24
+0003AA B101            1251         MOVS.B  R0L,#01H
+0003AC FE01            1252         BR      _25
+0003AC FE01            1252         BR      _25
+0003AE                 1253 _24:
+0003AE B100            1254         MOVS.B  R0L,#00H
+0003AE B100            1254         MOVS.B  R0L,#00H
+0003B0                 1255 _25:
+                       1256 ; audio.c   306  }
+0003B0 D680            1258         RET
+                       1260 ; audio.c   307 
+                       1261 ; audio.c   308 /**************************************************************************/
+                       1262 ; audio.c   309 /* SetAudioOutput                                                                
+                                                                                                                             
+                                                              AUDIO.C */
+                       1263 ; audio.c   310 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1264 ; audio.c   311 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1265 ; audio.c   312 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1266 ; audio.c   313 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1267 ; audio.c   314 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1268 ; audio.c   315 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1269 ; audio.c   316 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1270 ; audio.c   317 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1271 ; audio.c   318 /**************************************************************************/
+                       1272 ; audio.c   319 int SetAudioOutput( int output)
+                       1273 ; audio.c   320   {
+                       1274         ALIGN   1
+                       1276         PUBLIC  _SetAudioOutput
+0003B2                 1277 _SetAudioOutput:
+0003B2 0F70            1281         PUSH.W  R4, R5, R6
+0003B4 A97E            1283         ADDS.W  R7,#0EH
+                       1287 ; audio.c   321         Settings.ActivePreset = 0;
+0003B6 964842rr        1289         MOV.B   ES,#SEG( _Settings )
+0003BA 9918rrrr        1290         MOV.W   R1,#SOF( _Settings )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+0003BE BA10            1291         MOV.W   [R1],#00H
+                       1292 ; audio.c   322 
+                       1293 ; audio.c   323         Settings.AudioOutput = AudioOutput = output;
+0003C0 8940            1295         MOV.W   R4,R0
+0003C2 964842rr        1296         MOV.B   ES,#SEG( _AudioOutput )
+0003C6 9908rrrr        1297         MOV.W   R0,#SOF( _AudioOutput )
+0003CA 8A48            1298         MOV.W   [R0],R4
+0003CC 964842rr        1301         MOV.B   ES,#SEG( _Settings+44 )
+0003D0 9908rrrr        1302         MOV.W   R0,#SOF( _Settings+44 )
+0003D4 8A48            1303         MOV.W   [R0],R4
+                       1304 ; audio.c   324         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+0003D6 9918rrrr        1306         MOV.W   R1,#SEG( _Settings )
+0003DA 9908rrrr        1307         MOV.W   R0,#SOF( _Settings )
+0003DE 964842rr        1308         MOV.B   ES,#SEG( _SettingsPtr )
+0003E2 9928rrrr        1309         MOV.W   R2,#SOF( _SettingsPtr )
+0003E6 8A22            1310         MOV.W   R2,[R2]
+0003E8 9938004A        1311         MOV.W   R3,#04AH
+                       1312         CALL    _NV_Store
+0003EC C4rrrrrr       +1312 ;       FCALL   _NV_Store
+                       1313 ; audio.c   325 
+                       1314 ; audio.c   326         if ( output == AnalogAudio)
+0003F0 6944            1316         OR.W    R4,R4
+0003F2 F20D            1317         BNE     _26
+                       1318 ; audio.c   327                 AudioControl |= SELANALOG;                      // Select analog 
+                            output
+0003F4 964842rr        1320         MOV.B   ES,#SEG( _AudioControl )
+0003F8 9908rrrr        1321         MOV.W   R0,#SOF( _AudioControl )
+0003FC 8A00            1322         MOV.W   R0,[R0]
+0003FE 99060020        1323         OR.W    R0,#020H
+000402 964842rr        1324         MOV.B   ES,#SEG( _AudioControl )
+000406 9918rrrr        1325         MOV.W   R1,#SOF( _AudioControl )
+00040A 8A09            1326         MOV.W   [R1],R0
+00040C FE0C            1327         BR      _27
+00040C FE0C            1327         BR      _27
+00040E                 1328 _26:
+                       1329 ; audio.c   328         else
+                       1330 ; audio.c   329                 AudioControl |= SELAESEBU;                      // Select AES/EBU
+                             output
+00040E 964842rr        1332         MOV.B   ES,#SEG( _AudioControl )
+000412 9908rrrr        1333         MOV.W   R0,#SOF( _AudioControl )
+000416 8A00            1334         MOV.W   R0,[R0]
+000418 99060010        1335         OR.W    R0,#010H
+00041C 964842rr        1336         MOV.B   ES,#SEG( _AudioControl )
+000420 9918rrrr        1337         MOV.W   R1,#SOF( _AudioControl )
+000424 8A09            1338         MOV.W   [R1],R0
+000424 8A09            1338         MOV.W   [R1],R0
+000426                 1339 _27:
+                       1340 ; audio.c   330 
+                       1341 ; audio.c   331         AudioControlPort = AudioControl;        // Select output mode. The output
+                             selection
+000426 964842rr        1343         MOV.B   ES,#SEG( _AudioControl )
+00042A 9908rrrr        1344         MOV.W   R0,#SOF( _AudioControl )
+00042E 8A00            1345         MOV.W   R0,[R0]
+000430 96484207        1346         MOV.B   ES,#SEG( _AudioControlPort )
+000434 99180006        1347         MOV.W   R1,#SOF( _AudioControlPort )
+000438 8A09            1348         MOV.W   [R1],R0
+                       1349 ; audio.c   332                                                                                  
+                                                                                            //  requires the generation of a 
+                            50ms pulse.
+                       1350 ; audio.c   333 
+                       1351 ; audio.c   334         Sleep( 50);                                                              
+                                                            // Sleep for 50 ms
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+00043A 99080032        1353         MOV.W   R0,#032H
+                       1354         CALL    _Sleep
+00043E C4rrrrrr       +1354 ;       FCALL   _Sleep
+                       1355 ; audio.c   335 
+                       1356 ; audio.c   336         AudioControl &= ~( SELANALOG + SELAESEBU);      // End of 50ms pulse
+000442 964842rr        1358         MOV.B   ES,#SEG( _AudioControl )
+000446 9908rrrr        1359         MOV.W   R0,#SOF( _AudioControl )
+00044A 8A00            1360         MOV.W   R0,[R0]
+00044C 9905FFCF        1361         AND.W   R0,#0FFCFH
+000450 964842rr        1362         MOV.B   ES,#SEG( _AudioControl )
+000454 9918rrrr        1363         MOV.W   R1,#SOF( _AudioControl )
+000458 8A09            1364         MOV.W   [R1],R0
+                       1365 ; audio.c   337 
+                       1366 ; audio.c   338                                                                                  
+                                                                                                            // Update output 
+                            variable and LEDs
+                       1367 ; audio.c   339         LEDSet( AnalogAudioLED, output == AnalogAudio);
+00045A 99080100        1369         MOV.W   R0,#0100H
+00045E 6944            1370         OR.W    R4,R4
+000460 F202            1371         BNE     _28
+000462 B911            1372         MOVS.W  R1,#01H
+000464 FE01            1373         BR      _29
+000464 FE01            1373         BR      _29
+000466                 1374 _28:
+000466 B910            1375         MOVS.W  R1,#00H
+000466 B910            1375         MOVS.W  R1,#00H
+000468                 1376 _29:
+                       1377         CALL    _LEDSet
+000468 C4rrrrrr       +1377 ;       FCALL   _LEDSet
+                       1378 ; audio.c   340         LEDSet( AESEBUAudioLED, output == AESEBUAudio);
+00046C 99080200        1380         MOV.W   R0,#0200H
+000470 99440001        1381         CMP.W   R4,#01H
+000474 F202            1382         BNE     _30
+000476 B911            1383         MOVS.W  R1,#01H
+000478 FE01            1384         BR      _32
+000478 FE01            1384         BR      _32
+00047A                 1385 _30:
+00047A B910            1386         MOVS.W  R1,#00H
+00047A B910            1386         MOVS.W  R1,#00H
+00047C                 1387 _32:
+                       1388         CALL    _LEDSet
+00047C C4rrrrrr       +1388 ;       FCALL   _LEDSet
+                       1389 ; audio.c   341 
+                       1390 ; audio.c   342         SetAudioSystem( output, AudioSetup[output].System);
+000480 9908000E        1392         MOV.W   R0,#0EH
+000484 E404            1393         MULU.W  R0,R4
+000486 8960            1394         MOV.W   R6,R0
+000488 8906            1395         MOV.W   R0,R6
+00048A B910            1396         MOVS.W  R1,#00H
+00048C 964842rr        1397         MOV.B   ES,#SEG( _AudioSetup )
+000490 8D10rrrr        1398         MOV.W   R1,[R0+SOF( _AudioSetup )]
+000494 8A4F            1399         MOV.W   [R7],R4
+000496 8904            1400         MOV.W   R0,R4
+000498 C5002C          1405         CALL    _SetAudioSystem
+                       1408 ; audio.c   343         SetAudioSignal( output, AudioSetup[output].Signal);
+00049B 8946            1410         MOV.W   R4,R6
+00049D B950            1411         MOVS.W  R5,#00H
+00049F 964842rr        1412         MOV.B   ES,#SEG( _AudioSetup+2 )
+0004A3 8D14rrrr        1413         MOV.W   R1,[R4+SOF( _AudioSetup+2 )]
+0004A7 8A07            1414         MOV.W   R0,[R7]
+0004A9 C50070          1417         CALL    _SetAudioSignal
+                       1420 ; audio.c   344         SetAudioLevel( output, AudioSetup[output].Level);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+0004AC 964842rr        1422         MOV.B   ES,#SEG( _AudioSetup+4 )
+0004B0 8D14rrrr        1423         MOV.W   R1,[R4+SOF( _AudioSetup+4 )]
+0004B4 8A07            1424         MOV.W   R0,[R7]
+0004B6 C500BD          1427         CALL    _SetAudioLevel
+                       1430 ; audio.c   345         SetAudioTiming( output, AudioSetup[output].Timing);
+0004B9 8926            1432         MOV.W   R2,R6
+0004BB B930            1433         MOVS.W  R3,#00H
+0004BD 964842rr        1434         MOV.B   ES,#SEG( _AudioSetup+6 )
+0004C1 8D32rrrr        1435         MOV.W   R3,[R2+SOF( _AudioSetup+8 )]
+0004C5 8D22rrrr        1436         MOV.W   R2,[R2+SOF( _AudioSetup+6 )]
+0004C9 8A07            1437         MOV.W   R0,[R7]
+0004CB C50101          1440         CALL    _SetAudioTiming
+                       1443 ; audio.c   346         SetAudioWordClock( output, AudioSetup[output].Frequency);
+0004CE 964842rr        1445         MOV.B   ES,#SEG( _AudioSetup+10 )
+0004D2 8D14rrrr        1446         MOV.W   R1,[R4+SOF( _AudioSetup+10 )]
+0004D6 8A07            1447         MOV.W   R0,[R7]
+0004D8 C5018F          1450         CALL    _SetAudioWordClock
+                       1453 ; audio.c   347         SetAudioClick( output, AudioSetup[output].Click);
+0004DB 964842rr        1455         MOV.B   ES,#SEG( _AudioSetup+12 )
+0004DF 8D14rrrr        1456         MOV.W   R1,[R4+SOF( _AudioSetup+12 )]
+0004E3 8A07            1457         MOV.W   R0,[R7]
+0004E5 C501F6          1458         CALL    _SetAudioClick
+                       1462 ; audio.c   348 
+                       1463 ; audio.c   349         return( OK);
+0004E8 9908FFFF        1465         MOV.W   R0,#0FFFFH
+                       1466 ; audio.c   350 }
+0004EC A972            1468         ADDS.W  R7,#02H
+0004EE 2F70            1470         POP.W   R4, R5, R6
+0004F0 D680            1472         RET
+                       1474 ; audio.c   351 
+                       1475 ; audio.c   352 /**************************************************************************/
+                       1476 ; audio.c   353 /* SetAudioSystem                                                                
+                                                                                                                             
+                                                              AUDIO.C */
+                       1477 ; audio.c   354 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1478 ; audio.c   355 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1479 ; audio.c   356 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1480 ; audio.c   357 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1481 ; audio.c   358 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1482 ; audio.c   359 /* Remarks:      Only possible if the selected audio output is AES/EBU           
+                                            */
+                       1483 ; audio.c   360 /* Returns:      FAIL if the selected output is different from AES/EBU,          
+                                            */
+                       1484 ; audio.c   361 /*                                       otherwise is returns OK.                
+                                                                                                                             
+                                                                    */
+                       1485 ; audio.c   362 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1486 ; audio.c   363 /**************************************************************************/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+                       1487 ; audio.c   364 int SetAudioSystem( int output, int system)
+                       1488 ; audio.c   365 {
+                       1489         ALIGN   1
+                       1491         PUBLIC  _SetAudioSystem
+0004F2                 1492 _SetAudioSystem:
+0004F2 0F70            1496         PUSH.W  R4, R5, R6
+0004F4 A97E            1498         ADDS.W  R7,#0EH
+0004F6 8921            1502         MOV.W   R2,R1
+                       1509 ; audio.c   366         int tmp = AudioControl;
+0004F8 964842rr        1511         MOV.B   ES,#SEG( _AudioControl )
+0004FC 9948rrrr        1512         MOV.W   R4,#SOF( _AudioControl )
+000500 8A44            1513         MOV.W   R4,[R4]
+000502 8954            1514         MOV.W   R5,R4
+                       1516 ; audio.c   367 
+                       1517 ; audio.c   368         if ( output != AESEBUAudio)
+000504 8960            1519         MOV.W   R6,R0
+000506 99640001        1520         CMP.W   R6,#01H
+00050A F302            1523         BEQ     _33
+                       1524 ; audio.c   369                 return( FAIL);
+00050C B900            1526         MOV.W   R0,#00H
+00050E FE3B            1527         BR      _37
+00050E FE3B            1527         BR      _37
+000510                 1528 _33:
+                       1535 ; audio.c   370 
+                       1536 ; audio.c   371         Settings.ActivePreset = 0;
+000510 964842rr        1538         MOV.B   ES,#SEG( _Settings )
+000514 9908rrrr        1539         MOV.W   R0,#SOF( _Settings )
+000518 BA00            1540         MOV.W   [R0],#00H
+                       1541 ; audio.c   372 
+                       1542 ; audio.c   373         Settings.AudioSetup[output].System = AudioSetup[output].System = system;
+00051A 9908000E        1544         MOV.W   R0,#0EH
+00051E E406            1545         MULU.W  R0,R6
+000520 B910            1546         MOVS.W  R1,#00H
+000522 964842rr        1547         MOV.B   ES,#SEG( _AudioSetup )
+000526 8D28rrrr        1548         MOV.W   [R0+SOF( _AudioSetup )],R2
+00052A 8A2F            1549         MOV.W   [R7],R2
+00052C 964842rr        1550         MOV.B   ES,#SEG( _Settings+46 )
+000530 8D28rrrr        1551         MOV.W   [R0+SOF( _Settings+46 )],R2
+                       1554 ; audio.c   374         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000534 9918rrrr        1556         MOV.W   R1,#SEG( _Settings )
+000538 9908rrrr        1557         MOV.W   R0,#SOF( _Settings )
+00053C 964842rr        1558         MOV.B   ES,#SEG( _SettingsPtr )
+000540 9928rrrr        1559         MOV.W   R2,#SOF( _SettingsPtr )
+000544 8A22            1560         MOV.W   R2,[R2]
+000546 9938004A        1561         MOV.W   R3,#04AH
+                       1562         CALL    _NV_Store
+00054A C4rrrrrr       +1562 ;       FCALL   _NV_Store
+                       1563 ; audio.c   375 
+                       1564 ; audio.c   376         if ( system == AudioPAL)
+00054E 8A07            1566         MOV.W   R0,[R7]
+000550 F204            1569         BNE     _34
+                       1570 ; audio.c   377                 tmp &= ~NTSCPHASE;
+000552 9945FFBF        1572         AND.W   R4,#0FFBFH
+000556 8904            1573         MOV.W   R0,R4
+000558 FE03            1577         BR      _35
+000558 FE03            1577         BR      _35
+00055A                 1578 _34:
+                       1581 ; audio.c   378         else
+                       1582 ; audio.c   379                 tmp |= NTSCPHASE;
+00055A 8905            1584         MOV.W   R0,R5
+00055C 99060040        1585         OR.W    R0,#040H
+000560                 1590 _35:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+                       1591 ; audio.c   380 
+                       1592 ; audio.c   381         if ( output == AudioOutput)
+000560 964842rr        1594         MOV.B   ES,#SEG( _AudioOutput )
+000564 9918rrrr        1595         MOV.W   R1,#SOF( _AudioOutput )
+000568 8A11            1596         MOV.W   R1,[R1]
+00056A 4961            1597         CMP.W   R6,R1
+00056C F20A            1598         BNE     _36
+                       1599 ; audio.c   382         {
+                       1600 ; audio.c   383                 AudioControl = tmp;
+00056E 964842rr        1602         MOV.B   ES,#SEG( _AudioControl )
+000572 9918rrrr        1603         MOV.W   R1,#SOF( _AudioControl )
+000576 8A09            1604         MOV.W   [R1],R0
+                       1605 ; audio.c   384                 AudioControlPort = AudioControl;
+000578 96484207        1607         MOV.B   ES,#SEG( _AudioControlPort )
+00057C 99180006        1608         MOV.W   R1,#SOF( _AudioControlPort )
+000580 8A09            1609         MOV.W   [R1],R0
+                       1610 ; audio.c   385         }
+000582                 1612 _36:
+                       1613 ; audio.c   386 
+                       1614 ; audio.c   387         return( OK);
+000582 9908FFFF        1616         MOV.W   R0,#0FFFFH
+                       1618 ; audio.c   388 }
+000586                 1620 _37:
+000586 A972            1621         ADDS.W  R7,#02H
+000588 2F70            1623         POP.W   R4, R5, R6
+00058A D680            1625         RET
+                       1628 ; audio.c   389 
+                       1629 ; audio.c   390 /**************************************************************************/
+                       1630 ; audio.c   391 /* SetAudioSignal                                                                
+                                                                                                                             
+                                                              AUDIO.C */
+                       1631 ; audio.c   392 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1632 ; audio.c   393 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1633 ; audio.c   394 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1634 ; audio.c   395 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1635 ; audio.c   396 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1636 ; audio.c   397 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1637 ; audio.c   398 /* Returns:      FAIL if signal is not valid, otherwise OK.                      
+                                                                                    */
+                       1638 ; audio.c   399 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1639 ; audio.c   400 /**************************************************************************/
+                       1640 ; audio.c   401 int SetAudioSignal( int output, int signal)
+                       1641 ; audio.c   402   {
+                       1642         ALIGN   1
+                       1644         PUBLIC  _SetAudioSignal
+00058C                 1645 _SetAudioSignal:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+00058C 0F70            1649         PUSH.W  R4, R5, R6
+00058E A97E            1651         ADDS.W  R7,#0EH
+000590 8920            1655         MOV.W   R2,R0
+                       1662 ; audio.c   403         int tmp;
+                       1663 ; audio.c   404 
+                       1664 ; audio.c   405         if ( signal > S8kHz)
+000592 8961            1666         MOV.W   R6,R1
+000594 99640003        1667         CMP.W   R6,#03H
+000598 FD02            1670         BLE     _40
+                       1671 ; audio.c   406                 return( FAIL);
+00059A B900            1673         MOV.W   R0,#00H
+00059C FE47            1674         BR      _46
+00059C FE47            1674         BR      _46
+00059E                 1675 _40:
+                       1680 ; audio.c   407 
+                       1681 ; audio.c   408         Settings.ActivePreset = 0;
+00059E 964842rr        1683         MOV.B   ES,#SEG( _Settings )
+0005A2 9908rrrr        1684         MOV.W   R0,#SOF( _Settings )
+0005A6 BA00            1685         MOV.W   [R0],#00H
+                       1686 ; audio.c   409 
+                       1687 ; audio.c   410         Settings.AudioSetup[output].Signal = AudioSetup[output].Signal = signal;
+0005A8 9948000E        1689         MOV.W   R4,#0EH
+0005AC 8A2F            1690         MOV.W   [R7],R2
+0005AE E442            1691         MULU.W  R4,R2
+0005B0 B950            1694         MOVS.W  R5,#00H
+0005B2 964842rr        1695         MOV.B   ES,#SEG( _AudioSetup+2 )
+0005B6 8D6Crrrr        1696         MOV.W   [R4+SOF( _AudioSetup+2 )],R6
+0005BA 964842rr        1697         MOV.B   ES,#SEG( _Settings+48 )
+0005BE 8D6Crrrr        1698         MOV.W   [R4+SOF( _Settings+48 )],R6
+                       1699 ; audio.c   411         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+0005C2 9918rrrr        1701         MOV.W   R1,#SEG( _Settings )
+0005C6 9908rrrr        1702         MOV.W   R0,#SOF( _Settings )
+0005CA 964842rr        1703         MOV.B   ES,#SEG( _SettingsPtr )
+0005CE 9928rrrr        1704         MOV.W   R2,#SOF( _SettingsPtr )
+0005D2 8A22            1705         MOV.W   R2,[R2]
+0005D4 9938004A        1706         MOV.W   R3,#04AH
+                       1707         CALL    _NV_Store
+0005D8 C4rrrrrr       +1707 ;       FCALL   _NV_Store
+                       1708 ; audio.c   412 
+                       1709 ; audio.c   413         if ( output == AnalogAudio)
+0005DC 8A07            1711         MOV.W   R0,[R7]
+0005DE F203            1712         BNE     _41
+                       1713 ; audio.c   414                 tmp = ANALOGAUDIOOFFSET;                                // Analog
+                             signal offset
+0005E0 99080008        1715         MOV.W   R0,#08H
+0005E4 FE08            1717         BR      _44
+0005E4 FE08            1717         BR      _44
+0005E6                 1718 _41:
+                       1719 ; audio.c   415         else
+                       1720 ; audio.c   416           {
+                       1721 ; audio.c   417                 if ( AudioSetup[output].Frequency == f441kHz)
+0005E6 964842rr        1723         MOV.B   ES,#SEG( _AudioSetup+10 )
+0005EA 8D04rrrr        1724         MOV.W   R0,[R4+SOF( _AudioSetup+10 )]
+0005EE F202            1726         BNE     _42
+                       1727 ; audio.c   418                         tmp = AESEBUF441KHZOFFSET;              // AESEBU 44.1kHz
+                             signal offset
+0005F0 B904            1729         MOV.W   R0,#04H
+0005F2 FE01            1731         BR      _44
+0005F2 FE01            1731         BR      _44
+0005F4                 1732 _42:
+                       1733 ; audio.c   419                 else
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+                       1734 ; audio.c   420                         tmp = AESEBUF48KHZOFFSET;                       // AESEBU
+                             48kHz signal offset
+0005F4 B900            1736         MOV.W   R0,#00H
+                       1739 ; audio.c   421           }
+0005F6                 1741 _44:
+                       1742 ; audio.c   422 
+                       1743 ; audio.c   423         tmp += signal;
+0005F6 0906            1745         ADD.W   R0,R6
+                       1748 ; audio.c   424         tmp += CLICKPERIOD * AudioSetup[output].Click;
+0005F8 964842rr        1750         MOV.B   ES,#SEG( _AudioSetup+12 )
+0005FC 8D14rrrr        1751         MOV.W   R1,[R4+SOF( _AudioSetup+12 )]
+000600 D918            1752         ASL.W   R1,#08H
+000602 0901            1753         ADD.W   R0,R1
+                       1756 ; audio.c   425 
+                       1757 ; audio.c   426         if ( output == AudioOutput)
+000604 964842rr        1759         MOV.B   ES,#SEG( _AudioOutput )
+000608 9918rrrr        1760         MOV.W   R1,#SOF( _AudioOutput )
+00060C 8A11            1761         MOV.W   R1,[R1]
+00060E 8A27            1762         MOV.W   R2,[R7]
+000610 4921            1763         CMP.W   R2,R1
+000612 F20A            1766         BNE     _45
+                       1767 ; audio.c   427           {
+                       1768 ; audio.c   428                 AudioMode = tmp;
+000614 964842rr        1770         MOV.B   ES,#SEG( _AudioMode )
+000618 9918rrrr        1771         MOV.W   R1,#SOF( _AudioMode )
+00061C 8A09            1772         MOV.W   [R1],R0
+                       1773 ; audio.c   429                 AudioModePort = AudioMode;
+00061E 96484207        1775         MOV.B   ES,#SEG( _AudioModePort )
+000622 99180000        1776         MOV.W   R1,#SOF( _AudioModePort )
+000626 8A09            1777         MOV.W   [R1],R0
+                       1778 ; audio.c   430           }
+000628                 1780 _45:
+                       1781 ; audio.c   431   //SetAudioClick(output, Settings.AudioSetup[output].Click);
+                       1782 ; audio.c   432         return( OK);
+000628 9908FFFF        1784         MOV.W   R0,#0FFFFH
+                       1786 ; audio.c   433   }
+00062C                 1788 _46:
+00062C A972            1789         ADDS.W  R7,#02H
+00062E 2F70            1791         POP.W   R4, R5, R6
+000630 D680            1793         RET
+                       1797 ; audio.c   434 
+                       1798 ; audio.c   435 /**************************************************************************/
+                       1799 ; audio.c   436 /* SetAudioLevel                                                                 
+                                                                                                                             
+                                                              AUDIO.C */
+                       1800 ; audio.c   437 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1801 ; audio.c   438 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1802 ; audio.c   439 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1803 ; audio.c   440 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1804 ; audio.c   441 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+                       1805 ; audio.c   442 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1806 ; audio.c   443 /* Returns:      FAIL if level is invalid, otherwise it returns OK.              
+                                                            */
+                       1807 ; audio.c   444 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1808 ; audio.c   445 /**************************************************************************/
+                       1809 ; audio.c   446 int SetAudioLevel( int output, int level)
+                       1810 ; audio.c   447 {
+                       1811         ALIGN   1
+                       1813         PUBLIC  _SetAudioLevel
+000632                 1814 _SetAudioLevel:
+000632 0F30            1818         PUSH.W  R4, R5
+000634 8951            1822         MOV.W   R5,R1
+                       1827 ; audio.c   448         if ( output == AESEBUAudio)
+000636 8940            1829         MOV.W   R4,R0
+000638 99440001        1830         CMP.W   R4,#01H
+00063C F205            1833         BNE     _49
+                       1834 ; audio.c   449         {
+                       1835 ; audio.c   450                 if ( level > AESEBUSilence)
+00063E 99540007        1837         CMP.W   R5,#07H
+000642 FD07            1838         BLE     _51
+                       1839 ; audio.c   451                         return( FAIL);
+000644 B900            1841         MOV.W   R0,#00H
+000646 FE42            1842         BR      _54
+                       1843 ; audio.c   452         }
+000648                 1845 _49:
+                       1850 ; audio.c   453         else
+                       1851 ; audio.c   454         {
+                       1852 ; audio.c   455                 if ( level > AnalogSilence)
+000648 9954001F        1854         CMP.W   R5,#01FH
+00064C FD02            1855         BLE     _51
+                       1856 ; audio.c   456                         return( FAIL);
+00064E B900            1858         MOV.W   R0,#00H
+000650 FE3D            1859         BR      _54
+                       1860 ; audio.c   457         }
+000652                 1862 _51:
+                       1867 ; audio.c   458 
+                       1868 ; audio.c   459         Settings.ActivePreset = 0;
+000652 964842rr        1870         MOV.B   ES,#SEG( _Settings )
+000656 9908rrrr        1871         MOV.W   R0,#SOF( _Settings )
+00065A BA00            1872         MOV.W   [R0],#00H
+                       1873 ; audio.c   460 
+                       1874 ; audio.c   461         Settings.AudioSetup[output].Level = AudioSetup[output].Level = level;
+00065C 9908000E        1876         MOV.W   R0,#0EH
+000660 E404            1877         MULU.W  R0,R4
+000662 B910            1878         MOVS.W  R1,#00H
+000664 964842rr        1879         MOV.B   ES,#SEG( _AudioSetup+4 )
+000668 8D58rrrr        1880         MOV.W   [R0+SOF( _AudioSetup+4 )],R5
+00066C 964842rr        1881         MOV.B   ES,#SEG( _Settings+50 )
+000670 8D58rrrr        1882         MOV.W   [R0+SOF( _Settings+50 )],R5
+                       1883 ; audio.c   462         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000674 9918rrrr        1885         MOV.W   R1,#SEG( _Settings )
+000678 9908rrrr        1886         MOV.W   R0,#SOF( _Settings )
+00067C 964842rr        1887         MOV.B   ES,#SEG( _SettingsPtr )
+000680 9928rrrr        1888         MOV.W   R2,#SOF( _SettingsPtr )
+000684 8A22            1889         MOV.W   R2,[R2]
+000686 9938004A        1890         MOV.W   R3,#04AH
+                       1891         CALL    _NV_Store
+00068A C4rrrrrr       +1891 ;       FCALL   _NV_Store
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  23
+
+ADDR   CODE            LINE SOURCELINE
+                       1892 ; audio.c   463 
+                       1893 ; audio.c   464         if ( output == AudioOutput)
+00068E 964842rr        1895         MOV.B   ES,#SEG( _AudioOutput )
+000692 9908rrrr        1896         MOV.W   R0,#SOF( _AudioOutput )
+000696 8A00            1897         MOV.W   R0,[R0]
+000698 4940            1898         CMP.W   R4,R0
+00069A F216            1899         BNE     _52
+                       1900 ; audio.c   465         {
+                       1901 ; audio.c   466                 AudioLevel &= ~AUDIOLEVEL;
+00069C 964842rr        1903         MOV.B   ES,#SEG( _AudioLevel )
+0006A0 9908rrrr        1904         MOV.W   R0,#SOF( _AudioLevel )
+0006A4 8A00            1905         MOV.W   R0,[R0]
+0006A6 9905FFFF        1906         AND.W   R0,#0FFFFH
+0006AA 964842rr        1907         MOV.B   ES,#SEG( _AudioLevel )
+0006AE 9918rrrr        1908         MOV.W   R1,#SOF( _AudioLevel )
+0006B2 8A09            1909         MOV.W   [R1],R0
+                       1910 ; audio.c   467                 AudioLevel = level;
+0006B4 964842rr        1912         MOV.B   ES,#SEG( _AudioLevel )
+0006B8 9908rrrr        1913         MOV.W   R0,#SOF( _AudioLevel )
+0006BC 8A58            1914         MOV.W   [R0],R5
+                       1915 ; audio.c   468                 AudioLevelPort = AudioLevel;
+0006BE 96484207        1917         MOV.B   ES,#SEG( _AudioLevelPort )
+0006C2 99080002        1918         MOV.W   R0,#SOF( _AudioLevelPort )
+0006C6 8A58            1919         MOV.W   [R0],R5
+                       1920 ; audio.c   469         }
+0006C8                 1922 _52:
+                       1923 ; audio.c   470 
+                       1924 ; audio.c   471         return( OK);
+0006C8 9908FFFF        1926         MOV.W   R0,#0FFFFH
+                       1927 ; audio.c   472 }
+0006CC                 1929 _54:
+0006CC 2F30            1930         POP.W   R4, R5
+0006CE D680            1932         RET
+                       1936 ; audio.c   473 
+                       1937 ; audio.c   474 /**************************************************************************/
+                       1938 ; audio.c   475 /* SetAudioTiming                                                                
+                                                                                                                             
+                                                              AUDIO.C */
+                       1939 ; audio.c   476 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1940 ; audio.c   477 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       1941 ; audio.c   478 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1942 ; audio.c   479 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1943 ; audio.c   480 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1944 ; audio.c   481 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1945 ; audio.c   482 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  24
+
+ADDR   CODE            LINE SOURCELINE
+                       1946 ; audio.c   483 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1947 ; audio.c   484 /**************************************************************************/
+                       1948 ; audio.c   485 int SetAudioTiming( int output, float timing)
+                       1949 ; audio.c   486 {
+                       1950         ALIGN   1
+                       1952         PUBLIC  _SetAudioTiming
+0006D0                 1953 _SetAudioTiming:
+0006D0 0F70            1957         PUSH.W  R4, R5, R6
+0006D2 99720014        1959         SUB.W   R7,#014H
+                       1967 ; audio.c   487         int tmp;
+                       1968 ; audio.c   488 
+                       1969 ; audio.c   489         Settings.ActivePreset = 0;
+0006D6 964842rr        1971         MOV.B   ES,#SEG( _Settings )
+0006DA 9918rrrr        1972         MOV.W   R1,#SOF( _Settings )
+0006DE BA10            1973         MOV.W   [R1],#00H
+                       1974 ; audio.c   490 
+                       1975 ; audio.c   491         Settings.AudioSetup[output].Timing = AudioSetup[output].Timing = timing;
+0006E0 8940            1977         MOV.W   R4,R0
+0006E2 9908000E        1978         MOV.W   R0,#0EH
+0006E6 E404            1979         MULU.W  R0,R4
+0006E8 B910            1981         MOVS.W  R1,#00H
+0006EA 964842rr        1982         MOV.B   ES,#SEG( _AudioSetup+6 )
+0006EE 8D28rrrr        1983         MOV.W   [R0+SOF( _AudioSetup+6 )],R2
+0006F2 8D38rrrr        1984         MOV.W   [R0+SOF( _AudioSetup+8 )],R3
+0006F6 8C3F12          1985         MOV.W   [R7+18],R3
+0006F9 8C2F10          1986         MOV.W   [R7+16],R2
+0006FC 964842rr        1987         MOV.B   ES,#SEG( _Settings+52 )
+000700 8D28rrrr        1988         MOV.W   [R0+SOF( _Settings+52 )],R2
+000704 8D38rrrr        1989         MOV.W   [R0+SOF( _Settings+54 )],R3
+                       1992 ; audio.c   492         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000708 9918rrrr        1994         MOV.W   R1,#SEG( _Settings )
+00070C 9908rrrr        1995         MOV.W   R0,#SOF( _Settings )
+000710 964842rr        1996         MOV.B   ES,#SEG( _SettingsPtr )
+000714 9928rrrr        1997         MOV.W   R2,#SOF( _SettingsPtr )
+000718 8A22            1998         MOV.W   R2,[R2]
+00071A 9938004A        1999         MOV.W   R3,#04AH
+                       2000         CALL    _NV_Store
+00071E C4rrrrrr       +2000 ;       FCALL   _NV_Store
+                       2001 ; audio.c   493 
+                       2002 ; audio.c   494         if ( output == AudioOutput)
+000722 964842rr        2004         MOV.B   ES,#SEG( _AudioOutput )
+000726 9908rrrr        2005         MOV.W   R0,#SOF( _AudioOutput )
+00072A 8A00            2006         MOV.W   R0,[R0]
+00072C 4940            2007         CMP.W   R4,R0
+00072E F25E            2008         BNE     _63
+                       2009 ; audio.c   495         {
+                       2010 ; audio.c   496                 tmp = (int)(( timing / 0.8) + 0.5 - ( 1*( timing < 0)));
+000730 8C1712          2012         MOV.W   R1,[R7+18]
+000733 8C0710          2013         MOV.W   R0,[R7+16]
+000736 C4rrrrrr        2014         FCALL   __SPF2DPF
+00073A 9C780E3FE9      2015         MOV.W   [R7+14],#03FE9H
+00073F 9C780C9999      2016         MOV.W   [R7+12],#09999H
+000744 9C780A9999      2017         MOV.W   [R7+10],#09999H
+000749 9C7808999A      2018         MOV.W   [R7+8],#0999AH
+00074E 406708          2019         LEA     R6,R7+8
+000751 C4rrrrrr        2020         FCALL   __DIV_DPF
+000755 9C780E3FE0      2021         MOV.W   [R7+14],#03FE0H
+00075A BC700C          2022         MOV.W   [R7+12],#00H
+00075D BC700A          2023         MOV.W   [R7+10],#00H
+000760 BC7008          2024         MOV.W   [R7+8],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  25
+
+ADDR   CODE            LINE SOURCELINE
+000763 406708          2025         LEA     R6,R7+8
+000766 C4rrrrrr        2026         FCALL   __ADD_DPF
+00076A 8C3F06          2027         MOV.W   [R7+6],R3
+00076D 8C2F04          2028         MOV.W   [R7+4],R2
+000770 8C1F02          2029         MOV.W   [R7+2],R1
+000773 8A0F            2030         MOV.W   [R7],R0
+000775 B930            2031         MOV.W   R3,#00H
+000777 B920            2032         MOV.W   R2,#00H
+000779 8C1712          2033         MOV.W   R1,[R7+18]
+00077C 8C0710          2034         MOV.W   R0,[R7+16]
+00077F C4rrrrrr        2035         FCALL   __CMP_SPF
+000783 9104FF          2036         CMP.B   R0L,#0FFH
+000786 F206            2039         BNE     _65
+000788 B900            2040         MOVS.W  R0,#00H
+00078A B910            2041         MOVS.W  R1,#00H
+00078C B920            2042         MOVS.W  R2,#00H
+00078E 99383FF0        2043         MOV.W   R3,#03FF0H
+000792 FE04            2044         BR      _66
+000792 FE04            2044         BR      _66
+000794                 2045 _65:
+000794 B900            2046         MOVS.W  R0,#00H
+000796 B910            2047         MOVS.W  R1,#00H
+000798 B920            2048         MOVS.W  R2,#00H
+00079A B930            2049         MOVS.W  R3,#00H
+00079A B930            2049         MOVS.W  R3,#00H
+00079C                 2050 _66:
+00079C 8967            2052         MOV.W   R6,R7
+00079E C4rrrrrr        2053         FCALL   __SUBR_DPF
+0007A2 C4rrrrrr        2054         FCALL   __DPF2S
+0007A6 8910            2055         MOV.W   R1,R0
+                       2057 ; audio.c   497 
+                       2058 ; audio.c   498                 if ( tmp < 0)
+0007A8 99040000        2060         CMP.W   R0,#00H
+0007AC FA03            2061         BGE     _62
+                       2062 ; audio.c   499                         tmp += 26;
+0007AE 9900001A        2064         ADD.W   R0,#01AH
+0007B2 8910            2065         MOV.W   R1,R0
+0007B4                 2068 _62:
+                       2069 ; audio.c   500                                 
+                       2070 ; audio.c   501                 AudioTiming = TimingValues[tmp];
+0007B4 8901            2072         MOV.W   R0,R1
+0007B6 D901            2073         ASL.W   R0,#01H
+0007B8 8920            2077         MOV.W   R2,R0
+0007BA B930            2078         MOVS.W  R3,#00H
+0007BC 9918rrrr        2079         MOV.W   R1,#SEG( _TimingValues )
+0007C0 9908rrrr        2080         MOV.W   R0,#SOF( _TimingValues )
+0007C4 0902            2081         ADD.W   R0,R2
+0007C6 1913            2082         ADDC.W  R1,R3
+0007C8 862C43          2083         MOV.B   CS,R1L
+0007CB 8810            2084         MOVC.W  R1,[R0+]
+0007CD 964842rr        2085         MOV.B   ES,#SEG( _AudioTiming )
+0007D1 9908rrrr        2086         MOV.W   R0,#SOF( _AudioTiming )
+0007D5 8A18            2087         MOV.W   [R0],R1
+                       2088 ; audio.c   502                 AudioTimingPort = AudioTiming;
+0007D7 964842rr        2090         MOV.B   ES,#SEG( _AudioTiming )
+0007DB 9908rrrr        2091         MOV.W   R0,#SOF( _AudioTiming )
+0007DF 8A00            2092         MOV.W   R0,[R0]
+0007E1 96484207        2093         MOV.B   ES,#SEG( _AudioTimingPort )
+0007E5 99180004        2094         MOV.W   R1,#SOF( _AudioTimingPort )
+0007E9 8A09            2095         MOV.W   [R1],R0
+                       2096 ; audio.c   503         }
+0007EC                 2098 _63:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  26
+
+ADDR   CODE            LINE SOURCELINE
+                       2099 ; audio.c   504 
+                       2100 ; audio.c   505         return( OK);
+0007EC 9908FFFF        2102         MOV.W   R0,#0FFFFH
+                       2103 ; audio.c   506 }
+0007F0 99700014        2105         ADD.W   R7,#014H
+0007F4 2F70            2107         POP.W   R4, R5, R6
+0007F6 D680            2109         RET
+                       2111 ; audio.c   507 
+                       2112 ; audio.c   508 /**************************************************************************/
+                       2113 ; audio.c   509 /* SetAudioWordClock                                                             
+                                                                                                                             
+                                              AUDIO.C */
+                       2114 ; audio.c   510 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       2115 ; audio.c   511 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       2116 ; audio.c   512 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       2117 ; audio.c   513 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       2118 ; audio.c   514 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       2119 ; audio.c   515 /* Remarks:      WordClock and audio mode is integrated. This function is        
+                                    */
+                       2120 ; audio.c   516 /*                                       only valid for the AES/EBU output.      
+                                                                                                                             
+                                    */
+                       2121 ; audio.c   517 /* Returns:      FAIL if click and is invalid, otherwise it returns OK.          
+                                            */
+                       2122 ; audio.c   518 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       2123 ; audio.c   519 /**************************************************************************/
+                       2124 ; audio.c   520 int SetAudioWordClock( int output, int frequency)
+                       2125 ; audio.c   521 {
+                       2126         ALIGN   1
+                       2128         PUBLIC  _SetAudioWordClock
+0007F8                 2129 _SetAudioWordClock:
+0007F8 0F70            2133         PUSH.W  R4, R5, R6
+0007FA A97E            2135         ADDS.W  R7,#0EH
+0007FC 8921            2139         MOV.W   R2,R1
+                       2146 ; audio.c   522         int tmp;
+                       2147 ; audio.c   523 
+                       2148 ; audio.c   524         if ( output != AESEBUAudio)
+0007FE 8960            2150         MOV.W   R6,R0
+000800 99640001        2151         CMP.W   R6,#01H
+000804 F302            2154         BEQ     _68
+                       2155 ; audio.c   525                 return( FAIL);
+000806 B900            2157         MOV.W   R0,#00H
+000808 FE62            2158         BR      _72
+000808 FE62            2158         BR      _72
+00080A                 2159 _68:
+                       2164 ; audio.c   526 
+                       2165 ; audio.c   527         Settings.ActivePreset = 0;
+00080A 964842rr        2167         MOV.B   ES,#SEG( _Settings )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  27
+
+ADDR   CODE            LINE SOURCELINE
+00080E 9908rrrr        2168         MOV.W   R0,#SOF( _Settings )
+000812 BA00            2169         MOV.W   [R0],#00H
+                       2170 ; audio.c   528 
+                       2171 ; audio.c   529         Settings.AudioSetup[output].Frequency = AudioSetup[output].Frequency = fr
+                            equency;
+000814 8906            2173         MOV.W   R0,R6
+000816 E900000E        2174         MULU.W  R0,#0EH
+00081A 8940            2175         MOV.W   R4,R0
+00081C B950            2176         MOVS.W  R5,#00H
+00081E 964842rr        2177         MOV.B   ES,#SEG( _AudioSetup+10 )
+000822 8D2Crrrr        2178         MOV.W   [R4+SOF( _AudioSetup+10 )],R2
+000826 8A2F            2179         MOV.W   [R7],R2
+000828 964842rr        2180         MOV.B   ES,#SEG( _Settings+56 )
+00082C 8D2Crrrr        2181         MOV.W   [R4+SOF( _Settings+56 )],R2
+                       2184 ; audio.c   530         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000830 9918rrrr        2186         MOV.W   R1,#SEG( _Settings )
+000834 9908rrrr        2187         MOV.W   R0,#SOF( _Settings )
+000838 964842rr        2188         MOV.B   ES,#SEG( _SettingsPtr )
+00083C 9928rrrr        2189         MOV.W   R2,#SOF( _SettingsPtr )
+000840 8A22            2190         MOV.W   R2,[R2]
+000842 9938004A        2191         MOV.W   R3,#04AH
+                       2192         CALL    _NV_Store
+000846 C4rrrrrr       +2192 ;       FCALL   _NV_Store
+                       2193 ; audio.c   531 
+                       2194 ; audio.c   532         if ( frequency == f441kHz)
+00084A 8A07            2196         MOV.W   R0,[R7]
+00084C F202            2197         BNE     _69
+                       2198 ; audio.c   533                 tmp = AESEBUF441KHZOFFSET;
+00084E B904            2200         MOV.W   R0,#04H
+000850 FE01            2202         BR      _70
+000850 FE01            2202         BR      _70
+000852                 2203 _69:
+                       2204 ; audio.c   534         else
+                       2205 ; audio.c   535                 tmp = AESEBUF48KHZOFFSET;
+000852 B900            2207         MOV.W   R0,#00H
+000854                 2210 _70:
+                       2211 ; audio.c   536 
+                       2212 ; audio.c   537         tmp += AudioSetup[output].Signal;
+000854 964842rr        2214         MOV.B   ES,#SEG( _AudioSetup+2 )
+000858 0D04rrrr        2215         ADD.W   R0,[R4+SOF( _AudioSetup+2 )]
+                       2218 ; audio.c   538         tmp += CLICKPERIOD*AudioSetup[output].Click;
+00085C 964842rr        2220         MOV.B   ES,#SEG( _AudioSetup+12 )
+000860 8D14rrrr        2221         MOV.W   R1,[R4+SOF( _AudioSetup+12 )]
+000864 D918            2222         ASL.W   R1,#08H
+000866 0901            2223         ADD.W   R0,R1
+                       2226 ; audio.c   539 
+                       2227 ; audio.c   540         if ( output == AudioOutput)
+000868 964842rr        2229         MOV.B   ES,#SEG( _AudioOutput )
+00086C 9918rrrr        2230         MOV.W   R1,#SOF( _AudioOutput )
+000870 8A11            2231         MOV.W   R1,[R1]
+000872 4961            2232         CMP.W   R6,R1
+000874 F21D            2233         BNE     _71
+                       2234 ; audio.c   541         {
+                       2235 ; audio.c   542                 AudioMode = tmp;
+000876 964842rr        2237         MOV.B   ES,#SEG( _AudioMode )
+00087A 9918rrrr        2238         MOV.W   R1,#SOF( _AudioMode )
+00087E 8A09            2239         MOV.W   [R1],R0
+                       2240 ; audio.c   543                 AudioModePort = AudioMode;
+000880 96484207        2242         MOV.B   ES,#SEG( _AudioModePort )
+000884 99180000        2243         MOV.W   R1,#SOF( _AudioModePort )
+000888 8A09            2244         MOV.W   [R1],R0
+                       2245 ; audio.c   544 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  28
+
+ADDR   CODE            LINE SOURCELINE
+                       2246 ; audio.c   545                 LEDSet( WordClk441LED, frequency == f441kHz);   
+00088A 99081000        2248         MOV.W   R0,#01000H
+00088E 8A17            2250         MOV.W   R1,[R7]
+000890 F202            2251         BNE     _75
+000892 B911            2252         MOVS.W  R1,#01H
+000894 FE01            2253         BR      _76
+000894 FE01            2253         BR      _76
+000896                 2254 _75:
+000896 B910            2255         MOVS.W  R1,#00H
+000896 B910            2255         MOVS.W  R1,#00H
+000898                 2256 _76:
+                       2257         CALL    _LEDSet
+000898 C4rrrrrr       +2257 ;       FCALL   _LEDSet
+                       2258 ; audio.c   546                 LEDSet( WordClk48LED, frequency == f48kHz);
+00089C 99082000        2260         MOV.W   R0,#02000H
+0008A0 9A740001        2261         CMP.W   [R7],#01H
+0008A4 F202            2262         BNE     _77
+0008A6 B911            2263         MOVS.W  R1,#01H
+0008A8 FE01            2264         BR      _79
+0008A8 FE01            2264         BR      _79
+0008AA                 2265 _77:
+0008AA B910            2266         MOVS.W  R1,#00H
+0008AA B910            2266         MOVS.W  R1,#00H
+0008AC                 2267 _79:
+                       2268         CALL    _LEDSet
+0008AC C4rrrrrr       +2268 ;       FCALL   _LEDSet
+                       2269 ; audio.c   547         }
+0008B0                 2271 _71:
+                       2272 ; audio.c   548 
+                       2273 ; audio.c   549         AudioSetup[AudioOutput].Frequency = frequency;
+0008B0 964842rr        2275         MOV.B   ES,#SEG( _AudioOutput )
+0008B4 9908rrrr        2276         MOV.W   R0,#SOF( _AudioOutput )
+0008B8 8A00            2277         MOV.W   R0,[R0]
+0008BA E900000E        2278         MULU.W  R0,#0EH
+0008BE B910            2279         MOVS.W  R1,#00H
+0008C0 8A27            2280         MOV.W   R2,[R7]
+0008C2 964842rr        2281         MOV.B   ES,#SEG( _AudioSetup+10 )
+0008C6 8D28rrrr        2282         MOV.W   [R0+SOF( _AudioSetup+10 )],R2
+                       2285 ; audio.c   550 
+                       2286 ; audio.c   551         return( OK);
+0008CA 9908FFFF        2288         MOV.W   R0,#0FFFFH
+                       2289 ; audio.c   552 }
+0008CE                 2291 _72:
+0008CE A972            2292         ADDS.W  R7,#02H
+0008D0 2F70            2294         POP.W   R4, R5, R6
+0008D2 D680            2296         RET
+                       2300 ; audio.c   553 
+                       2301 ; audio.c   554 /**************************************************************************/
+                       2302 ; audio.c   555 /* SetAudioClick                                                                 
+                                                                                                                             
+                                                              AUDIO.C */
+                       2303 ; audio.c   556 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       2304 ; audio.c   557 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                       2305 ; audio.c   558 /* Revised:      000618, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       2306 ; audio.c   559 /*                                                                               
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  29
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                             
+                                            */
+                       2307 ; audio.c   560 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       2308 ; audio.c   561 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       2309 ; audio.c   562 /* Returns:  FAIL if audio output is invalid, otherwise it returns OK.          *
+                            /
+                       2310 ; audio.c   563 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       2311 ; audio.c   564 /**************************************************************************/
+                       2312 ; audio.c   565 int SetAudioClick( int output, int click)
+                       2313 ; audio.c   566 {
+                       2314         ALIGN   1
+                       2316         PUBLIC  _SetAudioClick
+0008D4                 2317 _SetAudioClick:
+0008D4 0F70            2321         PUSH.W  R4, R5, R6
+0008D6 A97A            2323         ADDS.W  R7,#0AH
+0008D8 8921            2327         MOV.W   R2,R1
+                       2334 ; audio.c   567         int tmp = AudioSetup[output].Signal;
+0008DA 8960            2336         MOV.W   R6,R0
+0008DC 9908000E        2337         MOV.W   R0,#0EH
+0008E0 E406            2338         MULU.W  R0,R6
+0008E2 B910            2340         MOVS.W  R1,#00H
+0008E4 8C1F02          2341         MOV.W   [R7+2],R1
+0008E7 8A0F            2342         MOV.W   [R7],R0
+0008E9 964842rr        2343         MOV.B   ES,#SEG( _AudioSetup+2 )
+0008ED 8D50rrrr        2344         MOV.W   R5,[R0+SOF( _AudioSetup+2 )]
+0008F1 8945            2345         MOV.W   R4,R5
+                       2347 ; audio.c   568 
+                       2348 ; audio.c   569         if ( output > AESEBUAudio)
+0008F3 99640001        2350         CMP.W   R6,#01H
+0008F7 FD03            2351         BLE     _80
+                       2352 ; audio.c   570                 return( FAIL);
+0008F9 B900            2354         MOV.W   R0,#00H
+0008FB FE4A            2355         BR      _86
+0008FB FE4A00          2355         BR      _86
+0008FE                 2356 _80:
+                       2362 ; audio.c   571 
+                       2363 ; audio.c   572         Settings.ActivePreset = 0;
+0008FE 964842rr        2365         MOV.B   ES,#SEG( _Settings )
+000902 9908rrrr        2366         MOV.W   R0,#SOF( _Settings )
+000906 BA00            2367         MOV.W   [R0],#00H
+                       2368 ; audio.c   573 
+                       2369 ; audio.c   574         Settings.AudioSetup[output].Click = AudioSetup[output].Click = click;
+000908 8C1702          2371         MOV.W   R1,[R7+2]
+00090B 8A07            2372         MOV.W   R0,[R7]
+00090D 964842rr        2373         MOV.B   ES,#SEG( _AudioSetup+12 )
+000911 8D28rrrr        2374         MOV.W   [R0+SOF( _AudioSetup+12 )],R2
+000915 8C2F04          2375         MOV.W   [R7+4],R2
+000918 8C1702          2376         MOV.W   R1,[R7+2]
+00091B 8A07            2377         MOV.W   R0,[R7]
+00091D 964842rr        2378         MOV.B   ES,#SEG( _Settings+58 )
+000921 8D28rrrr        2379         MOV.W   [R0+SOF( _Settings+58 )],R2
+                       2382 ; audio.c   575         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000925 9918rrrr        2384         MOV.W   R1,#SEG( _Settings )
+000929 9908rrrr        2385         MOV.W   R0,#SOF( _Settings )
+00092D 964842rr        2386         MOV.B   ES,#SEG( _SettingsPtr )
+000931 9928rrrr        2387         MOV.W   R2,#SOF( _SettingsPtr )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  30
+
+ADDR   CODE            LINE SOURCELINE
+000935 8A22            2388         MOV.W   R2,[R2]
+000937 9938004A        2389         MOV.W   R3,#04AH
+                       2390         CALL    _NV_Store
+00093B C4rrrrrr       +2390 ;       FCALL   _NV_Store
+                       2391 ; audio.c   576 
+                       2392 ; audio.c   577         if ( click == click1s)
+00093F 8C0704          2394         MOV.W   R0,[R7+4]
+000942 99040001        2395         CMP.W   R0,#01H
+000946 F203            2398         BNE     _81
+                       2399 ; audio.c   578                 tmp += CLICKPERIOD;
+000948 99500100        2401         ADD.W   R5,#0100H
+00094C 8945            2402         MOV.W   R4,R5
+00094E                 2405 _81:
+                       2406 ; audio.c   579 
+                       2407 ; audio.c   580         if ( output == AnalogAudio)
+00094E 6966            2409         OR.W    R6,R6
+000950 F203            2410         BNE     _82
+                       2411 ; audio.c   581                 tmp += ANALOGAUDIOOFFSET;                                       /
+                            / Analog signal offset
+000952 99400008        2413         ADD.W   R4,#08H
+000956 FE09            2416         BR      _84
+000956 FE09            2416         BR      _84
+000958                 2417 _82:
+                       2418 ; audio.c   582         else
+                       2419 ; audio.c   583         {
+                       2420 ; audio.c   584                 if ( AudioSetup[output].Frequency == f441kHz)
+000958 8C1702          2422         MOV.W   R1,[R7+2]
+00095B 8A07            2423         MOV.W   R0,[R7]
+00095D 964842rr        2424         MOV.B   ES,#SEG( _AudioSetup+10 )
+000961 8D00rrrr        2425         MOV.W   R0,[R0+SOF( _AudioSetup+10 )]
+000965 F202            2427         BNE     _84
+                       2428 ; audio.c   585                         tmp += AESEBUF441KHZOFFSET;                     // AESEBU
+                             44.1kHz signal offset
+000967 A944            2430         ADDS.W  R4,#04H
+                       2433 ; audio.c   586                 else
+                       2434 ; audio.c   587                         tmp += AESEBUF48KHZOFFSET;                      // AESEBU
+                             48kHz signal offset
+                       2435 ; audio.c   588         }
+00096A                 2437 _84:
+                       2438 ; audio.c   589 
+                       2439 ; audio.c   590         if ( output == AudioOutput)
+00096A 964842rr        2441         MOV.B   ES,#SEG( _AudioOutput )
+00096E 9908rrrr        2442         MOV.W   R0,#SOF( _AudioOutput )
+000972 8A00            2443         MOV.W   R0,[R0]
+000974 4960            2444         CMP.W   R6,R0
+000976 F20A            2445         BNE     _85
+                       2446 ; audio.c   591         {
+                       2447 ; audio.c   592                 AudioMode = tmp;
+000978 964842rr        2449         MOV.B   ES,#SEG( _AudioMode )
+00097C 9908rrrr        2450         MOV.W   R0,#SOF( _AudioMode )
+000980 8A48            2451         MOV.W   [R0],R4
+                       2452 ; audio.c   593                 AudioModePort = AudioMode;
+000982 96484207        2454         MOV.B   ES,#SEG( _AudioModePort )
+000986 99080000        2455         MOV.W   R0,#SOF( _AudioModePort )
+00098A 8A48            2456         MOV.W   [R0],R4
+                       2457 ; audio.c   594         }
+00098C                 2459 _85:
+                       2460 ; audio.c   595 
+                       2461 ; audio.c   596         return( OK);
+00098C 9908FFFF        2463         MOV.W   R0,#0FFFFH
+                       2464 ; audio.c   597 }
+000990                 2466 _86:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  31
+
+ADDR   CODE            LINE SOURCELINE
+000990 A976            2467         ADDS.W  R7,#06H
+000992 2F70            2469         POP.W   R4, R5, R6
+000994 D680            2471         RET
+                       2475 ; audio.c   598 
+000000                 2479 AUDIO_CLR_FA    SEGMENT HDATA INSEGMENT CLEAR
+000000                 2480         RSEG    AUDIO_CLR_FA
+                       2481         ALIGN   1
+000000                 2482 _AudioControl:  DS      2
+   |  RESERVED             
+000001
+                       2485         PUBLIC  _AudioOutput
+                       2486         ALIGN   1
+000002                 2487 _AudioOutput:   DS      2
+   |  RESERVED             
+000003
+                       2488         EXTRN   HCODE(__DIV_DPF)
+                       2489         EXTRN   HCODE(__SUBR_DPF)
+                       2490         EXTRN   HCODE(__SPF2DPF)
+                       2493         EXTRN   HCODE(_LEDSet)
+                       2495         ALIGN   1
+000004                 2496 _AudioMode:     DS      2
+   |  RESERVED             
+000005
+                       2499         PUBLIC  _AudioSetup
+                       2500         ALIGN   1
+000006                 2501 _AudioSetup:    DS      28
+   |  RESERVED             
+000021
+                       2503         ALIGN   1
+000022                 2504 _AudioTiming:   DS      2
+   |  RESERVED             
+000023
+                       2506         EXTRN   HDATA(_SettingsPtr)
+070002                 2509         HSEG AT 070002H
+                       2510         PUBLIC  _AudioLevelPort
+                       2511         ALIGN   1
+070002                 2512 _AudioLevelPort:        DS      2
+   |  RESERVED             
+070003
+                       2514         EXTRN   HDATA(_Settings)
+070004                 2517         HSEG AT 070004H
+                       2518         PUBLIC  _AudioTimingPort
+                       2519         ALIGN   1
+070004                 2520 _AudioTimingPort:       DS      2
+   |  RESERVED             
+070005
+                       2521         EXTRN   HCODE(__CMP_SPF)
+                       2524         EXTRN   HCODE(_NV_Store)
+070006                 2527         HSEG AT 070006H
+                       2528         PUBLIC  _AudioControlPort
+                       2529         ALIGN   1
+070006                 2530 _AudioControlPort:      DS      2
+   |  RESERVED             
+070007
+                       2532         EXTRN   HDATA(_Calibration)
+                       2533         EXTRN   HCODE(__ADD_DPF)
+070000                 2536         HSEG AT 070000H
+                       2537         PUBLIC  _AudioModePort
+                       2538         ALIGN   1
+070000                 2539 _AudioModePort: DS      2
+   |  RESERVED             
+070001
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  32
+
+ADDR   CODE            LINE SOURCELINE
+000024                 2541         RSEG    AUDIO_CLR_FA
+                       2542         ALIGN   1
+000024                 2543 _AudioLevel:    DS      2
+   |  RESERVED             
+000025
+                       2546         EXTRN   HCODE(_Sleep)
+                       2547         EXTRN   HCODE(__US2SPF)
+                       2548         EXTRN   HCODE(__DPF2S)
+                       2549         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       2550         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       2551         CALLS   'WriteAnlAudioDACLevel', 'Write_AD8402'
+                       2552         CALLS   'AudioDefaults', 'NV_Store'
+                       2553         CALLS   'AudioInit', 'WriteAnlAudioDACLevel'
+                       2554         CALLS   'AudioInit', 'LEDSet'
+                       2555         CALLS   'AudioUpdate', 'SetAudioOutput'
+                       2556         CALLS   'SetAudioOutput', 'NV_Store'
+                       2557         CALLS   'SetAudioOutput', 'Sleep'
+                       2558         CALLS   'SetAudioOutput', 'LEDSet'
+                       2559         CALLS   'SetAudioOutput', 'SetAudioSystem'
+                       2560         CALLS   'SetAudioOutput', 'SetAudioSignal'
+                       2561         CALLS   'SetAudioOutput', 'SetAudioLevel'
+                       2562         CALLS   'SetAudioOutput', 'SetAudioTiming'
+                       2563         CALLS   'SetAudioOutput', 'SetAudioWordClock'
+                       2564         CALLS   'SetAudioOutput', 'SetAudioClick'
+                       2565         CALLS   'SetAudioSystem', 'NV_Store'
+                       2566         CALLS   'SetAudioSignal', 'NV_Store'
+                       2567         CALLS   'SetAudioLevel', 'NV_Store'
+                       2568         CALLS   'SetAudioTiming', 'NV_Store'
+                       2569         CALLS   'SetAudioWordClock', 'NV_Store'
+                       2570         CALLS   'SetAudioWordClock', 'LEDSet'
+                       2571         CALLS   'SetAudioClick', 'NV_Store'

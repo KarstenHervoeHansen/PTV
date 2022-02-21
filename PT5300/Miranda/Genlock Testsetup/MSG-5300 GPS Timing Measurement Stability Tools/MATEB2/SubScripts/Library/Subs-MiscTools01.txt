@@ -1,0 +1,1128 @@
+// Subs-MiscTools01.txt.
+//
+// Création : 2009-04-17 par Robert Tremblay.
+// Modification : 2012-12-13 par Robert Tremblay.
+// Copyright © 2009-2012 - Miranda Technologies inc., tous droits réservés.
+// 
+// Test de fonctionnalité en QA/R&D.
+// Sous-script de sous-routines d'usages variés.
+
+
+// ---------------------------------------------------------------------------------------------------- //
+//                                                                                                      //
+// Sous-routines d'usages variés                                                                        //
+//                                                                                                      //
+// Préfixe réservé : MT                                                                                 //
+//                                                                                                      //
+// Sous-routines d'usage publique :                                                                     //
+//                                                                                                      //
+//   MTComplete                                                                                         //
+//   MTEnd                                                                                              //
+//   MTAbort                                                                                            //
+//                                                                                                      //
+//   MTAddMonList                                                                                       //
+//                                                                                                      //
+//   MTGetShortDateTimeString                                                                           //
+//   MTGetMATEB2PathName                                                                                //
+//   MTTextToLines                                                                                      //
+//                                                                                                      //
+//   MTSaveExpertTextDef                                                                                //
+//   MTSaveExpertTextDefWithSN                                                                          //
+//   MTSaveLocalMonitorTextDef                                                                          //
+//                                                                                                      //
+//   MTFileTextSave                                                                                     //
+//   MTFileTextLoad                                                                                     //
+//   MTFileCompare                                                                                      //
+//                                                                                                      //
+//   MTGetParamString                                                                                   //
+//   MTGetParamNumber                                                                                   //
+//   MTGetParamStrings                                                                                  //
+//                                                                                                      //
+//   MTBuildCustomTextResults                                                                           //
+//                                                                                                      //
+//   MTFTPDeleteFiles                                                                                   //
+//                                                                                                      //
+//   MTPing                                                                                             //
+//   MTWaitForServer                                                                                    //
+//                                                                                                      //
+//   MTNew                                                                                              //
+//                                                                                                      //
+// Sous-routines d'usage privé :                                                                        //
+//                                                                                                      //
+// Modules requis :                                                                                     //
+//                                                                                                      //
+//   Library\Subs-Functions01.txt                                                                       //
+//                                                                                                      //
+// Variables externes utilisées :                                                                       //
+//                                                                                                      //
+//   kstrAttnDlgTitle                                                                                   //
+//                                                                                                      //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+// Constantes opérationnelles globales.
+
+
+// Variables globales d'usage publique.
+
+
+// Variables globales d'usage privé.
+
+
+// Variables modulaires.
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+////////////////
+// MTComplete //
+////////////////
+
+BeginSub(MTComplete)
+// Fin gracieuse de l'exécution.
+// Usage : GoSub(MTComplete).
+
+  MsgBoxOK(">>> Fin de l'exécution <<<",kstrAttnDlgTitle,500,118,14)
+  AddMonitorText("")
+  AddMonitorText("")
+  AddMonitorDateTime(">>> Séquence de test terminée - %s/%s <<<")
+  AddMonitorText("")
+  GoTo(Complete)
+
+EndSub(MTComplete)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////
+// MTEnd //
+///////////
+
+BeginSub(MTEnd)
+// Fin de l'exécution.
+// Usage : GoSub(MTEnd).
+
+  MsgBoxOK(">>> Fin de l'exécution <<<",kstrAttnDlgTitle,500,118,14)
+  AddMonitorText("")
+  AddMonitorText("")
+  AddMonitorDateTime(">>> Séquence de test terminée - %s/%s <<<")
+  AddMonitorText("")
+  GoTo(End)
+
+EndSub(MTEnd)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+/////////////
+// MTAbort //
+/////////////
+
+BeginSub(MTAbort)
+// Avortement de l'exécution.
+// Usage : GoSub(MTAbort).
+
+  MsgBoxOK(">>> Avortement de l'exécution <<<",kstrAttnDlgTitle,500,118,14)
+  AddMonitorText("")
+  AddMonitorText("")
+  AddMonitorDateTime(">>> Séquence de test avortée - %s/%s <<<")
+  AddMonitorText("")
+  Abort()
+
+EndSub(MTAbort)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+//////////////////
+// MTAddMonList //
+//////////////////
+
+BeginSub(MTAddMonList)
+// Affiche dans le moniteur une liste contenue dans une variable String, en ajoutant à chacune des lignes
+// un préfixe et un suffixe composés d'une série d'espaces ou de caractères spécifiques.
+// Usage : GoSubArg(MTAddMonList,strList,strPrefix,strSuffix).
+//         strList (V/L) : Liste à afficher.
+//         strPrefix (V/L) : Préfixe à ajouter au début de chaque ligne.
+//         strSuffix (V/L) : Suffixe à ajouter àa la fin de chaque ligne.
+// Exemple : GoSubArg(MTAddMonList,strList,"      < "," >").
+
+  // Arguments.
+  LStrings(lstrList,lstrPrefix,lstrSuffix)
+
+  // Variables locales.
+  LStrings(lstrOneLine)
+  LLongs(llNumLines,llLineIndex)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrList,lstrPrefix,lstrSuffix)
+
+  // Exécution.
+  If(lstrList!="")
+    StringTools(GetNumLines,lstrList,llNumLines)
+    :llLineIndex=0
+    BeginLoop()
+      StringTools(GetLine,lstrList,llLineIndex,lstrOneLine)
+      AddnMonitorText(lstrPrefix,lstrOneLine,lstrSuffix)
+      Incr(llLineIndex)
+      ExitLoopIf(llLineIndex>=llNumLines)
+    EndLoop()
+  EndIf()
+
+EndSub(MTAddMonList)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+//////////////////////////////
+// MTGetShortDateTimeString //
+//////////////////////////////
+
+BeginSub(MTGetShortDateTimeString)
+// Retourne la date et l'heure en format court (Ex. : 20090223-111236).
+// Usage : GoSubArg(MTGetShortDateTimeString,strDate,strTime,strShortDateTime).
+//         strDate : Date (Ex. : 2009-02-23).
+//         strTime : Heure (Ex. : 11:12:36).
+//         strShortDateTime : Date/Heure retournés en format court (Ex. : 20090223-111236).
+
+  // Arguments.
+  LStrings(lstrDate,lstrTime,lstrShortDateTime)
+
+  // Variables locales.
+  LStrings(lstrYear,lstrMonth,lstrDay,lstrHour,lstrMin,lstrSec)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrDate,lstrTime,lstrShortDateTime)
+
+  // Conversion.
+  SubString(lstrDate,Left,0,4,lstrYear)
+  SubString(lstrDate,Mid,6,2,lstrMonth)
+  SubString(lstrDate,Right,0,2,lstrDay)
+  SubString(lstrTime,Left,0,2,lstrHour)
+  SubString(lstrTime,Mid,4,2,lstrMin)
+  SubString(lstrTime,Right,0,2,lstrSec)
+  Addn(lstrYear,lstrMonth,lstrDay,"-",lstrHour,lstrMin,lstrSec,lstrShortDateTime)
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,lstrShortDateTime)
+
+EndSub(MTGetShortDateTimeString)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+/////////////////////////
+// MTGetMATEB2PathName //
+/////////////////////////
+
+BeginSub(MTGetMATEB2PathName)
+// Fonction retournant le chemin et nom complet d'un fichier dans un sous-répertoire de MATEB2.
+// Usage : Fct@MTGetMATEB2PathName(strRelativePathName).
+// Exemple : Assign(Fct@MTGetMATEB2PathName("UserData\Place Holder.txt"),strFileName).
+
+  // Arguments.
+  LStrings(lstrRelativePathName)
+
+  // Variables locales.
+  LStrings(lstrApplDir,lstrAbsolutePathName)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrRelativePathName)
+
+  // Exécution.
+  GetApplDir(lstrApplDir)
+  Addn(lstrApplDir,lstrRelativePathName,lstrAbsolutePathName)
+
+  // Écriture dans les arguments de retour.
+  Return(lstrAbsolutePathName)
+
+EndSub(MTGetMATEB2PathName)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////////////
+// MTTextToLines //
+///////////////////
+
+BeginSub(MTTextToLines)
+// Conversion d'un texte en champ de lignes de texte.
+// Usage : GoSubArg(MTTextToLines,strText,strLinesArray,lNumLines).
+//         strText : Texte complet.
+//         strLinesArray : Champ de texte, dimensionné au départ à 1 ou autre, qui sera redimensionné et contiendra les lignes de strText.
+// Exemple : GoSubArg(MTTextToLines,strText,strLinesArray,lNumLines).
+
+  // Arguments.
+  LStrings(lstrText,lstrLinesArray[1])
+
+  // Variables locales.
+  LShorts(lsError)
+  LLongs(llNumLines,llLineIndex)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrText,lstrLinesArray)
+
+  // Exécution.
+  StringTools(GetNumLines,lstrText,llNumLines)
+  ResizeArrays(lstrLinesArray,llNumLines)
+  DOSCmd(SetRespFileText,lstrText,lsError)
+  Assign(0,llLineIndex)
+  BeginLoop()
+    DOSCmd(GetRespFileLine,llLineIndex,lstrLinesArray[llLineIndex],lsError)
+    Incr(llLineIndex)
+    ExitLoopIf(llLineIndex>=llNumLines)
+  EndLoop()
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,llNumLines)
+
+EndSub(MTTextToLines)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+/////////////////////////
+// MTSaveExpertTextDef //
+/////////////////////////
+
+BeginSub(MTSaveExpertTextDef)
+// Sauvegarde du texte 'Expert' dans un fichier (Selon les paramètres par défaut).
+// Usage : GoSub(MTSaveExpertTextDef).
+
+  // Variables locales.
+  LStrings(lstrShortDateTime,lstrFullFileName,lstrExpertText)
+  LShorts(lsErrorFlag)
+
+  // Sauvegarde du texte Expert.
+  GoSubArg(MTGetShortDateTimeString,kstrStartDate,kstrStartTime,lstrShortDateTime)
+  Addn(kstrApplDir,"Expert\",kstrTestSequence,"-",lstrShortDateTime,".txt",lstrFullFileName)
+  GetFieldText(Expert,lstrExpertText)
+  FileTextStringSave(lstrFullFileName,"",lstrExpertText,lsErrorFlag)
+
+EndSub(MTSaveExpertTextDef)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////////////////////////
+// MTSaveExpertTextDefWithSN //
+///////////////////////////////
+
+BeginSub(MTSaveExpertTextDefWithSN)
+// Sauvegarde du texte 'Expert' dans un fichier (Selon les paramètres par défaut).
+// Usage : GoSub(MTSaveExpertTextDef).
+
+  // Variables locales.
+  LStrings(lstrSN,lstrShortDateTime,lstrFullFileName,lstrExpertText)
+  LShorts(lsErrorFlag)
+
+  // Sauvegarde du texte Expert.
+  GetSerialNumberField(lstrSN)
+  GoSubArg(MTGetShortDateTimeString,kstrStartDate,kstrStartTime,lstrShortDateTime)
+  Addn(kstrApplDir,"Expert\",kstrTestSequence,"-(",lstrSN,")-",lstrShortDateTime,".txt",lstrFullFileName)
+  GetFieldText(Expert,lstrExpertText)
+  FileTextStringSave(lstrFullFileName,"",lstrExpertText,lsErrorFlag)
+
+EndSub(MTSaveExpertTextDefWithSN)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////////////////////////
+// MTSaveLocalMonitorTextDef //
+///////////////////////////////
+
+BeginSub(MTSaveLocalMonitorTextDef)
+// Sauvegarde du texte 'Moniteur local' dans un fichier (Selon les paramètres par défaut).
+// Usage : GoSubArg(MTSaveLocalMonitorTextDef,strLocalMonitorText).
+
+  // Arguments.
+  LStrings(lstrLocalMonitorText)
+
+  // Variables locales.
+  LStrings(lstrShortDateTime,lstrFullFileName,lstrExpertText)
+  LShorts(lsErrorFlag)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrLocalMonitorText)
+
+  // Sauvegarde du texte 'Moniteur local'.
+  GoSubArg(MTGetShortDateTimeString,kstrStartDate,kstrStartTime,lstrShortDateTime)
+  Addn(kstrApplDir,"UserData\Local Monitors\",kstrTestSequence,"-",lstrShortDateTime,".txt",lstrFullFileName)
+  FileTextStringSave(lstrFullFileName,"",lstrLocalMonitorText,lsErrorFlag)
+
+EndSub(MTSaveLocalMonitorTextDef)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+////////////////////
+// MTFileTextSave //
+////////////////////
+
+BeginSub(MTFileTextSave)
+// Sauvegarde intégrale d'un texte dans un fichier.
+// Note : Par opposition au mot-clé FileTextStringSave qui ajoute un CR à chaque ligne.
+// Usage : GoSubArg(MTFileTextSave,strDirName,strFileName,strFileText,sErrorFlag).
+//         strDirName, strFileName : Chemin et nom complet du fichier. La répartition dans les deux arguments est arbitraire.
+//         strFileText : Texte à sauvegarder.
+//         sErrorFlag : Flag d'erreur retourné (0 : Pas d'erreur; 1 : Erreur)
+
+  // Arguments.
+  LStrings(lstrDirName,lstrFileName,lstrFileText)
+  LShorts(lsErrorFlag)
+
+  // Variables locales.
+  LBytes(lbTextArray[1])
+  LLongs(llTextLength)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrDirName,lstrFileName,lstrFileText,lsErrorFlag)
+
+  // Exécution.
+  StringLength(lstrFileText,llTextLength)
+  ResizeArrays(lbTextArray,llTextLength)
+  CommTools(StringToByteArray,lstrFileText,lbTextArray,0,llTextLength)
+  FileBinarySave(lstrDirName,lstrFileName,lbTextArray,0,llTextLength,lsErrorFlag)
+  ResizeArrays(lbTextArray,1)
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,-,lsErrorFlag)
+
+EndSub(MTFileTextSave)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+////////////////////
+// MTFileTextLoad //
+////////////////////
+
+BeginSub(MTFileTextLoad)
+// Chargement intégrale d'un texte d'un fichier. Les caractères '0' sont remplacés par des espaces (Caractère '32').
+// Note : Par opposition au mot-clé FileTextStringLoad qui demande à connaître d'avance la dimension du fichier préalablement.
+// Usage : GoSubArg(MTFileTextLoad,strDirName,strFileName,strFileText,sErrorFlag).
+//         strDirName, strFileName : Chemin et nom complet du fichier. La répartition dans les deux arguments est arbitraire.
+//         strFileText : Texte retourné.
+//         sErrorFlag : Flag d'erreur retourné (0 : Pas d'erreur; 1 : Erreur)
+
+  // Arguments.
+  LStrings(lstrDirName,lstrFileName,lstrFileText)
+  LShorts(lsErrorFlag)
+
+  // Variables locales.
+  LStrings(lstrDirFileName)
+  LBytes(lbTextArray[1])
+  LLongs(llTextLength)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrDirName,lstrFileName,lstrFileText,lsErrorFlag)
+
+  // Exécution.
+  Add(lstrDirName,lstrFileName,lstrDirFileName)
+  FileSize(lstrDirFileName,llTextLength)
+  ResizeArrays(lbTextArray,llTextLength)
+  FileBinaryLoad(lstrDirName,lstrFileName,lbTextArray,0,llTextLength,lsErrorFlag)
+  If(lsErrorFlag=0):::CommTools(ByteArrayToString,lbTextArray,0,llTextLength,lstrFileText,32):::Else():::Assign("",lstrFileText):::EndIf()
+  ResizeArrays(lbTextArray,1)
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,lstrFileText,lsErrorFlag)
+
+EndSub(MTFileTextLoad)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////////////
+// MTFileCompare //
+///////////////////
+
+BeginSub(MTFileCompare)
+// Comparaison de deux fichiers.
+// Usage : GoSubArg(MTFileCompare,strFileName1,strFileName2,lFileSize1,lFileSize2,lFileSizeDiff,lNumErroredBytes,lNumErroredBits,dByteCorrelation,dBitCorrelation,dByteValueCorrelation).
+//         strFileName1, strFileName2 : Chemins et noms complets des fichiers à comparer.
+//         lFileSize1, lFileSize2 : Dimension retournée de chaque fichier. Une valeur de -1 est retournée si le fichier correspondant n'existe pas.
+//         lFileSizeDiff : Différence retourné de dimension retournée.
+//         lNumErroredBytes : Nombre retourné d'octets en erreur.
+//         lNumErroredBits : Nombre retourné de bits en erreur.
+//         dByteCorrelation : Fraction retournée du nombre d’octets correspondants deux à deux. Deux champs d’octets complètement semblables retournent 1 alors que deux champs d’octets complètement différents retournent 0.
+//         dBitCorrelation :  Fraction retournée du nombre de bits correspondants deux à deux. Deux champs d’octets complètement semblables retournent 1 alors que deux champs d’octets complètement différents retournent 0.
+//         dByteValueCorrelation : Valeur retournée de la correlation des valeurs des octets. Deux champs d’octets complètement semblables retournent 1 alors que deux champs d’octets complètement différents retournent 0.
+// Notes :
+//   1) Si un des deux ou les deux fichiers n'existe(nt) pas, une valeur de -1 est retournée dans lFileSizeDiff, lNumErroredBytes, lNumErroredBits, dByteCorrelation, dBitCorrelation et dByteValueCorrelation.
+//   2) Si les deux fichiers ont de dimensions différentes, une valeur de -1 est retournée dans lNumErroredBytes, lNumErroredBits, dByteCorrelation, dBitCorrelation et dByteValueCorrelation.
+
+  // Arguments.
+  LStrings(lstrFileName1,lstrFileName2)
+  LLongs(llFileSize1,llFileSize2,llFileSizeDiff,llNumErroredBytes,llNumErroredBits)
+  LDoubles(ldByteCorrelation,ldBitCorrelation,ldByteValueCorrelation)
+
+  // Variables locales.
+  LBytes(lbFileData1[1],lbFileData2[1])
+  LShorts(lsErrorFlag1,lsErrorFlag2)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrFileName1,lstrFileName2,llFileSize1,llFileSize2,llFileSizeDiff,llNumErroredBytes,llNumErroredBits,ldByteCorrelation,ldBitCorrelation,ldByteValueCorrelation)
+
+  // Exécution.
+  {
+    FileSize(lstrFileName1,llFileSize1)
+    FileSize(lstrFileName2,llFileSize2)
+  
+    Ifn(llFileSize1>=0,llFileSize2>=0,AND)
+      Sub(llFileSize1,llFileSize2,llFileSizeDiff)
+    Else()
+      Assign(-1,llFileSizeDiff)
+    EndIf()
+  
+    Ifn(llFileSize1>=0,llFileSize2>=0,AND,llFileSize1=llFileSize2,AND)
+      ResizeArrays(lbFileData1,llFileSize1,lbFileData2,llFileSize2)
+      FileBinaryLoad("",lstrFileName1,lbFileData1,0,llFileSize1,lsErrorFlag1)
+      FileBinaryLoad("",lstrFileName2,lbFileData2,0,llFileSize2,lsErrorFlag2)
+      Ifn(lsErrorFlag1=0,lsErrorFlag2=0,AND)
+        CommTools(Compare2ByteArrays,lbFileData1,0,lbFileData2,0,llFileSize1,llNumErroredBytes,llNumErroredBits,ldByteCorrelation,ldBitCorrelation,ldByteValueCorrelation)
+      Else()
+        Assign(-1,llFileSizeDiff,-1,llNumErroredBytes,-1,llNumErroredBits,-1,ldByteCorrelation,-1,ldBitCorrelation,-1,ldByteValueCorrelation)
+      EndIf()
+      ResizeArrays(lbFileData1,1,lbFileData2,1)
+    Else()
+      Assign(-1,llNumErroredBytes,-1,llNumErroredBits,-1,ldByteCorrelation,-1,ldBitCorrelation,-1,ldByteValueCorrelation)
+    EndIf()
+  }
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,llFileSize1,llFileSize2,llFileSizeDiff,llNumErroredBytes,llNumErroredBits,ldByteCorrelation,ldBitCorrelation,ldByteValueCorrelation)
+
+EndSub(MTFileCompare)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+//////////////////////
+// MTGetParamString //
+//////////////////////
+
+BeginSub(MTGetParamString)
+// Lecture d'un paramètre texte du champ texte 'Liste de paramètres' de MATEB2 (Onglet Paramètres).
+// Usage : GoSubArg(MTGetParamString,strParamsList,lLineIndex,strMonOutLeadingSpaces,strParamDesc,strParamValue).
+//         strParamsList : Liste complète des paramètres, i.e. texte complet du champ texte 'Liste de paramètres'.
+//         lLineIndex : Numéro de la ligne dans la liste, allant de 0 au nombre total de ligne moins 1.
+//                      Une valeur de -1 peut être passée pour laisser à la sous-routine le soin de chercher dans l'ensemble du texte.
+//         strMonOutLeadingSpaces : Espaces ajouté en début de réponse affichée dans le moniteur.
+//         strParamDesc : Texte de descrition du paramètre que l'on retrouve dans la liste des paramètres.
+//         strParamValue : Valeur texte du paramètre retournée.
+// Notes :
+//   1) Dans la liste de paramètres, le format doit être <strParamDesc+" : "+Valeur>.
+
+  // Arguments.
+  LStrings(lstrParamsList,lstrMonOutLeadingSpaces,lstrParamDesc,lstrParamValue)
+  LLongs(llLineIndex)
+
+  // Variables locales.
+  LStrings(lstrLineText)
+  LShorts(lsScanResult)  
+  LLongs(llNumLines)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrParamsList,llLineIndex,lstrMonOutLeadingSpaces,lstrParamDesc,lstrParamValue)
+
+  // Exécution.
+  {
+    If(llLineIndex>=0)
+      StringTools(GetLine,lstrParamsList,llLineIndex,lstrLineText)
+      StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^\n]\n"),lstrParamValue,lsScanResult)
+    Else()
+      StringTools(FindLineWithText,lstrParamsList,Fct@StrAdd(lstrParamDesc," : "),0,-1,2,llLineIndex,lstrLineText)
+      If(llLineIndex>=0)
+        StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^\n]\n"),lstrParamValue,lsScanResult)
+      Else()
+        Assign(0,lsScanResult)
+      EndIf()
+    EndIf()
+  
+    If(lsScanResult=1)
+      AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValue,">")
+    Else()
+      MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du paramètre <",lstrParamDesc,"> en erreur !"))
+      Abort()
+    EndIf()
+  }
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,-,-,lstrParamValue)
+
+EndSub(MTGetParamString)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+//////////////////////
+// MTGetParamNumber //
+//////////////////////
+
+BeginSub(MTGetParamNumber)
+// Lecture d'un paramètre numérique du champ texte 'Liste de paramètres' de MATEB2 (Onglet Paramètres).
+// Usage : GoSubArg(MTGetParamNumber,strParamsList,lLineIndex,strMonOutLeadingSpaces,strParamDesc,dParamValue).
+//         strParamsList : Liste complète des paramètres, i.e. texte complet du champ texte 'Liste de paramètres'.
+//         lLineIndex : Numéro de la ligne dans la liste, allant de 0 au nombre total de ligne moins 1.
+//                      Une valeur de -1 peut être passée pour laisser à la sous-routine le soin de chercher dans l'ensemble du texte.
+//         strMonOutLeadingSpaces : Espaces ajouté en début de réponse affichée dans le moniteur.
+//         strParamDesc : Texte de descrition du paramètre que l'on retrouve dans la liste des paramètres.
+//         dParamValue : Valeur numérique (Byte, Short, Long, Float ou Double) du paramètre retournée.
+// Notes :
+//   1) Dans la liste de paramètres, le format doit être <strParamDesc+" : "+Valeur>.
+
+  // Arguments.
+  LStrings(lstrParamsList,lstrMonOutLeadingSpaces,lstrParamDesc)
+  LLongs(llLineIndex)
+  LDoubles(ldParamValue)
+
+  // Variables locales.
+  LStrings(lstrLineText,lstrParamValue)
+  LShorts(lsScanResult,lsConvError)  
+  LLongs(llNumLines)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrParamsList,llLineIndex,lstrMonOutLeadingSpaces,lstrParamDesc,ldParamValue)
+
+  // Exécution.
+  {
+    If(llLineIndex>=0)
+      StringTools(GetLine,lstrParamsList,llLineIndex,lstrLineText)
+      StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^\n]\n"),lstrParamValue,lsScanResult)
+    Else()
+      StringTools(FindLineWithText,lstrParamsList,Fct@StrAdd(lstrParamDesc," : "),0,-1,2,llLineIndex,lstrLineText)
+      If(llLineIndex>=0)
+        StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^\n]\n"),lstrParamValue,lsScanResult)
+      Else()
+        Assign(0,lsScanResult)
+      EndIf()
+    EndIf()
+  
+    If(lsScanResult=1)
+      StringToNum(lstrParamValue,ldParamValue,lsConvError)
+      If(lsConvError=0)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",ldParamValue,">")
+      Else()
+        MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du paramètre <",lstrParamDesc,"> en erreur !"))
+        Abort()
+      EndIf()
+    Else()
+      MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du paramètre <",lstrParamDesc,"> en erreur !"))
+      Abort()
+    EndIf()
+  }
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,-,-,ldParamValue)
+
+EndSub(MTGetParamNumber)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////////////////
+// MTGetParamStrings //
+///////////////////////
+
+BeginSub(MTGetParamStrings)
+// Lecture de paramètres texte du champ texte 'Liste de paramètres' de MATEB2 (Onglet Paramètres).
+// Usage : GoSubArg(MTGetParamString,strParamsList,lLineIndex,strMonOutLeadingSpaces,strParamDesc,strParamValue1,...,strParamValueN).
+//         strParamsList : Liste complète des paramètres, i.e. texte complet du champ texte 'Liste de paramètres'.
+//         lLineIndex : Numéro de la ligne dans la liste, allant de 0 au nombre total de ligne moins 1.
+//                      Une valeur de -1 peut être passée pour laisser à la sous-routine le soin de chercher dans l'ensemble du texte.
+//         strMonOutLeadingSpaces : Espaces ajouté en début de réponse affichée dans le moniteur.
+//         strParamDesc : Texte de descrition du paramètre que l'on retrouve dans la liste des paramètres.
+//         strParamValue1,...,strParamValueN : N<=8. Valeurs texte des paramètres retournées, séparées par des vigules dans la liste.
+// Notes :
+//   1) Dans la liste de paramètres, le format doit être <strParamDesc+" : "+Valeur1+","+...+","+ValeurN>.
+
+  // Arguments.
+  LStrings(lstrParamsList,lstrMonOutLeadingSpaces,lstrParamDesc,lstrParamValues[8])
+  LLongs(llLineIndex)
+
+  // Variables locales.
+  LStrings(lstrLineText)
+  LShorts(lsScanResult,lsNumArgs,lsNumParams)  
+  LLongs(llNumLines)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrParamsList,llLineIndex,lstrMonOutLeadingSpaces,lstrParamDesc)
+  GetSubNumArgs(lsNumArgs)
+  :lsNumParams=lsNumArgs-4
+
+  // Exécution.
+  {
+    If(llLineIndex>=0)
+      StringTools(GetLine,lstrParamsList,llLineIndex,lstrLineText)
+    Else()
+      StringTools(FindLineWithText,lstrParamsList,Fct@StrAdd(lstrParamDesc," : "),0,-1,2,llLineIndex,lstrLineText)
+    EndIf()
+
+    If(llLineIndex>=0)
+      :lsScanResult=0
+      If(lsNumParams=1):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^\n]\n"),lstrParamValues[0],lsScanResult)
+      ElseIf(lsNumParams=2):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lsScanResult)
+      ElseIf(lsNumParams=3):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lsScanResult)
+      ElseIf(lsNumParams=4):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^,],%[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lsScanResult)
+      ElseIf(lsNumParams=5):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^,],%[^,],%[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lsScanResult)
+      ElseIf(lsNumParams=6):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^,],%[^,],%[^,],%[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lstrParamValues[5],lsScanResult)
+      ElseIf(lsNumParams=7):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lstrParamValues[5],lstrParamValues[6],lsScanResult)
+      ElseIf(lsNumParams=8):::StringSscanf(lstrLineText,Fct@StrAdd(lstrParamDesc," : %[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^\n]\n"),lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lstrParamValues[5],lstrParamValues[6],lstrParamValues[7],lsScanResult)
+      Else
+        MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du(des) paramètre(s) <",lstrParamDesc,"> en erreur !"))
+        Abort()
+      EndIf()
+    Else()
+      MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du(des) paramètre(s) <",lstrParamDesc,"> en erreur !"))
+      Abort()
+    EndIf()
+
+  // Extraction et écriture dans les arguments de retour.
+  {
+    If(lsScanResult>0)
+      If(lsNumParams=1)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0])
+      ElseIf(lsNumParams=2)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1])
+      ElseIf(lsNumParams=3)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],",",lstrParamValues[2],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1],lstrParamValues[2])
+      ElseIf(lsNumParams=4)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],",",lstrParamValues[2],",",lstrParamValues[3],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3])
+      ElseIf(lsNumParams=5)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],",",lstrParamValues[2],",",lstrParamValues[3],",",lstrParamValues[4],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4])
+      ElseIf(lsNumParams=6)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],",",lstrParamValues[2],",",lstrParamValues[3],",",lstrParamValues[4],",",lstrParamValues[5],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lstrParamValues[5])
+      ElseIf(lsNumParams=7)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],",",lstrParamValues[2],",",lstrParamValues[3],",",lstrParamValues[4],",",lstrParamValues[5],",",lstrParamValues[6],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lstrParamValues[5],lstrParamValues[6])
+      ElseIf(lsNumParams=8)
+        AddnMonitorText(lstrMonOutLeadingSpaces,"- Paramètre <",lstrParamDesc,"> : <",lstrParamValues[0],",",lstrParamValues[1],",",lstrParamValues[2],",",lstrParamValues[3],",",lstrParamValues[4],",",lstrParamValues[5],",",lstrParamValues[6],",",lstrParamValues[7],">")
+        SetSubArgs(-,-,-,-,lstrParamValues[0],lstrParamValues[1],lstrParamValues[2],lstrParamValues[3],lstrParamValues[4],lstrParamValues[5],lstrParamValues[6],lstrParamValues[7])
+      Else                    
+        MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du(des) paramètre(s) <",lstrParamDesc,"> en erreur !"))
+        Abort()               
+      EndIf()                 
+    Else()
+      MsgBoxOK(Fct@StrAdd("ATTENTION : Lecture du(des) paramètre(s) <",lstrParamDesc,"> en erreur !"))
+      Abort()
+    EndIf()
+  }
+
+EndSub(MTGetParamStrings)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+//////////////////////////////
+// MTBuildCustomTextResults //
+//////////////////////////////
+
+BeginSub(MTBuildCustomTextResults)
+// Construction custom du texte des résultats.
+// Usage : GoSubArg(MTBuildCustomTextResults,strModel,sFirstIndex,sLastIndex,sOptionFailedPassed,sOptionResultFormat,strResultsText).
+//         strModel (V/L) : Model désiré...
+//                          "Base" : En tout point semblable à la construction standard, mais avec des options.
+//         sFirstIndex, sLastIndex (V/L) : Premier et dernier index des résultats à considérer.
+//         sOptionFailedPassed (V/L) : Sélection des résultats selon le verdict de chacun...
+//                                     0 : En échec seulement.
+//                                     1 : En succès seulement.
+//                                     2 : Tous.
+//         sOptionResultFormat : Sélection du format des résultats...
+//                                0 : Standard, i.e. décimal seulement.
+//                                1 : Décimal, plus partie entière en hexadécimal 32 bits ajoutée entre parenthèses.
+//                                2 : Décimal, plus partie entière en binaire 4 X 8 bits ajoutée entre parenthèses.
+//                                3 : Décimal, plus partie entière en hexadécimal 32 bits et en binaire 4 X 8 bits ajoutées entre parenthèses.
+// Retours :
+//   strResultsText : Texte des résultats construit.
+// Exemple : GoSubArg(MTBuildCustomTextResults,"Base",0,4,strResultsText).
+
+  // Constantes opérationnelles locales.
+
+  // Arguments.
+  LStrings(lstrBuildModel,lstrResultsText)
+  LShorts(lsFirstResultIndex,lsLastResultIndex,lsOptionFailedPassed,lsOptionResultFormat)
+
+  // Variables locales.
+  LStrings(lstrResDescription,lstrActive,lstrResultsSubText,lstrResultValue,lstrBinaryArray[4])
+  LBytes(lbIntValue)
+  LShorts(lsResultIndex,lsResEnableFlag,lsResPassedOrFailedFlag)
+  LFloats(lfResMinLimit,lfResMaxLimit,lfResValue)
+  LLongs(llIntValue)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lstrBuildModel,lsFirstResultIndex,lsLastResultIndex,lsOptionFailedPassed,lsOptionResultFormat,lstrResultsText)
+
+  // Exécution.
+  {
+    If(lstrBuildModel="Base")
+
+      Assign(lsFirstResultIndex,lsResultIndex,"",lstrResultsText)
+
+      BeginLoop()
+
+        ResultsGetAll(lsResultIndex,lstrResDescription,lsResEnableFlag,lfResMinLimit,lfResMaxLimit,lfResValue,lsResPassedOrFailedFlag)
+
+        If(lsResEnableFlag=1):::Assign("Actif",lstrActive):::Else():::Assign("Inactif",lstrActive):::EndIf()
+  
+        Assign(Fct@Int(lfResValue),llIntValue)
+        RPN(llIntValue,0xFF000000,&,6,>>,lbIntValue)
+        FormatStringBSL(lbIntValue,"Binary8",lstrBinaryArray[0])
+        RPN(llIntValue,0x00FF0000,&,4,>>,lbIntValue)
+        FormatStringBSL(lbIntValue,"Binary8",lstrBinaryArray[1])
+        RPN(llIntValue,0x0000FF00,&,2,>>,lbIntValue)
+        FormatStringBSL(lbIntValue,"Binary8",lstrBinaryArray[2])
+        RPN(llIntValue,0x000000FF,&,lbIntValue)
+        FormatStringBSL(lbIntValue,"Binary8",lstrBinaryArray[3])
+  
+        If(lsOptionResultFormat=0)
+          StringTools(FormatStringCStyle,lfResValue,"%8.6f",lstrResultValue)
+        ElseIf(lsOptionResultFormat=1)
+          StringTools(FormatStringCStyle,lfResValue,"%8.6f",llIntValue," (0x%.8X)",lstrResultValue)
+        ElseIf(lsOptionResultFormat=2)
+          StringTools(FormatStringCStyle,lfResValue,"%8.6f",lstrBinaryArray[0]," (0b%s",lstrBinaryArray[1],"/0b%s",lstrBinaryArray[2],"/0b%s",lstrBinaryArray[3],"/0b%s)",lstrResultValue)
+        ElseIf(lsOptionResultFormat=3)
+          StringTools(FormatStringCStyle,lfResValue,"%8.6f",llIntValue," (0x%.8X)",lstrBinaryArray[0]," (0b%s",lstrBinaryArray[1],"/0b%s",lstrBinaryArray[2],"/0b%s",lstrBinaryArray[3],"/0b%s)",lstrResultValue)
+        EndIf()
+  
+        Ifn(lsResPassedOrFailedFlag=1,lsOptionFailedPassed=1,lsOptionFailedPassed=2,OR,AND)
+          StringTools(FormatStringCStyle,lsResultIndex,"   Résultat #%hd",lstrResDescription,", '%s'",lstrActive,", %s",lfResMinLimit,", Limites : %8.6f",lfResMaxLimit,"/%8.6f",lstrResultValue,", Valeur : %s, Succès",lstrResultsSubText)
+          StringTools(AddLine,lstrResultsText,lstrResultsSubText,lstrResultsText)
+        ElseIfn(lsResPassedOrFailedFlag=0,lsOptionFailedPassed=0,lsOptionFailedPassed=2,OR,AND)
+          StringTools(FormatStringCStyle,lsResultIndex,">>>Résultat #%hd",lstrResDescription,", '%s'",lstrActive,", %s",lfResMinLimit,", Limites : %8.6f",lfResMaxLimit,"/%8.6f",lstrResultValue,", Valeur : %s, Échec <<<<<",lstrResultsSubText)
+          StringTools(AddLine,lstrResultsText,lstrResultsSubText,lstrResultsText)
+        EndIf()
+
+        Incr(lsResultIndex)
+        ExitLoopIf(lsResultIndex>lsLastResultIndex)
+
+      EndLoop()
+
+    EndIf()
+  }
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,-,-,-,lstrResultsText)
+
+EndSub(MTBuildCustomTextResults)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+//////////////////////
+// MTFTPDeleteFiles //
+//////////////////////
+
+BeginSub(MTFTPDeleteFiles)
+// Effaçage en FTP d'une liste de fichiers.
+// Usage : GoSubArg(MTFTPDeleteFiles,sFTPChannel,strFTPFileList,sMonMsgFlag,strMonMsgPrefix,strMonMsgSuffix,sFTPErrorCode,strFTPErrorDesc,strFTPFileInError).
+//         sFTPChannel (V/L) : Canal FTP (0-15).
+//         strFTPFileList (V/L) : Liste des fichiers à effacer.
+//         sMonMsgFlag (V/L) : Indique si une sortie dans le moniteur est désirée (1) ouo non (0).
+//         strMonMsgPrefix (V/L) : Préfixe à ajouter au début de chaque ligne de message dans le moniteur.
+//         strMonMsgSuffix (V/L) : Suffixe à ajouter àa la fin de chaque ligne de message dans le moniteur.
+//         sFTPErrorCode (V) : Code d'erreur FTP retourné.
+//         strFTPErrorDesc (V) : Description d'erreur FTP retourné.
+//         strFTPFileInError (V) : Fichier à la source de l'erreur, si applicable
+// Exemples : GoSubArg(MTFTPDeleteFiles,sFTPChannel,strFTPFileList,0,"","",sFTPErrorCode,strFTPErrorDesc,strFTPFileInError).
+//            GoSubArg(MTFTPDeleteFiles,sFTPChannel,strFTPFileList,1,"    Effaçage du fichier '","'...",sFTPErrorCode,strFTPErrorDesc,strFTPFileInError).
+// Notes :
+//   1) Le canal FTP doit déjà être ouvert et le répertoire désiré dèjà sélectionné.
+//   2) Tous les fichiers mentionnés doivent exister.
+
+  // Constantes opérationnelles locales.
+
+  // Arguments.
+  LStrings(lstrFTPFileList,lstrMonMsgPrefix,lstrMonMsgSuffix,lstrFTPErrorDesc,lstrFTPFileInError)
+  LShorts(lsFTPChannel,lsMonMsgFlag,lsFTPErrorCode)
+
+  // Variables locales.
+  LStrings(lstrOneFile)
+  LLongs(llNumLines,llLineIndex)
+
+  // Lecture des arguments d'entrée et de retour.
+  GetSubArgs(lsFTPChannel,lstrFTPFileList,lsMonMsgFlag,lstrMonMsgPrefix,lstrMonMsgSuffix)
+
+  // Exécution.
+  If(lstrFTPFileList!="")
+    StringTools(GetNumLines,lstrFTPFileList,llNumLines)
+    Assign("",lstrFTPFileInError)
+    :llLineIndex=0
+    BeginLoop()
+      StringTools(GetLine,lstrFTPFileList,llLineIndex,lstrOneFile)
+      AddnMonitorText(lstrMonMsgPrefix,lstrOneFile,lstrMonMsgSuffix)
+      EtherCommEx(FTPClient,lsFTPChannel,DeleteFile,lstrOneFile,lsFTPErrorCode,lstrFTPErrorDesc)
+      If(lsFTPErrorCode!=0)
+        Assign(lstrOneFile,lstrFTPFileInError)
+        ExitLoop()
+      EndIf()
+      Incr(llLineIndex)
+      ExitLoopIf(llLineIndex>=llNumLines)
+    EndLoop()
+  Else()
+    Assign(0,lsFTPErrorCode,"",lstrFTPErrorDesc,"",lstrFTPFileInError)
+  EndIf()
+
+  // Écriture dans les arguments de retour.
+  SetSubArgs(-,-,-,-,-,lsFTPErrorCode,lstrFTPErrorDesc,lstrFTPFileInError)
+
+EndSub(MTFTPDeleteFiles)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+////////////
+// MTPing //
+////////////
+
+BeginSub(MTPing)
+// Vérification d'une connection réseau par un ping.
+// GoSubArg(MTPing,strIPAddr,lNumPackets,lNumBytes,lPacketsSent,lPacketsReceived,lPacketsLost,lPercentLost,lMinDelay,lMaxDelay,lAvgDelay,sErrorCode,strErrorDesc)
+// Entrées :
+//   strIPAddr : Adresse IP ou nom de la station.
+//   lNumPackets : Nombre de paquets à envoyer (-1 pour 4 paquets, ou 1 à 100).
+//   lNumBytes : Nombre d'octets par paquet à envoyer (-1 pour 32, ou 1 à 8192).
+// Retours :
+//   lPacketsSent : Nombre de paquets envoyés.
+//   lPacketsReceived : Nombre de paquets reçus.
+//   lPacketsLost : Nombre de paquets perdus.
+//   lPercentLost : Pourcentage de paquets perdus.
+//   lMinDelay : Délai de réponse minimum obtenu.
+//   lMaxDelay : Délai de réponse maximum obtenu.
+//   lAvgDelay : Délai de réponse moyen obtenu.
+//   sErrorCode : Code d'erreur.
+//   strErrorDesc : Description de l'erreur.
+// Note : En cas de perte totale de connection avec le serveur, le code d'erreur retourné sera le 3, i.e. 'Lecture des données statistiques en erreur'.
+
+  LStrings(lstrIPAddr,lstrErrorDesc,lstrBatchText,lstrBatchFile,lstrRespFile,lstrRespFileText,lstrRespFileLineText,lstrScanResults[4])
+  LShorts(lsErrorCode,lsDOSError,lsStringToNumError)
+  LLongs(llNumPackets,llNumBytes,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay)
+
+  GetSubArgs(lstrIPAddr,llNumPackets,llNumBytes)
+
+  Assign(0,lsErrorCode,"Pas d'erreur",lstrErrorDesc,-1,llPacketsSent,-1,llPacketsReceived,-1,llPacketsLost,-1,llPercentLost,-1,llMinDelay,-1,llMaxDelay,-1,llAvgDelay)
+
+  // Nom des fichiers.
+  Assign("c:\\MATEB2Ping.bat",lstrBatchFile)
+  Assign("c:\\MATEB2Ping.txt",lstrRespFile)
+
+  // Destruction des fichiers existants.
+  DeleteFile(lstrBatchFile,0)
+  DeleteFile(lstrRespFile,0)
+
+  // Création et exécution du fichier batch.
+  If(llNumPackets<0):::Assign(4,llNumPackets):::EndIf()
+  If(llNumPackets>100):::Assign(100,llNumPackets):::EndIf()
+  If(llNumBytes<0):::Assign(32,llNumBytes):::EndIf()
+  If(llNumBytes>8192):::Assign(8192,llNumBytes):::EndIf()
+  Add("Ping ",lstrIPAddr," -n ",llNumPackets," -l ",llNumBytes," > ",lstrRespFile,lstrBatchText)
+  DOSCmd(BuildExecBatchFile,lstrBatchText,lstrBatchFile,lsDOSError)
+  If(lsDOSError!=0)
+    Assign(1,lsErrorCode,"Création et exécution du fichier batch en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+
+  // Ouverture du fichier de réponse.
+  DOSCmd(OpenRespFile,lstrRespFile,lsDOSError)
+  If(lsDOSError!=0)
+    Assign(2,lsErrorCode,"Ouverture du fichier de réponse en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+
+  // Lecture des données statistiques.
+  DOSCmd(GetRespFileLine,Fct!Add(llNumPackets,4),lstrRespFileLineText,lsDOSError)
+  If(lsDOSError!=0)
+    Assign(3,lsErrorCode,"Lecture des données statistiques en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  DOSCmd(ScanRespFileLine,lstrRespFileLineText,"    Packets: Sent = %[^,], Received = %[^,], Lost = %[^ ] (%[^%%]%% loss),",lstrScanResults[0],lstrScanResults[1],lstrScanResults[2],lstrScanResults[3],lsDOSError)
+  If(lsDOSError!=0)
+    Assign(4,lsErrorCode,"Interprétation des données statistiques en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[0],llPacketsSent,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(5,lsErrorCode,"Lecture du nombre de paquets envoyés en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[1],llPacketsReceived,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(6,lsErrorCode,"Lecture du nombre de paquets reçus en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[2],llPacketsLost,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(7,lsErrorCode,"Lecture du nombre de paquets perdus en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[3],llPercentLost,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(8,lsErrorCode,"Lecture du pourcentage de paquets perdus en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+
+  // Lecture des données temporelles.
+  DOSCmd(GetRespFileLine,Fct!Add(llNumPackets,6),lstrRespFileLineText,lsDOSError)
+  If(lsDOSError!=0)
+    Assign(9,lsErrorCode,"Lecture des données temporelles en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  DOSCmd(ScanRespFileLine,lstrRespFileLineText,"    Minimum = %[^m]ms, Maximum = %[^m]ms, Average = %[^m]ms",lstrScanResults[0],lstrScanResults[1],lstrScanResults[2],lsDOSError)
+  If(lsDOSError!=0)
+    Assign(10,lsErrorCode,"Interprétation des données temporelles en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[0],llMinDelay,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(11,lsErrorCode,"Lecture du délai minimum en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[0],llMaxDelay,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(12,lsErrorCode,"Lecture du délai maximum en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+  StringToNum(lstrScanResults[0],llAvgDelay,lsStringToNumError)
+  If(lsStringToNumError!=0)
+    Assign(13,lsErrorCode,"Lecture du délai moyen en erreur",lstrErrorDesc)
+    SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitSub(MTPing)
+  EndIf()
+
+  SetSubArgs(-,-,-,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+
+EndSub(MTPing)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+/////////////////////
+// MTWaitForServer //
+/////////////////////
+
+BeginSub(MTWaitForServer)
+// Boucle d'attente d'une connection réseau avec un serveur.
+// GoSubArg(MTWaitForServer,sLeadingSpaces,strMessage,strIPAddr,lNumLoops,lLoopDelay,strCallBackSub).
+// Entrées :
+//   sLeadingSpaces : Nombre d'espaces précédent le message.
+//   strMessage : Message à afficher dans le moniteur.
+//   strIPAddr : Adresse IP ou nom de la station.
+//   lNumLoops : Nombre de boucles d'attente (-1 : Nombre infini).
+//   lLoopDelay : Délai entre les boucles en msec.
+//   strCallBackSub : Sous-routine qui sera appelé en cas d'échec final de connection.
+
+  LStrings(lstrMessage,lstrIPAddr,lstrCallBackSub,lstrErrorDesc)
+  LShorts(lsLeadingSpaces,lsErrorCode,lsDlgResult)
+  LLongs(llNumLoops,llLoopDelay,llIndex,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay)
+
+  GetSubArgs(lsLeadingSpaces,lstrMessage,lstrIPAddr,llNumLoops,llLoopDelay,lstrCallBackSub)
+
+  If(lstrMessage!=""):::AddMonitorDateTime(Fct@StrCRLF(1),Fct@StrChars(" ",lsLeadingSpaces),lstrMessage,"...Entrée - %s/%s"):::EndIf()
+
+  Assign(0,llIndex)
+  BeginLoop()
+    GoSubArg(MTPing,lstrIPAddr,3,32,llPacketsSent,llPacketsReceived,llPacketsLost,llPercentLost,llMinDelay,llMaxDelay,llAvgDelay,lsErrorCode,lstrErrorDesc)
+    ExitLoopIf(lsErrorCode=0)
+    Incr(llIndex)
+    Ifn(llNumLoops>-1,llIndex>=llNumLoops,AND)
+      MsgBoxYesNo("Vérification réseau",Fct@StrAdd("ATTENTION! - Le serveur <",lstrIPAddr,"> n'est pas présent !",Fct@StrCRLF(1),"Désirez-vous réessayer ?"),lsDlgResult,700,140,14)
+      If(lsDlgResult=1)
+        Assign(0,llIndex)
+      ElseIf(lsDlgResult=2)
+        If(lstrCallBackSub!=""):::GoSubParam(lstrCallBackSub):::EndIf()
+        Abort()
+      EndIf()
+    EndIf()
+    msecWait(llLoopDelay)
+  EndLoop()
+
+  If(lstrMessage!=""):::AddMonitorDateTime(Fct@StrChars(" ",lsLeadingSpaces),lstrMessage,"...Sortie - %s/%s",Fct@StrCRLF(1)):::EndIf()
+
+EndSub(MTWaitForServer)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------------------------------------------------------------- //
+
+
+///////////
+// MTNew //
+///////////
+
+BeginSub(MTNew)
+// .
+// Usage : .
+// Exemple : .
+// Notes :
+//   1) .
+//   2) .
+
+  // Constantes opérationnelles locales.
+
+  // Arguments.
+
+  // Variables locales.
+
+  // Lecture des arguments d'entrée et de retour.
+
+  // Exécution.
+
+  // Écriture dans les arguments de retour.
+
+EndSub(MTNew)
+
+
+// ---------------------------------------------------------------------------------------------------- //
+
+
+// Subs-MiscTools01.txt... Fin.
+
+----------------------------------------------------------------------------------------------------

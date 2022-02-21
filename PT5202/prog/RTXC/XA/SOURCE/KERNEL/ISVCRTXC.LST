@@ -1,0 +1,320 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\KERNEL\cc716c5b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; isvcrtxc.asm
+                          3 ;
+                          4 ;   RTXC    Version 3.2
+                          5 ;   Copyright (c) 1986-1997.
+                          6 ;   Embedded System Products, Inc.
+                          7 ;   ALL RIGHTS RESERVED
+                          8 ;
+                          9 ;
+                         10 ;   RTXC assembly code - for the 8051XA
+                         11 ;
+                         12 ;=============================================================================
+                         15 $                      
+                         17 ; rtxcopts.inc - RTXC assembly options 8051XA
+                         19 ;
+                         20 ;   RTXC    
+                         21 ;   Copyright (c) 
+                         22 ;   Embedded System Products, Inc.
+                         23 ;   ALL RIGHTS RESERVED
+                         24 ;
+                         25 ;============================================================================
+                         27 ;-------------------------------------
+                         28 ; KERNEL priority level
+                         29 ;    NOTE: RTXCINTLVL must match level in RTXCOPTS.H
+                         30 ;-------------------------------------
+                         31 RTXCINTLVL    equ   0Dh
+                         33 ;-------------------------------------
+                         34 ; KERNEL Trap number
+                         35 ;    NOTE:
+                         36 ;-------------------------------------
+                         37 RTXC_TRAPNUM  equ    0h
+                         39 ;-------------------------------------
+                         40 ; RTXC stack size
+                         41 ;    NOTE: RTXCSTKSZ must match definition in RTXCOPTS.H
+                         42 ;-------------------------------------
+                         43 RTXCSTKSZ    equ   256; can be changed as needed, min = approx 256 bytes
+                         45 ;-------------------------------------
+                         46 ; Nulltask's stack size
+                         47 ;-------------------------------------
+                         48 NULLSTKSZ    equ   128; Size of null stack, min = 128
+                         50 ;===========================================================================
+                         51 ; This switch is to define 12 bytes of kernel data into the first 1k bytes
+                         52 ; of RAM.  Having this switch defined to _near allows the kernel to execute
+                         53 ; considerably faster at a minimal cost. If this data is not desired to be
+                         54 ; in the 1k bytes, then define CORE_IRAMDATA to zero (0).
+                         55 ;                1 = YES,  0 = NO
+                         56 ;---------------------------------------------------------------------------
+                         58 ;===========================================================================
+                         60 ;===========================================================================
+                         61 ; This allows the kernel in the LARGE memory model to access the stacks as
+                         62 ; 16 bit data.
+                         63 ;
+                         64 ;NOTE1: This switch must match the setting of the switch of the same name
+                         65 ;       in the RTXCOPTS.H module.
+                         66 ;
+                         67 ;NOTE2: This switch is supported only in the Tasking LARGE memory model.
+                         68 ;                1 = YES,  0 = NO
+                         69 ;---------------------------------------------------------------------------
+                         71 ;===========================================================================
+                         73 ;****************************************************************************
+                         74 ; Do not modify anything below this line
+                         75 ;---------------------------------------------------------------------------
+                         77    
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         78    
+                         79    
+                         80    
+                         81        
+                         82        
+                         83            
+                         84        
+                         85    
+                         86    
+                         87    
+                         91 ;===========================================================================
+                         92 ; The SYSMODE switch should always be defined and equal to 0x080.
+                         93 ; This defines the system mode.  User mode is not supported by RTXC.
+                         94 ;---------------------------------------------------------------------------
+                         95 SYSMODE  equ 080h
+                         96 ;===========================================================================
+                         98 ; end of rtxcopts.inc
+000000                  101 ISVCRTXC_DATA SEGMENT HDATA  CLEAR
+                        103 PSWOFFSET       equ     012h
+000000                  105         RSEG ISVCRTXC_DATA
+                        106 ;
+                        107 ; Reserve memory for the Kernel stack and Nulltask stack
+                        108 ;
+                        109         public _nulltos
+                        110         public _nullstak
+000000                  111 _nulltos:
+000000                  112         ds      NULLSTKSZ
+   |  RESERVED             
+00007F
+000080                  113 _nullstak:
+                        114         public _rtxctos
+                        115         public _rtxcstak
+000080                  116 _rtxctos:
+000080                  117         ds      RTXCSTKSZ
+   |  RESERVED             
+00017F
+000180                  118 _rtxcstak:
+                        120 EXTRN DATA (_isrcnt)
+                        121 EXTRN DATA (_intlvl)
+                        123 EXTRN HCODE (_rtxc)
+000040                  125 CSEG AT 040H
+000040 008Drrrrrrrrrr   126 DW   8000H+(RTXCINTLVL SHL 8),isvcrtx
+       rrrrrr               
+000000                  128 ISVCRTXC_CODE SEGMENT HCODE 
+000000                  129        RSEG ISVCRTXC_CODE
+000000                  129        RSEG ISVCRTXC_CODE
+                        130 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        131 ;                                                          ;
+                        132 ; C to Assembly call to trap to kernel                     ;
+                        133 ;                                                          ;
+                        134 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        135         public _ks
+000000                  136 _ks:
+000000 D630             137         trap #RTXC_TRAPNUM
+000002 D680             138         ret
+000002 D680             138         ret
+                        140 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        141 ;                                                          ;
+                        142 ; interrupt service for RTXC Kernel Service using trap     ;
+                        143 ;                                                          ;
+                        144 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        145        public isvcrtx
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000004                  146 isvcrtx:
+                        147     ; save register set on the interrupted's frame or stack
+                        148     ; R6 first, R0 last
+000004 0F7F             149     push      R6,R5,R4,R3,R2,R1,R0
+                        151     ; load and save the segment select and data segment
+                        152     ; registers in the interrupted's frame. Then set them
+                        153     ; to page zero (0).
+000006 86C403           154     mov.b     R6L,SSEL
+000009 86D441           155     mov.b     R6H,DS
+00000C 0F40             156     push      R6
+00000E 9648037F         158     mov.b     SSEL,#7Fh
+000012 B64041           161     mov.b     DS,#0
+                        163     ; store the Extra and Code Segment registers in the interrupted's frame.
+000015 86C442           164     mov.b     R6L,ES
+000018 86D443           165     mov.b     R6H,CS
+00001B 0F40             166     push      R6
+                        168     ; force the interrupt level count to one.
+                        169     ; Should always come in as zero (0).
+                        170      ; declared as type DATA
+00001D B6r1rr           171     movs.b      _isrcnt,#01h
+                        172    ; end of if CORE_IRAMDATA
+                        175     ; pass the frame pointer or stack pointer as an argument to the kernel.
+000020 862441           177     mov.b     R1L, DS
+000023 7133             178     xor.b     R1H, R1H
+000025 8907             181     mov.w     R0,R7
+                        183     ; switch to the kernel stack
+000027 9978rrrr         184     mov.w     R7,#_rtxcstak
+                        186     ; restore the processor priority level to the
+                        187     ; global task interrupt priority level
+                        188      ; declared as type DATA
+00002B 86Crrr           189     mov.b      R6L,_intlvl
+                        190    ; end of if CORE_IRAMDATA
+00002E 86CC01           193     mov.b      PSWH,R6L
+                        195     ; call the RTXC kernel
+000031 C4rrrrrr         196     FCALL      _rtxc                   ;call kernel
+000031 C4rrrrrr00       196     FCALL      _rtxc                   ;call kernel
+                        198     ; exit the RTXC kernel by restoring the highest priority task
+000036                  199 ksexit:
+                        201     ;restore the SP with the pointer to task frame or stack
+000036 862C41           203     mov.b     DS, R1L
+000039 8970             206     mov.w     R7, R0
+                        208     ; replace the highest priority task's copy of the PSW in its frame
+                        209     ; with the global task interrupt priority level stored in _intlvl.
+00003B 8C0712           210     mov.w     R0,[R7+PSWOFFSET]       ;get psw of current task
+00003E 9905F0FF         211     and.w     R0,#0F0FFh              ;set ppl to zero
+                        212      ; declared as type DATA
+000042 661rrr           213     or.b      R0H,_intlvl             ;OR in current task ppl
+                        214    ; end of if CORE_IRAMDATA
+000045 8C0F12           217     mov.w     [R7+PSWOFFSET],R0       ;put in task stack frame
+                        219     ; force the interrupt level count to zero (0).
+                        220     ; Should always be one here.
+                        221      ; declared as type DATA
+000048 B6r0rr           222     movs.b    _isrcnt,#0h
+                        223   ; end of if CORE_IRAMDATA
+                        226     ; restore the Extra and Code Segment registers off the stack.
+00004B 2F40             227     pop       R6
+00004D 86DC43           228     mov.b     CS,R6H
+000050 86CC42           229     mov.b     ES,R6L
+                        231     ; restore the Data Segment and Segment SELect register off the stack.
+000053 2F40             232     pop       R6
+000055 86DC41           233     mov.b     DS,R6H
+000058 86CC03           234     mov.b     SSEL,R6L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        236     ; restore the register set
+00005B 2F7F             237     pop       R0,R1,R2,R3,R4,R5,R6
+                        239     ;return from interrupt
+00005D D690             240     reti
+00005D D69000           240     reti
+                        242       public isrexit
+000060                  243 isrexit:
+                        245     ;restore the SP with the pointer to task frame or stack
+000060 862C41           247     mov.b     DS, R1L
+000063 8970             250     mov.w     R7, R0
+                        252     ; decrement the interrupt level count
+                        253      ; declared as type DATA
+000065 A6rFrr           254     adds.b    _isrcnt,#-1
+                        255     ; end of if CORE_IRAMDATA
+                        258     ; restore the Extra and Code Segment registers off the stack.
+000068 2F40             259     pop       R6
+00006A 86DC43           260     mov.b     CS,R6H
+00006D 86CC42           261     mov.b     ES,R6L
+                        263     ; restore the Data Segment and Segment SELect register off the stack.
+000070 2F40             264     pop       R6
+000072 86DC41           265     mov.b     DS,R6H
+000075 86CC03           266     mov.b     SSEL,R6L
+                        268     ; restore the register set
+000078 2F7F             269     pop       R0,R1,R2,R3,R4,R5,R6
+                        271     ;return from interrupt
+00007A D690             272     reti
+00007A D690             272     reti
+                        274 ;
+                        275 ; interrupt enable
+                        276 ;
+                        277       public   _ks_enable
+00007C                  278 _ks_enable:
+00007C 0F01             279       push    R0
+00007E 860401           280       mov.b   R0L,PSWH
+000081 9105F0           281       and.b   R0L,#0F0h
+                        282      ; declared as type DATA
+000084 660rrr           283       or.b    R0L,_intlvl
+                        284    ; end of if CORE_IRAMDATA
+000087 860C01           287       mov.b   PSWH,R0L
+00008A 2F01             288       pop     R0
+00008C D680             289       ret
+00008C D680             289       ret
+                        291 ;
+                        292 ; interrupt disable
+                        293 ;
+                        294       public   _ks_disable
+00008E                  295 _ks_disable:
+00008E 9648018D         296       mov.b     PSWH,#SYSMODE+RTXCINTLVL  ;disable interrupts
+000092 D680             297       ret
+000092 D680             297       ret
+                        299       public   _pushpswh
+000094                  300 _pushpswh:
+000094 A00401           301       mov.b     [R0],PSWH             ;save current psw
+000097 D680             302       ret
+000097 D68000           302       ret
+                        304       public   _poppswh
+00009A                  305 _poppswh:
+00009A 860C01           306       mov.b      PSWH,R0L             ;restore psw
+00009D D680             307       ret
+00009D D68000           307       ret
+                        309       public   _popnull
+0000A0                  310 _popnull:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000A0 D680             311       ret
+0000A0 D680             311       ret
+                        313 ;
+                        314 ; Routine to allow, allow a task to change the processor priority level
+                        315 ; at which tasks run.
+                        316 ;
+                        317 ; As distributed, all RTXC tasks begin execution at processor priority
+                        318 ; level 0 (TASK_INT_LEVEL defined in RTXCOPTS.H).  If a level change is
+                        319 ; required, a task MUST change levels (up and down) by calling setintlvl().
+                        320 ; This will change the processor priority level at which all tasks run.
+                        321 ; The global variable "intlvl" defines the PPL at which tasks run.
+                        322 ;
+                        323 ; char setintlvl(char level);  /* pass and return level = 0-15 */
+                        324 ;
+                        325 ;
+                        326         public  _setintlvl
+0000A2                  327 _setintlvl:
+                        328         ; save the values of these registers on the stack
+0000A2 0F20             329         push    R5
+0000A4 0F40             330         push    R6
+                        332         ; get current level of psw and preserve only the priority level to return
+0000A6 86C401           333         mov.b   R6L,PSWH
+0000A9 91C50F           334         and.b   R6L,#0Fh
+                        336         ; Mask out interrupts at level 15, store the new interrupt level
+                        337         ; and the force supervisor mode in the global variable _intlvl
+0000AC 9646010F         338         or.b    PSWH,#0Fh
+0000B0 910680           339         or.b    R0L,#SYSMODE
+                        340            ; declared as type DATA
+0000B3 860rrr           341         mov.b   _intlvl,R0L
+                        342     ; end of if CORE_IRAMDATA
+                        345         ; take the PSWH value and AND out the priority level
+                        346         ; then set the new priority level
+0000B6 86A401           347         mov.b   R5L,PSWH             ;reread psw
+0000B9 91A5F0           348         and.b   R5L,#0F0h            ;preserve all but priority level
+0000BC 61A0             349         or.b    R5L,R0L              ;set psw to new level
+0000BE 86AC01           350         mov.b   PSWH,R5L             ;store new psw into sfr
+                        352         ; return old priority level (IM3,IM2,IM1,IM0)
+0000C1 810C             353         mov.b   R0L,R6L
+                        355         ; restore the values of these registers off the stack
+0000C3 2F40             356         pop     R6
+0000C5 2F20             357         pop     R5
+0000C7 D680             359         ret
+0000C7 D68000           359         ret
+                        361 ;
+                        362 ; char getintlvl(void);  /* returns level 0-15 */
+                        363 ;
+                        364         public  _getintlvl
+0000CA                  366 _getintlvl:
+0000CA 860401           367         mov.b   R0L,PSWH              ;get psw
+0000CD 91050F           368         and.b   R0L,#0Fh              ;preserve only the priority level
+0000D0 D680             369         ret
+                        373 ; end of isvcrtxc.asm 

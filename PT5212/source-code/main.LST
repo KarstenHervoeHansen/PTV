@@ -1,0 +1,345 @@
+C51 COMPILER V7.05   MAIN                                                                  06/18/2007 13:33:33 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.EXE main.c DB OE
+
+stmt level    source
+
+   1          #include <C8051F320.h>  // Register definition file.
+   2          
+   3          //leds
+   4          sbit fault1_LED = P2^0;
+   5          sbit fault2_LED = P2^1;
+   6          sbit sync_1_2_LED_sel = P2^2;
+   7          sbit man_auto_LED_sel = P2^3;
+   8          sbit onair_1_2_LED_sel = P2^4;
+   9          sbit ext_remote_LED = P1^2;
+  10          
+  11                                       
+  12          //relay + remote en sel
+  13          sbit remote_en_sel = P2^5;
+  14          sbit auto_sel   = P2^6;
+  15          sbit manual_sel = P2^7;
+  16          sbit sync1_sel = P1^6;
+  17          sbit sync2_sel = P1^7;
+  18          
+  19          sbit rel_sense1 = P1^0;
+  20          sbit rel_sense2 = P1^1;
+  21          
+  22          //remote in
+  23          sbit fault1 = P0^0;
+  24          sbit fault2 = P0^1;
+  25          sbit on_air = P0^2;
+  26          unsigned char fault1_=0;
+  27          unsigned char fault2_line=0;
+  28          unsigned char on_air_line=0;
+  29          unsigned char VDD_Check=0;
+  30          
+  31          //switch in
+  32          
+  33          sbit auto_sel_sw = P0^3;
+  34          sbit manual_sel_sw = P0^4;
+  35          sbit sync1_sw = P0^5;
+  36          sbit sync2_sw = P0^6;
+  37          sbit remote_en_sw = P0^7;
+  38          unsigned char auto_sel_line=0;
+  39          unsigned char manual_sel_line=0;
+  40          unsigned char sync1_line=0;
+  41          unsigned char sync2_line=0;
+  42          unsigned char remote_en_line=0;
+  43          void vardelay(int time);
+  44          void sw_ver(int version);
+  45          
+  46          char gen_flag = 0;
+  47          char man_auto_flag = 0;
+  48          char remote_en_flag = 0;
+  49          
+  50          //debouncing in line
+  51          void timer_0() interrupt 3
+  52          {
+  53   1      
+  54   1              auto_sel_line = auto_sel_line << 1;
+  55   1              auto_sel_line |= auto_sel_sw;
+C51 COMPILER V7.05   MAIN                                                                  06/18/2007 13:33:33 PAGE 2   
+
+  56   1      
+  57   1              manual_sel_line = manual_sel_line << 1;
+  58   1              manual_sel_line |= manual_sel_sw;
+  59   1      
+  60   1              sync1_line = sync1_line << 1;
+  61   1              sync1_line |= sync1_sw;
+  62   1      
+  63   1              sync2_line = sync2_line << 1;
+  64   1              sync2_line |= sync2_sw;
+  65   1      
+  66   1              remote_en_line = remote_en_line << 1;
+  67   1              remote_en_line |= remote_en_sw;
+  68   1      
+  69   1              on_air_line = on_air_line << 1;
+  70   1              on_air_line |= on_air;
+  71   1      }
+  72          
+  73          void vardelay(int time)
+  74          {
+  75   1         int i, j;
+  76   1      
+  77   1         for(i=0; i<time; i++)
+  78   1              {
+  79   2              for(j=0; j<100; j++)
+  80   2                      {
+  81   3                          i=i+0;
+  82   3              }
+  83   2              }
+  84   1      }
+  85          
+  86          void sw_ver(int version)
+  87          {
+  88   1         int i;
+  89   1      
+  90   1         for(i=0; i<version; i++)
+  91   1              {
+  92   2                      ext_remote_LED = 1;
+  93   2                      vardelay(250);
+  94   2                      ext_remote_LED = 0;
+  95   2                      vardelay(250);
+  96   2              }
+  97   1                      vardelay(750);
+  98   1      }
+  99          
+ 100          void main()
+ 101          {
+ 102   1              remote_en_sel = 0;
+ 103   1      
+ 104   1              VDM0CN = 0x80; //Enable VDD Monitor.
+ 105   1      
+ 106   1              PCA0MD &= ~0x40;   
+ 107   1              OSCXCN = 0x00;  // EXTERNAL Oscillator Control Register 
+ 108   1          CLKSEL = 0x00;  // Oscillator Clock Select Register
+ 109   1              OSCICN = 0x80;  // Internal Oscillator Control Register
+ 110   1      
+ 111   1              CKCON = 0x08;     // Timer1 bruger SYSCLK
+ 112   1              TL1   = 0x00;     // Timer 1 Low Byte
+ 113   1          TH1   = 0x00;     // BaudRate = 38400
+ 114   1          TMOD  = 0x20;     // Timer Mode Register
+ 115   1          TCON  = 0x45;     // Timer Control Register, timer1 enabled
+ 116   1              TR1 = 1;          // Start timer1
+ 117   1      
+C51 COMPILER V7.05   MAIN                                                                  06/18/2007 13:33:33 PAGE 3   
+
+ 118   1              XBR0 = 0x00;    // Crossbar Register 1
+ 119   1              XBR1 = 0x40; //40;      // Crossbar Register 2
+ 120   1      
+ 121   1              P0SKIP    = 0xFF;
+ 122   1              P1SKIP    = 0xFF;
+ 123   1              P2SKIP    = 0xDF;
+ 124   1              
+ 125   1              P1MDIN = 0xFF; // Input configuration for P1
+ 126   1      
+ 127   1              P0MDOUT   = 0x00;
+ 128   1              P1MDOUT   = 0x04;
+ 129   1              P2MDOUT = 0xFF; // Output configuration for P
+ 130   1      
+ 131   1              sw_ver(2); //Blink Remote Led to show software revision.
+ 132   1      
+ 133   1              RSTSRC = 0x02;//Enable VDD Monitor as reset source.
+ 134   1              IE=0x08;
+ 135   1              EA=1;
+ 136   1      
+ 137   1              vardelay(100);
+ 138   1              PCA0MD = 0x00; //Disable WD Timer.
+ 139   1              PCA0CPL4 = 0xFF; //Set WD Timer timeout interval.
+ 140   1      
+ 141   1      //      AMX0P = 0xFF;
+ 142   1      //      AMX0N = 0xFF;
+ 143   1      //      ADC0CN = 0x80;
+ 144   1      //      REF0CN = 0x08;
+ 145   1      //      AD0BUSY = 1;
+ 146   1      
+ 147   1              ext_remote_LED = 1;
+ 148   1      
+ 149   1              //sæt primær gen = on air gen
+ 150   1              if(on_air_line==0)
+ 151   1              {
+ 152   2                      sync1_sel=0;
+ 153   2                      vardelay(25);
+ 154   2                      sync1_sel=1;
+ 155   2              }
+ 156   1              else
+ 157   1              {
+ 158   2                      sync2_sel=0;
+ 159   2                      vardelay(25);
+ 160   2                      sync2_sel=1;
+ 161   2              }
+ 162   1      
+ 163   1              PCA0MD = 0x40;  //Enable the WD Timer (System Clock Divide by 12)
+ 164   1      
+ 165   1              while(1)
+ 166   1              {
+ 167   2              PCA0CPH4 = 0xFF; //Update WD Timer...
+ 168   2      
+ 169   2              /*if((fault1 == 0) && (fault2 == 0)) {fault1_LED = 0; fault2_LED = 1;}// Gen1 Fail
+ 170   2              if((fault1 != 0) && (fault2 != 0)) {fault1_LED = 1; fault2_LED = 1;}// No Fail
+ 171   2              if((fault1 != 0) && (fault2 == 0)) {fault1_LED = 0; fault2_LED = 0;}// Both Fail
+ 172   2              if((fault1 == 0) && (fault2 != 0)) {fault1_LED = 1; fault2_LED = 0;}// Gen2 Fail*/
+ 173   2      
+ 174   2              if((fault1 == 0) && (fault2 == 0)) {fault1_LED = 0; fault2_LED = 0;}// Both Fail
+ 175   2              if((fault1 != 0) && (fault2 != 0)) {fault1_LED = 1; fault2_LED = 1;}// No Fail
+ 176   2              if((fault1 == 0) && (fault2 != 0)) {fault1_LED = 0; fault2_LED = 1;}// Gen1 Fail
+ 177   2              if((fault1 != 0) && (fault2 == 0)) {fault1_LED = 1; fault2_LED = 0;}// Gen2 Fail
+ 178   2      
+ 179   2              
+C51 COMPILER V7.05   MAIN                                                                  06/18/2007 13:33:33 PAGE 4   
+
+ 180   2              onair_1_2_LED_sel = on_air_line;
+ 181   2      
+ 182   2              man_auto_flag = rel_sense2;
+ 183   2              gen_flag = rel_sense1;
+ 184   2      
+ 185   2              //hvis der trykkes på remote enable
+ 186   2              if (remote_en_line == 1) 
+ 187   2              {
+ 188   3                      vardelay(100);
+ 189   3                      remote_en_sel = !remote_en_sel;
+ 190   3                      remote_en_flag = remote_en_sel;
+ 191   3              }
+ 192   2      
+ 193   2              //hvis remote er disabled, følg on_air
+ 194   2              if (remote_en_flag == 0)
+ 195   2              {
+ 196   3                      if(on_air_line==1)
+ 197   3                      {
+ 198   4                              sync2_sel=0;
+ 199   4                              vardelay(25);
+ 200   4                      }
+ 201   3      
+ 202   3                      else if (on_air_line == 254)
+ 203   3                      {
+ 204   4                              sync1_sel=0;
+ 205   4                              vardelay(25);
+ 206   4                      }
+ 207   3              }       
+ 208   2              
+ 209   2              //hvis remote enabled og i manual-mode
+ 210   2              if((remote_en_flag == 1) && (man_auto_flag == 0))
+ 211   2              {
+ 212   3                      if(auto_sel_line == 1)
+ 213   3                      {
+ 214   4                              auto_sel=0;
+ 215   4                              vardelay(25);
+ 216   4                      }
+ 217   3      
+ 218   3                      if(sync1_line==1)
+ 219   3                      {
+ 220   4                              sync1_sel=0;
+ 221   4                              vardelay(25);
+ 222   4                      }
+ 223   3      
+ 224   3                      if(sync2_line==1)
+ 225   3                      {
+ 226   4                              sync2_sel=0;
+ 227   4                              vardelay(25);
+ 228   4                      }
+ 229   3              }
+ 230   2      
+ 231   2              //hvis remote enabled og i auto-mode
+ 232   2              if((remote_en_flag == 1) && (man_auto_flag == 1))
+ 233   2              {
+ 234   3                      //hvis der slås tilbage til manual mode
+ 235   3                      if(manual_sel_line == 1)
+ 236   3                      {
+ 237   4                              //sæt prim sync = on air gen
+ 238   4                              if(on_air_line==0)
+ 239   4                              {
+ 240   5                                      sync1_sel=0;
+ 241   5                                      vardelay(25);
+C51 COMPILER V7.05   MAIN                                                                  06/18/2007 13:33:33 PAGE 5   
+
+ 242   5                                      sync1_sel=1;
+ 243   5                              }
+ 244   4                              else
+ 245   4                              {
+ 246   5                                      sync2_sel=0;
+ 247   5                                      vardelay(25);
+ 248   5                                      sync2_sel=1;
+ 249   5                              }
+ 250   4      
+ 251   4                              manual_sel = 0;
+ 252   4                              vardelay(25);
+ 253   4                      }
+ 254   3                      
+ 255   3                      //hvis der skiftes generator
+ 256   3                      if((sync1_line==1) || (sync2_line==1)) 
+ 257   3                      {
+ 258   4                              //sæt prim sync = on air gen
+ 259   4                              if(on_air_line==0)
+ 260   4                              {
+ 261   5                                      sync1_sel=0;
+ 262   5                                      vardelay(25);
+ 263   5                                      sync1_sel=1;
+ 264   5                              }
+ 265   4                              else
+ 266   4                              {
+ 267   5                                      sync2_sel=0;
+ 268   5                                      vardelay(25);
+ 269   5                                      sync2_sel=1;
+ 270   5                              }
+ 271   4      
+ 272   4                              //sæt til manual mode og tilbage for evt. reset
+ 273   4                              manual_sel = 0;
+ 274   4                              vardelay(25);
+ 275   4                              manual_sel = 1;
+ 276   4                              auto_sel = 0;
+ 277   4                              vardelay(25);
+ 278   4                              auto_sel = 1;
+ 279   4      
+ 280   4                              //set primær gen til den på knapperne valgte generator
+ 281   4                              if(sync2_line==0)
+ 282   4                              {
+ 283   5                                      sync1_sel=0;
+ 284   5                                      vardelay(25);
+ 285   5                              }
+ 286   4                              else
+ 287   4                              {
+ 288   5                                      sync2_sel=0;
+ 289   5                                      vardelay(25);
+ 290   5                              }
+ 291   4                      }
+ 292   3              }
+ 293   2      
+ 294   2              man_auto_LED_sel = !rel_sense2;
+ 295   2              sync_1_2_LED_sel = rel_sense1;
+ 296   2      
+ 297   2              auto_sel = 1;
+ 298   2              manual_sel = 1;
+ 299   2              sync2_sel = 1;
+ 300   2              sync1_sel = 1;
+ 301   2              
+ 302   2              /*
+ 303   2              VDD_Check = checkbit(VDM0CN, 0x40); 
+C51 COMPILER V7.05   MAIN                                                                  06/18/2007 13:33:33 PAGE 6   
+
+ 304   2              if (VDD_Check == 0)
+ 305   2              {
+ 306   2                      remote_en_sel = 0;
+ 307   2              } 
+ 308   2              */
+ 309   2      
+ 310   2              }
+ 311   1      
+ 312   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    551    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     12       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,775 @@
+INST "rocket_io_inst_1/serial_data_output/GT_CUSTOM_INST" LOC = GT_X0Y1;
+#INST "rocket_io_inst_2/serial_data_output/GT_CUSTOM_INST" LOC = GT_X1Y1;
+#INST "rocket_io_inst_3/serial_data_output/GT_CUSTOM_INST" LOC = GT_X2Y1;
+#INST "rocket_io_inst_4/serial_data_output/GT_CUSTOM_INST" LOC = GT_X3Y1;
+
+# Timing Constraints:
+NET "clk_27_i"    TNM_NET = "clk_27_i";
+TIMESPEC "TS_clk_27_i" = PERIOD "clk_27_i" 27 MHz HIGH 50 % INPUT_JITTER 1 ns;
+NET "brefclk_p_i" TNM_NET = "brefclk_p_i";
+TIMESPEC "TS_brefclk_p_i" = PERIOD "brefclk_p_i" 150 MHz HIGH 50 % INPUT_JITTER 0 ns;
+NET "brefclk_n_i" TNM_NET = "brefclk_n_i";
+TIMESPEC "TS_brefclk_n_i" = PERIOD "brefclk_n_i" 150 MHz HIGH 50 % INPUT_JITTER 0 ns;
+NET "brefclk2_p_i" TNM_NET = "brefclk2_p_i";
+TIMESPEC "TS_brefclk2_p_i" = PERIOD "brefclk2_p_i" 150 MHz HIGH 50 % INPUT_JITTER 0 ns;
+NET "brefclk2_n_i" TNM_NET = "brefclk2_n_i";
+TIMESPEC "TS_brefclk2_n_i" = PERIOD "brefclk2_n_i" 150 MHz HIGH 50 % INPUT_JITTER 0 ns;
+
+# Special timing constraints for inter clock domain transfers :
+TIMEGRP pll_ffs_on_27_mhz  = FFS ("clock_and_genlock_control/f*_genlock/*");
+TIMEGRP pll_ffs_on_148_mhz = FFS ("clock_and_genlock_control/digital_pll_f148*/*");
+TIMEGRP genlock_ffs_on_148_mhz = FFS ("clock_and_genlock_control/sec*_transfer_to_148*/*");
+TIMESPEC "TS_pll_F2F" = FROM : pll_ffs_on_27_mhz : TO : pll_ffs_on_148_mhz : 2 ns;      #PLL
+#TIMESPEC "TS_genlock_F2F" = FROM : pll_ffs_on_27_mhz : TO : genlock_ffs_on_148_mhz : 2 ns;  #Genlock
+
+# Ignore timing on some pathes:
+NET "HD_Gen_Channel_*/serial_interfacing/system_o*"               TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/pattern_o*"              TIG;
+NET "HD_Gen_Channel_*/serial_interfacing/timing_o*"               TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/click_timing*"           TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/audio_level_index_o*"    TIG;      #xia
+#NET "HD_Gen_Channel_*/serial_interfacing/audio_signal_index_o*"   TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_v_position_o*"       TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_h_position_o*"       TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_h_size_o*"           TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_v_size_o*"           TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_scale_o*"            TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_back_text_color_o*"  TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_movement_o*"         TIG;
+#NET "HD_Gen_Channel_*/serial_interfacing/bmp_on_zoff_o*"          TIG;
+
+#NET "HD_Gen_Channel_*/system_controller/actual_system*"           TIG;
+#NET "HD_Gen_Channel_*/system_controller/actual_pattern*"          TIG;       #xia
+
+# Specify double-cycle pathes:
+#INST "HD_Gen_Channel_*/video_generator_instance/audio_generation/*"                          TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/audio_content_generation/*"                  TNM = "double_cycle";
+##INST "HD_Gen_Channel_*/video_generator_instance/Checkfield_generation/*"                     TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/clapboard_index_generation/*"                TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/colorbar_index_generation/*"                 TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/active_video_filtering/*"                    TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/active_video_filtering/luma_filtering/*"     TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/active_video_filtering/chroma_filtering/*"   TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/luma_ramp_generation/*"                      TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/pluge_generation/*"                          TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/text_generation/*"                           TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/window_generation/*"                         TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/crosshatch_generation/*"                     TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/payload_insertion/*"                         TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/CRC_insertion_*/*"         TNM = "double_cycle";
+
+#Selected output signals from system generator:
+#INST "HD_Gen_Channel_*/video_generator_instance/system_generation/active_line_count*"        TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/last_av_sample*"           TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/system_generation/av_sample*"                TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/line_count*"               TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/f_bit*"                    TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/v_bit*"                    TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/h_bit*"                    TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/system_generation/cr_zcb*"                   TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/system_generation/sav_tick_advanced*"        TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/system_generation/eav_tick_advanced_o*"      TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/frame_end*"                TNM = "double_cycle";
+#INST "HD_Gen_Channel_*/video_generator_instance/system_generation/filter_force_black_o*"     TNM = "double_cycle";
+INST "HD_Gen_Channel_*/video_generator_instance/system_generation/anc_space_o*"              TNM = "double_cycle";
+
+# Specify quad-cycle pathes:
+INST "clock_and_genlock_control/digital_pll_f148*/phase_detector/phase_diff*"                TNM = "quad_cycle";
+INST "clock_and_genlock_control/digital_pll_f148*/loopfilter/lf_int_reg*"                    TNM = "quad_cycle";
+#INST "clock_and_genlock_control/digital_pll_f148*/sd_dac_input*"                             TNM = "quad_cycle";
+INST "clock_and_genlock_control/digital_pll_f148*/serial_data_to_dac/shift_reg*"             TNM = "quad_cycle";
+#INST "clock_and_genlock_control/digital_pll_f148*/single_bit_dac/dac_int_reg*"               TNM = "quad_cycle";
+
+TIMESPEC "TS_2cycle" = FROM "double_cycle" TO "double_cycle" "TS_brefclk_p_i" / 2;
+TIMESPEC "TS_4cycle" = FROM "quad_cycle" TO "quad_cycle" "TS_brefclk_p_i" / 4;
+
+# clock to output pin:
+#NET "led_o*" OFFSET = OUT 5 AFTER "brefclk2_n_i";
+#TIMESPEC TSF2P  = FROM : FFS   : TO : PADS  : 25 ns;
+
+
+NET "brefclk2_n_i"   LOC = "F15";   #brefclk2
+NET "brefclk2_p_i"   LOC = "G15";   #brefclk2
+NET "brefclk_n_i"    LOC = "G16";   #brefclk
+NET "brefclk_p_i"    LOC = "F16";   #brefclk
+NET "clk_27_i"       LOC = "AH16";  #f27
+
+NET "cs1_i"          LOC = "Y27";
+NET "f4m_i"          LOC = "AH21";
+NET "f8g_i"          LOC = "AF22";
+
+NET "led_o<0>"       LOC = "AG28";  #D2
+NET "led_o<1>"       LOC = "AF29";  #D3
+NET "led_o<2>"       LOC = "AF30";  #D4
+NET "led_o<3>"       LOC = "AD29";  #D5
+
+NET "dac_sclk_1_o"   LOC = "E30";   # OBS: Opposite as on schematics!
+NET "dac_dout_1_o"   LOC = "F30";
+NET "dac_zsync_1_o"  LOC = "D30";
+
+NET "dac_sclk_2_o"   LOC = "K1"; 
+NET "dac_dout_2_o"   LOC = "G1"; 
+NET "dac_zsync_2_o"  LOC = "M1"; 
+    
+NET "mosi_i"         LOC = "W28";
+NET "miso_o"         LOC = "V28";
+NET "mreset_i"       LOC = "AD23";
+NET "ok1_o"          LOC = "AE21";
+NET "ok2_o"          LOC = "AH23";
+
+NET "pll1_s_o<0>"      LOC = "AK21";     # clock to brefclk2
+NET "pll1_s_o<1>"      LOC = "AJ21";     
+NET "pll1_s_o<2>"      LOC = "AK23";     
+NET "pll1_s_o<3>"      LOC = "AJ22";     
+NET "pll2_s_o<0>"      LOC = "AH24";     # clock to brefclk
+NET "pll2_s_o<1>"      LOC = "AJ23";
+NET "pll2_s_o<2>"      LOC = "AA30";
+NET "pll2_s_o<3>"      LOC = "AD30";
+
+NET "sck_i"          LOC = "AC29";
+NET "sd_zhd_1_o"     LOC = "C1";
+NET "sd_zhd_2_o"     LOC = "D1";
+NET "sd_zhd_3_o"     LOC = "E1";
+NET "sd_zhd_4_o"     LOC = "F1";
+
+#NET "vcxo_control_1_o"  LOC = "D30"; # | DRIVE = 2 ; # VCXO_Ctrl2
+#NET "vcxo_control_2_o"  LOC = "A3";  # | DRIVE = 2 ; # VCXO_Ctrl1
+
+NET "red_o(0)"    LOC = "AE26";
+NET "red_o(1)"    LOC = "AD25";
+NET "red_o(2)"    LOC = "AE24";
+NET "red_o(3)"    LOC = "AF23";
+NET "red_o(4)"    LOC = "AE22";
+NET "red_o(5)"    LOC = "AF21";
+
+NET "green_o(0)"  LOC = "AG29";
+NET "green_o(1)"  LOC = "AJ28";
+NET "green_o(2)"  LOC = "AF27";
+NET "green_o(3)"  LOC = "AG26";
+NET "green_o(4)"  LOC = "AF25";
+NET "green_o(5)"  LOC = "AF24";
+
+NET "blue_o(0)"   LOC = "AH30";
+NET "blue_o(1)"   LOC = "AH29";
+NET "blue_o(2)"   LOC = "AK28";
+NET "blue_o(3)"   LOC = "AH27";
+NET "blue_o(4)"   LOC = "AH26";
+NET "blue_o(5)"   LOC = "AE23";
+
+
+#NET "pc_ibf_i"  LOC = "AE26"  ; #NET "Red0_o"  LOC = "AE26";
+#NET "pc_zstb_o"  LOC = "AD25" | SLEW = SLOW ; #NET "Red1_o"  LOC = "AD25";
+
+#NET "pc_data_o<0>"  LOC = "AE23" | SLEW = SLOW ; #NET "Blue5_o" LOC = "AE23";| #NET "Blue5_o" LOC = "AE23";
+#NET "pc_data_o<1>"  LOC = "AH26" | SLEW = SLOW ; #NET "Blue4_o" LOC = "AH26";| #NET "Blue4_o" LOC = "AH26";
+#NET "pc_data_o<2>"  LOC = "AH27" | SLEW = SLOW ; #NET "Blue3_o" LOC = "AH27";| #NET "Blue3_o" LOC = "AH27";
+#NET "pc_data_o<3>"  LOC = "AK28" | SLEW = SLOW ; #NET "Blue2_o" LOC = "AK28";| #NET "Blue2_o" LOC = "AK28";
+#NET "pc_data_o<4>"  LOC = "AH29" | SLEW = SLOW ; #NET "Blue1_o" LOC = "AH29";| #NET "Blue1_o" LOC = "AH29";
+#NET "pc_data_o<5>"  LOC = "AH30" | SLEW = SLOW ; #NET "Blue0_o" LOC = "AH30";| #NET "Blue0_o" LOC = "AH30";
+#NET "pc_data_o<6>"  LOC = "AF21" | SLEW = SLOW ; #NET "Red5_o"  LOC = "AF21";| #NET "Red5_o"  LOC = "AF21";
+#NET "pc_data_o<7>"  LOC = "AE22" | SLEW = SLOW ; #NET "Red4_o"  LOC = "AE22";| #NET "Red4_o"  LOC = "AE22";
+#NET "pc_data_o<8>"  LOC = "AF23" | SLEW = SLOW ; #NET "Red3_o"  LOC = "AF23";| #NET "Red3_o"  LOC = "AF23";
+#NET "pc_data_o<9>"  LOC = "AE24" | SLEW = SLOW ; #NET "Red2_o"  LOC = "AE24";
+#NET "Red2_o"  LOC = "AE24";
+
+#NET "pc_ibf_i"  LOC = "AE26"  ; #NET "Red0_o"  LOC = "AE26";
+#NET "pc_zstb_o"  LOC = "AD25" | SLEW = SLOW ; #NET "Red1_o"  LOC = "AD25";
+#NET "Red1_o"  LOC = "AD25";
+
+
+
+NET "mem_interface_top_inst/infrastructure_top0/wait_200us*" TNM = "wait200us";
+NET "mem_interface_top_inst/infrastructure_top0/wait_clk90" TNM = "wait200us90";
+NET "mem_interface_top_inst/infrastructure_top0/sys_rst*" TNM = "sysrst";
+
+
+TIMESPEC TS01 =  FROM  "wait200us"  TO  "sysrst"   TIG;
+TIMESPEC TS02 =  FROM  "wait200us90"  TO  "sysrst"   TIG;
+TIMESPEC TS05 =  FROM  "wait200us"  TO  "wait200us90"   TIG;
+
+#NET "*/ddr2_top0/reset90_r" TIG;
+NET "*/controller0/rst_calib*" TIG;
+INST "*/ddr2_top0/infrastructure0/delay_sel_val*" TIG;
+INST "*/ddr2_top0/infrastructure0/rst_calib*" TIG;
+#INST "*/cal_top0/cal_ctl0/un1_tapForDqs*" TIG;
+NET "*/controller0/rst0*" TIG;
+NET "*/controller0/rst180*" TIG;
+INST "*/data_path0/data_read_controller0/dqs_delay*_col*" TIG;
+#INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delayed*" TIG;
+
+
+#############################################################################
+# Calibration Circuit Constraints                                                                         
+#############################################################################
+
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/seltap(4)" S;            #xia
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/delay1" KEEP;
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/delay2" KEEP;
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/delay3" KEEP;
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/delay4" KEEP;
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/delay5" KEEP;
+
+############################################################################
+# Calibration Circuit Constraints
+############################################################################
+
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/cal_dcm" LOC= "DCM_X2Y0";
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0" AREA_GROUP=gp1;          #xia
+AREA_GROUP "gp1" RANGE = SLICE_X52Y0:SLICE_X75Y15;
+
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/cal_clkd2" LOC = SLICE_X72Y0;
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/cal_phClkd2" LOC = SLICE_X72Y3;
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/hxSampReg0" LOC = SLICE_X74Y0;  #xia
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/cal_suClkd2" LOC = SLICE_X72Y4;  #xia
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/cal_suPhClkd2" LOC = SLICE_X74Y5; #xia
+INST "mem_interface_top_inst/infrastructure_top0/cal_top0/phSampReg0" LOC = SLICE_X74Y4;    #xia
+#############################################################
+# LUT Location Constraints for dqs_delay Circuit
+#############################################################
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/one" LOC = SLICE_X74Y2; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/one" BEL = F; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/two" LOC = SLICE_X74Y3; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/two" BEL = F; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/three" LOC = SLICE_X74Y3; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/three" BEL = G; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/four" LOC = SLICE_X75Y2; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/four" BEL = F; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/five" LOC = SLICE_X75Y2; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/five" BEL = G; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/six" LOC = SLICE_X75Y3; 
+ INST "mem_interface_top_inst/infrastructure_top0/cal_top0/ckt_to_cal/six" BEL = G; 
+
+###no_dcm
+############################################################################
+# DCM, MACRO and BUFG  Constraints
+############################################################################
+
+INST "mem_interface_top_inst/infrastructure_top0/clk_dcm0/DCM_INST1" LOC="DCM_X3Y0";
+
+INST "mem_interface_top_inst/infrastructure_top0/clk_dcm0/BUFG_CLK0" LOC="BUFGMUX6P";
+INST "mem_interface_top_inst/infrastructure_top0/clk_dcm0/BUFG_CLK90" LOC="BUFGMUX7S";
+
+
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/clkdiv2" MAXDELAY = 600 ps;
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/phclkdiv2" MAXDELAY = 600 ps;
+
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/suclkdiv2" MAXDELAY = 600ps;     #xia
+NET "mem_interface_top_inst/infrastructure_top0/cal_top0/suphclkdiv2" MAXDELAY = 700ps;   #xia
+
+##############################################################################
+# MaxDelay constraints                                                                                                #
+##############################################################################
+
+NET "mem_interface_top_inst/infrastructure_top0/clk_dcm0/clk0dcm" MAXDELAY = 0.450ns;
+NET "mem_interface_top_inst/infrastructure_top0/clk_dcm0/clk90dcm" MAXDELAY = 0.450ns;
+NET "mem_interface_top_inst/infrastructure_top0/clk_dcm0/clk0d2inv" MAXDELAY = 0.755ns;
+NET "mem_interface_top_inst/infrastructure_top0/clk_dcm0/clk90d2inv" MAXDELAY = 0.755ns;
+
+
+#********************************************************************#
+#                        CONTROLLER 0                               #
+#********************************************************************#
+############################################################################
+# I/O STANDARDS                                                         #
+############################################################################
+# SSTL18_II for input or output signals   
+
+#NET "ddr2_dq(*)"                      IOSTANDARD = SSTL18_II; 
+#NET "ddr2_dm(*)"                         IOSTANDARD = SSTL18_II;
+#NET "ddr2_clk*"                       IOSTANDARD = SSTL18_II; 
+#NET "ddr2_clk*b"                      IOSTANDARD = SSTL18_II; 
+#NET "ddr2_address(*)"                 IOSTANDARD = SSTL18_II; 
+#NET "ddr2_ba(*)"                      IOSTANDARD = SSTL18_II; 
+#NET "ddr2_rasb"                       IOSTANDARD = SSTL18_II; 
+#NET "ddr2_casb"                       IOSTANDARD = SSTL18_II; 
+#NET "ddr2_web"                        IOSTANDARD = SSTL18_II; 
+#NET "ddr2_csb"                        IOSTANDARD = SSTL18_II; 
+#NET "ddr2_cke"                        IOSTANDARD = SSTL18_II; 
+#NET "ddr_rst_dqs_div_i"                        IOSTANDARD = SSTL18_II; 
+#NET "ddr_rst_dqs_div_o"                        IOSTANDARD = SSTL18_II; 
+#NET "cntrl0_led_error_output1"                 IOSTANDARD = LVCMOS25;
+#NET "ddr2_ODT0"                    IOSTANDARD = SSTL18_II;
+
+NET "*/ddr2_top0/controller0/cas_latency(*)" TIG;
+
+############################################################################
+# IO Signals Registering Constraints                                           #
+############################################################################
+INST "*/ddr2_top0/iobs0/data_path_iobs0/ddr_dqs_iob*"  IOB = TRUE;
+INST "*/ddr2_top0/iobs0/data_path_iobs0/ddr_dq_iob*"  IOB = TRUE;
+INST "*/ddr2_top0/controller0/rst_iob_out"            IOB = TRUE;
+INST "*/ddr2_top0/iobs0/controller_iobs0/iob_addr*" IOB = TRUE;
+INST "*/ddr2_top0/iobs0/controller_iobs0/iob_ba*" IOB = TRUE;
+INST "*/ddr2_top0/iobs0/controller_iobs0/iob_rasb"      IOB = TRUE;
+INST "*/ddr2_top0/iobs0/controller_iobs0/iob_casb"      IOB = TRUE;
+INST "*/ddr2_top0/iobs0/controller_iobs0/iob_web"     IOB = TRUE;
+INST "*/ddr2_top0/iobs0/controller_iobs0/iob_cke"     IOB = TRUE;
+
+############################################################################
+# Banks 3
+# Pin Location Constraints for Clock,Masks, Address, and Controls 
+ ############################################################################
+NET  "ddr2_clk0"              LOC = "V8" ;
+NET  "ddr2_clk0b"             LOC = "V7" ;
+NET  "ddr2_dm(0)"             LOC = "W4" ;
+NET  "ddr2_dm(1)"             LOC = "W3" ;
+NET  "ddr2_cke"               LOC = "W6" ;
+NET  "ddr2_csb"               LOC = "W5" ;
+NET  "ddr2_rasb"              LOC = "Y5" ;
+NET  "ddr2_casb"              LOC = "Y4" ;
+NET  "ddr2_web"               LOC = "AA4" ;
+NET  "ddr2_ba(0)"             LOC = "AA3" ;
+NET  "ddr2_ba(1)"             LOC = "W8" ;
+NET  "ddr2_address(0)"       LOC = "W7" ;
+NET  "ddr2_address(1)"       LOC = "AB4" ;
+NET  "ddr2_address(2)"       LOC = "AB3" ;
+NET  "ddr2_address(3)"       LOC = "AA6" ;
+NET  "ddr2_address(4)"       LOC = "AA5" ;
+NET  "ddr2_address(5)"       LOC = "AC4" ;
+NET  "ddr2_address(6)"       LOC = "AC3" ;
+NET  "ddr2_address(7)"       LOC = "AD2" ;
+NET  "ddr2_address(8)"       LOC = "AD1" ;
+NET  "ddr2_address(9)"       LOC = "Y8" ;
+NET  "ddr2_address(10)"       LOC = "Y7" ;
+NET  "ddr2_address(11)"       LOC = "AB6" ;
+NET  "ddr2_address(12)"       LOC = "AB5" ;
+NET  "ddr2_ODT0"              LOC = "AA8" ;
+
+#########################################################################
+# MAXDELAY constraints                                                                        #
+#########################################################################
+NET  "*/ddr2_top0/data_path0/data_read0/fbit_0(*)"                            MAXDELAY = 1500ps;
+NET  "*/ddr2_top0/data_path0/data_read0/fbit_1(*)"                            MAXDELAY = 1500ps;
+NET  "*/ddr2_top0/data_path0/data_read0/fbit_2(*)"                            MAXDELAY = 1500ps;
+NET  "*/ddr2_top0/data_path0/data_read0/fbit_3(*)"                            MAXDELAY = 1500ps;
+NET  "*/ddr2_top0/controller0/rst_dqs_div_int"                                    MAXDELAY = 700ps ;    #xia
+NET  "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delayed"            MAXDELAY = 2000ps;
+NET  "*/ddr2_top0/data_path0/data_read_controller0/fifo_*_wr_addr*"                 MAXDELAY = 4000ps;
+NET  "*/ddr2_top0/data_path0/data_read0/fifo_*_rd_addr*"                            MAXDELAY = 4000ps;  #xia
+NET  "*/ddr2_top0/data_path0/data_read_controller0/transfer_done_*"                 MAXDELAY = 2000ps;  #xia
+#########################################################################
+
+########################################################################
+NET  "ddr_rst_dqs_div_i"    LOC = "Y2";
+NET  "ddr_rst_dqs_div_o"    LOC = "AA2";
+
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/one" LOC = SLICE_X90Y38;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/one" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/two" LOC = SLICE_X90Y39;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/two" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/three" LOC = SLICE_X90Y39;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/three" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/four" LOC = SLICE_X91Y38;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/four" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/five" LOC = SLICE_X91Y38;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/five" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/six" LOC = SLICE_X91Y39;
+INST "*/ddr2_top0/data_path0/data_read_controller0/rst_dqs_div_delay0/six" BEL = G;
+
+#############################################################
+##  constraints for bit ddr2_dqs_n, 0
+NET  "ddr2_dqs_n(0)" LOC = U1;
+#############################################################
+##  constraints for bit ddr2_dqs, 0
+NET  "ddr2_dqs(0)" LOC = V1;
+NET "*/ddr2_top0/dqs_int_delay_in0"
+ ROUTE="{2;1;-7!-1;104456;80400;22;141;210;16;8!0;-159;0;38!1;-4441;-1263;"
+"2!2;-2416;724;0!2;-31;723!2;3456;0!2;31;-723!2;-56;320!2;-40;80!2;65;-77!"
+"2;0;80!2;-3481;-83!2;-40;80!2;65;-77!2;0;80!3;167;-768;4;135;208;13;13!4;"
+"160;1088;4;135;211;18!5;3456;0;4;138!6;-160;-1088;4;138;208;13!7;0;320;4;"
+"138;209;10!8;0;80;4;138;209;18!9;160;288;4;138;210;13!10;0;80;4;138;210;"
+"21!11;-3616;-448;4;135;209;10!12;0;80;4;135;209;18!13;160;288;4;135;210;"
+"13!14;0;80;4;135;210;21!}";
+## LUT location constraints for col 0
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/one" LOC = SLICE_X90Y54;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/one" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/two" LOC = SLICE_X90Y55;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/two" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/three" LOC = SLICE_X90Y55;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/three" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/four" LOC = SLICE_X91Y54;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/four" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/five" LOC = SLICE_X91Y54;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/five" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/six" LOC = SLICE_X91Y55;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col0/six" BEL = G;
+
+## LUT location constraints for col 1
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/one" LOC = SLICE_X88Y54;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/one" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/two" LOC = SLICE_X88Y55;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/two" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/three" LOC = SLICE_X88Y55;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/three" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/four" LOC = SLICE_X89Y54;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/four" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/five" LOC = SLICE_X89Y54;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/five" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/six" LOC = SLICE_X89Y55;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay0_col1/six" BEL = G;
+#############################################################
+##  constraints for bit ddr2_dq, 0
+NET  "ddr2_dq(0)" LOC = T5;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit0" RLOC_ORIGIN = X88Y52;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 1
+NET  "ddr2_dq(1)" LOC = T6;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit1/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 2
+NET  "ddr2_dq(2)" LOC = T3;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit2/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 3
+NET  "ddr2_dq(3)" LOC = T4;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit3/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit0/dq";
+
+#############################################################
+##  constraints for bit no_dpin, 0
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div0/col0" LOC = SLICE_X91Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div0/col1" LOC = SLICE_X89Y51;
+NET "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div0/dqs_divn" MAXDELAY = 1200ps;   #xia
+NET "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div0/dqs_divp" MAXDELAY = 1200ps;   #xia
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk0" LOC = SLICE_X89Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk0" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk90" LOC = SLICE_X91Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk90" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_rst90" LOC = SLICE_X91Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_rst90" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk180" LOC = SLICE_X88Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk180" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk270" LOC = SLICE_X90Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_clk270" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_rst270" LOC = SLICE_X90Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0_rst270" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0" LOC = SLICE_X90Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone0" BEL = F;
+
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone1_clk270" LOC = SLICE_X87Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone1_clk270" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone2_clk270" LOC = SLICE_X87Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone2_clk270" BEL = FFY;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone1_clk90" LOC = SLICE_X87Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone1_clk90" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone2_clk90" LOC = SLICE_X87Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone2_clk90" BEL = FFY;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone1" LOC = SLICE_X87Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone1" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone2" LOC = SLICE_X87Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone2" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone3_clk90" LOC = SLICE_X86Y51;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone3_clk90" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone3_clk270" LOC = SLICE_X86Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone3_clk270" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone3" LOC = SLICE_X86Y50;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done0/xdone3" BEL = F;
+#############################################################
+##  constraints for bit ddr2_dq, 4
+NET  "ddr2_dq(4)" LOC = T7;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit0" RLOC_ORIGIN = X88Y48;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 5
+NET  "ddr2_dq(5)" LOC = T8;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit5/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 6
+NET  "ddr2_dq(6)" LOC = U4;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit6/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 7
+NET  "ddr2_dq(7)" LOC = U5;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit7/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit4/dq";
+
+#############################################################
+##  constraints for bit ddr2_dqs_n, 1
+NET  "ddr2_dqs_n(1)" LOC = V2;
+#############################################################
+##  constraints for bit ddr2_dqs, 1
+NET  "ddr2_dqs(1)" LOC = W2;
+NET "*/ddr2_top0/dqs_int_delay_in1"
+ ROUTE="{2;1;-7!-1;104456;80400;22;141;210;16;8!0;-159;0;38!1;-4441;-1263;"
+"2!2;-2416;724;0!2;-31;723!2;3456;0!2;31;-723!2;-56;320!2;-40;80!2;65;-77!"
+"2;0;80!2;-3481;-83!2;-40;80!2;65;-77!2;0;80!3;167;-768;4;135;208;13;13!4;"
+"160;1088;4;135;211;18!5;3456;0;4;138!6;-160;-1088;4;138;208;13!7;0;320;4;"
+"138;209;10!8;0;80;4;138;209;18!9;160;288;4;138;210;13!10;0;80;4;138;210;"
+"21!11;-3616;-448;4;135;209;10!12;0;80;4;135;209;18!13;160;288;4;135;210;"
+"13!14;0;80;4;135;210;21!}";
+## LUT location constraints for col 0
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/one" LOC = SLICE_X90Y46;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/one" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/two" LOC = SLICE_X90Y47;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/two" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/three" LOC = SLICE_X90Y47;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/three" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/four" LOC = SLICE_X91Y46;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/four" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/five" LOC = SLICE_X91Y46;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/five" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/six" LOC = SLICE_X91Y47;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col0/six" BEL = G;
+
+## LUT location constraints for col 1
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/one" LOC = SLICE_X88Y46;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/one" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/two" LOC = SLICE_X88Y47;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/two" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/three" LOC = SLICE_X88Y47;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/three" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/four" LOC = SLICE_X89Y46;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/four" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/five" LOC = SLICE_X89Y46;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/five" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/six" LOC = SLICE_X89Y47;
+INST "*/ddr2_top0/data_path0/data_read_controller0/dqs_delay1_col1/six" BEL = G;
+#############################################################
+##  constraints for bit ddr2_dq, 8
+NET  "ddr2_dq(8)" LOC = T9;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit0" RLOC_ORIGIN = X88Y44;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 9
+NET  "ddr2_dq(9)" LOC = U9;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit9/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 10
+NET  "ddr2_dq(10)" LOC = V3;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit10/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 11
+NET  "ddr2_dq(11)" LOC = V4;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit11/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit8/dq";
+
+#############################################################
+##  constraints for bit no_dpin, 1
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div1/col0" LOC = SLICE_X91Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div1/col1" LOC = SLICE_X89Y43;
+NET "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div1/dqs_divn" MAXDELAY = 1200ps;    #xia
+NET "*/ddr2_top0/data_path0/data_read_controller0/ddr2_dqs_div1/dqs_divp" MAXDELAY = 1200ps;    #xia
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk0" LOC = SLICE_X89Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk0" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk90" LOC = SLICE_X91Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk90" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_rst90" LOC = SLICE_X91Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_rst90" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk180" LOC = SLICE_X88Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk180" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk270" LOC = SLICE_X90Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_clk270" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_rst270" LOC = SLICE_X90Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0_rst270" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0" LOC = SLICE_X90Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone0" BEL = F;
+
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone1_clk270" LOC = SLICE_X87Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone1_clk270" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone2_clk270" LOC = SLICE_X87Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone2_clk270" BEL = FFY;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone1_clk90" LOC = SLICE_X87Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone1_clk90" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone2_clk90" LOC = SLICE_X87Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone2_clk90" BEL = FFY;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone1" LOC = SLICE_X87Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone1" BEL = F;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone2" LOC = SLICE_X87Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone2" BEL = G;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone3_clk90" LOC = SLICE_X86Y43;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone3_clk90" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone3_clk270" LOC = SLICE_X86Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone3_clk270" BEL = FFX;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone3" LOC = SLICE_X86Y42;
+INST "*/ddr2_top0/data_path0/data_read_controller0/ddr2_transfer_done1/xdone3" BEL = F;
+#############################################################
+##  constraints for bit ddr2_dq, 12
+NET  "ddr2_dq(12)" LOC = U7;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit0" RLOC_ORIGIN = X88Y40;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 13
+NET  "ddr2_dq(13)" LOC = U8;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit0" RLOC = X0Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit2" RLOC = X1Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit1" RLOC = X3Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit3" RLOC = X2Y0;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit13/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 14
+NET  "ddr2_dq(14)" LOC = V5;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit0" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit2" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit1" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit3" BEL = "FFY";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit14/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+#############################################################
+##  constraints for bit ddr2_dq, 15
+NET  "ddr2_dq(15)" LOC = V6;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit0" RLOC = X0Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit0" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit0" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit2" RLOC = X1Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit2" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit2" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit1" RLOC = X3Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit1" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit1" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit3" RLOC = X2Y1;
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit3" BEL = "FFX";
+INST "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit15/fbit3" U_SET = "*/ddr2_top0/data_path0/data_read0/ddr2_dqbit12/dq";

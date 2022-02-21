@@ -1,0 +1,227 @@
+
+Timer 0.
+
+Timer 0 is initialized in file tim0drv.c in the following way:
+
+
+#define T0_TMOD  (T0_GATE | T0_CT | T0_M1 | T0_M0)
+//                  0         1       0       1      
+#define xTMOD  (T0_TMOD | T1_TMOD)
+
+#define T0_CON (T0_TF0 | T0_TR0 | T0_IE0 | T0_IT0)
+//                0        1        0        0
+#define xTCON (T0_CON | T1_CON)
+void tim0_init( void)
+  {
+  /* Timer/Counter Mode Control Register */
+  TMOD &= 0xF0;   /* clear timer0 settings */
+  TMOD |= xTMOD;
+  
+  /* Timer/Counter Control Register */
+  TCON &= 0xCB;   /* clear timer0 settings */
+  TCON |= xTCON;
+  }
+
+It works as a counter and is enabled only by TR0 control bit.
+It works in Mode 1 as 16 bit non-autoreload counter, i.e. it counts 
+pulses on T0 input, which is fed by HINT (horizontal interrupt signal)
+coming from SPG FPGA. The HINT period is ~ 64 uS for both PAL and
+NTSC.  The HINT signal is also fed to INT0, causing line interrupt.
+The VINT (vertical interrupt) signal, coming also from SPG, is fed to 
+INT1.  Interrupt 1 is not enabled, instead inside horizontal interrupt
+routine a check is made for interrupt 1 flag (IE1).
+
+Timer 0 counts HINT pulses.  On each vertical interrupt, it is reloaded
+with LineOffset variable (in line interrupt routine).  It counts up and 
+on reaching 0xffff it's TF0 flag is set.  This flag is tested in line
+interrupt routine (delayed field interrupt).
+
+
+Timer 1 and Timer 2.
+
+Timer 1 is used as baud rate generator for serial channel 1, i.e. for 
+communication with remote control program.
+
+Timer 2 is used as baud rate genrator for serial channel 0, i.e. for 
+internal communication with Black Burst and SPG XA microcontrollers.
+
+
+Serial communication channel 1.
+
+Unlike standard 8051, the XA has separate interrupt vectors for send and
+receive, the TI_1 flag (character left the transmiter) causes execution of
+transmit interrupt routine and RI_1 flag (character received) causes 
+execution of receive interrupt routine.  Channel 1 is used for communication
+with remote interface program.
+
+
+Serial communication channel 0.
+
+Channel 0 is identical to channel 1.  It is used for communication with BB and
+SPG processors, using multiprocessor communication mode 2 with BB and SPG
+processors acting as slaves, each of the slaves using automatic address
+recognition.
+
+Transparent Mode.
+
+The master processor is also used to load programs into SPG and BB processors
+FLASH memory.  In this mode both channel baud rates are set to 115200
+with Timer 1 used for baud rate generation for both serial channels. 
+Channel 0 works in Mode 2 (9 bit multiprocessor communication).  After invoking
+the boot loader of appropriate slave, all characters received on channel 1 are 
+sent via channel 0 to a slave.  Similarly, all characters received from a slave
+are sent via channel 1 to the user.
+The transparent mode is controlled via the global bit variable UnitPgmMode.
+
+The transparent mode is implemented with both transmission and reception 
+controlled via interrupts.  The respective routines move characters from 
+one channel receiver to other channel transmiter and vice versa, with the
+UnitPgmMode variable signalling the transparent mode.  In normal mode, only
+reception on both channels is interrupt controlled.
+Transparent mode interrupt routines are implemented in assembler, file:
+isrs.asm.
+
+
+New architecture for serial communication.
+
+Both communnication channels are interrupt driven on receive only, using standard
+model with a ring buffer for incoming characters and two indexes, for incoming
+and read characters.
+
+volatile _near unsigned char RxInput_x;
+volatile _near unsigned char RxOutput_x;
+volatile _near unsigned char RxBuffer_x[RxBufferLen];
+
+
+RxInput_x  is the input index used by interrupt routine to place incoming chars into
+           buffer.
+
+RxOutput_x is the output index used by getchar_x() function to read characters from
+           buffer.
+
+The algorithm for serial receive interrupt routine is as follows:
+
+void interrupt int232i(void)
+  {
+  RI_0 = 0;                    // clear interrupt flag
+  RxBuffer[RxInput_x] = S1BUF; // place char into buffer
+  RxInput++;                   // increment input index
+  if (RxInput_x == RxBufferLen)
+    RxInput = 0;
+  }
+
+
+The following functions are implemented:
+
+int rs232charready(void)
+
+This function compares input and output idexes to receive buffer and returns
+0 - if they are equal (no character received)
+1 - if they are not (an unread character is in buffer)
+
+int rs232charready(void)
+  {
+  if (RxInput_x == RxOutput_x)
+    return 0;
+  return 1;
+  }
+
+int rs232getchar(void)
+
+This function returns a character from circular buffer pointed by output index.
+It returns -1 if the buffer is empty, i.e. if both input and output indexes are
+equal.  This is a new function.
+
+
+int rs232getchar(void)
+  {
+  unsigned char temp;
+    
+  if (RxInput_x == RxOutput_x)
+    return -1;                   // if no chars received return -1
+  temp = RxBuffer[RxOutput_x];
+  RxOuptput_x ++;
+  if (RxOutput_x == RxBufferLen)
+    RxOutput = 0;
+  return (int) temp;
+  }
+  
+
+For transmission, the following function is implemented:
+
+int rs232putchar(unsigned char ch)
+  {
+  S1BUF = ch;
+  while (!TI_1)
+    ;               // wait until characters leaves transmiter 
+  TI_1 = 0;         // clear transmiter flag
+  return (int) ch;
+  }
+  
+This function blocks until character is sent.
+
+These functions are for channel 1 communications.  Their names reflect names of 
+existing functions, in order to facilitate replacement.  Other existing functions
+like rs232puts, etc will have to be modified, so they all use rs232putchar.
+
+For channel 0 the following functions will be implemented:
+
+void interrupt intsio0i(void)
+int sio0charready(void)
+int sio0getchar(void)
+int sio0putchar(unsigned char ch)
+
+The last function uses the following algorithm, to allow for 9 bit multiprocessor
+communication:
+
+int sio0putchar(unsigned int ch)
+  {
+  TB8_0 = ( ch >> 8) & 0x01;            // if this is address, set TB8_0
+
+  S0BUF = (unsigned char) ch & 0xFF;    // Write char to port
+  while (!TI_1)
+    ;                                   // wait until character leaves transmiter 
+  TI_0 = 0;                             // clear transmiter flag
+  return (int) ch;
+  }
+
+When the ninth bit of ch is set, this means that a slave addres is being
+transmited.  This will interrupt all slaves, who will compare the transmitted
+byte with their respective preprogrammed slave addresses.  Only the addressed
+slave will receive subsequent transmission.
+
+Modifications of the program to implement serial channel 1 communication.
+
+
+1. Remove rtxcinit() from main()
+2. Set interrupt priorities as follows:
+   Line Interrupt has highiest priority
+   Serial channel 0 reception next
+   Serial channel 1 reception next and lowest
+3. Remove ptvmain.c from makefile
+4. InstrumentControl() function contains the main loop.
+5. Remove all references to RTXC from InstrumentControl together with
+   InstruTimer.
+6. The main loop does not update genlock LED at first.
+7. The main loop looks like this:
+
+
+      while (1)
+        {
+        if (rs232charready())
+          {
+          ch = (UC) rs232getchar();
+          CmdHandler(ch);
+          }
+        }
+    Note that it is not necessary to check for reception on channel 0, as 
+    slaves only respond to commands from master.
+    
+8. Modify functions sio0WaitAcknowledge() and sio0WaitAnswer()
+   in sio0drv.c so that they use 
+   sio0putchar() and 
+   sio0getchar().
+   Some timeout on sio0getchar() has to be implemented.
+   
+
+   

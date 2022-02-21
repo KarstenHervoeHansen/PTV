@@ -1,0 +1,123 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 1995-2003 Xilinx, Inc.
+// All Right Reserved.
+////////////////////////////////////////////////////////////////////////////////
+//   ____  ____ 
+//  /   /\/   / 
+// /___/  \  /    Vendor: Xilinx 
+// \   \   \/     Version : 9.1.03i
+//  \   \         Application : ISE
+//  /   /         Filename : test_loopfilter.ant
+// /___/   /\     Timestamp : Thu Jan 10 13:19:09 2008
+// \   \  /  \ 
+//  \___\/\___\ 
+//
+//Command: 
+//Design Name: test_loopfilter
+//Device: Xilinx
+//
+`timescale 1ns/1ps
+
+module test_loopfilter;
+    reg clk_i = 1'b0;
+    reg rst_i = 1'b0;
+    reg fix_i = 1'b0;
+    reg fastslow_i = 1'b0;
+    reg [27:0] phase_diff_i = 28'b0000000000000000000000000000;
+    reg update_tick_i = 1'b0;
+    wire [15:0] dac_word_o;
+
+    parameter PERIOD_clk_i = 200;
+    parameter real DUTY_CYCLE_clk_i = 0.5;
+    parameter OFFSET_clk_i = 100;
+    parameter PERIOD_update_tick_i = 1000;
+    parameter real DUTY_CYCLE_update_tick_i = 0.2;
+    parameter OFFSET_update_tick_i = 100;
+
+    initial    // Clock process for clk_i
+    begin
+        #OFFSET_clk_i;
+        forever
+        begin
+            clk_i = 1'b0;
+            #(PERIOD_clk_i-(PERIOD_clk_i*DUTY_CYCLE_clk_i)) clk_i = 1'b1;
+            #(PERIOD_clk_i*DUTY_CYCLE_clk_i);
+        end
+    end
+
+    initial    // Clock process for update_tick_i
+    begin
+        #OFFSET_update_tick_i;
+        forever
+        begin
+            update_tick_i = 1'b0;
+            #(PERIOD_update_tick_i-(PERIOD_update_tick_i*DUTY_CYCLE_update_tick_i)) update_tick_i = 1'b1;
+            #(PERIOD_update_tick_i*DUTY_CYCLE_update_tick_i);
+        end
+    end
+
+    GPS_phase_loop UUT (
+        .clk_i(clk_i),
+        .rst_i(rst_i),
+        .fix_i(fix_i),
+        .fastslow_i(fastslow_i),
+        .phase_diff_i(phase_diff_i),
+        .update_tick_i(update_tick_i),
+        .dac_word_o(dac_word_o));
+
+    integer TX_FILE = 0;
+    integer TX_ERROR = 0;
+    
+    initial begin    // Annotation process for clock clk_i
+        #0;
+        ANNOTATE_dac_word_o;
+        #OFFSET_clk_i;
+        forever begin
+            #115;
+            ANNOTATE_dac_word_o;
+            #85;
+        end
+    end
+
+    initial begin  // Open the annotations file...
+        TX_FILE = $fopen("\\\\wts\\data1\\PT8616\\final_source\\FPGA\\test_loopfilter.ano");
+        #1.001e+006 // Final time:  1.001e+006 ns
+        $display("Success! Annotation Simulation Complete.");
+        $fdisplay(TX_FILE, "Total[%d]", TX_ERROR);
+        $fclose(TX_FILE);
+        $finish;
+    end
+
+    initial begin // Process for clk_i
+        // -------------  Current Time:  185ns
+        #185;
+        rst_i = 1'b1;
+        fastslow_i = 1'b1;
+        // -------------------------------------
+        // -------------  Current Time:  1185ns
+        #1000;
+        rst_i = 1'b0;
+        // -------------------------------------
+        // -------------  Current Time:  3385ns
+        #2200;
+        phase_diff_i = 28'b1111111111111111111111000000;
+        // -------------------------------------
+        // -------------  Current Time:  9385ns
+        #6000;
+        phase_diff_i = 28'b0000000000000000000000000000;
+        // -------------------------------------
+    end
+
+    initial begin // Process for update_tick_i
+    end
+
+    task ANNOTATE_dac_word_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,dac_word_o,%b]", $time, dac_word_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+endmodule
+

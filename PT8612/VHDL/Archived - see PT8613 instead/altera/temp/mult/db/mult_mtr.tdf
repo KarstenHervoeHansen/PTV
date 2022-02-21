@@ -1,0 +1,75 @@
+--lpm_mult CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEDICATED_MULTIPLIER_CIRCUITRY="YES" DEVICE_FAMILY="Stratix" DSP_BLOCK_BALANCING="Auto" LPM_REPRESENTATION="UNSIGNED" LPM_WIDTHA=10 LPM_WIDTHB=10 LPM_WIDTHP=10 LPM_WIDTHS=1 MAXIMIZE_SPEED=5 dataa datab result CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=70
+--VERSION_BEGIN 4.1 cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_lpm_add_sub 2004:06:23:12:24:04:SJ cbx_lpm_mult 2004:06:23:16:45:16:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_padd 2004:06:16:20:36:44:SJ cbx_stratix 2004:04:28:15:20:14:SJ cbx_stratixii 2004:05:18:11:28:28:SJ cbx_util 2004:03:29:17:03:30:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION stratix_mac_mult (aclr[3..0], clk[3..0], dataa[17..0], datab[17..0], ena[3..0], signa, signb)
+WITH ( 	dataa_clear,	dataa_clock,	dataa_width,	datab_clear,	datab_clock,	datab_width,	output_clear,	output_clock,	signa_clear,	signa_clock,	signa_internally_grounded,	signb_clear,	signb_clock,	signb_internally_grounded) 
+RETURNS ( dataout[35..0], scanouta[17..0], scanoutb[17..0]);
+FUNCTION stratix_mac_out (aclr[3..0], addnsub0, addnsub1, clk[3..0], dataa[35..0], datab[35..0], datac[35..0], datad[35..0], ena[3..0], signa, signb, zeroacc)
+WITH ( 	addnsub0_clear,	addnsub0_clock,	addnsub0_pipeline_clear,	addnsub0_pipeline_clock,	addnsub1_clear,	addnsub1_clock,	addnsub1_pipeline_clear,	addnsub1_pipeline_clock,	dataa_width,	datab_width,	datac_width,	datad_width,	dataout_width,	operation_mode,	output_clear,	output_clock,	signa_clear,	signa_clock,	signa_pipeline_clear,	signa_pipeline_clock,	signb_clear,	signb_clock,	signb_pipeline_clear,	signb_pipeline_clock,	zeroacc_clear,	zeroacc_clock,	zeroacc_pipeline_clear,	zeroacc_pipeline_clock) 
+RETURNS ( accoverflow, dataout[dataout_width-1..0]);
+
+--synthesis_resources = dsp_9bit 2 
+SUBDESIGN mult_mtr
+( 
+	dataa[9..0]	:	input;
+	datab[9..0]	:	input;
+	result[9..0]	:	output;
+) 
+VARIABLE 
+	mac_mult2 : stratix_mac_mult
+		WITH (
+			dataa_width = 10,
+			datab_width = 10
+		);
+	mac_out1 : stratix_mac_out
+		WITH (
+			dataa_width = 20,
+			dataout_width = 72,
+			operation_mode = "output_only"
+		);
+	aclr	: NODE;
+	clken	: NODE;
+	clock	: NODE;
+
+BEGIN 
+	mac_mult2.aclr[] = aclr;
+	mac_mult2.clk[] = clock;
+	mac_mult2.dataa[] = ( B"11111111", dataa[]);
+	mac_mult2.datab[] = ( B"11111111", datab[]);
+	mac_mult2.ena[] = clken;
+	mac_mult2.signa = B"0";
+	mac_mult2.signb = B"0";
+	mac_out1.aclr[] = aclr;
+	mac_out1.clk[] = clock;
+	mac_out1.dataa[] = ( B"0000000000000000", mac_mult2.dataout[19..0]);
+	mac_out1.ena[] = clken;
+	mac_out1.signa = B"0";
+	mac_out1.signb = B"0";
+	aclr = GND;
+	clken = VCC;
+	clock = GND;
+	result[9..0] = mac_out1.dataout[19..10];
+END;
+--VALID FILE

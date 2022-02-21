@@ -1,0 +1,252 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTL\cc7147cb.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    ULTOA
+                          6 ; ultoa.c     1 /* ultoa.c */
+                          7 ; ultoa.c     2 
+                          8 ; ultoa.c     3 /*
+                          9 ; ultoa.c     4  *   RTXCio    
+                         10 ; ultoa.c     5  *   Copyright (c) 
+                         11 ; ultoa.c     6  *   Embedded System Products, Inc.
+                         12 ; ultoa.c     7  *   ALL RIGHTS RESERVED
+                         13 ; ultoa.c     8 */
+                         14 ; ultoa.c     9 
+                         15 ; ultoa.c    10 extern int strlen(const char *);
+                         16 ; ultoa.c    11 
+                         17 ; ultoa.c    12 /* CONFIG */
+                         18 ; ultoa.c    13 #define NEED_LTOA
+                         19 ; ultoa.c    14 #define NEED_ULTOA
+                         20 ; ultoa.c    15 /* #define NEED_REVERSE */
+                         21 ; ultoa.c    16 
+                         22 ; ultoa.c    17 #define RADIX  /* indicates non-decimal radix support */
+                         23 ; ultoa.c    18                /* some versions don't support non-decimal radix */
+                         24 ; ultoa.c    19 
+                         25 ; ultoa.c    20 #ifdef NEED_REVERSE
+                         26 ; ultoa.c    21 void reverse(char *);
+                         27 ; ultoa.c    22 #else
+                         28 ; ultoa.c    23 extern void reverse(char *);
+                         29 ; ultoa.c    24 #endif
+                         30 ; ultoa.c    25 
+                         31 ; ultoa.c    26 #ifdef RADIX
+                         32 ; ultoa.c    27 static const char lookup[] =
+000000                   33 ULTOA_INI_FA    SEGMENT HDATA INSEGMENT INIT
+000000                   34         RSEG    ULTOA_INI_FA
+000000                   35 _lookup:
+000000 30313233343536    36         DB      030H,031H,032H,033H,034H,035H,036H,037H,038H,039H,041H,042H
+       3738394142           
+                         37 ; ultoa.c    28 {
+                         38 ; ultoa.c    29    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                         39 ; ultoa.c    30    'A', 'B', 'C', 'D', 'E', 'F'
+                         40 ; ultoa.c    31 };
+                         41 ; ultoa.c    32 #endif
+                         42 ; ultoa.c    33 
+                         43 ; ultoa.c    34 
+                         44 ; ultoa.c    35 #ifdef NEED_ULTOA
+                         45 ; ultoa.c    36 /* unsigned long to ascii */
+                         46 ; ultoa.c    37 void ultoa(
+                         47 ; ultoa.c    38 unsigned long n,    /* unsigned integer to be converted */
+                         48 ; ultoa.c    39 char s[],          /* storage area to save ascii */
+                         49 ; ultoa.c    40 int radix)         /* optional radix, decimal assumed */
+                         50 ; ultoa.c    41 {
+                         51         PUBLIC  _ultoa
+00000C 43444546          52         DB      043H,044H,045H,046H
+000000                   53 ULTOA_PR        SEGMENT HCODE
+000000                   54         RSEG    ULTOA_PR
+000000                   54         RSEG    ULTOA_PR
+000000                   55 _ultoa:
+000000 0F30              56         PUSH.W  R4, R5
+000002 9972000E          57         SUB.W   R7,#0EH
+000006 8C3F08            58         MOV.W   [R7+8],R3
+000009 8C2F06            59         MOV.W   [R7+6],R2
+                         60 ; ultoa.c    42     int i = 0;
+00000C BC7004            61         MOV.W   [R7+4],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+00000C BC700400          61         MOV.W   [R7+4],#00H
+                         62 ; ultoa.c    43 
+                         63 ; ultoa.c    44     do
+000010                   64 _3:
+                         65 ; ultoa.c    45         { /* generate digits in reverse order */
+                         66 ; ultoa.c    46 #ifdef RADIX
+                         67 ; ultoa.c    47             s[i++] = lookup[n % radix]; /* get next digit */
+000010 8926              68         MOV.W   R2,R6
+000012 9839              69         SEXT.W  R3
+000014 8C1F0C            70         MOV.W   [R7+12],R1
+000017 8C0F0A            71         MOV.W   [R7+10],R0
+00001A 8C3F02            72         MOV.W   [R7+2],R3
+00001D 8A2F              73         MOV.W   [R7],R2
+00001F C4rrrrrr          74         FCALL   __UMODL
+000023 964842rr          75         MOV.B   ES,#SEG( _lookup )
+000027 8580rrrr          76         MOV.B   R4L,[R0+SOF( _lookup )]
+00002B 8C0704            77         MOV.W   R0,[R7+4]
+00002E 8920              78         MOV.W   R2,R0
+000030 9839              79         SEXT.W  R3
+000032 8C1708            80         MOV.W   R1,[R7+8]
+000035 8C0706            81         MOV.W   R0,[R7+6]
+000038 0902              82         ADD.W   R0,R2
+00003A 862C42            83         MOV.B   ES,R1L
+00003D 8288              84         MOV.B   [R0],R4L
+00003F 8C0704            85         MOV.W   R0,[R7+4]
+000042 A901              86         ADDS.W  R0,#01H
+000044 8C0F04            87         MOV.W   [R7+4],R0
+                         88 ; ultoa.c    48 #else
+                         89 ; ultoa.c    49             s[i++] = n % 10L + '0'; /* get next digit */
+                         90 ; ultoa.c    50 #endif
+                         91 ; ultoa.c    51         }
+                         92 ; ultoa.c    52 #ifdef RADIX
+                         93 ; ultoa.c    53     while ((n /= radix) > 0L); /* delete it */
+000047 8C170C            94         MOV.W   R1,[R7+12]
+00004A 8C070A            95         MOV.W   R0,[R7+10]
+00004D 8C3702            96         MOV.W   R3,[R7+2]
+000050 8A27              97         MOV.W   R2,[R7]
+000052 C4rrrrrr          98         FCALL   __UDIVL
+000056 99140000          99         CMP.W   R1,#00H
+00005A F202             100         BNE     _4
+00005C 99040000         101         CMP.W   R0,#00H
+00005C 99040000         101         CMP.W   R0,#00H
+000060                  102 _4:
+000060 F8D7             103         BG      _3
+                        104 ; ultoa.c    54 #else
+                        105 ; ultoa.c    55     while ((n /= 10L) > 0); /* delete it */
+                        106 ; ultoa.c    56 #endif
+                        107 ; ultoa.c    57     s[i] = '\0';
+000062 8C0704           108         MOV.W   R0,[R7+4]
+000065 9819             109         SEXT.W  R1
+000067 8C3708           110         MOV.W   R3,[R7+8]
+00006A 8C2706           111         MOV.W   R2,[R7+6]
+00006D 0920             112         ADD.W   R2,R0
+00006F 866C42           113         MOV.B   ES,R3L
+000072 B220             114         MOV.B   [R2],#00H
+                        115 ; ultoa.c    58 
+                        116 ; ultoa.c    59     reverse(s);
+000074 8C1708           117         MOV.W   R1,[R7+8]
+000077 8C0706           118         MOV.W   R0,[R7+6]
+                        119         CALL    _reverse
+00007A C4rrrrrr        +119 ;       FCALL   _reverse
+                        120 ; ultoa.c    60 }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+00007E 9970000E         121         ADD.W   R7,#0EH
+000082 2F30             122         POP.W   R4, R5
+000084 D680             123         RET
+000084 D680             123         RET
+                        124 ; ultoa.c    61 #endif
+                        125 ; ultoa.c    62 
+                        126 ; ultoa.c    63 
+                        127 ; ultoa.c    64 #ifdef NEED_LTOA
+                        128 ; ultoa.c    65 /* long to ascii */
+                        129 ; ultoa.c    66 void ltoa(
+                        130 ; ultoa.c    67 long n,            /* unsigned long to be converted */
+                        131 ; ultoa.c    68 char s[],          /* storage area to save ascii */
+                        132 ; ultoa.c    69 int radix)         /* optional radix, decimal assumed */
+                        133 ; ultoa.c    70 {
+                        134         PUBLIC  _ltoa
+000086                  135 _ltoa:
+000086 0F30             136         PUSH.W  R4, R5
+000088 9972000A         137         SUB.W   R7,#0AH
+00008C 8C3F04           138         MOV.W   [R7+4],R3
+00008F 8C2F02           139         MOV.W   [R7+2],R2
+                        140 ; ultoa.c    71     int i = 0;
+000092 BA70             141         MOV.W   [R7],#00H
+000092 BA70             141         MOV.W   [R7],#00H
+                        142 ; ultoa.c    72 
+                        143 ; ultoa.c    73     do
+000094                  144 _5:
+                        145 ; ultoa.c    74         { /* generate digits in reverse order */
+                        146 ; ultoa.c    75 #ifdef RADIX
+                        147 ; ultoa.c    76             s[i++] = lookup[n % radix]; /* get next digit */
+000094 8926             148         MOV.W   R2,R6
+000096 9839             149         SEXT.W  R3
+000098 8C1F08           150         MOV.W   [R7+8],R1
+00009B 8C0F06           151         MOV.W   [R7+6],R0
+00009E C4rrrrrr         152         FCALL   __UMODL
+0000A2 964842rr         153         MOV.B   ES,#SEG( _lookup )
+0000A6 8580rrrr         154         MOV.B   R4L,[R0+SOF( _lookup )]
+0000AA 8A07             155         MOV.W   R0,[R7]
+0000AC 8920             156         MOV.W   R2,R0
+0000AE 9839             157         SEXT.W  R3
+0000B0 8C1704           158         MOV.W   R1,[R7+4]
+0000B3 8C0702           159         MOV.W   R0,[R7+2]
+0000B6 0902             160         ADD.W   R0,R2
+0000B8 862C42           161         MOV.B   ES,R1L
+0000BB 8288             162         MOV.B   [R0],R4L
+0000BD 8A07             163         MOV.W   R0,[R7]
+0000BF A901             164         ADDS.W  R0,#01H
+0000C1 8A0F             165         MOV.W   [R7],R0
+                        166 ; ultoa.c    77 #else
+                        167 ; ultoa.c    78             s[i++] = n % 10L + '0'; /* get next digit */
+                        168 ; ultoa.c    79 #endif
+                        169 ; ultoa.c    80         }
+                        170 ; ultoa.c    81 #ifdef RADIX
+                        171 ; ultoa.c    82     while ((n /= radix) > 0L); /* delete it */
+0000C3 8926             172         MOV.W   R2,R6
+0000C5 9839             173         SEXT.W  R3
+0000C7 8C1708           174         MOV.W   R1,[R7+8]
+0000CA 8C0706           175         MOV.W   R0,[R7+6]
+0000CD C4rrrrrr         176         FCALL   __SDIVL
+0000D1 99140000         177         CMP.W   R1,#00H
+0000D5 FCDF             178         BGT     _5
+0000D7 FB04             179         BLT     _6
+0000D9 99040000         180         CMP.W   R0,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+0000DD F8DB             181         BG      _5
+0000DD F8DB00           181         BG      _5
+0000E0                  182 _6:
+                        183 ; ultoa.c    83 #else
+                        184 ; ultoa.c    84     while ((n /= 10L) > 0); /* delete it */
+                        185 ; ultoa.c    85 #endif
+                        186 ; ultoa.c    86     s[i] = '\0';
+0000E0 8A07             187         MOV.W   R0,[R7]
+0000E2 9819             188         SEXT.W  R1
+0000E4 8C3704           189         MOV.W   R3,[R7+4]
+0000E7 8C2702           190         MOV.W   R2,[R7+2]
+0000EA 0920             191         ADD.W   R2,R0
+0000EC 866C42           192         MOV.B   ES,R3L
+0000EF B220             193         MOV.B   [R2],#00H
+                        194 ; ultoa.c    87 
+                        195 ; ultoa.c    88     reverse(s);
+0000F1 8C1704           196         MOV.W   R1,[R7+4]
+0000F4 8C0702           197         MOV.W   R0,[R7+2]
+                        198         CALL    _reverse
+0000F7 C4rrrrrr        +198 ;       FCALL   _reverse
+                        199 ; ultoa.c    89 }
+0000FB 9970000A         200         ADD.W   R7,#0AH
+0000FF 2F30             201         POP.W   R4, R5
+000101 D680             202         RET
+                        203 ; ultoa.c    90 #endif
+                        204 ; ultoa.c    91 
+                        205 ; ultoa.c    92 
+                        206 ; ultoa.c    93 #ifdef NEED_REVERSE
+                        207 ; ultoa.c    94 static void reverse(s)  /* reverse string s in place */
+                        208 ; ultoa.c    95 char s[];
+                        209 ; ultoa.c    96 {
+                        210 ; ultoa.c    97     char c;
+                        211 ; ultoa.c    98     int i, j;
+                        212 ; ultoa.c    99 
+                        213 ; ultoa.c   100     for (i = 0, j = strlen(s) - 1; i < j; i++, j--)
+                        214 ; ultoa.c   101     {
+                        215 ; ultoa.c   102         c = s[i];
+                        216 ; ultoa.c   103         s[i] = s[j];
+                        217 ; ultoa.c   104         s[j] = c;
+                        218 ; ultoa.c   105     }
+                        219 ; ultoa.c   106 }
+                        220 ; ultoa.c   107 #endif
+                        221 ; ultoa.c   108 
+                        222 ; ultoa.c   109 /* end of ultoa.c */
+                        224         EXTRN   HCODE(__UMODL)
+                        225         EXTRN   HCODE(_reverse)
+                        226         EXTRN   HCODE(__SDIVL)
+                        227         EXTRN   HCODE(__UDIVL)
+                        228         CALLS   'ultoa', 'reverse'
+                        229         CALLS   'ltoa', 'reverse'

@@ -1,0 +1,1480 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -A1 -Cxag3 -e -g -IcF:\PT5202\prog\include
+;          -IF:\PT5202\prog\rtxc\xa\include -I. -Ml -O2 -s
+$CASE
+$NOZPAGE
+	NAME	NV_DRV
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "nv_drv.c"
+; nv_drv.c    1	
+; nv_drv.c    2	#include "define.h"
+	SYMB	FILE, "define.h"
+	SYMB	ENDF
+; nv_drv.c    3	#include "nv_drv.h"
+	SYMB	FILE, "nv_drv.h"
+	SYMB	TYPE, 257, "NvPointer", 'T', #18
+	SYMB	ENDF
+; nv_drv.c    4	
+; nv_drv.c    5	#ifdef __BORLANDC__
+; nv_drv.c    6	 #include <stdio.h>
+; nv_drv.c    7	#endif
+; nv_drv.c    8	
+; nv_drv.c    9	/* Write array of bytes from RAM 'source' to Non-volatile back up 'dest' */
+; nv_drv.c   10	/* Writing includes checksum update and two copies in bytewide NV-RAM    */
+; nv_drv.c   11	/* Calling modules needs to allocate NV-memory with a total of 4 times   */
+; nv_drv.c   12	/* the required datastorage plus 4 times the checksum size */
+; nv_drv.c   13	
+; nv_drv.c   14	
+; nv_drv.c   15	/* Memory allocation in nonvolatile RAM         */
+; nv_drv.c   16	/* Start address fixed in HW (PC fixed or file) */
+; nv_drv.c   17	
+; nv_drv.c   18	/* In the top of the memory som fixed locations are used :*/
+; nv_drv.c   19	/* Real time clock (HW ) */
+; nv_drv.c   20	/* Some housekeping data with fixed allocation 
+; nv_drv.c   21	   (only accessed via function calls)          */
+; nv_drv.c   22	   
+; nv_drv.c   23	/* The bottom part is used as array of events  */
+; nv_drv.c   24	
+; nv_drv.c   25	
+; nv_drv.c   26	/* NV ram is 32 kbytes excluding 16 bytes reserved for HW RTC */
+; nv_drv.c   27	#define NV_size ((NvPointer)8*1024-16)
+; nv_drv.c   28	
+; nv_drv.c   29	// Allocation definitions
+; nv_drv.c   30	#define NV_time (NV_size-16)
+; nv_drv.c   31	
+; nv_drv.c   32	
+; nv_drv.c   33	/* Checksum related definitions */
+; nv_drv.c   34	/* By changing CheckBase you can force all checksums i NV to fail */
+; nv_drv.c   35	
+; nv_drv.c   36	typedef UI CheckType ;
+; nv_drv.c   37	
+; nv_drv.c   38	#define CheckSumSize sizeof(CheckType)
+; nv_drv.c   39	#define CheckBase  0x1234
+	SYMB	TYPE, 258, "CheckType", 'T', #18
+; nv_drv.c   40	
+; nv_drv.c   41	/* prototype of checksum calculator */
+; nv_drv.c   42	static CheckType CheckUpdate(CheckType sum,UC data);
+; nv_drv.c   43	
+; nv_drv.c   44	/* Define pointer-type used as reference to NV_array*/
+; nv_drv.c   45	/* ( done in .h file ) */
+; nv_drv.c   46	
+; nv_drv.c   47	/* declare  struct occupying 16 bits */
+; nv_drv.c   48	typedef struct halfwidth
+; nv_drv.c   49	{
+; nv_drv.c   50	   UC low;
+; nv_drv.c   51	// borland does not like array of 64 kbytes
+; nv_drv.c   52	#ifndef __BORLANDC__
+; nv_drv.c   53	   UC high;
+; nv_drv.c   54	#endif
+; nv_drv.c   55	
+; nv_drv.c   56	}  NvByte;
+; nv_drv.c   57	
+; nv_drv.c   58	
+; nv_drv.c   59	#ifdef __BORLANDC__
+; nv_drv.c   60	static far NvByte NV_array[NV_size];
+; nv_drv.c   61	#else
+	SYMB	TYPE, 259, "halfwidth", 'S', 2,\
+		 "low", #3, 0,\
+		 "high", #3, 1
+	SYMB	TYPE, 260, "NvByte", 'T', #259
+; nv_drv.c   62	static NvByte NV_array[NV_size] _at (0x80000) ;
+; nv_drv.c   63	#endif
+; nv_drv.c   64	
+; nv_drv.c   65	//  Addressing : NV_array[Nvpointer].low
+; nv_drv.c   66	
+; nv_drv.c   67	
+; nv_drv.c   68	#define First_nv        0
+; nv_drv.c   69	/* Zero used as null pointer, allocation error => dont start alloc @ 0 */
+; nv_drv.c   70	
+; nv_drv.c   71	
+; nv_drv.c   72	
+; nv_drv.c   73	#define AllocateStart   ( EventLogStart + EventLogSize)
+; nv_drv.c   74	#define AllocateEnd     ( NV_time-1)
+; nv_drv.c   75	
+; nv_drv.c   76	#if ( AllocateStart > 20000)
+; nv_drv.c   77	#Not space for NV items
+; nv_drv.c   78	#endif
+; nv_drv.c   79	
+; nv_drv.c   80	// Layout of fixed data
+; nv_drv.c   81	
+; nv_drv.c   82	// Eventlog definitions
+; nv_drv.c   83	// Two pointers to eventlog
+; nv_drv.c   84	
+; nv_drv.c   85	// Pointers to nonvolatile variables for eventlog :
+; nv_drv.c   86	//static NvPointer FirstEventP,CountEventP;
+; nv_drv.c   87	// Volatile memory locations :
+; nv_drv.c   88	//static UI        FirstEvent,CountEvent;
+; nv_drv.c   89	
+; nv_drv.c   90	// allocation pointer
+; nv_drv.c   91	static NvPointer AllocTop;
+; nv_drv.c   92	
+; nv_drv.c   93	#ifdef __BORLANDC__
+; nv_drv.c   94	FILE* fp;
+; nv_drv.c   95	#endif
+; nv_drv.c   96	
+; nv_drv.c   97	/**************************************************************************/
+; nv_drv.c   98	/* NV_Init																										   NV_DRV.C	*/
+; nv_drv.c   99	/*																																				*/
+; nv_drv.c  100	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  101	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  102	/*																																				*/
+; nv_drv.c  103	/* Function: 	Initialise NV RAM hardware															 		*/
+; nv_drv.c  104	/* Remarks:																																*/
+; nv_drv.c  105	/* Returns:																																*/
+; nv_drv.c  106	/* Updates:																																*/
+; nv_drv.c  107	/**************************************************************************/
+; nv_drv.c  108	int NV_Init( void)
+; nv_drv.c  109	{
+NV_DRV_PR	SEGMENT	HCODE
+	RSEG	NV_DRV_PR
+	ALIGN	1
+	SYMB	LINE, 109
+	PUBLIC	_NV_Init
+_NV_Init:
+	SYMB	TYPE, 261, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "NV_Init", _NV_Init, #261, 0, 0, 0
+	SYMB	ALAB, _NV_Init, #261
+; nv_drv.c  110		// PC version : load NV file ?
+; nv_drv.c  111	
+; nv_drv.c  112	  // Allocate fixed part of nv_ram
+; nv_drv.c  113	  // Reset allocation pointers, REQUIRED before any allocation
+; nv_drv.c  114	  AllocTop = AllocateStart;
+	SYMB	LINE, 114
+	MOV.B	ES,#SEG( _AllocTop )
+	MOV.W	R0,#SOF( _AllocTop )
+	MOV.W	[R0],#0FA0H
+; nv_drv.c  115	
+; nv_drv.c  116	  // Allocation has to be in the same order if NV readings
+; nv_drv.c  117	  // are supposed to be identical to earlier writes
+; nv_drv.c  118	
+; nv_drv.c  119	#ifdef __BORLANDC__
+; nv_drv.c  120	
+; nv_drv.c  121		if (( fp = fopen( "NV.dat", "rb")) == NULL)
+; nv_drv.c  122		{
+; nv_drv.c  123	  	fp = fopen( "NV.dat", "wb");	
+; nv_drv.c  124			fwrite( &NV_array, NV_size, 1, fp);
+; nv_drv.c  125		}
+; nv_drv.c  126		else
+; nv_drv.c  127			fread( &NV_array, NV_size, 1, fp);
+; nv_drv.c  128			fclose( fp);
+; nv_drv.c  129	
+; nv_drv.c  130	#endif
+; nv_drv.c  131	
+; nv_drv.c  132		return( OK);
+	SYMB	LINE, 132
+	MOV.W	R0,#0FFFFH
+; nv_drv.c  133	}
+	SYMB	LINE, 133
+	RET
+	SYMB	EFUN
+; nv_drv.c  134	
+; nv_drv.c  135	/**************************************************************************/
+; nv_drv.c  136	/* NV_AllocP																									   NV_DRV.C	*/
+; nv_drv.c  137	/*																																				*/
+; nv_drv.c  138	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  139	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  140	/*																																				*/
+; nv_drv.c  141	/* Function: 	Allocate preset memories using allocP												*/
+; nv_drv.c  142	/* Remarks:																																*/
+; nv_drv.c  143	/* Returns:		NvPointer to allocated preset if ram available, otherwise 	*/
+; nv_drv.c  144	/*						NvNull																											*/
+; nv_drv.c  145	/* Updates:																																*/
+; nv_drv.c  146	/**************************************************************************/
+; nv_drv.c  147	NvPointer NV_AllocP( int numbytes)
+; nv_drv.c  148	{
+	ALIGN	1
+	SYMB	LINE, 148
+	PUBLIC	_NV_AllocP
+_NV_AllocP:
+	SYMB	TYPE, 262, 'X', 12, #257, 30, 1, #16
+	SYMB	GFUN, "NV_AllocP", _NV_AllocP, #262, 0, 0, 0
+	SYMB	ALAB, _NV_AllocP, #262
+	SYMB	LTIM, "numbytes", 2, 0, 2253
+	MOV.W	R2,R0
+	SYMB	LTIM, "numbytes", 2, 0, 2125
+	SYMB	LTIM, "numbytes", 10, 0, 2253
+	SYMB	IDEN, "numbytes", 10, #16, 0, 2061
+	SYMB	IDEN, "loc", -1, #257, 130, 5
+	SYMB	LTIM, "loc", -1, 0, 69
+; nv_drv.c  149		NvPointer loc;
+; nv_drv.c  150	
+; nv_drv.c  151		loc = AllocTop;
+	SYMB	LINE, 151
+	MOV.B	ES,#SEG( _AllocTop )
+	MOV.W	R1,#SOF( _AllocTop )
+	MOV.W	R1,[R1]
+	MOV.W	R3,R1
+	SYMB	LTIM, "loc", 14, 0, 205
+; nv_drv.c  152	
+; nv_drv.c  153		if ( AllocTop + numbytes + CheckSumSize <= AllocateEnd )
+	SYMB	LINE, 153
+	ADD.W	R1,R2
+	MOV.W	R0,R1
+	ADDS.W	R0,#02H
+	CMP.W	R0,#01FDFH
+	BG	_3
+; nv_drv.c  154		{
+; nv_drv.c  155	  	AllocTop = AllocTop + numbytes + CheckSumSize;
+	SYMB	LINE, 155
+	MOV.B	ES,#SEG( _AllocTop )
+	MOV.W	R1,#SOF( _AllocTop )
+	MOV.W	[R1],R0
+; nv_drv.c  156		}	
+	SYMB	LINE, 156
+	BR	_4
+_3:
+; nv_drv.c  157		else
+; nv_drv.c  158		{
+; nv_drv.c  159	  	// Allocation error
+; nv_drv.c  160			loc = NvNull;
+	SYMB	LINE, 160
+	MOV.W	R3,#00H
+	SYMB	LTIM, "loc", 14, 0, 77
+	SYMB	LTIM, "loc", 14, 0, 205
+; nv_drv.c  161		}
+	SYMB	LINE, 161
+_4:
+; nv_drv.c  162	
+; nv_drv.c  163		return( loc);
+	SYMB	LINE, 163
+	MOV.W	R0,R3
+	SYMB	LTIM, "loc", 14, 0, 77
+	SYMB	LTIM, "loc", 2, 0, 205
+; nv_drv.c  164	}
+	SYMB	LINE, 164
+	RET
+	SYMB	LTIM, "loc", 2, 0, 77
+	SYMB	LTIM, "numbytes", 10, 0, 2125
+	SYMB	EFUN
+; nv_drv.c  165	
+; nv_drv.c  166	/**************************************************************************/
+; nv_drv.c  167	/* NV_Alloc																										   NV_DRV.C	*/
+; nv_drv.c  168	/*																																				*/
+; nv_drv.c  169	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  170	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  171	/*																																				*/
+; nv_drv.c  172	/* Function: 	Allocate memory for storing data with double & checksum			*/
+; nv_drv.c  173	/* Remarks:																																*/
+; nv_drv.c  174	/* Returns:		NvPointer to allocated preset if ram available, otherwise 	*/
+; nv_drv.c  175	/*						NvNull																											*/
+; nv_drv.c  176	/* Updates:																																*/
+; nv_drv.c  177	/**************************************************************************/
+; nv_drv.c  178	NvPointer NV_Alloc( int numbytes)
+; nv_drv.c  179	{
+	ALIGN	1
+	SYMB	LINE, 179
+	PUBLIC	_NV_Alloc
+_NV_Alloc:
+	SYMB	TYPE, 263, 'X', 12, #257, 30, 1, #16
+	SYMB	GFUN, "NV_Alloc", _NV_Alloc, #263, 0, 0, 0
+	SYMB	ALAB, _NV_Alloc, #263
+	SYMB	LTIM, "numbytes", 2, 0, 2253
+	MOV.W	R2,R0
+	SYMB	LTIM, "numbytes", 2, 0, 2125
+	SYMB	LTIM, "numbytes", 10, 0, 2253
+	SYMB	IDEN, "numbytes", 10, #16, 0, 2061
+	SYMB	IDEN, "loc", -1, #257, 130, 5
+	SYMB	LTIM, "loc", -1, 0, 69
+; nv_drv.c  180		NvPointer loc;
+; nv_drv.c  181	
+; nv_drv.c  182		loc = AllocTop;
+	SYMB	LINE, 182
+	MOV.B	ES,#SEG( _AllocTop )
+	MOV.W	R1,#SOF( _AllocTop )
+	MOV.W	R1,[R1]
+	MOV.W	R3,R1
+	SYMB	LTIM, "loc", 14, 0, 205
+; nv_drv.c  183	
+; nv_drv.c  184		if ( AllocTop + 2*numbytes + 2*CheckSumSize <= AllocateEnd )
+	SYMB	LINE, 184
+	ASL.W	R2,#01H
+	SYMB	LTIM, "numbytes", 10, 0, 2125
+	ADD.W	R1,R2
+	MOV.W	R0,R1
+	ADDS.W	R0,#04H
+	CMP.W	R0,#01FDFH
+	BG	_6
+; nv_drv.c  185		{
+; nv_drv.c  186	  	AllocTop = AllocTop+2*numbytes+2*CheckSumSize;
+	SYMB	LINE, 186
+	MOV.B	ES,#SEG( _AllocTop )
+	MOV.W	R1,#SOF( _AllocTop )
+	MOV.W	[R1],R0
+; nv_drv.c  187		}	
+	SYMB	LINE, 187
+	BR	_7
+_6:
+; nv_drv.c  188		else
+; nv_drv.c  189		{
+; nv_drv.c  190	  	// Allocation error
+; nv_drv.c  191		loc = NvNull;
+	SYMB	LINE, 191
+	MOV.W	R3,#00H
+	SYMB	LTIM, "loc", 14, 0, 77
+	SYMB	LTIM, "loc", 14, 0, 205
+; nv_drv.c  192		}
+	SYMB	LINE, 192
+_7:
+; nv_drv.c  193	
+; nv_drv.c  194		return( loc);
+	SYMB	LINE, 194
+	MOV.W	R0,R3
+	SYMB	LTIM, "loc", 14, 0, 77
+	SYMB	LTIM, "loc", 2, 0, 205
+; nv_drv.c  195	}
+	SYMB	LINE, 195
+	RET
+	SYMB	LTIM, "loc", 2, 0, 77
+	SYMB	EFUN
+; nv_drv.c  196	
+; nv_drv.c  197	/**************************************************************************/
+; nv_drv.c  198	/* NV_Write																										   NV_DRV.C	*/
+; nv_drv.c  199	/*																																				*/
+; nv_drv.c  200	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  201	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  202	/*																																				*/
+; nv_drv.c  203	/* Function: 	Store item in NV memory																			*/
+; nv_drv.c  204	/* Remarks:																																*/
+; nv_drv.c  205	/* Returns:		OK only																											*/
+; nv_drv.c  206	/* Updates:																																*/
+; nv_drv.c  207	/**************************************************************************/
+; nv_drv.c  208	int NV_Write( void *source, NvPointer dest, int bytes)
+; nv_drv.c  209	{
+	ALIGN	1
+	SYMB	LINE, 209
+	PUBLIC	_NV_Write
+_NV_Write:
+	SYMB	TYPE, 265, 'n', #1, 130
+	SYMB	TYPE, 266, 'P', #265
+	SYMB	TYPE, 264, 'X', 12, #16, 30, 3, #266, #257, #16
+	SYMB	GFUN, "NV_Write", _NV_Write, #264, 0, 0, 112
+	SYMB	ALAB, _NV_Write, #264
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#0EH
+	SYMB	SOFF, 20
+	SYMB	LTIM, "source", 3, 0, 2253
+	SYMB	LTIM, "dest", 10, 0, 2253
+	SYMB	LTIM, "bytes", 14, 0, 2253
+	MOV.W	[R7+6],R2
+	SYMB	LTIM, "dest", 10, 0, 2125
+	SYMB	LTIM, "dest", -14, 130, 2245
+	SYMB	IDEN, "source", 3, #266, 0, 2061
+	SYMB	IDEN, "dest", -7, #257, 130, 2053
+	SYMB	IDEN, "bytes", 14, #16, 0, 2061
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+	SYMB	IDEN, "checksum", -8, #18, 130, 5
+; nv_drv.c  210		int i;
+; nv_drv.c  211		UI checksum = CheckBase;
+	SYMB	LINE, 211
+	MOV.W	[R7+12],#01234H
+	SYMB	TYPE, 267, 'n', #3, 130
+	SYMB	TYPE, 268, 'P', #267
+	SYMB	IDEN, "src_point", -1, #268, 130, 5
+	SYMB	LTIM, "src_point", -1, 0, 69
+; nv_drv.c  212		UC *src_point = source;
+	SYMB	LINE, 212
+	MOV.W	[R7+10],R1
+	MOV.W	[R7+8],R0
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	SYMB	LTIM, "source", 3, 0, 2125
+	SYMB	LTIM, "source", -12, 130, 2245
+	SYMB	LTIM, "src_point", 19, 0, 205
+; nv_drv.c  213	
+; nv_drv.c  214		for ( i = 0; i < bytes; i++, dest++, src_point++)
+	SYMB	LINE, 214
+	MOV.W	R6,#00H
+	SYMB	LTIM, "i", 26, 0, 205
+	MOV.W	[R7+4],R3
+	CMP.W	R3,#00H
+	SYMB	LTIM, "bytes", 14, 0, 2125
+	SYMB	LTIM, "bytes", -16, 130, 2245
+	BLE	_10
+_9:
+; nv_drv.c  215	  {
+; nv_drv.c  216	  	NV_array[dest].low = *src_point;
+	SYMB	LINE, 216
+	MOV.B	ES,R5L
+	MOV.B	R0L,[R4]
+	MOV.W	R1,[R7+6]
+	ASL.W	R1,#01H
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R2+SOF( _NV_array )],R0L
+; nv_drv.c  217			checksum = CheckUpdate( checksum, *src_point);
+	SYMB	LINE, 217
+	MOV.W	R0,[R7+12]
+	MOV.B	ES,R5L
+	MOV.B	R1L,[R4]
+	CALL	_CheckUpdate
+	MOV.W	[R7+12],R0
+	SYMB	LINE, 214
+	ADDS.W	R6,#01H
+	SYMB	LTIM, "i", 26, 0, 77
+	SYMB	LTIM, "i", 26, 0, 205
+	MOV.W	R0,[R7+6]
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "dest", -14, 130, 2117
+	SYMB	LTIM, "dest", 2, 0, 2253
+	SYMB	LTIM, "dest", 2, 0, 2125
+	MOV.W	[R7+6],R0
+	SYMB	LTIM, "dest", -14, 130, 2245
+	ADD.W	R4,#01H
+	SYMB	LTIM, "src_point", 19, 0, 77
+	SYMB	LTIM, "src_point", 19, 0, 205
+	CMP.W	R6,[R7+4]
+	BLT	_9
+; nv_drv.c  218		}
+	SYMB	LINE, 218
+_10:
+; nv_drv.c  219	
+; nv_drv.c  220		src_point =(UC*)&checksum;
+	SYMB	LINE, 220
+	MOV.B	R5L,#SEG( __lc_bs )
+	XOR.B	R5H,R5H
+	LEA	R4,R7+12
+	SYMB	LTIM, "src_point", 19, 0, 77
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	SYMB	LTIM, "src_point", 3, 0, 205
+; nv_drv.c  221		NV_array[dest++].low = *src_point;
+	SYMB	LINE, 221
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	MOV.B	ES,R1L
+	MOV.B	R3L,[R0]
+	SYMB	LTIM, "src_point", 3, 0, 77
+	SYMB	LTIM, "src_point", 19, 0, 205
+	MOV.W	R2,[R7+6]
+	ASL.W	R2,#01H
+	MOV.W	R0,R2
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R0+SOF( _NV_array )],R3L
+	MOV.W	R2,[R7+6]
+	ADDS.W	R2,#01H
+	SYMB	LTIM, "dest", -14, 130, 2117
+	SYMB	LTIM, "dest", 10, 0, 2253
+	SYMB	LTIM, "dest", 10, 0, 2125
+	SYMB	LTIM, "dest", 10, 0, 2253
+; nv_drv.c  222	
+; nv_drv.c  223		src_point++;
+	SYMB	LINE, 223
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	ADD.W	R0,#01H
+	SYMB	LTIM, "src_point", 19, 0, 77
+	SYMB	LTIM, "src_point", 3, 0, 205
+	SYMB	LTIM, "src_point", 3, 0, 77
+	SYMB	LTIM, "src_point", 3, 0, 205
+; nv_drv.c  224		NV_array[dest++].low = *src_point;
+	SYMB	LINE, 224
+	MOV.B	ES,R1L
+	MOV.B	R1L,[R0]
+	SYMB	LTIM, "src_point", 3, 0, 77
+	MOV.W	R0,R2
+	ASL.W	R0,#01H
+	MOV.W	R4,R0
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R4+SOF( _NV_array )],R1L
+	ADDS.W	R2,#01H
+	SYMB	LTIM, "dest", 10, 0, 2125
+	MOV.W	R6,R2
+	SYMB	LTIM, "i", 26, 0, 77
+	SYMB	LTIM, "dest", 26, 0, 2253
+; nv_drv.c  225	
+; nv_drv.c  226		/* Repeat for 2nd copy without recalculating checksum */
+; nv_drv.c  227	  src_point = source;
+	SYMB	LINE, 227
+	MOV.W	R3,[R7+10]
+	MOV.W	R2,[R7+8]
+	SYMB	LTIM, "source", -12, 130, 2117
+	SYMB	LTIM, "source", 11, 0, 2253
+	SYMB	LTIM, "source", 11, 0, 2125
+	SYMB	LTIM, "src_point", 11, 0, 205
+; nv_drv.c  228	  for ( i = 0; i < bytes; i++, dest++, src_point++)
+	SYMB	LINE, 228
+	MOV.W	R0,#00H
+	SYMB	LTIM, "i", 2, 0, 205
+	CMP.W	[R7+4],#00H
+	BLE	_12
+_11:
+; nv_drv.c  229	  {
+; nv_drv.c  230	  	NV_array[dest].low = *src_point;
+	SYMB	LINE, 230
+	MOV.W	[R7+2],R3
+	MOV.W	[R7],R2
+	MOV.B	ES,R3L
+	MOV.B	R4L,[R2]
+	SYMB	LTIM, "src_point", 11, 0, 77
+	SYMB	LTIM, "src_point", -20, 130, 197
+	MOV.W	R1,R6
+	ASL.W	R1,#01H
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R2+SOF( _NV_array )],R4L
+	SYMB	LINE, 228
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	ADDS.W	R6,#01H
+	SYMB	LTIM, "dest", 26, 0, 2125
+	SYMB	LTIM, "dest", 26, 0, 2253
+	MOV.W	R3,[R7+2]
+	MOV.W	R2,[R7]
+	ADD.W	R2,#01H
+	SYMB	LTIM, "src_point", -20, 130, 69
+	SYMB	LTIM, "src_point", 11, 0, 205
+	SYMB	LTIM, "src_point", 11, 0, 77
+	SYMB	LTIM, "src_point", 11, 0, 205
+	CMP.W	R0,[R7+4]
+	BLT	_11
+; nv_drv.c  231		}
+	SYMB	LINE, 231
+_12:
+; nv_drv.c  232	
+; nv_drv.c  233	  src_point = (UC*)&checksum;
+	SYMB	LINE, 233
+	MOV.B	R1L,#SEG( __lc_bs )
+	XOR.B	R1H,R1H
+	LEA	R0,R7+12
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "src_point", 11, 0, 77
+	SYMB	LTIM, "src_point", 3, 0, 205
+; nv_drv.c  234		NV_array[dest++].low = *src_point;
+	SYMB	LINE, 234
+	MOV.B	ES,R1L
+	MOV.B	R2L,[R0]
+	MOV.W	R3,R6
+	ASL.W	R3,#01H
+	MOV.W	R4,R3
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R4+SOF( _NV_array )],R2L
+	ADDS.W	R6,#01H
+	SYMB	LTIM, "dest", 26, 0, 2125
+	SYMB	LTIM, "dest", 26, 0, 2253
+; nv_drv.c  235	
+; nv_drv.c  236		src_point++;
+	SYMB	LINE, 236
+	ADD.W	R0,#01H
+	SYMB	LTIM, "src_point", 3, 0, 77
+	SYMB	LTIM, "src_point", 3, 0, 205
+; nv_drv.c  237		NV_array[dest++].low = *src_point;
+	SYMB	LINE, 237
+	MOV.B	ES,R1L
+	MOV.B	R0L,[R0]
+	SYMB	LTIM, "src_point", 3, 0, 77
+	ASL.W	R6,#01H
+	SYMB	LTIM, "dest", 26, 0, 2125
+	MOV.W	R2,R6
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R2+SOF( _NV_array )],R0L
+; nv_drv.c  238	
+; nv_drv.c  239		return( OK);
+	SYMB	LINE, 239
+	MOV.W	R0,#0FFFFH
+; nv_drv.c  240	}
+	SYMB	LINE, 240
+	ADD.W	R7,#0EH
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "bytes", -16, 130, 2117
+	SYMB	EFUN
+; nv_drv.c  241	
+; nv_drv.c  242	/**************************************************************************/
+; nv_drv.c  243	/* NV_Read																										   NV_DRV.C	*/
+; nv_drv.c  244	/*																																				*/
+; nv_drv.c  245	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  246	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  247	/*																																				*/
+; nv_drv.c  248	/* Function: 	Read item from NV memory																		*/
+; nv_drv.c  249	/* Remarks:		If 1st item fails and the 2nd item is allright, the 2nd 		*/
+; nv_drv.c  250	/*						item will be copied to the 1st item													*/
+; nv_drv.c  251	/* Returns:		FAIL if both 1st & 2nd copy	checksum test fails otherwise		*/
+; nv_drv.c  252	/*						OK																													*/
+; nv_drv.c  253	/* Updates:																																*/
+; nv_drv.c  254	/**************************************************************************/
+; nv_drv.c  255	int NV_Read( void *dest, NvPointer source, int bytes)
+; nv_drv.c  256	{
+	ALIGN	1
+	SYMB	LINE, 256
+	PUBLIC	_NV_Read
+_NV_Read:
+	SYMB	TYPE, 269, 'X', 12, #16, 30, 3, #266, #257, #16
+	SYMB	GFUN, "NV_Read", _NV_Read, #269, 0, 0, 112
+	SYMB	ALAB, _NV_Read, #269
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#0EH
+	SYMB	SOFF, 20
+	SYMB	LTIM, "dest", 3, 0, 2253
+	SYMB	LTIM, "bytes", 14, 0, 2253
+	MOV.W	[R7+8],R1
+	MOV.W	[R7+6],R0
+	SYMB	LTIM, "dest", 3, 0, 2125
+	SYMB	LTIM, "dest", -14, 130, 2245
+	SYMB	IDEN, "dest", -7, #266, 130, 2053
+	SYMB	IDEN, "source", -10, #257, 130, 2053
+	SYMB	IDEN, "bytes", 14, #16, 0, 2061
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+	SYMB	IDEN, "testsum", -8, #258, 130, 5
+	SYMB	IDEN, "checksum", -1, #258, 130, 5
+	SYMB	LTIM, "checksum", -1, 0, 69
+; nv_drv.c  257		int i;
+; nv_drv.c  258		CheckType testsum, checksum = CheckBase;
+	SYMB	LINE, 258
+	MOV.W	[R7+4],#01234H
+	SYMB	LTIM, "checksum", -16, 130, 197
+	MOV.W	R0,[R7+4]
+	SYMB	IDEN, "dst_point", -1, #268, 130, 5
+	SYMB	LTIM, "dst_point", -1, 0, 69
+	SYMB	IDEN, "srcP", -1, #257, 130, 5
+	SYMB	LTIM, "srcP", -1, 0, 69
+; nv_drv.c  259		UC *dst_point ;
+; nv_drv.c  260		
+; nv_drv.c  261		NvPointer srcP = source;
+	SYMB	LINE, 261
+	MOV.W	[R7+10],R2
+	MOV.W	R5,R2
+	SYMB	LTIM, "srcP", 22, 0, 205
+; nv_drv.c  262	
+; nv_drv.c  263		// Checksum test
+; nv_drv.c  264		for ( i = 0; i < bytes; i++, srcP++)
+	SYMB	LINE, 264
+	MOV.W	R4,#00H
+	SYMB	LTIM, "i", 18, 0, 205
+	MOV.W	R6,R3
+	CMP.W	R6,#00H
+	SYMB	LTIM, "bytes", 14, 0, 2125
+	SYMB	LTIM, "bytes", 26, 0, 2253
+	BLE	_18
+_17:
+; nv_drv.c  265		{
+; nv_drv.c  266	  	//*dst_point =NV_array[source].low;
+; nv_drv.c  267	    checksum = CheckUpdate( checksum, NV_array[srcP].low);
+	SYMB	LINE, 267
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R1L,[R2+SOF( _NV_array )]
+	MOV.W	R0,[R7+4]
+	CALL	_CheckUpdate
+	SYMB	LTIM, "checksum", -16, 130, 69
+	SYMB	LTIM, "checksum", 2, 0, 205
+	SYMB	LTIM, "checksum", 2, 0, 77
+	MOV.W	[R7+4],R0
+	SYMB	LTIM, "checksum", -16, 130, 197
+	SYMB	LINE, 264
+	ADDS.W	R4,#01H
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "i", 18, 0, 205
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+	CMP.W	R4,R6
+	BLT	_17
+; nv_drv.c  268		}
+	SYMB	LINE, 268
+_18:
+; nv_drv.c  269		dst_point =(UC*)&testsum;
+	SYMB	LINE, 269
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	LEA	R2,R7+12
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  270		*dst_point = NV_array[srcP++].low;
+	SYMB	LINE, 270
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R0,R1
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R0+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R0L
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+; nv_drv.c  271	
+; nv_drv.c  272		dst_point++;
+	SYMB	LINE, 272
+	ADD.W	R2,#01H
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  273		*dst_point = NV_array[srcP++].low;
+	SYMB	LINE, 273
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R0,R1
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R0+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R0L
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+; nv_drv.c  274	
+; nv_drv.c  275		if (testsum != checksum)
+	SYMB	LINE, 275
+	MOV.W	R1,[R7+4]
+	MOV.W	R0,[R7+12]
+	CMP.W	R0,R1
+	SYMB	LTIM, "checksum", -16, 130, 69
+	SYMB	LTIM, "checksum", 6, 0, 205
+	BEQ	_24
+; nv_drv.c  276		{
+; nv_drv.c  277			// test 2nd copy
+; nv_drv.c  278		  checksum = CheckBase;
+	SYMB	LINE, 278
+	MOV.W	[R7+4],#01234H
+	SYMB	LTIM, "checksum", 6, 0, 77
+	SYMB	LTIM, "checksum", -16, 130, 197
+	MOV.W	R0,[R7+4]
+; nv_drv.c  279	
+; nv_drv.c  280			// Checksum test
+; nv_drv.c  281		  for ( i = 0; i < bytes; i++, srcP++)
+	SYMB	LINE, 281
+	MOV.W	R4,#00H
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "i", 18, 0, 205
+	CMP.W	R6,#00H
+	BLE	_20
+_19:
+; nv_drv.c  282			{
+; nv_drv.c  283		  	//*dst_point =NV_array[source].low;
+; nv_drv.c  284		    checksum = CheckUpdate( checksum, NV_array[srcP].low);
+	SYMB	LINE, 284
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R1L,[R2+SOF( _NV_array )]
+	MOV.W	R0,[R7+4]
+	CALL	_CheckUpdate
+	SYMB	LTIM, "checksum", -16, 130, 69
+	SYMB	LTIM, "checksum", 2, 0, 205
+	SYMB	LTIM, "checksum", 2, 0, 77
+	MOV.W	[R7+4],R0
+	SYMB	LTIM, "checksum", -16, 130, 197
+	SYMB	LINE, 281
+	ADDS.W	R4,#01H
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "i", 18, 0, 205
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+	CMP.W	R4,R6
+	BLT	_19
+; nv_drv.c  285			}
+	SYMB	LINE, 285
+_20:
+; nv_drv.c  286		  dst_point = (UC*)&testsum;
+	SYMB	LINE, 286
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	LEA	R2,R7+12
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  287		  *dst_point = NV_array[srcP++].low;
+	SYMB	LINE, 287
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R0,R1
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R0+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R0L
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+; nv_drv.c  288	
+; nv_drv.c  289		  dst_point++;
+	SYMB	LINE, 289
+	ADD.W	R2,#01H
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  290		  *dst_point = NV_array[srcP++].low;
+	SYMB	LINE, 290
+	ASL.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	MOV.W	R4,R5
+	MOVS.W	R5,#00H
+	SYMB	LTIM, "i", 18, 0, 77
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R4+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R0L
+; nv_drv.c  291	
+; nv_drv.c  292			if (testsum != checksum)
+	SYMB	LINE, 292
+	MOV.W	R1,[R7+4]
+	MOV.W	R0,[R7+12]
+	CMP.W	R0,R1
+	SYMB	LTIM, "checksum", -16, 130, 69
+	SYMB	LTIM, "checksum", 6, 0, 205
+	BEQ	_21
+; nv_drv.c  293			{
+; nv_drv.c  294				// 2nd sum FAIL
+; nv_drv.c  295				return( FAIL);
+	SYMB	LINE, 295
+	MOV.W	R0,#00H
+	BR	_28
+; nv_drv.c  296			}
+	SYMB	LINE, 296
+_21:
+	SYMB	LTIM, "dest", -14, 130, 2117
+	SYMB	LTIM, "dest", -14, 130, 2245
+	SYMB	LTIM, "bytes", 26, 0, 2125
+	SYMB	LTIM, "bytes", 26, 0, 2253
+; nv_drv.c  297			else
+; nv_drv.c  298			{
+; nv_drv.c  299				// 2nd copy works
+; nv_drv.c  300				// Read data copy #2 and copy to #1
+; nv_drv.c  301				srcP = source + bytes + 2;
+	SYMB	LINE, 301
+	MOV.W	R3,[R7+10]
+	ADD.W	R3,R6
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	ADDS.W	R3,#02H
+	SYMB	LTIM, "srcP", 14, 0, 205
+; nv_drv.c  302				dst_point = dest;
+	SYMB	LINE, 302
+	MOV.W	R5,[R7+8]
+	MOV.W	R4,[R7+6]
+	SYMB	LTIM, "dest", -14, 130, 2117
+	SYMB	LTIM, "dest", 19, 0, 2253
+	SYMB	LTIM, "dest", 19, 0, 2125
+	SYMB	LTIM, "dst_point", 19, 0, 205
+; nv_drv.c  303	
+; nv_drv.c  304			  for ( i = 0; i < bytes; i++, srcP++, dst_point++)
+	SYMB	LINE, 304
+	MOV.W	[R7],#00H
+	SYMB	LTIM, "i", -20, 130, 197
+	CMP.W	R6,#00H
+	BLE	_23
+_22:
+; nv_drv.c  305			  {
+; nv_drv.c  306					*dst_point = NV_array[srcP].low;
+	SYMB	LINE, 306
+	MOV.W	R0,R3
+	ASL.W	R0,#01H
+	MOVS.W	R1,#00H
+	SYMB	LTIM, "checksum", 6, 0, 77
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R2L,[R0+SOF( _NV_array )]
+	MOV.B	ES,R5L
+	MOV.B	[R4],R2L
+	MOV.W	[R7+4],R5
+	MOV.W	[R7+2],R4
+	SYMB	LTIM, "dst_point", 19, 0, 77
+	SYMB	LTIM, "dst_point", -18, 130, 197
+; nv_drv.c  307			    NV_array[source++].low = NV_array[srcP].low;
+	SYMB	LINE, 307
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R1L,[R0+SOF( _NV_array )]
+	MOV.W	R0,[R7+10]
+	ASL.W	R0,#01H
+	MOV.W	R4,R0
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R4+SOF( _NV_array )],R1L
+	MOV.W	R0,[R7+10]
+	ADDS.W	R0,#01H
+	MOV.W	[R7+10],R0
+	SYMB	LINE, 304
+	MOV.W	R2,[R7]
+	ADDS.W	R2,#01H
+	SYMB	LTIM, "i", -20, 130, 69
+	SYMB	LTIM, "i", 10, 0, 205
+	SYMB	LTIM, "i", 10, 0, 77
+	SYMB	LTIM, "i", 10, 0, 205
+	ADDS.W	R3,#01H
+	SYMB	LTIM, "srcP", 14, 0, 77
+	SYMB	LTIM, "srcP", 14, 0, 205
+	MOV.W	R5,[R7+4]
+	MOV.W	R4,[R7+2]
+	ADD.W	R4,#01H
+	SYMB	LTIM, "dst_point", -18, 130, 69
+	SYMB	LTIM, "dst_point", 19, 0, 205
+	SYMB	LTIM, "dst_point", 19, 0, 77
+	SYMB	LTIM, "dst_point", 19, 0, 205
+	MOV.W	[R7],R2
+	CMP.W	R2,R6
+	SYMB	LTIM, "i", 10, 0, 77
+	SYMB	LTIM, "i", -20, 130, 197
+	BLT	_22
+; nv_drv.c  308			  }
+	SYMB	LINE, 308
+_23:
+; nv_drv.c  309	
+; nv_drv.c  310				// copy checksum from 2nd to 1st
+; nv_drv.c  311	      NV_array[source++].low = NV_array[srcP++].low;
+	SYMB	LINE, 311
+	MOV.W	R0,R3
+	ASL.W	R0,#01H
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R0+SOF( _NV_array )]
+	MOV.W	R1,[R7+10]
+	ASL.W	R1,#01H
+	MOV.W	R4,R1
+	MOVS.W	R5,#00H
+	SYMB	LTIM, "dst_point", 19, 0, 77
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R4+SOF( _NV_array )],R0L
+	ADDS.W	R3,#01H
+	SYMB	LTIM, "srcP", 14, 0, 77
+	SYMB	LTIM, "srcP", 14, 0, 205
+	MOV.W	R0,[R7+10]
+	ADDS.W	R0,#01H
+; nv_drv.c  312	      NV_array[source++].low = NV_array[srcP++].low;
+	SYMB	LINE, 312
+	ASL.W	R3,#01H
+	SYMB	LTIM, "srcP", 14, 0, 77
+	MOV.W	R2,R3
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R1L,[R2+SOF( _NV_array )]
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R2+SOF( _NV_array )],R1L
+; nv_drv.c  313	
+; nv_drv.c  314				return( OK);
+	SYMB	LINE, 314
+	MOV.W	R0,#0FFFFH
+	BR	_28
+; nv_drv.c  315			}
+; nv_drv.c  316		}
+	SYMB	LINE, 316
+_24:
+	SYMB	LTIM, "dest", -14, 130, 2245
+	SYMB	LTIM, "bytes", 26, 0, 2125
+	SYMB	LTIM, "bytes", 26, 0, 2253
+; nv_drv.c  317		else
+; nv_drv.c  318		{
+; nv_drv.c  319			srcP = source;
+	SYMB	LINE, 319
+	MOV.W	R1,[R7+10]
+	SYMB	LTIM, "srcP", 6, 0, 205
+; nv_drv.c  320	    dst_point = dest;
+	SYMB	LINE, 320
+	MOV.W	R3,[R7+8]
+	MOV.W	R2,[R7+6]
+	SYMB	LTIM, "dest", -14, 130, 2117
+	SYMB	LTIM, "dest", 11, 0, 2253
+	SYMB	LTIM, "dest", 11, 0, 2125
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  321	
+; nv_drv.c  322			// Read data copy #1
+; nv_drv.c  323		  for ( i = 0; i < bytes; i++, srcP++, dst_point++)
+	SYMB	LINE, 323
+	MOV.W	R0,#00H
+	SYMB	LTIM, "i", -20, 130, 69
+	SYMB	LTIM, "i", 2, 0, 205
+	CMP.W	R6,#00H
+	BLE	_26
+_25:
+; nv_drv.c  324		  {
+; nv_drv.c  325		  	*dst_point =NV_array[srcP].low;
+	SYMB	LINE, 325
+	MOV.W	R4,R1
+	ASL.W	R4,#01H
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R4L,[R4+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R4L
+	SYMB	LINE, 323
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	ADDS.W	R1,#01H
+	SYMB	LTIM, "srcP", 6, 0, 77
+	SYMB	LTIM, "srcP", 6, 0, 205
+	ADD.W	R2,#01H
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "dst_point", 11, 0, 205
+	CMP.W	R0,R6
+	BLT	_25
+; nv_drv.c  326		  }
+	SYMB	LINE, 326
+_26:
+; nv_drv.c  327			 return( OK);
+	SYMB	LINE, 327
+	MOV.W	R0,#0FFFFH
+	SYMB	LTIM, "i", 2, 0, 77
+; nv_drv.c  328		}
+; nv_drv.c  329	}
+	SYMB	LINE, 329
+_28:
+	ADD.W	R7,#0EH
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "srcP", 6, 0, 77
+	SYMB	LTIM, "bytes", 26, 0, 2125
+	SYMB	EFUN
+; nv_drv.c  330	
+; nv_drv.c  331	/**************************************************************************/
+; nv_drv.c  332	/* NV_Store																										   NV_DRV.C	*/
+; nv_drv.c  333	/*																																				*/
+; nv_drv.c  334	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  335	/* Revised:		000413, KEn, DEV     																				*/
+; nv_drv.c  336	/*																																				*/
+; nv_drv.c  337	/* Function: 	Store presets, (single storage items with checksum)					*/
+; nv_drv.c  338	/* Remarks:																																*/
+; nv_drv.c  339	/* Returns:		OK only																											*/
+; nv_drv.c  340	/* Updates:																																*/
+; nv_drv.c  341	/**************************************************************************/
+; nv_drv.c  342	int NV_Store( void *source, NvPointer dest, int bytes)
+; nv_drv.c  343	{
+	ALIGN	1
+	SYMB	LINE, 343
+	PUBLIC	_NV_Store
+_NV_Store:
+	SYMB	TYPE, 270, 'X', 12, #16, 30, 3, #266, #257, #16
+	SYMB	GFUN, "NV_Store", _NV_Store, #270, 0, 0, 112
+	SYMB	ALAB, _NV_Store, #270
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	ADDS.W	R7,#0AH
+	SYMB	SOFF, 12
+	SYMB	LTIM, "source", 3, 0, 2253
+	SYMB	LTIM, "dest", 10, 0, 2253
+	SYMB	LTIM, "bytes", 14, 0, 2253
+	SYMB	IDEN, "source", 3, #266, 0, 2061
+	SYMB	IDEN, "dest", 10, #257, 0, 2061
+	SYMB	IDEN, "bytes", 14, #16, 0, 2061
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+	SYMB	IDEN, "checksum", -8, #258, 130, 5
+; nv_drv.c  344		int i;
+; nv_drv.c  345		CheckType checksum = CheckBase;
+	SYMB	LINE, 345
+	MOV.W	[R7+4],#01234H
+	SYMB	IDEN, "src_point", -1, #268, 130, 5
+	SYMB	LTIM, "src_point", -1, 0, 69
+; nv_drv.c  346		UC *src_point = source;
+	SYMB	LINE, 346
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	SYMB	LTIM, "src_point", 19, 0, 205
+; nv_drv.c  347	
+; nv_drv.c  348	  for ( i = 0; i < bytes; i++, dest++, src_point++)
+	SYMB	LINE, 348
+	MOV.W	R6,#00H
+	SYMB	LTIM, "i", 26, 0, 205
+	MOV.W	[R7],R3
+	CMP.W	R3,#00H
+	SYMB	LTIM, "bytes", 14, 0, 2125
+	SYMB	LTIM, "bytes", -12, 130, 2245
+	BLE	_40
+_39:
+; nv_drv.c  349	  {
+; nv_drv.c  350	  	NV_array[dest].low = *src_point;
+	SYMB	LINE, 350
+	MOV.B	ES,R5L
+	MOV.B	R0L,[R4]
+	SYMB	LTIM, "source", 3, 0, 2125
+	MOV.W	[R7+2],R2
+	ASL.W	R2,#01H
+	SYMB	LTIM, "dest", 10, 0, 2125
+	SYMB	LTIM, "dest", -10, 130, 2245
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R2+SOF( _NV_array )],R0L
+; nv_drv.c  351	  	checksum = CheckUpdate( checksum, *src_point);
+	SYMB	LINE, 351
+	MOV.W	R0,[R7+4]
+	MOV.B	ES,R5L
+	MOV.B	R1L,[R4]
+	CALL	_CheckUpdate
+	MOV.W	[R7+4],R0
+	SYMB	LINE, 348
+	ADDS.W	R6,#01H
+	SYMB	LTIM, "i", 26, 0, 77
+	SYMB	LTIM, "i", 26, 0, 205
+	MOV.W	R0,[R7+2]
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "dest", -10, 130, 2117
+	SYMB	LTIM, "dest", 2, 0, 2253
+	SYMB	LTIM, "dest", 2, 0, 2125
+	MOV.W	R2,R0
+	SYMB	LTIM, "dest", 10, 0, 2253
+	ADD.W	R4,#01H
+	SYMB	LTIM, "src_point", 19, 0, 77
+	SYMB	LTIM, "src_point", 19, 0, 205
+	CMP.W	R6,[R7]
+	BLT	_39
+; nv_drv.c  352		}
+	SYMB	LINE, 352
+_40:
+; nv_drv.c  353	
+; nv_drv.c  354		src_point = (UC*)&checksum;
+	SYMB	LINE, 354
+	MOV.B	R1L,#SEG( __lc_bs )
+	XOR.B	R1H,R1H
+	LEA	R0,R7+4
+	SYMB	LTIM, "src_point", 19, 0, 77
+	SYMB	LTIM, "src_point", 3, 0, 205
+; nv_drv.c  355		NV_array[dest++].low = *src_point;
+	SYMB	LINE, 355
+	MOV.B	ES,R1L
+	MOV.B	R3L,[R0]
+	MOV.W	R4,R2
+	ASL.W	R4,#01H
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R4+SOF( _NV_array )],R3L
+	ADDS.W	R2,#01H
+	SYMB	LTIM, "dest", 10, 0, 2125
+	SYMB	LTIM, "dest", 10, 0, 2253
+; nv_drv.c  356	
+; nv_drv.c  357		src_point++;
+	SYMB	LINE, 357
+	ADD.W	R0,#01H
+	SYMB	LTIM, "src_point", 3, 0, 77
+	SYMB	LTIM, "src_point", 3, 0, 205
+; nv_drv.c  358	  NV_array[dest++].low = *src_point;
+	SYMB	LINE, 358
+	MOV.B	ES,R1L
+	MOV.B	R0L,[R0]
+	SYMB	LTIM, "src_point", 3, 0, 77
+	ASL.W	R2,#01H
+	SYMB	LTIM, "dest", 10, 0, 2125
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	[R2+SOF( _NV_array )],R0L
+; nv_drv.c  359	  
+; nv_drv.c  360		return( OK);
+	SYMB	LINE, 360
+	MOV.W	R0,#0FFFFH
+; nv_drv.c  361	}
+	SYMB	LINE, 361
+	ADDS.W	R7,#06H
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "i", 26, 0, 77
+	SYMB	LTIM, "bytes", -12, 130, 2117
+	SYMB	EFUN
+; nv_drv.c  362	
+; nv_drv.c  363	/**************************************************************************/
+; nv_drv.c  364	/* NV_Recall																									   NV_DRV.C	*/
+; nv_drv.c  365	/*																																				*/
+; nv_drv.c  366	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  367	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  368	/*																																				*/
+; nv_drv.c  369	/* Function: 	Recall presets, (single storage items with checksum)		 		*/
+; nv_drv.c  370	/* Remarks:																																*/
+; nv_drv.c  371	/* Returns:		FAIL if checksum error, otherwise OK												*/
+; nv_drv.c  372	/* Updates:																																*/
+; nv_drv.c  373	/**************************************************************************/
+; nv_drv.c  374	int NV_Recall( void *dest, NvPointer source, int bytes)
+; nv_drv.c  375	{
+	ALIGN	1
+	SYMB	LINE, 375
+	PUBLIC	_NV_Recall
+_NV_Recall:
+	SYMB	TYPE, 271, 'X', 12, #16, 30, 3, #266, #257, #16
+	SYMB	GFUN, "NV_Recall", _NV_Recall, #271, 0, 0, 112
+	SYMB	ALAB, _NV_Recall, #271
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SUB.W	R7,#0AH
+	SYMB	SOFF, 16
+	SYMB	LTIM, "dest", 3, 0, 2253
+	SYMB	LTIM, "source", 10, 0, 2253
+	SYMB	LTIM, "bytes", 14, 0, 2253
+	MOV.W	[R7+6],R1
+	MOV.W	[R7+4],R0
+	SYMB	LTIM, "dest", 3, 0, 2125
+	SYMB	LTIM, "dest", -12, 130, 2245
+	SYMB	IDEN, "dest", -7, #266, 130, 2053
+	SYMB	IDEN, "source", 10, #257, 0, 2061
+	SYMB	IDEN, "bytes", 14, #16, 0, 2061
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+	SYMB	IDEN, "testsum", -8, #258, 130, 5
+	SYMB	IDEN, "checksum", -1, #258, 130, 5
+	SYMB	LTIM, "checksum", -1, 0, 69
+; nv_drv.c  376		int i;
+; nv_drv.c  377		CheckType testsum, checksum = CheckBase;
+	SYMB	LINE, 377
+	MOV.W	[R7],#01234H
+	SYMB	LTIM, "checksum", -16, 130, 197
+	MOV.W	R0,[R7]
+	SYMB	IDEN, "dst_point", -1, #268, 130, 5
+	SYMB	LTIM, "dst_point", -1, 0, 69
+	SYMB	IDEN, "srcP", -1, #257, 130, 5
+	SYMB	LTIM, "srcP", -1, 0, 69
+; nv_drv.c  378		UC *dst_point ;
+; nv_drv.c  379		NvPointer srcP = source;
+	SYMB	LINE, 379
+	MOV.W	[R7+2],R2
+	MOV.W	R5,R2
+	SYMB	LTIM, "source", 10, 0, 2125
+	SYMB	LTIM, "source", -14, 130, 2245
+	SYMB	LTIM, "srcP", 22, 0, 205
+; nv_drv.c  380	
+; nv_drv.c  381		// Checksum test
+; nv_drv.c  382	  for ( i = 0; i < bytes; i++, srcP++)
+	SYMB	LINE, 382
+	MOV.W	R4,#00H
+	SYMB	LTIM, "i", 18, 0, 205
+	MOV.W	R6,R3
+	CMP.W	R6,#00H
+	SYMB	LTIM, "bytes", 14, 0, 2125
+	SYMB	LTIM, "bytes", 26, 0, 2253
+	BLE	_44
+_43:
+; nv_drv.c  383	  {
+; nv_drv.c  384	  	//*dst_point =NV_array[source].low;
+; nv_drv.c  385	    checksum = CheckUpdate( checksum, NV_array[srcP].low);
+	SYMB	LINE, 385
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R1L,[R2+SOF( _NV_array )]
+	MOV.W	R0,[R7]
+	CALL	_CheckUpdate
+	SYMB	LTIM, "checksum", -16, 130, 69
+	SYMB	LTIM, "checksum", 2, 0, 205
+	SYMB	LTIM, "checksum", 2, 0, 77
+	MOV.W	[R7],R0
+	SYMB	LTIM, "checksum", -16, 130, 197
+	SYMB	LINE, 382
+	ADDS.W	R4,#01H
+	SYMB	LTIM, "i", 18, 0, 77
+	SYMB	LTIM, "i", 18, 0, 205
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+	CMP.W	R4,R6
+	BLT	_43
+; nv_drv.c  386		}
+	SYMB	LINE, 386
+_44:
+; nv_drv.c  387	
+; nv_drv.c  388	  dst_point = (UC*)&testsum;
+	SYMB	LINE, 388
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	LEA	R2,R7+8
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  389		*dst_point = NV_array[srcP++].low;
+	SYMB	LINE, 389
+	MOV.W	R1,R5
+	ASL.W	R1,#01H
+	MOV.W	R0,R1
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R0+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R0L
+	ADDS.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	SYMB	LTIM, "srcP", 22, 0, 205
+; nv_drv.c  390	
+; nv_drv.c  391		dst_point++;
+	SYMB	LINE, 391
+	ADD.W	R2,#01H
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  392	  *dst_point = NV_array[srcP++].low;
+	SYMB	LINE, 392
+	ASL.W	R5,#01H
+	SYMB	LTIM, "srcP", 22, 0, 77
+	MOV.W	R4,R5
+	MOVS.W	R5,#00H
+	SYMB	LTIM, "i", 18, 0, 77
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R0L,[R4+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R0L
+; nv_drv.c  393	
+; nv_drv.c  394		if (testsum != checksum) 
+	SYMB	LINE, 394
+	MOV.W	R1,[R7]
+	MOV.W	R0,[R7+8]
+	CMP.W	R0,R1
+	SYMB	LTIM, "checksum", -16, 130, 69
+	SYMB	LTIM, "checksum", 6, 0, 205
+	BEQ	_45
+; nv_drv.c  395		{
+; nv_drv.c  396	   	return( FAIL);
+	SYMB	LINE, 396
+	MOV.W	R0,#00H
+	BR	_48
+; nv_drv.c  397		}
+	SYMB	LINE, 397
+_45:
+	SYMB	LTIM, "dest", -12, 130, 2117
+	SYMB	LTIM, "dest", -12, 130, 2245
+	SYMB	LTIM, "source", -14, 130, 2117
+	SYMB	LTIM, "source", -14, 130, 2245
+	SYMB	LTIM, "bytes", 26, 0, 2125
+	SYMB	LTIM, "bytes", 26, 0, 2253
+; nv_drv.c  398		else
+; nv_drv.c  399		{
+; nv_drv.c  400			srcP = source;
+	SYMB	LINE, 400
+	MOV.W	R1,[R7+2]
+	SYMB	LTIM, "checksum", 6, 0, 77
+	SYMB	LTIM, "source", -14, 130, 2117
+	SYMB	LTIM, "source", 6, 0, 2253
+	SYMB	LTIM, "source", 6, 0, 2125
+	SYMB	LTIM, "srcP", 6, 0, 205
+; nv_drv.c  401			dst_point = dest;
+	SYMB	LINE, 401
+	MOV.W	R3,[R7+6]
+	MOV.W	R2,[R7+4]
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "dest", -12, 130, 2117
+	SYMB	LTIM, "dest", 11, 0, 2253
+	SYMB	LTIM, "dest", 11, 0, 2125
+	SYMB	LTIM, "dst_point", 11, 0, 205
+; nv_drv.c  402	
+; nv_drv.c  403			// Read data 
+; nv_drv.c  404			for ( i = 0; i < bytes; i++, srcP++, dst_point++)
+	SYMB	LINE, 404
+	MOV.W	R0,#00H
+	SYMB	LTIM, "i", 2, 0, 205
+	CMP.W	R6,#00H
+	BLE	_47
+_46:
+; nv_drv.c  405		  {
+; nv_drv.c  406		  	*dst_point = NV_array[srcP].low;
+	SYMB	LINE, 406
+	MOV.W	R4,R1
+	ASL.W	R4,#01H
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _NV_array )
+	MOV.B	R4L,[R4+SOF( _NV_array )]
+	MOV.B	ES,R3L
+	MOV.B	[R2],R4L
+	SYMB	LINE, 404
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	ADDS.W	R1,#01H
+	SYMB	LTIM, "srcP", 6, 0, 77
+	SYMB	LTIM, "srcP", 6, 0, 205
+	ADD.W	R2,#01H
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "dst_point", 11, 0, 205
+	CMP.W	R0,R6
+	BLT	_46
+; nv_drv.c  407		  }
+	SYMB	LINE, 407
+_47:
+; nv_drv.c  408	
+; nv_drv.c  409			return( OK);
+	SYMB	LINE, 409
+	MOV.W	R0,#0FFFFH
+	SYMB	LTIM, "i", 2, 0, 77
+; nv_drv.c  410		}
+; nv_drv.c  411	}
+	SYMB	LINE, 411
+_48:
+	ADD.W	R7,#0AH
+	SYMB	SOFF, 6
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "dst_point", 11, 0, 77
+	SYMB	LTIM, "srcP", 6, 0, 77
+	SYMB	LTIM, "bytes", 26, 0, 2125
+	SYMB	EFUN
+; nv_drv.c  412	
+; nv_drv.c  413	/**************************************************************************/
+; nv_drv.c  414	/* CheckUpdate																								   NV_DRV.C	*/
+; nv_drv.c  415	/*																																				*/
+; nv_drv.c  416	/* Author:		Sten A.Andersen, DEV, xxxxxx																*/
+; nv_drv.c  417	/* Revised:		000411, KEn, DEV     																				*/
+; nv_drv.c  418	/*																																				*/
+; nv_drv.c  419	/* Function: 																															*/
+; nv_drv.c  420	/* Remarks:																																*/
+; nv_drv.c  421	/* Returns:																																*/
+; nv_drv.c  422	/* Updates:																																*/
+; nv_drv.c  423	/**************************************************************************/
+; nv_drv.c  424	static CheckType CheckUpdate( CheckType sum, UC data)
+; nv_drv.c  425	{
+	ALIGN	1
+	SYMB	LINE, 425
+_CheckUpdate:
+	SYMB	TYPE, 272, 'X', 12, #258, 30, 2, #258, #3
+	SYMB	LFUN, "CheckUpdate", _CheckUpdate, #272, 0, 0, 0
+	SYMB	LTIM, "sum", 2, 0, 2253
+	SYMB	LTIM, "data", 4, 0, 2253
+	SYMB	IDEN, "sum", 2, #258, 0, 2061
+	SYMB	IDEN, "data", 4, #3, 0, 2061
+; nv_drv.c  426	   return((sum ^ data) << 1 );
+	SYMB	LINE, 426
+	MOVS.B	R1H,#00H
+	SYMB	LTIM, "data", 4, 0, 2125
+	XOR.W	R0,R1
+	SYMB	LTIM, "sum", 2, 0, 2125
+	ASL.W	R0,#01H
+; nv_drv.c  427	}
+	SYMB	LINE, 427
+	RET
+	SYMB	EFUN
+; nv_drv.c  428	
+; nv_drv.c  429	// PC version : update NV file
+; nv_drv.c  430	#ifdef __BORLANDC__
+; nv_drv.c  431	
+; nv_drv.c  432	void NV_file_update(void)
+; nv_drv.c  433	{
+; nv_drv.c  434	 if ((fp=fopen("NV.dat","r+b"))!=NULL)
+; nv_drv.c  435	 {
+; nv_drv.c  436	   fwrite(&NV_array,NV_size,1,fp);
+; nv_drv.c  437	   fclose(fp);
+; nv_drv.c  438	 }
+; nv_drv.c  439	}
+; nv_drv.c  440	
+; nv_drv.c  441	#endif
+; nv_drv.c  442	
+	SYMB	ENDF
+
+	SYMB	TYPE, 273, 'Z', #260, 8175
+	SYMB	IDEN, "NV_array", _NV_array, #273, 130, 4
+	HSEG AT 080000H
+	ALIGN	1
+_NV_array:	DS	16352
+	SYMB	IDEN, "AllocTop", _AllocTop, #257, 130, 4
+NV_DRV_CLR_FA	SEGMENT	HDATA INSEGMENT CLEAR
+	RSEG	NV_DRV_CLR_FA
+	ALIGN	1
+_AllocTop:	DS	2
+	EXTRN	IDATA(__lc_bs)
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'NV_Write', 'NV_DRV?CheckUpdate'
+	CALLS	'NV_Read', 'NV_DRV?CheckUpdate'
+	CALLS	'NV_Store', 'NV_DRV?CheckUpdate'
+	CALLS	'NV_Recall', 'NV_DRV?CheckUpdate'
+	END

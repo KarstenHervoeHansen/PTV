@@ -1,0 +1,5740 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -A1 -Cxag3 -e -g -IcF:\PT5202\prog\include
+;          -IF:\PT5202\prog\rtxc\xa\include -I. -Ml -O2 -s
+$CASE
+$NOZPAGE
+	NAME	CBAR
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "cbar.c"
+; cbar.c      1	/****************************************************************************/
+; cbar.c      2	/* MODULE:                                                                  */
+; cbar.c      3	/*  cbar.c - ColorBar generator                                             */
+; cbar.c      4	/****************************************************************************/
+; cbar.c      5	/* FUNCTIONS:                                                               */
+; cbar.c      6	/*                                                                          */
+; cbar.c      7	/*  int WriteCBGain( UC gain)                                               */
+; cbar.c      8	/*  int WriteCBChromaGain( UC gain)                                          */
+; cbar.c      9	/*  int SRAMVideoLoad( UC signal, UC bank)                                  */
+; cbar.c     10	/*  int SRAMSoundLoad( UC signal)                                           */
+; cbar.c     11	/*  void CBLineInterrupt( void)                                             */
+; cbar.c     12	/*  void CBDefaults( void)                                                  */
+; cbar.c     13	/*  int CBInit( void)                                                        */
+; cbar.c     14	/*  int CBUpdate( void)                                                      */
+; cbar.c     15	/*  int SetCBPattern( UI pattern)                                            */
+; cbar.c     16	/*  int SetCBSystem( UC system)                                              */
+; cbar.c     17	/*  int SetCBDelay( UL delay)                                                */
+; cbar.c     18	/*  int SetCBScHPhase( int schphase)                                        */
+; cbar.c     19	/*  int SetCBEmbAudioSignal( UC signal)                                     */
+; cbar.c     20	/*  int ValidateCBPattern( UC system, UI *pattern)                          */  
+; cbar.c     21	/*                                                                          */
+; cbar.c     22	/* TASKS:                                                                   */
+; cbar.c     23	/*                                                                          */
+; cbar.c     24	/* NOTES:                                                                   */
+; cbar.c     25	/*                                                                          */
+; cbar.c     26	/****************************************************************************/
+; cbar.c     27	/*
+; cbar.c     28	 *   PTV software for PT5201    
+; cbar.c     29	 *   Copyright (c) 
+; cbar.c     30	 *   ProTeleVision Technologies A/S.
+; cbar.c     31	 *   ALL RIGHTS RESERVED
+; cbar.c     32	*/
+; cbar.c     33	/****************************************************************************/
+; cbar.c     34	
+; cbar.c     35	#include "reg8051.h"
+	SYMB	FILE, "reg8051.h"
+	SYMB	ENDF
+; cbar.c     36	#include "define.h"        // Standard PTV defines
+	SYMB	FILE, "define.h"
+	SYMB	ENDF
+; cbar.c     37	#include "rtxcobj.h"
+	SYMB	FILE, "rtxcobj.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxcapi.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\typedef.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxcopts.h"
+	SYMB	ENDF
+	SYMB	TYPE, 257, "KOBJNUM", 'T', #3
+	SYMB	TYPE, 258, "TASK", 'T', #2
+	SYMB	ENDF
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxstruc.h"
+	SYMB	FILE, "F:\\PT5202\\prog\\rtxc\\xa\\include\\rtxcopts.h"
+	SYMB	ENDF
+	SYMB	TYPE, 259, "KSNUM", 'T', #3
+	SYMB	TYPE, 260, "PRIORITY", 'T', #258
+	SYMB	TYPE, 261, "TSTATE", 'T', #5
+	SYMB	TYPE, 262, "size_t", 'T', #18
+	SYMB	TYPE, 263, "TSLICE", 'T', #3
+	SYMB	TYPE, 265, 'n', #264, 130
+	SYMB	TYPE, 266, 'P', #265
+	SYMB	TYPE, 268, 'n', #267, 130
+	SYMB	TYPE, 269, 'P', #268
+	SYMB	TYPE, 270, 'n', #259, 130
+	SYMB	TYPE, 271, 'P', #270
+	SYMB	TYPE, 272, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 273, 'n', #272, 129
+	SYMB	TYPE, 274, 'P', #273
+	SYMB	TYPE, 275, "frame", 'S', 24,\
+		 "es", #3, 0,\
+		 "cs", #3, 1,\
+		 "ssel", #3, 2,\
+		 "ds", #3, 3,\
+		 "pksnum", #271, 4,\
+		 "R2", #18, 8,\
+		 "R3", #18, 10,\
+		 "R4", #18, 12,\
+		 "R5", #18, 14,\
+		 "R6", #18, 16,\
+		 "psw", #18, 18,\
+		 "pc", #274, 20
+	SYMB	TYPE, 276, 'n', #275, 130
+	SYMB	TYPE, 277, 'P', #276
+	SYMB	TYPE, 278, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 279, 'n', #278, 129
+	SYMB	TYPE, 280, 'P', #279
+	SYMB	TYPE, 281, 'n', #2, 130
+	SYMB	TYPE, 282, 'P', #281
+	SYMB	TYPE, 283, 'n', #1, 130
+	SYMB	TYPE, 284, 'P', #283
+	SYMB	TYPE, 264, "tcb", 'S', 36,\
+		 "flink", #266, 0,\
+		 "blink", #266, 4,\
+		 "pclkblk", #269, 8,\
+		 "task", #258, 12,\
+		 "priority", #260, 13,\
+		 "sp", #277, 14,\
+		 "status", #261, 18,\
+		 "pc_t0", #280, 20,\
+		 "stackbase", #282, 24,\
+		 "stacksize", #262, 28,\
+		 "tslice", #263, 30,\
+		 "newslice", #263, 31,\
+		 "arg", #284, 32
+	SYMB	TYPE, 285, "TCB", 'T', #264
+	SYMB	TYPE, 286, "SEMA", 'T', #257
+	SYMB	TYPE, 287, "MAP", 'T', #257
+	SYMB	TYPE, 289, 'n', #288, 130
+	SYMB	TYPE, 290, 'P', #289
+	SYMB	TYPE, 288, "rtxcmsg", 'S', 8,\
+		 "link", #290, 0,\
+		 "task", #258, 4,\
+		 "priority", #260, 5,\
+		 "sema", #286, 6
+	SYMB	TYPE, 291, "RTXCMSG", 'T', #288
+	SYMB	TYPE, 292, "TICKS", 'T', #16
+	SYMB	TYPE, 293, 'N',\
+		 "DELAY_OBJ", 0,\
+		 "SEMAPHORE_OBJ", 1,\
+		 "PARTITION_OBJ", 2,\
+		 "QUEUE_OBJ", 3,\
+		 "RESOURCE_OBJ", 4,\
+		 "MAILBOX_OBJ", 5,\
+		 "TIMER_OBJ", 6
+	SYMB	TYPE, 294, "OBJTYPE", 'T', #293
+	SYMB	TYPE, 267, "clkblk", 'S', 18,\
+		 "flink", #269, 0,\
+		 "blink", #269, 4,\
+		 "remain", #292, 8,\
+		 "recycle", #292, 10,\
+		 "task", #258, 12,\
+		 "state", #2, 13,\
+		 "objtype", #294, 14,\
+		 "objid", #257, 16
+	SYMB	TYPE, 295, 'N',\
+		 "PRIORITY_INVERSION_OFF", 0,\
+		 "PRIORITY_INVERSION_ON", 1
+	SYMB	TYPE, 296, "RESATTR", 'T', #295
+	SYMB	ENDF
+	SYMB	TYPE, 297, 'N',\
+		 "RC_GOOD", 0,\
+		 "RC_WAIT_CONFLICT", 1,\
+		 "RC_NO_TIMERS", 2,\
+		 "RC_TIMER_INACTIVE", 3,\
+		 "RC_TIMER_ILLEGAL", 4,\
+		 "RC_TIMEOUT", 5,\
+		 "RC_QUEUE_FULL", 6,\
+		 "RC_QUEUE_EMPTY", 7,\
+		 "RC_ILLEGAL_QUEUE_SIZE", 8,\
+		 "RC_BUSY", 9,\
+		 "RC_NESTED", 10,\
+		 "RC_ILLEGAL_TASK", 11,\
+		 "RC_ACTIVE_TASK", 12,\
+		 "RC_NO_YIELD", 13,\
+		 "RC_MISSED_EVENT", 14
+	SYMB	TYPE, 298, "KSRC", 'T', #297
+	SYMB	TYPE, 299, "SSTATE", 'T', #258
+	SYMB	TYPE, 300, "MBOX", 'T', #257
+	SYMB	TYPE, 301, "QUEUE", 'T', #257
+	SYMB	TYPE, 302, 'N',\
+		 "QNE", 0,\
+		 "QNF", 1,\
+		 "QF", 2,\
+		 "QE", 3
+	SYMB	TYPE, 303, "QCOND", 'T', #302
+	SYMB	TYPE, 304, "RESOURCE", 'T', #257
+	SYMB	TYPE, 305, "CLKBLK", 'T', #267
+	SYMB	TYPE, 306, "time_t", 'T', #6
+	SYMB	TYPE, 307, "FRAME", 'T', #275
+	SYMB	ENDF
+	SYMB	FILE, "ctask.h"
+	SYMB	ENDF
+	SYMB	FILE, "csema.h"
+	SYMB	ENDF
+	SYMB	FILE, "cres.h"
+	SYMB	ENDF
+	SYMB	FILE, "cqueue.h"
+	SYMB	ENDF
+	SYMB	FILE, "cpart.h"
+	SYMB	ENDF
+	SYMB	FILE, "cmbox.h"
+	SYMB	ENDF
+	SYMB	FILE, "cclock.h"
+	SYMB	ENDF
+	SYMB	TYPE, 309, 'n', #308, 130
+	SYMB	TYPE, 310, 'P', #309
+	SYMB	TYPE, 308, 'X', 12, #1, 30, 2, #310, #282
+	SYMB	TYPE, 312, 'n', #311, 129
+	SYMB	TYPE, 313, 'P', #312
+	SYMB	TYPE, 314, 'X', 12, #1, 30, 1, #310
+	SYMB	TYPE, 315, 'n', #314, 129
+	SYMB	TYPE, 316, 'P', #315
+	SYMB	TYPE, 317, 'n', #6, 130
+	SYMB	TYPE, 318, 'P', #317
+	SYMB	TYPE, 317, 'X', 12, #16, 30, 2, #310, #318
+	SYMB	TYPE, 320, 'n', #319, 129
+	SYMB	TYPE, 321, 'P', #320
+	SYMB	TYPE, 322, 'X', 12, #1, 30, 1, #310
+	SYMB	TYPE, 323, 'n', #322, 129
+	SYMB	TYPE, 324, 'P', #323
+	SYMB	TYPE, 325, 'X', 12, #1, 30, 1, #310
+	SYMB	TYPE, 326, 'n', #325, 129
+	SYMB	TYPE, 327, 'P', #326
+	SYMB	TYPE, 328, 'X', 12, #16, 30, 1, #310
+	SYMB	TYPE, 329, 'n', #328, 129
+	SYMB	TYPE, 330, 'P', #329
+	SYMB	TYPE, 308, "TEvent", 'S', 32,\
+		 "ObjectID", #16, 0,\
+		 "TEvent", #313, 2,\
+		 "_TEvent", #316, 6,\
+		 "Wait", #321, 10,\
+		 "Set", #324, 14,\
+		 "Clear", #327, 18,\
+		 "IsSet", #330, 22,\
+		 "ID", #286, 26,\
+		 "Name", #282, 28
+	SYMB	TYPE, 331, "TEvent", 'T', #308
+	SYMB	TYPE, 333, 'n', #332, 130
+	SYMB	TYPE, 334, 'P', #333
+	SYMB	TYPE, 332, 'X', 12, #1, 30, 1, #334
+	SYMB	TYPE, 336, 'n', #335, 129
+	SYMB	TYPE, 337, 'P', #336
+	SYMB	TYPE, 338, 'X', 12, #1, 30, 1, #334
+	SYMB	TYPE, 339, 'n', #338, 129
+	SYMB	TYPE, 340, 'P', #339
+	SYMB	TYPE, 341, 'n', #331, 130
+	SYMB	TYPE, 342, 'P', #341
+	SYMB	TYPE, 341, 'X', 12, #16, 30, 2, #334, #342
+	SYMB	TYPE, 344, 'n', #343, 129
+	SYMB	TYPE, 345, 'P', #344
+	SYMB	TYPE, 346, 'X', 12, #1, 30, 2, #334, #342
+	SYMB	TYPE, 347, 'n', #346, 129
+	SYMB	TYPE, 348, 'P', #347
+	SYMB	TYPE, 349, 'X', 12, #16, 30, 2, #334, #342
+	SYMB	TYPE, 350, 'n', #349, 129
+	SYMB	TYPE, 351, 'P', #350
+	SYMB	TYPE, 352, 'X', 12, #342, 30, 2, #334, #318
+	SYMB	TYPE, 353, 'n', #352, 129
+	SYMB	TYPE, 354, 'P', #353
+	SYMB	TYPE, 355, 'Z', #2, 95
+	SYMB	TYPE, 332, "TEventList", 'S', 122,\
+		 "ObjectID", #16, 0,\
+		 "TEventList", #337, 2,\
+		 "_TEventList", #340, 6,\
+		 "Append", #345, 10,\
+		 "Clear", #348, 14,\
+		 "InList", #351, 18,\
+		 "Wait", #354, 22,\
+		 "Align", #355, 26
+	SYMB	TYPE, 357, "TEventList", 'T', #332
+	SYMB	TYPE, 359, 'n', #358, 130
+	SYMB	TYPE, 360, 'P', #359
+	SYMB	TYPE, 358, 'X', 12, #1, 30, 2, #360, #282
+	SYMB	TYPE, 362, 'n', #361, 129
+	SYMB	TYPE, 363, 'P', #362
+	SYMB	TYPE, 364, 'X', 12, #1, 30, 1, #360
+	SYMB	TYPE, 365, 'n', #364, 129
+	SYMB	TYPE, 366, 'P', #365
+	SYMB	TYPE, 367, 'X', 12, #1, 30, 1, #360
+	SYMB	TYPE, 368, 'n', #367, 129
+	SYMB	TYPE, 369, 'P', #368
+	SYMB	TYPE, 370, 'X', 12, #1, 30, 1, #360
+	SYMB	TYPE, 371, 'n', #370, 129
+	SYMB	TYPE, 372, 'P', #371
+	SYMB	TYPE, 373, 'X', 12, #16, 30, 1, #360
+	SYMB	TYPE, 374, 'n', #373, 129
+	SYMB	TYPE, 375, 'P', #374
+	SYMB	TYPE, 358, "TResource", 'S', 28,\
+		 "ObjectID", #16, 0,\
+		 "TResource", #363, 2,\
+		 "_TResource", #366, 6,\
+		 "Lock", #369, 10,\
+		 "Unlock", #372, 14,\
+		 "Owner", #375, 18,\
+		 "ID", #304, 22,\
+		 "Name", #282, 24
+	SYMB	TYPE, 376, "TResource", 'T', #358
+	SYMB	TYPE, 377, 'X', 12, #1, 30, 0
+	SYMB	TYPE, 378, 'n', #377, 129
+	SYMB	TYPE, 379, 'P', #378
+	SYMB	TYPE, 381, 'n', #380, 130
+	SYMB	TYPE, 382, 'P', #381
+	SYMB	TYPE, 377, 'X', 12, #1, 30, 3, #382, #16, #379
+	SYMB	TYPE, 384, 'n', #383, 129
+	SYMB	TYPE, 385, 'P', #384
+	SYMB	TYPE, 386, 'X', 12, #1, 30, 1, #382
+	SYMB	TYPE, 387, 'n', #386, 129
+	SYMB	TYPE, 388, 'P', #387
+	SYMB	TYPE, 389, 'X', 12, #1, 30, 1, #382
+	SYMB	TYPE, 390, 'n', #389, 129
+	SYMB	TYPE, 391, 'P', #390
+	SYMB	TYPE, 392, 'X', 12, #1, 30, 2, #382, #16
+	SYMB	TYPE, 393, 'n', #392, 129
+	SYMB	TYPE, 394, 'P', #393
+	SYMB	TYPE, 395, 'X', 12, #1, 30, 1, #382
+	SYMB	TYPE, 396, 'n', #395, 129
+	SYMB	TYPE, 397, 'P', #396
+	SYMB	TYPE, 398, 'X', 12, #16, 30, 1, #382
+	SYMB	TYPE, 399, 'n', #398, 129
+	SYMB	TYPE, 400, 'P', #399
+	SYMB	TYPE, 401, 'X', 12, #1, 30, 2, #382, #16
+	SYMB	TYPE, 402, 'n', #401, 129
+	SYMB	TYPE, 403, 'P', #402
+	SYMB	TYPE, 380, "TThread", 'S', 36,\
+		 "ObjectID", #16, 0,\
+		 "TThread", #385, 2,\
+		 "Execute", #388, 6,\
+		 "Terminate", #391, 10,\
+		 "Suspend", #394, 14,\
+		 "Resume", #397, 18,\
+		 "GetPriority", #400, 22,\
+		 "SetPriority", #403, 26,\
+		 "ID", #258, 30,\
+		 "Status", #2, 31,\
+		 "Stack", #282, 32
+	SYMB	TYPE, 404, "TThread", 'T', #380
+	SYMB	TYPE, 406, 'n', #405, 130
+	SYMB	TYPE, 407, 'P', #406
+	SYMB	TYPE, 405, 'X', 12, #1, 30, 1, #407
+	SYMB	TYPE, 409, 'n', #408, 129
+	SYMB	TYPE, 410, 'P', #409
+	SYMB	TYPE, 411, 'X', 12, #1, 30, 1, #407
+	SYMB	TYPE, 412, 'n', #411, 129
+	SYMB	TYPE, 413, 'P', #412
+	SYMB	TYPE, 414, 'X', 12, #1, 30, 2, #407, #16
+	SYMB	TYPE, 415, 'n', #414, 129
+	SYMB	TYPE, 416, 'P', #415
+	SYMB	TYPE, 417, 'X', 12, #16, 30, 1, #407
+	SYMB	TYPE, 418, 'n', #417, 129
+	SYMB	TYPE, 419, 'P', #418
+	SYMB	TYPE, 420, 'X', 12, #1, 30, 2, #407, #16
+	SYMB	TYPE, 421, 'n', #420, 129
+	SYMB	TYPE, 422, 'P', #421
+	SYMB	TYPE, 423, 'n', #305, 130
+	SYMB	TYPE, 424, 'P', #423
+	SYMB	TYPE, 405, "TTimer", 'S', 32,\
+		 "ObjectID", #16, 0,\
+		 "TTimer", #410, 2,\
+		 "_TTimer", #413, 6,\
+		 "SetPeriod", #416, 10,\
+		 "GetPeriod", #419, 14,\
+		 "Tick", #422, 18,\
+		 "TimeOut", #342, 22,\
+		 "Period", #4, 26,\
+		 "Handle", #424, 28
+	SYMB	TYPE, 425, "TTimer", 'T', #405
+	SYMB	TYPE, 427, 'n', #426, 130
+	SYMB	TYPE, 428, 'P', #427
+	SYMB	TYPE, 426, 'X', 12, #1, 30, 3, #428, #16, #16
+	SYMB	TYPE, 430, 'n', #429, 129
+	SYMB	TYPE, 431, 'P', #430
+	SYMB	TYPE, 432, 'X', 12, #1, 30, 1, #428
+	SYMB	TYPE, 433, 'n', #432, 129
+	SYMB	TYPE, 434, 'P', #433
+	SYMB	TYPE, 435, 'X', 12, #282, 30, 2, #428, #284
+	SYMB	TYPE, 436, 'n', #435, 129
+	SYMB	TYPE, 437, 'P', #436
+	SYMB	TYPE, 438, 'X', 12, #1, 30, 2, #428, #284
+	SYMB	TYPE, 439, 'n', #438, 129
+	SYMB	TYPE, 440, 'P', #439
+	SYMB	TYPE, 426, "TStream", 'S', 28,\
+		 "ObjectID", #16, 0,\
+		 "TStream", #431, 2,\
+		 "_TStream", #434, 6,\
+		 "Get", #437, 10,\
+		 "Put", #440, 14,\
+		 "ID", #301, 18,\
+		 "Width", #16, 20,\
+		 "Depth", #16, 22,\
+		 "Handle", #282, 24
+	SYMB	TYPE, 441, "TStream", 'T', #426
+	SYMB	ENDF
+; cbar.c     38	#include "config.h" 
+	SYMB	FILE, "config.h"
+	SYMB	ENDF
+; cbar.c     39	#include "audio.h"
+	SYMB	FILE, "audio.h"
+	SYMB	TYPE, 442, 'S', 14,\
+		 "System", #16, 0,\
+		 "Signal", #16, 2,\
+		 "Level", #16, 4,\
+		 "Timing", #10, 6,\
+		 "Frequency", #16, 10,\
+		 "Click", #16, 12
+	SYMB	TYPE, 443, "AudioObject", 'T', #442
+	SYMB	ENDF
+; cbar.c     40	#include "cbar.h"
+	SYMB	FILE, "cbar.h"
+	SYMB	TYPE, 444, 'S', 12,\
+		 "System", #3, 0,\
+		 "Pattern", #18, 2,\
+		 "Delay", #7, 4,\
+		 "ScHPhase", #16, 8,\
+		 "EmbAudioSignal", #3, 10
+	SYMB	TYPE, 445, "CBObject", 'T', #444
+	SYMB	ENDF
+; cbar.c     41	#include "tables.h"
+	SYMB	FILE, "tables.h"
+	SYMB	ENDF
+; cbar.c     42	#include "led_hw.h"
+	SYMB	FILE, "led_hw.h"
+	SYMB	TYPE, 446, 'N',\
+		 "true", -1,\
+		 "false", 0
+	SYMB	TYPE, 447, "bool", 'T', #446
+	SYMB	ENDF
+; cbar.c     43	#include "tvp6kdrv.h"
+	SYMB	FILE, "tvp6kdrv.h"
+	SYMB	ENDF
+; cbar.c     44	#include "i2c_drv.h"
+	SYMB	FILE, "i2c_drv.h"
+	SYMB	ENDF
+; cbar.c     45	#include "instru.h"
+	SYMB	FILE, "instru.h"
+	SYMB	FILE, "nv_drv.h"
+	SYMB	TYPE, 448, "NvPointer", 'T', #18
+	SYMB	ENDF
+	SYMB	FILE, "genlock.h"
+	SYMB	TYPE, 449, 'S', 6,\
+		 "System", #3, 0,\
+		 "Delay", #7, 2
+	SYMB	TYPE, 450, "GenlockObject", 'T', #449
+	SYMB	ENDF
+	SYMB	FILE, "bb.h"
+	SYMB	TYPE, 451, 'S', 8,\
+		 "System", #3, 0,\
+		 "Delay", #7, 2,\
+		 "ScHPhase", #16, 6
+	SYMB	TYPE, 452, "BBObject", 'T', #451
+	SYMB	ENDF
+	SYMB	FILE, "cbar.h"
+	SYMB	ENDF
+	SYMB	FILE, "audio.h"
+	SYMB	ENDF
+	SYMB	TYPE, 453, 'S', 34,\
+		 "Date", #7, 0,\
+		 "DACFactDate", #7, 4,\
+		 "DACUserDate", #7, 8,\
+		 "DACFactValue", #18, 12,\
+		 "DACUserValue", #18, 14,\
+		 "HPHZeroG", #7, 16,\
+		 "PhaseG", #7, 20,\
+		 "HPHZeroM", #7, 24,\
+		 "PhaseM", #7, 28,\
+		 "DACOffset", #16, 32
+	SYMB	TYPE, 454, "GenlockCalibrationObject", 'T', #453
+	SYMB	TYPE, 455, 'S', 20,\
+		 "Date", #7, 0,\
+		 "PhaseG", #7, 4,\
+		 "ScHPhaseG", #18, 8,\
+		 "PhaseM", #7, 10,\
+		 "ScHPhaseM", #18, 14,\
+		 "DACGain", #3, 16,\
+		 "DACOffset", #3, 17,\
+		 "DACLevel", #3, 18
+	SYMB	TYPE, 456, "BBCalibrationObject", 'T', #455
+	SYMB	TYPE, 457, 'S', 20,\
+		 "Date", #7, 0,\
+		 "PhaseG", #7, 4,\
+		 "ScHPhaseG", #3, 8,\
+		 "PhaseM", #7, 10,\
+		 "ScHPhaseM", #3, 14,\
+		 "GainG", #3, 15,\
+		 "ChromaGainG", #3, 16,\
+		 "GainM", #3, 17,\
+		 "ChromaGainM", #3, 18
+	SYMB	TYPE, 458, "CBCalibrationObject", 'T', #457
+	SYMB	TYPE, 459, 'S', 6,\
+		 "Date", #7, 0,\
+		 "AnalogLeftChannel", #3, 4,\
+		 "AnalogRightChannel", #3, 5
+	SYMB	TYPE, 460, "AudioCalibrationObject", 'T', #459
+	SYMB	TYPE, 461, 'Z', #452, 2
+	SYMB	TYPE, 463, 'Z', #443, 1
+	SYMB	TYPE, 465, 'S', 74,\
+		 "ActivePreset", #16, 0,\
+		 "GenlockSetup", #450, 2,\
+		 "BBSetup", #461, 8,\
+		 "CBSetup", #445, 32,\
+		 "AudioOutput", #16, 44,\
+		 "AudioSetup", #463, 46
+	SYMB	TYPE, 466, "SettingsObject", 'T', #465
+	SYMB	TYPE, 467, 'Z', #2, 32
+	SYMB	TYPE, 469, 'Z', #2, 8
+	SYMB	TYPE, 471, 'Z', #2, 12
+	SYMB	TYPE, 473, 'Z', #456, 2
+	SYMB	TYPE, 475, 'S', 226,\
+		 "Company", #467, 0,\
+		 "Type", #467, 33,\
+		 "KUNumber", #469, 66,\
+		 "SWRevision", #469, 75,\
+		 "NC12", #471, 84,\
+		 "ResetSystem", #3, 97,\
+		 "ProdDate", #7, 98,\
+		 "UpdateDate", #7, 102,\
+		 "GenlockCalibration", #454, 106,\
+		 "BBCalibration", #473, 140,\
+		 "CBCalibration", #458, 200,\
+		 "AudioCalibration", #460, 220
+	SYMB	TYPE, 476, "CalibrationObject", 'T', #475
+	SYMB	ENDF
+; cbar.c     46	
+; cbar.c     47	#define SRAMBank0      0x00
+; cbar.c     48	#define SRAMBank1      0x10
+; cbar.c     49	#define SRAMBank2      0x14
+; cbar.c     50	#define SRAMBank3      0x18
+; cbar.c     51	#define SRAMBank4      0x1C
+; cbar.c     52	#define SRAMBank5      0x20
+; cbar.c     53	#define SRAMBank6      0x24
+; cbar.c     54	#define SRAMBank7      0x28
+; cbar.c     55	#define SRAMBank8      0x2C
+; cbar.c     56	#define SRAMBank9      0x30
+; cbar.c     57	#define SRAMBank10    0x34
+; cbar.c     58	#define SRAMBank11    0x38
+; cbar.c     59	#define SRAMBank12    0x3C
+; cbar.c     60	
+; cbar.c     61	#define dEBUCBar_8bit_625           0
+; cbar.c     62	#define dEBUCBar_625              1
+; cbar.c     63	#define dSMPTECBar                2
+; cbar.c     64	#define dBlueBars                  3
+; cbar.c     65	#define dIWhiteQ                  4
+; cbar.c     66	#define dCBar100_625              5
+; cbar.c     67	#define dGrey75_625                6
+; cbar.c     68	#define dRed75_625                7
+; cbar.c     69	#define dRed75_525                8
+; cbar.c     70	#define dChroma_Multiburst        9
+; cbar.c     71	#define d_CCIR18_625              9
+; cbar.c     72	#define dFCC_Multiburst_525        10
+; cbar.c     73	#define dChroma_Multiburst_525    11
+; cbar.c     74	#define dWhiteLine_625            11
+; cbar.c     75	#define dCrossHatch19_625          12
+; cbar.c     76	#define dWhiteLine_525            13
+; cbar.c     77	#define dCrossHatch17_525          14
+; cbar.c     78	#define dPlugeWhite_625            15
+; cbar.c     79	#define dPlugeGreyC_625            16
+; cbar.c     80	#define dPlugeGreyD_625            17
+; cbar.c     81	#define dPlugeGreyE_625            18
+; cbar.c     82	#define dPlugeWhite_525            19
+; cbar.c     83	#define dPlugeGreyC_525            20
+; cbar.c     84	#define dPlugeGreyD_525            21
+; cbar.c     85	#define dPlugeGreyE_525            22
+; cbar.c     86	#define dGreyScale5_625            23
+; cbar.c     87	#define dGreyScale5_525            24
+; cbar.c     88	#define dGreyScale10_625          25
+; cbar.c     89	#define dGreyScale10_525          26
+; cbar.c     90	#define dWindow50Marker            27
+; cbar.c     91	#define dMarkerLine              28
+; cbar.c     92	#define dWindow15                29
+; cbar.c     93	#define dMarker15                30
+; cbar.c     94	#define dWindow20                31
+; cbar.c     95	#define dMarker20                32
+; cbar.c     96	#define dWindow100              33
+; cbar.c     97	#define dMarker100              34
+; cbar.c     98	#define dDigitalGrey_625          35
+; cbar.c     99	#define dDigitalGrey_525          36
+; cbar.c    100	#define dSDI_test_line1            37
+; cbar.c    101	#define dSDI_test_line2            38
+; cbar.c    102	#define dSDI_test_line3            39
+; cbar.c    103	#define dCBar75_STD_625             40
+; cbar.c    104	#define dFCC_CBar_525              41
+; cbar.c    105	#define dFCC_CBar100_525          42
+; cbar.c    106	#define dWindow10                  43
+; cbar.c    107	#define dMarker10                  44
+; cbar.c    108	#define dkHz15BlWh_625            45
+; cbar.c    109	#define dkHz15BlWh_525            46
+; cbar.c    110	#define dCCIR18_625                47
+; cbar.c    111	
+; cbar.c    112	/****************************************************************************/
+; cbar.c    113	/*
+; cbar.c    114	The statusport is defined in the PLD as:
+; cbar.c    115	
+; cbar.c    116	  bit 0:  S0        Background system
+; cbar.c    117	  bit 1:  S1
+; cbar.c    118	
+; cbar.c    119	  bit 2:  S2        Linetype
+; cbar.c    120	  bit 3:  S3
+; cbar.c    121	  bit 4:  S4
+; cbar.c    122	  bit 5:  S5
+; cbar.c    123	
+; cbar.c    124	  bit 6:  SYSSEL    System select ( 0:G, 1:M)
+; cbar.c    125	  bit 7:  SOUND      Sound ( 0:off, 1:on)
+; cbar.c    126	
+; cbar.c    127	  bit 8:  3OR4      Samples in sound ( 0:3 samples, 1:4 samples)
+; cbar.c    128	  bit 9:  FIELD1    Field one bit ( 1 in Field 1/line 1 (out of 8/4) otherwise 0)
+; cbar.c    129	  bit 10: CB  
+; cbar.c    130	  bit 11: EDHON      EDH bit for future use ( 0:off, 1:on)
+; cbar.c    131	
+; cbar.c    132	  bit 12: PS        PS ( 0:disable writing in SRAM, 1: enable writing in SRAM)
+; cbar.c    133	  bit 13: Line7      Line 7 pulse in PAL w/PAL_ID
+; cbar.c    134	  bit 14: PhaseReg  Phase offset register select
+; cbar.c    135	  bit 15: -          Not used
+; cbar.c    136	*/
+; cbar.c    137	/****************************************************************************/
+; cbar.c    138	                    
+; cbar.c    139	#define S1S0        0x0003
+; cbar.c    140	#define S5S4S3S2    0x003C
+; cbar.c    141	#define SYSSEL      0x0040
+; cbar.c    142	#define SOUNDON      0x0080
+; cbar.c    143	#define S3OR4        0x0100
+; cbar.c    144	#define FIELD1      0x0200
+; cbar.c    145	#define CB          0x0400
+; cbar.c    146	#define EDHON        0x0800
+; cbar.c    147	#define PS          0x1000
+; cbar.c    148	#define LINE7PULSE  0x2000
+; cbar.c    149	#define PHASEREGSEL  0x4000
+; cbar.c    150	
+; cbar.c    151	#define SOUND        (int)(SOUNDON + S3OR4)
+; cbar.c    152	
+; cbar.c    153	#define SyncLineA    1
+; cbar.c    154	#define SyncLineB   0
+; cbar.c    155	#define SyncLineC   2
+; cbar.c    156	#define SyncLineD   3
+; cbar.c    157	
+; cbar.c    158	/****************************************************************************/
+; cbar.c    159	// Prototypes internal functions
+; cbar.c    160	
+; cbar.c    161	int ValidateCBPattern( UC system, UI *pattern);
+; cbar.c    162	
+; cbar.c    163	/* Tables start at TSTART  */
+; cbar.c    164	
+; cbar.c    165	#define TSTART 0x800
+; cbar.c    166	
+; cbar.c    167	_ROM_ UI TEST_SMPTECBarTable[] _at(TSTART) =
+	HCSEG AT 0800H
+	SYMB	TYPE, 477, 'Z', #18, -1
+	SYMB	IDEN, "TEST_SMPTECBarTable", _TEST_SMPTECBarTable, #477, 129, 0
+	SYMB	ALAB, _TEST_SMPTECBarTable, #477
+	PUBLIC	_TEST_SMPTECBarTable
+	ALIGN	1
+_TEST_SMPTECBarTable:
+	DW	00301H,01000H,0A412H,01316H,03D1AH,00200H,01101H,0A313H
+; cbar.c    168	{
+; cbar.c    169		3*256 	+							SyncLineA,
+; cbar.c    170		16*256	+							SyncLineB,
+; cbar.c    171		164*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    172		19*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    173		61*256	+	SRAMBank3 + SyncLineC,
+; cbar.c    174	
+; cbar.c    175		2*256		+							SyncLineB,
+; cbar.c    176		17*256 	+							SyncLineA,
+; cbar.c    177		163*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    178		19*256	+	SRAMBank2 + SyncLineD,
+; cbar.c    179		61*256	+	SRAMBank3 + SyncLineD,
+; cbar.c    180		0
+; cbar.c    181	};
+; cbar.c    182	
+; cbar.c    183	#define TA1 (TSTART + sizeof(TEST_SMPTECBarTable))
+; cbar.c    184	
+; cbar.c    185	_ROM_	UI PALBlackTable[] _at(TA1) =
+	DW	01317H,03D1BH,00000H
+	HCSEG AT 0816H
+	SYMB	IDEN, "PALBlackTable", _PALBlackTable, #477, 129, 0
+	SYMB	ALAB, _PALBlackTable, #477
+	PUBLIC	_PALBlackTable
+	ALIGN	1
+_PALBlackTable:
+	DW	01600H,09002H,09002H,00200H,01701H,09003H,09003H,00201H
+; cbar.c    186	{
+; cbar.c    187		22*256 	+							SyncLineB,
+; cbar.c    188		144*256	+							SyncLineC,
+; cbar.c    189		144*256	+							SyncLineC,
+; cbar.c    190		2*256		+							SyncLineB,
+; cbar.c    191	
+; cbar.c    192		23*256 	+							SyncLineA,
+; cbar.c    193		144*256	+							SyncLineD,
+; cbar.c    194		144*256	+							SyncLineD,
+; cbar.c    195		2*256		+							SyncLineA,
+; cbar.c    196		0
+; cbar.c    197	};
+; cbar.c    198	
+; cbar.c    199	#define TA2 (TA1 + sizeof(PALBlackTable))
+; cbar.c    200	
+; cbar.c    201	_ROM_ UI PALFullFieldTable[] _at(TA2)=
+	DW	00000H
+	HCSEG AT 0828H
+	SYMB	IDEN, "PALFullFieldTable", _PALFullFieldTable, #477, 129, 0
+	SYMB	ALAB, _PALFullFieldTable, #477
+	PUBLIC	_PALFullFieldTable
+	ALIGN	1
+_PALFullFieldTable:
+	DW	01600H,09012H,09012H,00200H,01701H,09013H,09013H,00201H
+; cbar.c    202	{
+; cbar.c    203		22*256 	+							SyncLineB,
+; cbar.c    204		144*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    205		144*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    206		2*256		+							SyncLineB,
+; cbar.c    207	
+; cbar.c    208		23*256 	+							SyncLineA,
+; cbar.c    209		144*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    210		144*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    211		2*256		+							SyncLineA,
+; cbar.c    212		0
+; cbar.c    213	};
+; cbar.c    214	#define TA3 (TA2 + sizeof(PALFullFieldTable))
+; cbar.c    215	
+; cbar.c    216	_ROM_ UI PALSplitFieldTable[] _at(TA3) =
+	DW	00000H
+	HCSEG AT 083AH
+	SYMB	IDEN, "PALSplitFieldTable", _PALSplitFieldTable, #477, 129, 0
+	SYMB	ALAB, _PALSplitFieldTable, #477
+	PUBLIC	_PALSplitFieldTable
+	ALIGN	1
+_PALSplitFieldTable:
+	DW	01600H,0C012H,06016H,00200H,01701H,0C013H,06017H,00201H
+; cbar.c    217	{
+; cbar.c    218		22*256 	+							SyncLineB,
+; cbar.c    219		192*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    220		96*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    221		2*256		+							SyncLineB,
+; cbar.c    222	
+; cbar.c    223		23*256 	+							SyncLineA,
+; cbar.c    224		192*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    225		96*256	+	SRAMBank2 + SyncLineD,
+; cbar.c    226		2*256		+							SyncLineA,
+; cbar.c    227		0
+; cbar.c    228	};
+; cbar.c    229	#define TA4 (TA3 + sizeof(PALSplitFieldTable))
+; cbar.c    230	
+; cbar.c    231	_ROM_ UI PALWindowTable[] _at(TA4) =
+	DW	00000H
+	HCSEG AT 084CH
+	SYMB	IDEN, "PALWindowTable", _PALWindowTable, #477, 129, 0
+	SYMB	ALAB, _PALWindowTable, #477
+	PUBLIC	_PALWindowTable
+	ALIGN	1
+_PALWindowTable:
+	DW	01600H,01802H,00112H,00116H,00102H,0011AH,02C02H,0901EH
+	DW	04802H,00200H,01701H,01803H,00113H,00117H,00103H,0011BH
+; cbar.c    232	{
+; cbar.c    233		22*256 	+							SyncLineB,
+; cbar.c    234		24*256	+         		SyncLineC,
+; cbar.c    235		1*256		+	SRAMBank1 + SyncLineC,
+; cbar.c    236		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    237		1*256		+	  		      SyncLineC,
+; cbar.c    238		1*256		+	SRAMBank3 + SyncLineC,
+; cbar.c    239		44*256	+	      		  SyncLineC,
+; cbar.c    240		144*256	+	SRAMBank4 + SyncLineC,
+; cbar.c    241		72*256	+	    		    SyncLineC,
+; cbar.c    242		2*256		+							SyncLineB,
+; cbar.c    243	
+; cbar.c    244		23*256 	+							SyncLineA,
+; cbar.c    245		24*256	+         		SyncLineD,
+; cbar.c    246		1*256		+	SRAMBank1 + SyncLineD,
+; cbar.c    247		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    248		1*256		+	      		  SyncLineD,
+; cbar.c    249		1*256		+	SRAMBank3 + SyncLineD,
+; cbar.c    250		44*256	+	 			      SyncLineD,
+; cbar.c    251		144*256	+	SRAMBank4 + SyncLineD,
+; cbar.c    252		72*256	+	      		  SyncLineD,
+; cbar.c    253		2*256		+							SyncLineA,
+; cbar.c    254		0
+; cbar.c    255	};
+; cbar.c    256	
+; cbar.c    257	#define TA5 (TA4 + sizeof(PALWindowTable))
+; cbar.c    258	
+; cbar.c    259	_ROM_ UI PALCheckfieldTable[] _at(TA5) =
+	DW	02C03H,0901FH,04803H,00201H,00000H
+	HCSEG AT 0876H
+	SYMB	IDEN, "PALCheckfieldTable", _PALCheckfieldTable, #477, 129, 0
+	SYMB	ALAB, _PALCheckfieldTable, #477
+	PUBLIC	_PALCheckfieldTable
+	ALIGN	1
+_PALCheckfieldTable:
+	DW	01600H,00112H,08F16H,0901AH,00200H,01701H,09017H,0901BH
+; cbar.c    260	{
+; cbar.c    261		22*256 	+							SyncLineB,
+; cbar.c    262		1*256		+	SRAMBank1 + SyncLineC,
+; cbar.c    263		143*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    264		144*256	+	SRAMBank3 + SyncLineC,
+; cbar.c    265		2*256		+							SyncLineB,
+; cbar.c    266	
+; cbar.c    267		23*256 	+							SyncLineA,
+; cbar.c    268		144*256	+	SRAMBank2 + SyncLineD,
+; cbar.c    269		144*256	+	SRAMBank3 + SyncLineD,
+; cbar.c    270		2*256		+							SyncLineA,
+; cbar.c    271		0
+; cbar.c    272	};
+; cbar.c    273	
+; cbar.c    274	#define TA6 (TA5 + sizeof(PALCheckfieldTable))
+; cbar.c    275	
+; cbar.c    276	_ROM_ UI PALCrosshatchTable[] _at(TA6) =
+	DW	00201H,00000H
+	HCSEG AT 088AH
+	SYMB	IDEN, "PALCrosshatchTable", _PALCrosshatchTable, #477, 129, 0
+	SYMB	ALAB, _PALCrosshatchTable, #477
+	PUBLIC	_PALCrosshatchTable
+	ALIGN	1
+_PALCrosshatchTable:
+	DW	01600H,00712H,00116H,01412H,00116H,01412H,00116H,01412H
+	DW	00116H,01412H,00116H,01412H,00116H,01412H,00116H,01412H
+	DW	00116H,01412H,00116H,01412H,00116H,01412H,00116H,01412H
+	DW	00116H,01412H,00116H,01412H,00116H,00712H,00200H,01701H
+	DW	00713H,00117H,01413H,00117H,01413H,00117H,01413H,00117H
+	DW	01413H,00117H,01413H,00117H,01413H,00117H,01413H,00117H
+	DW	01413H,00117H,01413H,00117H,01413H,00117H,01413H,00117H
+; cbar.c    277	{
+; cbar.c    278		22*256 	+							SyncLineB,
+; cbar.c    279		7*256		+ SRAMBank1 + SyncLineC,
+; cbar.c    280		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    281		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    282		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    283		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    284		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    285		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    286		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    287		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    288		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    289		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    290		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    291		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    292		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    293		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    294		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    295		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    296		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    297		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    298		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    299		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    300		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    301		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    302		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    303		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    304		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    305		20*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    306		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    307		7*256	  +	SRAMBank1 + SyncLineC,
+; cbar.c    308		2*256		+							SyncLineB,
+; cbar.c    309	
+; cbar.c    310		23*256 	+							SyncLineA,
+; cbar.c    311		7*256		+ SRAMBank1 + SyncLineD,
+; cbar.c    312		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    313		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    314		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    315		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    316		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    317		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    318		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    319		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    320		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    321		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    322		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    323		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    324		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    325		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    326		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    327		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    328		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    329		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    330		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    331		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    332		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    333		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    334		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    335		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    336		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    337		20*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    338		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    339		7*256	  +	SRAMBank1 + SyncLineD,
+; cbar.c    340		2*256		+							SyncLineA,
+; cbar.c    341		0
+; cbar.c    342	};
+; cbar.c    343	
+; cbar.c    344	#define TA7 (TA6 + sizeof(PALCrosshatchTable))
+; cbar.c    345	
+; cbar.c    346	_ROM_ UI PALPLUGETable[] _at(TA7) =
+	DW	01413H,00117H,01413H,00117H,00713H,00201H,00000H
+	HCSEG AT 0908H
+	SYMB	IDEN, "PALPLUGETable", _PALPLUGETable, #477, 129, 0
+	SYMB	ALAB, _PALPLUGETable, #477
+	PUBLIC	_PALPLUGETable
+	ALIGN	1
+_PALPLUGETable:
+	DW	01600H,02602H,03512H,03516H,0351AH,0351EH,02602H,00200H
+	DW	01701H,02603H,03513H,03517H,0351BH,0351FH,02603H,00201H
+; cbar.c    347	{
+; cbar.c    348		22*256 	+							SyncLineB,
+; cbar.c    349		38*256	+       		  SyncLineC,
+; cbar.c    350		53*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    351		53*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    352		53*256	+	SRAMBank3 + SyncLineC,
+; cbar.c    353		53*256	+	SRAMBank4 + SyncLineC,
+; cbar.c    354		38*256	+	  		      SyncLineC,
+; cbar.c    355		2*256		+							SyncLineB,
+; cbar.c    356	
+; cbar.c    357		23*256 	+							SyncLineA,
+; cbar.c    358		38*256	+     		    SyncLineD,
+; cbar.c    359		53*256 	+	SRAMBank1 + SyncLineD,
+; cbar.c    360		53*256 	+	SRAMBank2 + SyncLineD,
+; cbar.c    361		53*256 	+	SRAMBank3 + SyncLineD,
+; cbar.c    362		53*256 	+	SRAMBank4 + SyncLineD,
+; cbar.c    363		38*256	+	 		    	  SyncLineD,
+; cbar.c    364		2*256		+							SyncLineA,
+; cbar.c    365		0
+; cbar.c    366	};
+; cbar.c    367	
+; cbar.c    368	#define TA8 (TA7 + sizeof(PALPLUGETable))
+; cbar.c    369	
+; cbar.c    370	_ROM_ UI NTSCBlackTable[] _at(TA8) =
+	DW	00000H
+	HCSEG AT 092AH
+	SYMB	IDEN, "NTSCBlackTable", _NTSCBlackTable, #477, 129, 0
+	SYMB	ALAB, _NTSCBlackTable, #477
+	PUBLIC	_NTSCBlackTable
+	ALIGN	1
+_NTSCBlackTable:
+	DW	00301H,01000H,07A02H,07A02H,00200H,01101H,07A03H,07903H
+; cbar.c    371	{
+; cbar.c    372		3*256 	+							SyncLineA,
+; cbar.c    373		16*256	+							SyncLineB,
+; cbar.c    374		122*256	+							SyncLineC,
+; cbar.c    375		122*256	+							SyncLineC,
+; cbar.c    376	
+; cbar.c    377		2*256		+							SyncLineB,
+; cbar.c    378		17*256 	+							SyncLineA,
+; cbar.c    379		122*256	+							SyncLineD,
+; cbar.c    380		121*256	+							SyncLineD,
+; cbar.c    381		0
+; cbar.c    382	};
+; cbar.c    383	
+; cbar.c    384	#define TA9 (TA8 + sizeof(NTSCBlackTable))
+; cbar.c    385	
+; cbar.c    386	_ROM_ UI NTSCFullFieldTable[] _at(TA9) =
+	DW	00000H
+	HCSEG AT 093CH
+	SYMB	IDEN, "NTSCFullFieldTable", _NTSCFullFieldTable, #477, 129, 0
+	SYMB	ALAB, _NTSCFullFieldTable, #477
+	PUBLIC	_NTSCFullFieldTable
+	ALIGN	1
+_NTSCFullFieldTable:
+	DW	00301H,01000H,07A12H,07A12H,00200H,01101H,07A13H,07913H
+; cbar.c    387	{
+; cbar.c    388		3*256 	+							SyncLineA,
+; cbar.c    389		16*256	+							SyncLineB,
+; cbar.c    390		122*256	+	SRAMBank1	+	SyncLineC,
+; cbar.c    391		122*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    392	
+; cbar.c    393		2*256		+							SyncLineB,
+; cbar.c    394		17*256 	+							SyncLineA,
+; cbar.c    395		122*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    396		121*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    397		0
+; cbar.c    398	};
+; cbar.c    399	
+; cbar.c    400	#define TA10 (TA9 + sizeof(NTSCFullFieldTable))
+; cbar.c    401	
+; cbar.c    402	_ROM_ UI SMPTECBarTable[] _at(TA10) =
+	DW	00000H
+	HCSEG AT 094EH
+	SYMB	IDEN, "SMPTECBarTable", _SMPTECBarTable, #477, 129, 0
+	SYMB	ALAB, _SMPTECBarTable, #477
+	PUBLIC	_SMPTECBarTable
+	ALIGN	1
+_SMPTECBarTable:
+	DW	00301H,01000H,0A412H,01316H,03D1AH,00200H,01101H,0A313H
+; cbar.c    403	{
+; cbar.c    404		3*256 	+							SyncLineA,
+; cbar.c    405		16*256	+							SyncLineB,
+; cbar.c    406		164*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    407		19*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    408		61*256	+	SRAMBank3 + SyncLineC,
+; cbar.c    409	
+; cbar.c    410		2*256		+							SyncLineB,
+; cbar.c    411		17*256 	+							SyncLineA,
+; cbar.c    412		163*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    413		19*256	+	SRAMBank2 + SyncLineD,
+; cbar.c    414		61*256	+	SRAMBank3 + SyncLineD,
+; cbar.c    415		0
+; cbar.c    416	};
+; cbar.c    417	
+; cbar.c    418	#define TA11 (TA10 + sizeof(SMPTECBarTable))
+; cbar.c    419	
+; cbar.c    420	_ROM_ UI NTSCWindowTable[] _at(TA11) =
+	DW	01317H,03D1BH,00000H
+	HCSEG AT 0964H
+	SYMB	IDEN, "NTSCWindowTable", _NTSCWindowTable, #477, 129, 0
+	SYMB	ALAB, _NTSCWindowTable, #477
+	PUBLIC	_NTSCWindowTable
+	ALIGN	1
+_NTSCWindowTable:
+	DW	00301H,01000H,01E02H,00112H,00116H,00102H,0011AH,01D02H
+	DW	0771EH,03E02H,00200H,01101H,01D03H,00113H,00117H,00103H
+; cbar.c    421	{
+; cbar.c    422		3*256 	+							SyncLineA,
+; cbar.c    423		16*256	+							SyncLineB,
+; cbar.c    424		30*256	+	        		SyncLineC,
+; cbar.c    425		1*256		+	SRAMBank1 + SyncLineC,
+; cbar.c    426		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    427		1*256		+	    		    SyncLineC,
+; cbar.c    428		1*256		+	SRAMBank3 + SyncLineC,
+; cbar.c    429		29*256	+	 			    	SyncLineC,
+; cbar.c    430		119*256	+	SRAMBank4 + SyncLineC,
+; cbar.c    431		62*256	+			        SyncLineC,
+; cbar.c    432	
+; cbar.c    433		2*256		+							SyncLineB,
+; cbar.c    434		17*256 	+							SyncLineA,
+; cbar.c    435		29*256	+	       			SyncLineD,
+; cbar.c    436		1*256		+	SRAMBank1 + SyncLineD,
+; cbar.c    437		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    438		1*256		+	  		      SyncLineD,
+; cbar.c    439		1*256		+	SRAMBank3 + SyncLineD,
+; cbar.c    440		29*256	+	      		  SyncLineD,
+; cbar.c    441		119*256	+	SRAMBank4 + SyncLineD,
+; cbar.c    442		62*256	+	    		    SyncLineD,
+; cbar.c    443		0
+; cbar.c    444	};
+; cbar.c    445	
+; cbar.c    446	#define TA12 (TA11 + sizeof(NTSCWindowTable))
+; cbar.c    447	
+; cbar.c    448	_ROM_ UI NTSCCheckfieldTable[] _at(TA12) =
+	DW	0011BH,01D03H,0771FH,03E03H,00000H
+	HCSEG AT 098EH
+	SYMB	IDEN, "NTSCCheckfieldTable", _NTSCCheckfieldTable, #477, 129, 0
+	SYMB	ALAB, _NTSCCheckfieldTable, #477
+	PUBLIC	_NTSCCheckfieldTable
+	ALIGN	1
+_NTSCCheckfieldTable:
+	DW	00301H,01000H,00112H,07916H,07A1AH,00200H,01101H,07A17H
+; cbar.c    449	{
+; cbar.c    450		3*256 	+							SyncLineA,
+; cbar.c    451		16*256	+							SyncLineB,
+; cbar.c    452		1*256		+	SRAMBank1 + SyncLineC,
+; cbar.c    453		121*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    454		122*256	+	SRAMBank3 + SyncLineC,
+; cbar.c    455	
+; cbar.c    456		2*256		+							SyncLineB,
+; cbar.c    457		17*256 	+							SyncLineA,
+; cbar.c    458		122*256	+	SRAMBank2 + SyncLineD,
+; cbar.c    459		121*256	+	SRAMBank3 + SyncLineD,
+; cbar.c    460		0
+; cbar.c    461	};
+; cbar.c    462	
+; cbar.c    463	#define TA13 (TA12 + sizeof(NTSCCheckfieldTable))
+; cbar.c    464	
+; cbar.c    465	_ROM_ UI NTSCCrosshatchTable[] _at(TA13) =
+	DW	0791BH,00000H
+	HCSEG AT 09A2H
+	SYMB	IDEN, "NTSCCrosshatchTable", _NTSCCrosshatchTable, #477, 129, 0
+	SYMB	ALAB, _NTSCCrosshatchTable, #477
+	PUBLIC	_NTSCCrosshatchTable
+	ALIGN	1
+_NTSCCrosshatchTable:
+	DW	00301H,01000H,00912H,00116H,01012H,00116H,01112H,00116H
+	DW	01012H,00116H,01112H,00116H,01012H,00116H,01112H,00116H
+	DW	01012H,00116H,01112H,00116H,01012H,00116H,01112H,00116H
+	DW	01012H,00116H,01112H,00116H,01012H,00116H,00712H,00200H
+	DW	01101H,00813H,00117H,01113H,00117H,01013H,00117H,01113H
+	DW	00117H,01013H,00117H,01113H,00117H,01013H,00117H,01113H
+	DW	00117H,01013H,00117H,01113H,00117H,01013H,00117H,01113H
+; cbar.c    466	{
+; cbar.c    467		3*256 	+							SyncLineA,
+; cbar.c    468		16*256	+							SyncLineB,
+; cbar.c    469		9*256		+	SRAMBank1 + SyncLineC,
+; cbar.c    470		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    471		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    472		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    473		17*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    474		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    475		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    476		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    477		17*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    478		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    479		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    480		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    481		17*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    482		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    483		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    484		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    485		17*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    486		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    487		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    488		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    489		17*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    490		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    491		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    492		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    493		17*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    494		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    495		16*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    496		1*256		+	SRAMBank2 + SyncLineC,
+; cbar.c    497		7*256		+	SRAMBank1 + SyncLineC,
+; cbar.c    498	
+; cbar.c    499		2*256		+							SyncLineB,
+; cbar.c    500		17*256 	+							SyncLineA,
+; cbar.c    501		8*256		+	SRAMBank1 + SyncLineD,
+; cbar.c    502		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    503		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    504		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    505		16*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    506		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    507		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    508		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    509		16*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    510		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    511		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    512		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    513		16*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    514		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    515		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    516		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    517		16*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    518		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    519		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    520		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    521		16*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    522		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    523		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    524		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    525		16*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    526		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    527		17*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    528		1*256		+	SRAMBank2 + SyncLineD,
+; cbar.c    529		6*256		+	SRAMBank1 + SyncLineD,
+; cbar.c    530		0
+; cbar.c    531	};
+; cbar.c    532	
+; cbar.c    533	#define TA14 (TA13 + sizeof(NTSCCrosshatchTable))
+; cbar.c    534	
+; cbar.c    535	_ROM_ UI NTSCPLUGETable[] _at(TA14) =
+	DW	00117H,01013H,00117H,01113H,00117H,00613H,00000H
+	HCSEG AT 0A20H
+	SYMB	IDEN, "NTSCPLUGETable", _NTSCPLUGETable, #477, 129, 0
+	SYMB	ALAB, _NTSCPLUGETable, #477
+	PUBLIC	_NTSCPLUGETable
+	ALIGN	1
+_NTSCPLUGETable:
+	DW	00301H,01000H,03502H,03812H,01316H,0131AH,0131EH,04E02H
+	DW	00200H,01101H,03403H,03813H,01317H,0131BH,0131FH,04E03H
+; cbar.c    536	{
+; cbar.c    537		3*256 	+							SyncLineA,
+; cbar.c    538		16*256	+							SyncLineB,
+; cbar.c    539		53*256	+	 		       	SyncLineC,
+; cbar.c    540		56*256	+	SRAMBank1 + SyncLineC,
+; cbar.c    541		19*256	+	SRAMBank2 + SyncLineC,
+; cbar.c    542		19*256	+	SRAMBank3 + SyncLineC,
+; cbar.c    543		19*256	+	SRAMBank4 + SyncLineC,
+; cbar.c    544		78*256	+	    		    SyncLineC,
+; cbar.c    545	
+; cbar.c    546		2*256		+							SyncLineB,
+; cbar.c    547		17*256 	+							SyncLineA,
+; cbar.c    548		52*256	+	    		    SyncLineD,
+; cbar.c    549		56*256	+	SRAMBank1 + SyncLineD,
+; cbar.c    550		19*256	+	SRAMBank2 + SyncLineD,
+; cbar.c    551		19*256	+	SRAMBank3 + SyncLineD,
+; cbar.c    552		19*256	+	SRAMBank4 + SyncLineD,
+; cbar.c    553		78*256	+	       		 	SyncLineD,
+; cbar.c    554		0
+; cbar.c    555	};
+; cbar.c    556	
+; cbar.c    557	#define TA15 (TA14 + sizeof(NTSCPLUGETable))
+; cbar.c    558	
+; cbar.c    559		_ROM_ UI Sound525[] _at(TA15) = 
+	DW	00000H
+	HCSEG AT 0A42H
+	SYMB	IDEN, "Sound525", _Sound525, #477, 129, 0
+	SYMB	ALAB, _Sound525, #477
+	PUBLIC	_Sound525
+	ALIGN	1
+_Sound525:
+	DW	00083H,00181H,00085H,00003H,00086H,00181H,0008BH,00181H
+	DW	0008BH,00181H,0008BH,00181H,0008BH,00181H,0008BH,00181H
+	DW	0008BH,00181H,0008BH,00181H,0008BH,00181H,0008BH,00181H
+	DW	0008BH,00181H,0008BH,00181H,0008BH,00181H,0008BH,00181H
+	DW	0008BH,00181H,0008BH,00181H,0008BH,00181H,0008BH,00181H
+; cbar.c    560	    {
+; cbar.c    561	  	0x083, 0x181, 0x085, 0x003, 0x086, 0x181, 0x08B, 0x181,
+; cbar.c    562	  	0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181,
+; cbar.c    563	  	0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181,
+; cbar.c    564	  	0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181,
+; cbar.c    565	  	0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181,
+; cbar.c    566	  	0x08B, 0x181, 0x08B, 0x181, 0x08B, 0x181, 0x083, 0x081
+; cbar.c    567	    };
+; cbar.c    568	
+; cbar.c    569	#define TA16 (TA15 + sizeof(Sound525))
+; cbar.c    570	
+; cbar.c    571		_ROM_ UI Sound625[65] _at(TA16) = 
+	DW	0008BH,00181H,0008BH,00181H,0008BH,00181H,00083H,00081H
+	HCSEG AT 0AA2H
+	SYMB	TYPE, 479, 'Z', #18, 64
+	SYMB	IDEN, "Sound625", _Sound625, #479, 129, 0
+	SYMB	ALAB, _Sound625, #479
+	PUBLIC	_Sound625
+	ALIGN	1
+_Sound625:
+	DW	00181H,00084H,00003H,00085H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00089H
+	DW	00181H,00089H,00181H,00089H,00181H,00089H,00181H,00088H
+; cbar.c    572		  {
+; cbar.c    573	  	0x181,  0x084,  0x003,  0x085,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    574	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    575	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    576	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    577	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    578	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    579	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x089,
+; cbar.c    580	  	0x181,  0x089,  0x181,  0x089,  0x181,  0x089,  0x181,  0x088,
+; cbar.c    581	  	0x181
+; cbar.c    582	    };
+; cbar.c    583	
+; cbar.c    584	//Emulates the 8 lines avalible for text.
+; cbar.c    585	//Would be implemented ase a seperat table.
+; cbar.c    586	
+; cbar.c    587	#define TA17 (TA16 + sizeof(Sound625))
+; cbar.c    588	
+; cbar.c    589	_ROM_ UI TextLines_SyncLineC[] _at(TA17) =		//Interlaced 
+	DW	00181H
+	HCSEG AT 0B24H
+	SYMB	IDEN, "TextLines_SyncLineC", _TextLines_SyncLineC, #477, 129, 0
+	SYMB	ALAB, _TextLines_SyncLineC, #477
+	PUBLIC	_TextLines_SyncLineC
+	ALIGN	1
+_TextLines_SyncLineC:
+; cbar.c    590	  	{
+; cbar.c    591		1*256	+	SRAMBank5 + SyncLineC,		//Line 0
+; cbar.c    592		1*256	+	SRAMBank6 + SyncLineC,
+; cbar.c    593		1*256	+	SRAMBank7 + SyncLineC,
+; cbar.c    594		1*256	+	SRAMBank8 + SyncLineC,
+; cbar.c    595		1*256	+	SRAMBank9 + SyncLineC,
+; cbar.c    596		1*256	+	SRAMBank10 + SyncLineC,
+; cbar.c    597		1*256	+	SRAMBank11 + SyncLineC,
+; cbar.c    598		1*256	+	SRAMBank12 + SyncLineC,
+; cbar.c    599		};
+; cbar.c    600	
+; cbar.c    601	#define TA18 (TA17 + sizeof(Sound625))
+; cbar.c    602	
+; cbar.c    603	_ROM_ UI TextLines_SyncLineD[] _at(TA18) =		//De-Interlaced 
+	DW	00122H,00126H,0012AH,0012EH,00132H,00136H,0013AH,0013EH
+	HCSEG AT 0BA6H
+	SYMB	IDEN, "TextLines_SyncLineD", _TextLines_SyncLineD, #477, 129, 0
+	SYMB	ALAB, _TextLines_SyncLineD, #477
+	PUBLIC	_TextLines_SyncLineD
+	ALIGN	1
+_TextLines_SyncLineD:
+; cbar.c    604		{
+; cbar.c    605		1*256	+	SRAMBank5 + SyncLineD,		//Line 0
+; cbar.c    606		1*256	+	SRAMBank6 + SyncLineD,
+; cbar.c    607		1*256	+	SRAMBank7 + SyncLineD,
+; cbar.c    608		1*256	+	SRAMBank8 + SyncLineD,
+; cbar.c    609		1*256	+	SRAMBank9 + SyncLineD,
+; cbar.c    610		1*256	+	SRAMBank10 + SyncLineD,
+; cbar.c    611		1*256	+	SRAMBank11 + SyncLineD,
+; cbar.c    612		1*256	+	SRAMBank12 + SyncLineD,
+; cbar.c    613		};
+; cbar.c    614	
+; cbar.c    615	                                              // Signal array defined in ROM
+; cbar.c    616	                                              //  (size/start is specified in BYTES
+; cbar.c    617	                                              //  in config.h)
+; cbar.c    618	_ROM_ int VideoSignalArray[SizeOfCBVideoCode/2] _at( StartOfCBVideoCode);
+; cbar.c    619	_ROM_ int SoundSignalArray[SizeOfEmbAudioCode/2] _at( StartOfEmbAudioCode);
+; cbar.c    620	
+; cbar.c    621	//KS. Extended Video SRAM. Test Only.
+; cbar.c    622	volatile int ESRAMVideoPort _at( 0x54000);       // Port defined in PLD
+; cbar.c    623	volatile int SRAMVideoPort _at( 0x44000);       // Port defined in PLD
+; cbar.c    624	volatile int SRAMSoundPort _at( 0x40000);       // Port defined in PLD
+; cbar.c    625	volatile int StatusPort _at( 0x6a000);         // Port defined in PLD
+; cbar.c    626	volatile int HOffsetPort _at( 0x6a004);       // Port defined in PLD
+; cbar.c    627	volatile int ChromaGainPort _at( 0x6a008);    // Port defined in PLD
+; cbar.c    628	
+; cbar.c    629	/***/
+; cbar.c    630	volatile UI LEDPort _at( 0x6a00C);        // Port defined in PLD
+; cbar.c    631	volatile UI TestLEDPort _at( 0x6a014);  // Port defined in PLD
+; cbar.c    632	
+; cbar.c    633	
+; cbar.c    634	volatile _near UI TimeTickCounter;
+; cbar.c    635	volatile _near int LineOffset;
+; cbar.c    636	
+; cbar.c    637	volatile int PhaseOffset;
+; cbar.c    638	
+; cbar.c    639	CBObject CBSetup;
+; cbar.c    640	
+; cbar.c    641	typedef struct cbtag
+; cbar.c    642	    {
+; cbar.c    643	    _ROM_  UI * TablePtr;    // 4 bytes
+; cbar.c    644	    _ROM_  UI * newTablePtr; // 4 bytes
+; cbar.c    645	    UI LineCnt;              // 2 bytes
+; cbar.c    646	    UC FrameCnt;             // 1 byte
+; cbar.c    647	    UC SyncLineCnt;
+; cbar.c    648	    UC SyncLinePtr;
+; cbar.c    649	    UC SoundFrameCnt;
+; cbar.c    650	    UC SoundCnt;
+; cbar.c    651	    UC SoundPtr;
+; cbar.c    652	    UC SoundPtrMax;
+; cbar.c    653	    char Blanking;
+; cbar.c    654	    char NewPattern; 
+; cbar.c    655	    char SoundEnable;
+; cbar.c    656	    UI Status;               // 2 bytes
+; cbar.c    657	    } JK;
+	SYMB	TYPE, 481, 'n', #18, 129
+	SYMB	TYPE, 482, 'P', #481
+	SYMB	TYPE, 483, "cbtag", 'S', 22,\
+		 "TablePtr", #482, 0,\
+		 "newTablePtr", #482, 4,\
+		 "LineCnt", #18, 8,\
+		 "FrameCnt", #3, 10,\
+		 "SyncLineCnt", #3, 11,\
+		 "SyncLinePtr", #3, 12,\
+		 "SoundFrameCnt", #3, 13,\
+		 "SoundCnt", #3, 14,\
+		 "SoundPtr", #3, 15,\
+		 "SoundPtrMax", #3, 16,\
+		 "Blanking", #2, 17,\
+		 "NewPattern", #2, 18,\
+		 "SoundEnable", #2, 19,\
+		 "Status", #18, 20
+	SYMB	TYPE, 484, "JK", 'T', #483
+; cbar.c    658	
+; cbar.c    659	
+; cbar.c    660	
+; cbar.c    661	typedef union xxtag
+; cbar.c    662	  {
+; cbar.c    663	  JK  CBX;
+; cbar.c    664	  UC  array[sizeof(JK)];
+; cbar.c    665	  } CBVARS;
+	SYMB	TYPE, 485, 'Z', #3, 21
+	SYMB	TYPE, 487, "xxtag", 'U', 22,\
+		 "CBX", #484, 0,\
+		 "array", #485, 0
+	SYMB	TYPE, 488, "CBVARS", 'T', #487
+; cbar.c    666	  
+; cbar.c    667	CBVARS cb_vars;
+; cbar.c    668	CBVARS test_vars;
+; cbar.c    669	
+; cbar.c    670	extern       _bit JKflag;
+; cbar.c    671	_sfrbit    JKpin   _atbit(P1,5);    // P1^5
+; cbar.c    672	_sfrbit    SDApin  _atbit(P1,6);    // P1^6
+; cbar.c    673	
+; cbar.c    674	extern UI LEDMirror;
+; cbar.c    675	extern UI TestLEDMirror;
+; cbar.c    676	
+; cbar.c    677	#define CLASSIC
+; cbar.c    678	//#undef  CLASSIC
+; cbar.c    679	
+; cbar.c    680	/**************************************************************************/
+; cbar.c    681	/* CBLineInterrupt                                  CBAR.C */
+; cbar.c    682	/*                                                  */
+; cbar.c    683	/* Author:   Kim Engedahl, DEV, 000322                          */
+; cbar.c    684	/* Revised:   000603, KEn, DEV                                 */
+; cbar.c    685	/*                                                        */
+; cbar.c    686	/* Function:                                           */
+; cbar.c    687	/* Remarks:   Delayed field interrupt is synchronized to line ??/??      */
+; cbar.c    688	/* Returns:                                            */
+; cbar.c    689	/* Updates:                                            */
+; cbar.c    690	/**************************************************************************/
+; cbar.c    691	void CBLineInterrupt( void)
+; cbar.c    692	  {
+	DW	00123H,00127H,0012BH,0012FH,00133H,00137H,0013BH,0013FH
+CBAR_PR	SEGMENT	HCODE
+	RSEG	CBAR_PR
+	ALIGN	1
+	SYMB	LINE, 692
+CBAR_CLR_FA	SEGMENT	HDATA INSEGMENT CLEAR
+	RSEG	CBAR_CLR_FA
+	ALIGN	1
+_3:	DS	2
+_4:	DS	1
+_5:	DS	1
+	ALIGN	1
+_6:	DS	2
+	ALIGN	1
+_7:	DS	2
+	PUBLIC	_CBLineInterrupt
+	RSEG	CBAR_PR
+_CBLineInterrupt:
+	SYMB	TYPE, 489, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "CBLineInterrupt", _CBLineInterrupt, #489, 0, 0, 112
+	SYMB	ALAB, _CBLineInterrupt, #489
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SYMB	IDEN, "tmp", _7, #18, 130, 4
+	SYMB	IDEN, "tmpv", _6, #18, 130, 4
+	SYMB	IDEN, "TextLineCnt", _5, #3, 130, 4
+	SYMB	IDEN, "TextLineDir", _4, #3, 130, 4
+	SYMB	IDEN, "LineNum", _3, #18, 130, 4
+; cbar.c    693	  static UI tmp;
+; cbar.c    694	  static UI tmpv;
+; cbar.c    695	
+; cbar.c    696	  static UC TextLineCnt;  //Indicated from which line the Text lines have to be inserted !   	
+; cbar.c    697	  static UC TextLineDir;  //Indicates direction of the movement of the text line !		
+; cbar.c    698	
+; cbar.c    699	  static UI LineNum;  //Used to prevent Interlaving flicker ! 
+; cbar.c    700	
+; cbar.c    701	  //UI i;
+; cbar.c    702	  
+; cbar.c    703	  //JKpin = 0;
+; cbar.c    704	
+; cbar.c    705	  if ( CBSetup.System < NTSC_US)
+	SYMB	LINE, 705
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#02H
+	BCS	_18
+; cbar.c    706	    {
+; cbar.c    707	    ;
+; cbar.c    708	    }
+; cbar.c    709	  else    // NTSC
+; cbar.c    710	    {
+; cbar.c    711	    
+; cbar.c    712	    if ( TF0)                        // If delayed field interrupt...
+	SYMB	LINE, 712
+	MOV	C,0285H
+	BCC	_11
+; cbar.c    713	      {
+; cbar.c    714	      TF0 = 0;                      // Clear delayed field interrupt
+	SYMB	LINE, 714
+	CLR	0285H
+; cbar.c    715	#if 1
+; cbar.c    716	      if ( cb_vars.CBX.FrameCnt > 9)
+	SYMB	LINE, 716
+	MOV.B	ES,#SEG( _cb_vars+10 )
+	MOV.W	R0,#SOF( _cb_vars+10 )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#09H
+	BL	_8
+; cbar.c    717	        {
+; cbar.c    718	        cb_vars.CBX.FrameCnt = 1;
+	SYMB	LINE, 718
+	MOV.B	ES,#SEG( _cb_vars+10 )
+	MOV.W	R0,#SOF( _cb_vars+10 )
+	MOV.B	[R0],#01H
+; cbar.c    719	        cb_vars.CBX.SoundFrameCnt = 1;
+	SYMB	LINE, 719
+	MOV.B	ES,#SEG( _cb_vars+13 )
+	MOV.W	R0,#SOF( _cb_vars+13 )
+	MOV.B	[R0],#01H
+; cbar.c    720	        }
+	SYMB	LINE, 720
+_8:
+; cbar.c    721	
+; cbar.c    722	      cb_vars.CBX.SyncLineCnt = 12;              // Next interrupt in 12 lines
+	SYMB	LINE, 722
+	MOV.B	ES,#SEG( _cb_vars+11 )
+	MOV.W	R0,#SOF( _cb_vars+11 )
+	MOV.B	[R0],#0CH
+; cbar.c    723	      test_vars.CBX.SyncLineCnt = 12;              // Next interrupt in 12 lines
+	SYMB	LINE, 723
+	MOV.B	ES,#SEG( _test_vars+11 )
+	MOV.W	R0,#SOF( _test_vars+11 )
+	MOV.B	[R0],#0CH
+; cbar.c    724	      cb_vars.CBX.SyncLinePtr = 1;
+	SYMB	LINE, 724
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R0,#SOF( _cb_vars+12 )
+	MOV.B	[R0],#01H
+; cbar.c    725	
+; cbar.c    726	      cb_vars.CBX.LineCnt = 6;
+	SYMB	LINE, 726
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	[R0],#06H
+; cbar.c    727	
+; cbar.c    728	      cb_vars.CBX.SoundCnt = 2;
+	SYMB	LINE, 728
+	MOV.B	ES,#SEG( _cb_vars+14 )
+	MOV.W	R0,#SOF( _cb_vars+14 )
+	MOV.B	[R0],#02H
+; cbar.c    729	      cb_vars.CBX.SoundPtr = 3;
+	SYMB	LINE, 729
+	MOV.B	ES,#SEG( _cb_vars+15 )
+	MOV.W	R0,#SOF( _cb_vars+15 )
+	MOV.B	[R0],#03H
+; cbar.c    730	      cb_vars.CBX.SoundPtrMax = 47;
+	SYMB	LINE, 730
+	MOV.B	ES,#SEG( _cb_vars+16 )
+	MOV.W	R0,#SOF( _cb_vars+16 )
+	MOV.B	[R0],#02FH
+; cbar.c    731	
+; cbar.c    732	      cb_vars.CBX.Status |= FIELD1;                // This is field 1 of 4
+	SYMB	LINE, 732
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#0200H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    733	      StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 733
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    734	//#else      
+; cbar.c    735	//again
+; cbar.c    736	      if ( test_vars.CBX.FrameCnt > 9)
+	SYMB	LINE, 736
+	MOV.B	ES,#SEG( _test_vars+10 )
+	MOV.W	R0,#SOF( _test_vars+10 )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#09H
+	BL	_9
+; cbar.c    737	        {
+; cbar.c    738	        test_vars.CBX.FrameCnt = 1;
+	SYMB	LINE, 738
+	MOV.B	ES,#SEG( _test_vars+10 )
+	MOV.W	R0,#SOF( _test_vars+10 )
+	MOV.B	[R0],#01H
+; cbar.c    739	        test_vars.CBX.SoundFrameCnt = 1;
+	SYMB	LINE, 739
+	MOV.B	ES,#SEG( _test_vars+13 )
+	MOV.W	R0,#SOF( _test_vars+13 )
+	MOV.B	[R0],#01H
+; cbar.c    740	        }
+	SYMB	LINE, 740
+_9:
+; cbar.c    741	
+; cbar.c    742	      test_vars.CBX.SyncLineCnt = 12;              // Next interrupt in 12 lines
+	SYMB	LINE, 742
+	MOV.B	ES,#SEG( _test_vars+11 )
+	MOV.W	R0,#SOF( _test_vars+11 )
+	MOV.B	[R0],#0CH
+; cbar.c    743	      test_vars.CBX.SyncLinePtr = 1;
+	SYMB	LINE, 743
+	MOV.B	ES,#SEG( _test_vars+12 )
+	MOV.W	R0,#SOF( _test_vars+12 )
+	MOV.B	[R0],#01H
+; cbar.c    744	
+; cbar.c    745	      test_vars.CBX.LineCnt = 6;
+	SYMB	LINE, 745
+	MOV.B	ES,#SEG( _test_vars+8 )
+	MOV.W	R0,#SOF( _test_vars+8 )
+	MOV.W	[R0],#06H
+; cbar.c    746	
+; cbar.c    747	      test_vars.CBX.SoundCnt = 2;
+	SYMB	LINE, 747
+	MOV.B	ES,#SEG( _test_vars+14 )
+	MOV.W	R0,#SOF( _test_vars+14 )
+	MOV.B	[R0],#02H
+; cbar.c    748	      test_vars.CBX.SoundPtr = 3;
+	SYMB	LINE, 748
+	MOV.B	ES,#SEG( _test_vars+15 )
+	MOV.W	R0,#SOF( _test_vars+15 )
+	MOV.B	[R0],#03H
+; cbar.c    749	      test_vars.CBX.SoundPtrMax = 47;
+	SYMB	LINE, 749
+	MOV.B	ES,#SEG( _test_vars+16 )
+	MOV.W	R0,#SOF( _test_vars+16 )
+	MOV.B	[R0],#02FH
+; cbar.c    750	
+; cbar.c    751	      test_vars.CBX.Status = cb_vars.CBX.Status; //FIELD1;                // This is field 1 of 4
+	SYMB	LINE, 751
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    752	      //StatusPort = test_vars.CBX.Status;
+; cbar.c    753	#endif
+; cbar.c    754	//KS. Controls position of the text lines in the test pattern.
+; cbar.c    755		
+; cbar.c    756	      if (TextLineDir==0)
+	SYMB	LINE, 756
+	MOV.B	ES,#SEG( _4 )
+	MOV.W	R0,#SOF( _4 )
+	MOV.B	R0L,[R0]
+	BNE	_10
+; cbar.c    757		{ 	
+; cbar.c    758	      	if (TextLineCnt++ == 100) 
+	SYMB	LINE, 758
+	MOV.B	ES,#SEG( _5 )
+	MOV.W	R0,#SOF( _5 )
+	MOV.B	R0L,[R0]
+	MOV.B	R0H,R0L
+	ADDS.B	R0L,#01H
+	MOV.B	ES,#SEG( _5 )
+	MOV.W	R1,#SOF( _5 )
+	MOV.B	[R1],R0L
+	CMP.B	R0H,#064H
+	BNE	_38
+; cbar.c    759			TextLineDir = 1;	
+	SYMB	LINE, 759
+	MOV.B	ES,#SEG( _4 )
+	MOV.W	R0,#SOF( _4 )
+	MOV.B	[R0],#01H
+; cbar.c    760		}
+	SYMB	LINE, 760
+	BR	_38
+_10:
+; cbar.c    761	      else
+; cbar.c    762		{ 	
+; cbar.c    763	      	if (TextLineCnt-- == 50)	
+	SYMB	LINE, 763
+	MOV.B	ES,#SEG( _5 )
+	MOV.W	R0,#SOF( _5 )
+	MOV.B	R0L,[R0]
+	MOV.B	R0H,R0L
+	ADDS.B	R0L,#0FH
+	MOV.B	ES,#SEG( _5 )
+	MOV.W	R1,#SOF( _5 )
+	MOV.B	[R1],R0L
+	CMP.B	R0H,#032H
+	BNE	_38
+; cbar.c    764			TextLineDir = 0;	
+	SYMB	LINE, 764
+	MOV.B	ES,#SEG( _4 )
+	MOV.W	R0,#SOF( _4 )
+	MOV.B	[R0],#00H
+; cbar.c    765		}
+; cbar.c    766	
+; cbar.c    767	      goto JKexit;
+	SYMB	LINE, 767
+	BR	_38
+; cbar.c    768	      }
+	SYMB	LINE, 768
+_11:
+; cbar.c    769	    else
+; cbar.c    770	      {
+; cbar.c    771	#if 1    
+; cbar.c    772	      if ( cb_vars.CBX.Status & FIELD1)
+	SYMB	LINE, 772
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.W	R1,R0
+	MOV.W	R2,#0200H
+	AND.W	R1,#0200H
+	BEQ	_12
+; cbar.c    773	        {
+; cbar.c    774	        cb_vars.CBX.Status &= ~FIELD1;
+	SYMB	LINE, 774
+	AND.W	R0,#0FDFFH
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    775	        StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 775
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    776	        }
+	SYMB	LINE, 776
+_12:
+; cbar.c    777	
+; cbar.c    778	      if ( ++cb_vars.CBX.LineCnt >= 525)
+	SYMB	LINE, 778
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	R0,[R0]
+	ADDS.W	R0,#01H
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R1,#SOF( _cb_vars+8 )
+	MOV.W	[R1],R0
+	CMP.W	R0,#020DH
+	BCS	_14
+; cbar.c    779	        {
+; cbar.c    780	        cb_vars.CBX.FrameCnt++;
+	SYMB	LINE, 780
+	MOV.B	ES,#SEG( _cb_vars+10 )
+	MOV.W	R0,#SOF( _cb_vars+10 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#01H
+	MOV.B	ES,#SEG( _cb_vars+10 )
+	MOV.W	R1,#SOF( _cb_vars+10 )
+	MOV.B	[R1],R0L
+; cbar.c    781	        cb_vars.CBX.LineCnt = 0;
+	SYMB	LINE, 781
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	[R0],#00H
+; cbar.c    782	        if ( ++cb_vars.CBX.SoundFrameCnt > 5)
+	SYMB	LINE, 782
+	MOV.B	ES,#SEG( _cb_vars+13 )
+	MOV.W	R0,#SOF( _cb_vars+13 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#01H
+	MOV.B	ES,#SEG( _cb_vars+13 )
+	MOV.W	R1,#SOF( _cb_vars+13 )
+	MOV.B	[R1],R0L
+	CMP.B	R0L,#05H
+	BL	_14
+; cbar.c    783	          cb_vars.CBX.SoundFrameCnt = 1;
+	SYMB	LINE, 783
+	MOV.B	ES,#SEG( _cb_vars+13 )
+	MOV.W	R0,#SOF( _cb_vars+13 )
+	MOV.B	[R0],#01H
+; cbar.c    784	        }
+	SYMB	LINE, 784
+_14:
+; cbar.c    785	#if 0
+; cbar.c    786	      if ( !--cb_vars.CBX.SoundCnt)
+; cbar.c    787	        {
+; cbar.c    788	        if ( cb_vars.CBX.SoundPtr > cb_vars.CBX.SoundPtrMax)
+; cbar.c    789	          {
+; cbar.c    790	          cb_vars.CBX.SoundPtr = 0;
+; cbar.c    791	
+; cbar.c    792	          if ( cb_vars.CBX.SoundPtrMax == 46)
+; cbar.c    793	            cb_vars.CBX.SoundPtrMax = 47;
+; cbar.c    794	          else
+; cbar.c    795	            cb_vars.CBX.SoundPtrMax = 46;
+; cbar.c    796	          }
+; cbar.c    797	        tmp = Sound525[cb_vars.CBX.SoundPtr];      // Get sound information
+; cbar.c    798	
+; cbar.c    799	        if ( cb_vars.CBX.SoundPtr++ == 47)        // Prepare for line 263
+; cbar.c    800	          if ( cb_vars.CBX.SoundFrameCnt & 0x01)  // Sound frames 1,3,5 are special
+; cbar.c    801	            tmp |= S3OR4;
+; cbar.c    802	
+; cbar.c    803	        cb_vars.CBX.Status &= ~SOUND;              // Clear previous sound sample
+; cbar.c    804	
+; cbar.c    805	        if ( cb_vars.CBX.SoundEnable)
+; cbar.c    806	          {
+; cbar.c    807	          cb_vars.CBX.Status |= ( tmp & SOUND);    // Sound samples
+; cbar.c    808	          }
+; cbar.c    809	        cb_vars.CBX.SoundCnt = tmp & 0x0F;         // Lines to next sound update
+; cbar.c    810	        StatusPort = cb_vars.CBX.Status;          // Update status port
+; cbar.c    811	        }
+; cbar.c    812	#endif          
+; cbar.c    813	//#else
+; cbar.c    814	//again
+; cbar.c    815	      if ( test_vars.CBX.Status & FIELD1)
+	SYMB	LINE, 815
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R2,R0
+	BEQ	_15
+; cbar.c    816	        {
+; cbar.c    817	        test_vars.CBX.Status &= ~FIELD1;
+	SYMB	LINE, 817
+	AND.W	R0,#0FDFFH
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    818	        //StatusPort = test_vars.CBX.Status;
+; cbar.c    819	        }
+	SYMB	LINE, 819
+_15:
+; cbar.c    820	
+; cbar.c    821	      if ( ++test_vars.CBX.LineCnt >= 525)
+	SYMB	LINE, 821
+	MOV.B	ES,#SEG( _test_vars+8 )
+	MOV.W	R0,#SOF( _test_vars+8 )
+	MOV.W	R0,[R0]
+	ADDS.W	R0,#01H
+	MOV.B	ES,#SEG( _test_vars+8 )
+	MOV.W	R1,#SOF( _test_vars+8 )
+	MOV.W	[R1],R0
+	CMP.W	R0,#020DH
+	BCS	_18
+; cbar.c    822	        {
+; cbar.c    823	        test_vars.CBX.FrameCnt++;
+	SYMB	LINE, 823
+	MOV.B	ES,#SEG( _test_vars+10 )
+	MOV.W	R0,#SOF( _test_vars+10 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#01H
+	MOV.B	ES,#SEG( _test_vars+10 )
+	MOV.W	R1,#SOF( _test_vars+10 )
+	MOV.B	[R1],R0L
+; cbar.c    824	        test_vars.CBX.LineCnt = 0;
+	SYMB	LINE, 824
+	MOV.B	ES,#SEG( _test_vars+8 )
+	MOV.W	R0,#SOF( _test_vars+8 )
+	MOV.W	[R0],#00H
+; cbar.c    825	        if ( ++test_vars.CBX.SoundFrameCnt > 5)
+	SYMB	LINE, 825
+	MOV.B	ES,#SEG( _test_vars+13 )
+	MOV.W	R0,#SOF( _test_vars+13 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#01H
+	MOV.B	ES,#SEG( _test_vars+13 )
+	MOV.W	R1,#SOF( _test_vars+13 )
+	MOV.B	[R1],R0L
+	CMP.B	R0L,#05H
+	BL	_18
+; cbar.c    826	          test_vars.CBX.SoundFrameCnt = 1;
+	SYMB	LINE, 826
+	MOV.B	ES,#SEG( _test_vars+13 )
+	MOV.W	R0,#SOF( _test_vars+13 )
+	MOV.B	[R0],#01H
+; cbar.c    827	        }
+; cbar.c    828	#if 0
+; cbar.c    829	      if ( !--test_vars.CBX.SoundCnt)
+; cbar.c    830	        {
+; cbar.c    831	        if ( test_vars.CBX.SoundPtr > test_vars.CBX.SoundPtrMax)
+; cbar.c    832	          {
+; cbar.c    833	          test_vars.CBX.SoundPtr = 0;
+; cbar.c    834	
+; cbar.c    835	          if ( test_vars.CBX.SoundPtrMax == 46)
+; cbar.c    836	            test_vars.CBX.SoundPtrMax = 47;
+; cbar.c    837	          else
+; cbar.c    838	            test_vars.CBX.SoundPtrMax = 46;
+; cbar.c    839	          }
+; cbar.c    840	        tmpv = Sound525[test_vars.CBX.SoundPtr];      // Get sound information
+; cbar.c    841	
+; cbar.c    842	        if ( test_vars.CBX.SoundPtr++ == 47)        // Prepare for line 263
+; cbar.c    843	          if ( test_vars.CBX.SoundFrameCnt & 0x01)  // Sound frames 1,3,5 are special
+; cbar.c    844	            tmpv |= S3OR4;
+; cbar.c    845	
+; cbar.c    846	        test_vars.CBX.Status &= ~SOUND;              // Clear previous sound sample
+; cbar.c    847	
+; cbar.c    848	        if ( test_vars.CBX.SoundEnable)
+; cbar.c    849	          test_vars.CBX.Status |= ( tmpv & SOUND);    // Sound samples
+; cbar.c    850	        test_vars.CBX.SoundCnt = tmpv & 0x0F;         // Lines to next sound update
+; cbar.c    851	        //StatusPort = test_vars.CBX.Status;          // Update status port
+; cbar.c    852	        }
+; cbar.c    853	#endif
+; cbar.c    854	#endif        
+; cbar.c    855	     }
+; cbar.c    856	    } // if NTSC
+	SYMB	LINE, 856
+_18:
+; cbar.c    857	#ifdef CLASSIC   
+; cbar.c    858	  if ( --cb_vars.CBX.SyncLineCnt == 0)
+	SYMB	LINE, 858
+	MOV.B	ES,#SEG( _cb_vars+11 )
+	MOV.W	R0,#SOF( _cb_vars+11 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#0FH
+	MOV.B	ES,#SEG( _cb_vars+11 )
+	MOV.W	R1,#SOF( _cb_vars+11 )
+	MOV.B	[R1],R0L
+	OR.B	R0L,R0L
+	BNE	_22
+; cbar.c    859	    {
+; cbar.c    860	    JKpin = 1;
+	SYMB	LINE, 860
+	SETB	0431H.5
+; cbar.c    861	    tmp = cb_vars.CBX.TablePtr[++cb_vars.CBX.SyncLinePtr];
+	SYMB	LINE, 861
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R0,#SOF( _cb_vars+12 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#01H
+	MOV.B	R1L,R0L
+	MOV.B	R0L,R1L
+	MOVS.B	R0H,#00H
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R2,#SOF( _cb_vars+12 )
+	MOV.B	[R2],R1L
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	SEXT.W	R3
+	MOV.B	ES,#SEG( _cb_vars )
+	MOV.W	R1,#SOF( _cb_vars )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    862	    JKpin = 0;
+	SYMB	LINE, 862
+	CLR	0431H.5
+; cbar.c    863	    if ( tmp == 0)
+	SYMB	LINE, 863
+	OR.W	R1,R1
+	BNE	_20
+; cbar.c    864	      {
+; cbar.c    865	      if ( cb_vars.CBX.NewPattern)
+	SYMB	LINE, 865
+	MOV.B	ES,#SEG( _cb_vars+18 )
+	MOV.W	R0,#SOF( _cb_vars+18 )
+	MOV.B	R0L,[R0]
+	BEQ	_19
+; cbar.c    866	        {     
+; cbar.c    867	        cb_vars.CBX.NewPattern = cb_vars.CBX.Blanking = FALSE;
+	SYMB	LINE, 867
+	MOV.B	ES,#SEG( _cb_vars+17 )
+	MOV.W	R0,#SOF( _cb_vars+17 )
+	MOV.B	[R0],#00H
+	MOV.B	ES,#SEG( _cb_vars+18 )
+	MOV.W	R0,#SOF( _cb_vars+18 )
+	MOV.B	[R0],#00H
+; cbar.c    868	
+; cbar.c    869	        cb_vars.CBX.TablePtr = cb_vars.CBX.newTablePtr;
+	SYMB	LINE, 869
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R1,#SOF( _cb_vars+4 )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,#SEG( _cb_vars )
+	MOV.W	R2,#SOF( _cb_vars )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; cbar.c    870	        }
+	SYMB	LINE, 870
+_19:
+; cbar.c    871	      cb_vars.CBX.SyncLinePtr = 0;
+	SYMB	LINE, 871
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R0,#SOF( _cb_vars+12 )
+	MOV.B	[R0],#00H
+; cbar.c    872	      tmp = cb_vars.CBX.TablePtr[0];
+	SYMB	LINE, 872
+	MOV.B	ES,#SEG( _cb_vars )
+	MOV.W	R1,#SOF( _cb_vars )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    873	      }
+	SYMB	LINE, 873
+_20:
+; cbar.c    874	
+; cbar.c    875	    cb_vars.CBX.SyncLineCnt = tmp / 256; // extract line cnt to SyncLineCnt
+	SYMB	LINE, 875
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	R0,[R0]
+	MOV.W	R4,R0
+	LSR.W	R0,#08H
+	MOV.B	ES,#SEG( _cb_vars+11 )
+	MOV.W	R2,#SOF( _cb_vars+11 )
+	MOV.B	[R2],R0L
+; cbar.c    876	    tmp %= 256;              // extract SramBankX + SyncLineX tmp
+	SYMB	LINE, 876
+	XOR.W	R5,R5
+	DIVU.D	R4,#0100H
+	MOV.W	R1,R5
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R5
+; cbar.c    877	    tmp &= 0x3F;
+	SYMB	LINE, 877
+	AND.W	R1,#03FH
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    878	    cb_vars.CBX.Status &= ~( S5S4S3S2 | S1S0);
+	SYMB	LINE, 878
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC0H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c    879	    cb_vars.CBX.Status |= tmp;
+	SYMB	LINE, 879
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    880	
+; cbar.c    881	    if ( cb_vars.CBX.Blanking)                    // If blanking do NOT enable any
+	SYMB	LINE, 881
+	MOV.B	ES,#SEG( _cb_vars+17 )
+	MOV.W	R0,#SOF( _cb_vars+17 )
+	MOV.B	R0L,[R0]
+	BEQ	_21
+; cbar.c    882	      cb_vars.CBX.Status &= ~S5S4S3S2;            //  bank
+	SYMB	LINE, 882
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC3H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+_21:
+; cbar.c    883	    StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 883
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    884	    }
+	SYMB	LINE, 884
+_22:
+; cbar.c    885	//KS.Test of text line moving in the test pattern. 
+; cbar.c    886	
+; cbar.c    887	//Field #1.
+; cbar.c    888	
+; cbar.c    889	     if (cb_vars.CBX.LineCnt >= TextLineCnt)		//Start of text lines !
+	SYMB	LINE, 889
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _5 )
+	MOV.W	R1,#SOF( _5 )
+	MOV.B	R5L,[R1]
+	MOV.B	R4L,R5L
+	MOVS.B	R4H,#00H
+	CMP.W	R0,R4
+	BCS	_24
+; cbar.c    890	        {
+; cbar.c    891	     	if (cb_vars.CBX.LineCnt <= (TextLineCnt+7))
+	SYMB	LINE, 891
+	MOV.B	R1L,R5L
+	MOVS.B	R1H,#00H
+	ADDS.W	R1,#07H
+	CMP.W	R0,R1
+	BG	_24
+; cbar.c    892	        	{
+; cbar.c    893			tmp = TextLines_SyncLineC[cb_vars.CBX.LineCnt - TextLineCnt];
+	SYMB	LINE, 893
+	SUB.W	R0,R4
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	MOVS.W	R3,#00H
+	MOV.W	R1,#SEG( _TextLines_SyncLineC )
+	MOV.W	R0,#SOF( _TextLines_SyncLineC )
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.W	R2,R1
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    894	    		tmp %= 256;              // extract SramBankX + SyncLineX tmp
+	SYMB	LINE, 894
+	XOR.W	R3,R3
+	DIVU.D	R2,#0100H
+	MOV.W	R1,R3
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R3
+; cbar.c    895	    		tmp &= 0x3F;
+	SYMB	LINE, 895
+	AND.W	R1,#03FH
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    896	    		cb_vars.CBX.Status &= ~( S5S4S3S2 | S1S0);
+	SYMB	LINE, 896
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC0H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c    897	    		cb_vars.CBX.Status |= tmp;
+	SYMB	LINE, 897
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    898	    		StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 898
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    899		        } 
+; cbar.c    900	       }
+	SYMB	LINE, 900
+_24:
+; cbar.c    901	     if (cb_vars.CBX.LineCnt == (TextLineCnt + 8)) 	//Restore original pattern 
+	SYMB	LINE, 901
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	R0,[R0]
+	MOV.B	R6L,R5L
+	MOVS.B	R6H,#00H
+	MOV.W	R5,#08H
+	ADD.W	R5,R6
+	CMP.W	R0,R5
+	BNE	_25
+; cbar.c    902	        {
+; cbar.c    903		tmp = cb_vars.CBX.TablePtr[cb_vars.CBX.SyncLinePtr];
+	SYMB	LINE, 903
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R0,#SOF( _cb_vars+12 )
+	MOV.B	R0L,[R0]
+	MOVS.B	R0H,#00H
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	SEXT.W	R3
+	MOV.B	ES,#SEG( _cb_vars )
+	MOV.W	R1,#SOF( _cb_vars )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.W	R2,R1
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    904	   	tmp %= 256;              // extract SramBankX + SyncLineX tmp
+	SYMB	LINE, 904
+	XOR.W	R3,R3
+	DIVU.D	R2,#0100H
+	MOV.W	R1,R3
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R3
+; cbar.c    905	    	tmp &= 0x3F;
+	SYMB	LINE, 905
+	AND.W	R1,#03FH
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    906	    	cb_vars.CBX.Status &= ~( S5S4S3S2 | S1S0);
+	SYMB	LINE, 906
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC0H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c    907	    	cb_vars.CBX.Status |= tmp;
+	SYMB	LINE, 907
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    908	    	StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 908
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    909	       	}
+	SYMB	LINE, 909
+_25:
+; cbar.c    910	
+; cbar.c    911	
+; cbar.c    912	//Field #2.
+; cbar.c    913	//To prevent Interlacing "flicker" Down and Up movements is handled differently.
+; cbar.c    914	
+; cbar.c    915	     if (TextLineDir == 0)	//Down movement.
+	SYMB	LINE, 915
+	MOV.B	ES,#SEG( _4 )
+	MOV.W	R0,#SOF( _4 )
+	MOV.B	R0L,[R0]
+	BNE	_26
+; cbar.c    916		{
+; cbar.c    917		LineNum =	263; 	
+	SYMB	LINE, 917
+	MOV.B	ES,#SEG( _3 )
+	MOV.W	R0,#SOF( _3 )
+	MOV.W	[R0],#0107H
+; cbar.c    918		}
+	SYMB	LINE, 918
+	BR	_27
+_26:
+; cbar.c    919	     else			//Up movement.
+; cbar.c    920		{
+; cbar.c    921		LineNum =	262; 	
+	SYMB	LINE, 921
+	MOV.B	ES,#SEG( _3 )
+	MOV.W	R0,#SOF( _3 )
+	MOV.W	[R0],#0106H
+; cbar.c    922		}  	
+	SYMB	LINE, 922
+_27:
+; cbar.c    923	
+; cbar.c    924	     if (cb_vars.CBX.LineCnt >= (TextLineCnt + LineNum))   //263 = number of lines in a feeld #1. !
+	SYMB	LINE, 924
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _3 )
+	MOV.W	R1,#SOF( _3 )
+	MOV.W	R1,[R1]
+	MOV.B	ES,#SEG( _3 )
+	MOV.W	R2,#SOF( _3 )
+	MOV.W	[R2],R1
+	ADD.W	R4,R1
+	CMP.W	R0,R4
+	BCS	_29
+; cbar.c    925	        {
+; cbar.c    926	     	if (cb_vars.CBX.LineCnt <= (TextLineCnt + 7 + LineNum))
+	SYMB	LINE, 926
+	ADDS.W	R6,#07H
+	MOV.B	ES,#SEG( _3 )
+	MOV.W	R1,#SOF( _3 )
+	MOV.W	R1,[R1]
+	MOV.W	R3,R6
+	ADD.W	R3,R1
+	CMP.W	R0,R3
+	BG	_29
+; cbar.c    927	        	{
+; cbar.c    928			tmp = TextLines_SyncLineD[cb_vars.CBX.LineCnt - (TextLineCnt + LineNum)];
+	SYMB	LINE, 928
+	SUB.W	R0,R4
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	MOVS.W	R3,#00H
+	MOV.W	R1,#SEG( _TextLines_SyncLineD )
+	MOV.W	R0,#SOF( _TextLines_SyncLineD )
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.W	R2,R1
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    929	    		tmp %= 256;              // extract SramBankX + SyncLineX tmp
+	SYMB	LINE, 929
+	XOR.W	R3,R3
+	DIVU.D	R2,#0100H
+	MOV.W	R1,R3
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R3
+; cbar.c    930	    		tmp &= 0x3F;
+	SYMB	LINE, 930
+	AND.W	R1,#03FH
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    931	    		cb_vars.CBX.Status &= ~( S5S4S3S2 | S1S0);
+	SYMB	LINE, 931
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC0H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c    932	    		cb_vars.CBX.Status |= tmp;
+	SYMB	LINE, 932
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    933	    		StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 933
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    934			} 
+; cbar.c    935	       }
+	SYMB	LINE, 935
+_29:
+; cbar.c    936	     if (cb_vars.CBX.LineCnt == (TextLineCnt + 8 + LineNum))  //Restore original pattern
+	SYMB	LINE, 936
+	MOV.B	ES,#SEG( _cb_vars+8 )
+	MOV.W	R0,#SOF( _cb_vars+8 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _3 )
+	MOV.W	R1,#SOF( _3 )
+	MOV.W	R1,[R1]
+	ADD.W	R5,R1
+	CMP.W	R0,R5
+	BNE	_30
+; cbar.c    937	        {
+; cbar.c    938		tmp = cb_vars.CBX.TablePtr[cb_vars.CBX.SyncLinePtr];
+	SYMB	LINE, 938
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R0,#SOF( _cb_vars+12 )
+	MOV.B	R0L,[R0]
+	MOVS.B	R0H,#00H
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	SEXT.W	R3
+	MOV.B	ES,#SEG( _cb_vars )
+	MOV.W	R1,#SOF( _cb_vars )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.W	R2,R1
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    939	   	tmp %= 256;              // extract SramBankX + SyncLineX tmp
+	SYMB	LINE, 939
+	XOR.W	R3,R3
+	DIVU.D	R2,#0100H
+	MOV.W	R1,R3
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R3
+; cbar.c    940	    	tmp &= 0x3F;
+	SYMB	LINE, 940
+	AND.W	R1,#03FH
+	MOV.B	ES,#SEG( _7 )
+	MOV.W	R0,#SOF( _7 )
+	MOV.W	[R0],R1
+; cbar.c    941	    	cb_vars.CBX.Status &= ~( S5S4S3S2 | S1S0);
+	SYMB	LINE, 941
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC0H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c    942	    	cb_vars.CBX.Status |= tmp;
+	SYMB	LINE, 942
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    943	    	StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 943
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c    944	       	}
+	SYMB	LINE, 944
+_30:
+; cbar.c    945	
+; cbar.c    946	//#else
+; cbar.c    947	  // again for test_vars *****************************************
+; cbar.c    948	  if ( --test_vars.CBX.SyncLineCnt == 0)
+	SYMB	LINE, 948
+	MOV.B	ES,#SEG( _test_vars+11 )
+	MOV.W	R0,#SOF( _test_vars+11 )
+	MOV.B	R0L,[R0]
+	ADDS.B	R0L,#0FH
+	MOV.B	ES,#SEG( _test_vars+11 )
+	MOV.W	R1,#SOF( _test_vars+11 )
+	MOV.B	[R1],R0L
+	OR.B	R0L,R0L
+	BNE	_38
+; cbar.c    949	    {
+; cbar.c    950	     tmpv = test_vars.CBX.TablePtr[++test_vars.CBX.SyncLinePtr];
+	SYMB	LINE, 950
+	MOV.B	ES,#SEG( _test_vars+12 )
+	MOV.W	R0,#SOF( _test_vars+12 )
+	MOV.B	R1L,[R0]
+	ADDS.B	R1L,#01H
+	MOV.B	R0L,R1L
+	MOVS.B	R0H,#00H
+	MOV.B	ES,#SEG( _test_vars+12 )
+	MOV.W	R2,#SOF( _test_vars+12 )
+	MOV.B	[R2],R1L
+	ASL.W	R0,#01H
+	MOV.W	R2,R0
+	SEXT.W	R3
+	MOV.B	ES,#SEG( _test_vars )
+	MOV.W	R1,#SOF( _test_vars )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.B	ES,#SEG( _6 )
+	MOV.W	R0,#SOF( _6 )
+	MOV.W	[R0],R1
+; cbar.c    951	    if ( tmpv == 0)
+	SYMB	LINE, 951
+	OR.W	R1,R1
+	BNE	_32
+; cbar.c    952	      {
+; cbar.c    953	      if ( test_vars.CBX.NewPattern)
+	SYMB	LINE, 953
+	MOV.B	ES,#SEG( _test_vars+18 )
+	MOV.W	R0,#SOF( _test_vars+18 )
+	MOV.B	R0L,[R0]
+	BEQ	_31
+; cbar.c    954	        {
+; cbar.c    955	        test_vars.CBX.NewPattern = test_vars.CBX.Blanking = FALSE;
+	SYMB	LINE, 955
+	MOV.B	ES,#SEG( _test_vars+17 )
+	MOV.W	R0,#SOF( _test_vars+17 )
+	MOV.B	[R0],#00H
+	MOV.B	ES,#SEG( _test_vars+18 )
+	MOV.W	R0,#SOF( _test_vars+18 )
+	MOV.B	[R0],#00H
+; cbar.c    956	
+; cbar.c    957	        test_vars.CBX.TablePtr = test_vars.CBX.newTablePtr;
+	SYMB	LINE, 957
+	MOV.B	ES,#SEG( _test_vars+4 )
+	MOV.W	R1,#SOF( _test_vars+4 )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,#SEG( _test_vars )
+	MOV.W	R2,#SOF( _test_vars )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; cbar.c    958	        }
+	SYMB	LINE, 958
+_31:
+; cbar.c    959	      test_vars.CBX.SyncLinePtr = 0;
+	SYMB	LINE, 959
+	MOV.B	ES,#SEG( _test_vars+12 )
+	MOV.W	R0,#SOF( _test_vars+12 )
+	MOV.B	[R0],#00H
+; cbar.c    960	      tmpv = test_vars.CBX.TablePtr[0];
+	SYMB	LINE, 960
+	MOV.B	ES,#SEG( _test_vars )
+	MOV.W	R1,#SOF( _test_vars )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	CS,R1L
+	MOVC.W	R1,[R0+]
+	MOV.B	ES,#SEG( _6 )
+	MOV.W	R0,#SOF( _6 )
+	MOV.W	[R0],R1
+; cbar.c    961	      }
+	SYMB	LINE, 961
+_32:
+; cbar.c    962	
+; cbar.c    963	    test_vars.CBX.SyncLineCnt = tmpv / 256; // extract line cnt to SyncLineCnt
+	SYMB	LINE, 963
+	MOV.B	ES,#SEG( _6 )
+	MOV.W	R0,#SOF( _6 )
+	MOV.W	R0,[R0]
+	MOV.W	R4,R0
+	LSR.W	R0,#08H
+	MOV.B	ES,#SEG( _test_vars+11 )
+	MOV.W	R2,#SOF( _test_vars+11 )
+	MOV.B	[R2],R0L
+; cbar.c    964	    tmpv %= 256;              // extract SramBankX + SyncLineX tmp
+	SYMB	LINE, 964
+	XOR.W	R5,R5
+	DIVU.D	R4,#0100H
+	MOV.W	R1,R5
+	MOV.B	ES,#SEG( _6 )
+	MOV.W	R0,#SOF( _6 )
+	MOV.W	[R0],R5
+; cbar.c    965	    tmpv &= 0x3F;
+	SYMB	LINE, 965
+	AND.W	R1,#03FH
+	MOV.B	ES,#SEG( _6 )
+	MOV.W	R0,#SOF( _6 )
+	MOV.W	[R0],R1
+; cbar.c    966	    test_vars.CBX.Status &= ~( S5S4S3S2 | S1S0);
+	SYMB	LINE, 966
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC0H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R2,#SOF( _test_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c    967	    test_vars.CBX.Status |= tmpv;
+	SYMB	LINE, 967
+	OR.W	R0,R1
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    968	
+; cbar.c    969	    if ( test_vars.CBX.Blanking)                    // If blanking do NOT enable any
+	SYMB	LINE, 969
+	MOV.B	ES,#SEG( _test_vars+17 )
+	MOV.W	R0,#SOF( _test_vars+17 )
+	MOV.B	R0L,[R0]
+	BEQ	_38
+; cbar.c    970	      test_vars.CBX.Status &= ~S5S4S3S2;            //  bank
+	SYMB	LINE, 970
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC3H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c    971	    //StatusPort = test_vars.CBX.Status;
+; cbar.c    972	    
+; cbar.c    973	    }
+; cbar.c    974	#endif 
+; cbar.c    975	JKexit: 
+	SYMB	LINE, 975
+_38:
+	SYMB	IDEN, "JKexit", _38, #15, 129, 4
+; cbar.c    976	  LEDPort     = LEDMirror;
+	SYMB	LINE, 976
+	MOV.B	ES,#SEG( _LEDMirror )
+	MOV.W	R0,#SOF( _LEDMirror )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _LEDPort )
+	MOV.W	R1,#SOF( _LEDPort )
+	MOV.W	[R1],R0
+; cbar.c    977	  TestLEDPort = TestLEDMirror;
+	SYMB	LINE, 977
+	MOV.B	ES,#SEG( _TestLEDMirror )
+	MOV.W	R0,#SOF( _TestLEDMirror )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _TestLEDPort )
+	MOV.W	R1,#SOF( _TestLEDPort )
+	MOV.W	[R1],R0
+; cbar.c    978	
+; cbar.c    979	#if 0
+; cbar.c    980	  for (i = 12; i < 13; i++)
+; cbar.c    981	    //if (test_vars.array[i] != cb_vars.array[i])
+; cbar.c    982	     if (test_vars.CBX.Status != cb_vars.CBX.Status)
+; cbar.c    983	      JKpin = 1;
+; cbar.c    984	#endif
+; cbar.c    985	  //JKpin = 1;
+; cbar.c    986	  return;      
+; cbar.c    987	  }
+	SYMB	LINE, 987
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; cbar.c    988	
+; cbar.c    989	
+; cbar.c    990	
+; cbar.c    991	/**************************************************************************/
+; cbar.c    992	/* WriteCBGain                                                       CBAR.C */
+; cbar.c    993	/*                                                                        */
+; cbar.c    994	/* Author:   Kim Engedahl, DEV, 000504                                    */
+; cbar.c    995	/* Revised:   000606, KEn, DEV                                             */
+; cbar.c    996	/*                                                                        */
+; cbar.c    997	/* Function:                                                               */
+; cbar.c    998	/* Remarks:                                                                 */
+; cbar.c    999	/* Returns:                                                                */
+; cbar.c   1000	/* Updates:                                                                */
+; cbar.c   1001	/**************************************************************************/
+; cbar.c   1002	int WriteCBGain( UC gain)
+; cbar.c   1003	{
+	ALIGN	1
+	SYMB	LINE, 1003
+	PUBLIC	_WriteCBGain
+_WriteCBGain:
+	SYMB	TYPE, 490, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "WriteCBGain", _WriteCBGain, #490, 0, 0, 0
+	SYMB	ALAB, _WriteCBGain, #490
+	ADDS.W	R7,#0EH
+	SYMB	SOFF, 2
+	SYMB	LTIM, "gain", 0, 0, 2253
+	SYMB	IDEN, "gain", 0, #3, 0, 2061
+; cbar.c   1004	  return( Write_AD8402( CBPotMeter, 0, gain));
+	SYMB	LINE, 1004
+	MOV.B	R0H,#00H
+	MOV.B	R1L,R0H
+	MOV.B	[R7],R0L
+	SYMB	LTIM, "gain", 0, 0, 2125
+	SYMB	LTIM, "gain", -2, 130, 2245
+	MOV.B	R0L,R1L
+	MOV.B	R1L,[R7]
+	CALL	_Write_AD8402
+	SYMB	LTIM, "gain", -2, 130, 2117
+	SYMB	LTIM, "gain", 4, 0, 2253
+	SYMB	LTIM, "gain", 4, 0, 2125
+; cbar.c   1005	}
+	SYMB	LINE, 1005
+	ADDS.W	R7,#02H
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; cbar.c   1006	
+; cbar.c   1007	/**************************************************************************/
+; cbar.c   1008	/* WriteCBChromaGain                                                 CBAR.C */
+; cbar.c   1009	/*                                                                        */
+; cbar.c   1010	/* Author:   Kim Engedahl, DEV, 000504                                    */
+; cbar.c   1011	/* Revised:   000603, KEn, DEV                                             */
+; cbar.c   1012	/*                                                                        */
+; cbar.c   1013	/* Function:                                                               */
+; cbar.c   1014	/* Remarks:   The resistor at V118 has been swapped ie. bit 0 is bit 3 etc.*/
+; cbar.c   1015	/*           The conversion is done in SW instead of correcting the parts  */
+; cbar.c   1016	/*           list.                                                        */
+; cbar.c   1017	/* Returns:                                                                */
+; cbar.c   1018	/* Updates:                                                                */
+; cbar.c   1019	/**************************************************************************/
+; cbar.c   1020	int WriteCBChromaGain( UC gain)
+; cbar.c   1021	{
+	ALIGN	1
+	SYMB	LINE, 1021
+	PUBLIC	_WriteCBChromaGain
+_WriteCBChromaGain:
+	SYMB	TYPE, 491, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "WriteCBChromaGain", _WriteCBChromaGain, #491, 0, 0, 0
+	SYMB	ALAB, _WriteCBChromaGain, #491
+	SYMB	LTIM, "gain", 0, 0, 2253
+	SYMB	IDEN, "gain", 0, #3, 0, 2061
+	SYMB	IDEN, "tmp", -1, #3, 130, 5
+	SYMB	LTIM, "tmp", -1, 0, 69
+; cbar.c   1022	  UC tmp = 0;
+	SYMB	LINE, 1022
+	MOV.B	R0H,#00H
+	SYMB	LTIM, "tmp", 1, 0, 205
+; cbar.c   1023	
+; cbar.c   1024	  // gain bit 1 = bit4
+; cbar.c   1025	  // gain bit 2 = bit3
+; cbar.c   1026	  // gain bit 3 = bit2
+; cbar.c   1027	  // gain bit 4 = bit1
+; cbar.c   1028	
+; cbar.c   1029	  if ( gain & 0x01)
+	SYMB	LINE, 1029
+	MOV.B	R1L,R0L
+	AND.B	R1L,#01H
+	BEQ	_54
+; cbar.c   1030	    tmp += 0x08;
+	SYMB	LINE, 1030
+	MOV.B	R0H,#08H
+	SYMB	LTIM, "tmp", 1, 0, 77
+	SYMB	LTIM, "tmp", 1, 0, 205
+_54:
+; cbar.c   1031	
+; cbar.c   1032	  if ( gain & 0x02)
+	SYMB	LINE, 1032
+	MOV.B	R1L,R0L
+	AND.B	R1L,#02H
+	BEQ	_55
+; cbar.c   1033	    tmp += 0x04;
+	SYMB	LINE, 1033
+	ADDS.B	R0H,#04H
+	SYMB	LTIM, "tmp", 1, 0, 77
+	SYMB	LTIM, "tmp", 1, 0, 205
+_55:
+; cbar.c   1034	
+; cbar.c   1035	  if ( gain & 0x04)
+	SYMB	LINE, 1035
+	MOV.B	R1L,#04H
+	AND.B	R1L,R0L
+	BEQ	_56
+; cbar.c   1036	    tmp += 0x02;
+	SYMB	LINE, 1036
+	ADDS.B	R0H,#02H
+	SYMB	LTIM, "tmp", 1, 0, 77
+	SYMB	LTIM, "tmp", 1, 0, 205
+_56:
+; cbar.c   1037	
+; cbar.c   1038	  if ( gain & 0x08)
+	SYMB	LINE, 1038
+	AND.B	R0L,#08H
+	SYMB	LTIM, "gain", 0, 0, 2125
+	BEQ	_57
+; cbar.c   1039	    tmp += 0x01;
+	SYMB	LINE, 1039
+	ADDS.B	R0H,#01H
+	SYMB	LTIM, "tmp", 1, 0, 77
+	SYMB	LTIM, "tmp", 1, 0, 205
+_57:
+; cbar.c   1040	
+; cbar.c   1041	  ChromaGainPort = tmp;
+	SYMB	LINE, 1041
+	MOV.B	R0L,R0H
+	MOVS.B	R0H,#00H
+	SYMB	LTIM, "tmp", 1, 0, 77
+	MOV.B	ES,#SEG( _ChromaGainPort )
+	MOV.W	R1,#SOF( _ChromaGainPort )
+	MOV.W	[R1],R0
+; cbar.c   1042	
+; cbar.c   1043	  return( OK);
+	SYMB	LINE, 1043
+	MOV.W	R0,#0FFFFH
+; cbar.c   1044	}
+	SYMB	LINE, 1044
+	RET
+	SYMB	EFUN
+; cbar.c   1045	
+; cbar.c   1046	/**************************************************************************/
+; cbar.c   1047	/* SRAMVideoLoad                                    CBAR.C		 */
+; cbar.c   1048	/*                                                  			*/
+; cbar.c   1049	/* Author:   Kim Steffensen,                                   		*/
+; cbar.c   1050	/* Revised:                                                 		*/
+; cbar.c   1051	/*                                                  			*/
+; cbar.c   1052	/* Function: Copy video data to extended video RAM                        */
+; cbar.c   1053	/* Remarks:  S5,S4,S3 and S2 should be kept at ZERO while loading AND the */
+; cbar.c   1054	/*           interrupt system should NOT clear the PS bit.          	*/
+; cbar.c   1055	/* Returns:                                            			*/
+; cbar.c   1056	/* Updates:                                            			*/
+; cbar.c   1057	/**************************************************************************/
+; cbar.c   1058	int SRAMVideoLoad( UC signal, UC bank)
+; cbar.c   1059	{
+	ALIGN	1
+	SYMB	LINE, 1059
+	PUBLIC	_SRAMVideoLoad
+_SRAMVideoLoad:
+	SYMB	TYPE, 492, 'X', 12, #16, 30, 2, #3, #3
+	SYMB	GFUN, "SRAMVideoLoad", _SRAMVideoLoad, #492, 0, 0, 48
+	SYMB	ALAB, _SRAMVideoLoad, #492
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#08H
+	SYMB	SOFF, 12
+	SYMB	LTIM, "signal", 0, 0, 2253
+	SYMB	LTIM, "bank", 1, 0, 2253
+	SYMB	IDEN, "signal", 0, #3, 0, 2061
+	SYMB	IDEN, "bank", 1, #3, 0, 2061
+	SYMB	TYPE, 493, 'n', #16, 130
+	SYMB	TYPE, 494, 'P', #493
+	SYMB	IDEN, "VideoDstPtr", -8, #494, 130, 5
+	SYMB	TYPE, 495, 'n', #16, 129
+	SYMB	TYPE, 496, 'P', #495
+	SYMB	IDEN, "VideoSrcPtr", -1, #496, 130, 5
+	SYMB	LTIM, "VideoSrcPtr", -1, 0, 69
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+; cbar.c   1060	  volatile int *VideoDstPtr;
+; cbar.c   1061	  _ROM_  int *VideoSrcPtr;
+; cbar.c   1062	  int i;
+; cbar.c   1063	
+; cbar.c   1064	//  bit 12: PS(Bit 12 in status register)  PS ( 0:disable writing in SRAM, 1: enable writing in SRAM)
+; cbar.c   1065	
+; cbar.c   1066	  test_vars.CBX.Status |= PS;                    // Set PS bit while loading
+	SYMB	LINE, 1066
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	R1,[R1]
+	OR.W	R1,#01000H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R2,#SOF( _test_vars+20 )
+	MOV.W	[R2],R1
+; cbar.c   1067	  cb_vars.CBX.Status |= PS;                    // Set PS bit while loading
+	SYMB	LINE, 1067
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	R1,[R1]
+	OR.W	R1,#01000H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R1
+; cbar.c   1068	#ifdef CLASSIC    
+; cbar.c   1069	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1069
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R2,#SOF( _StatusPort )
+	MOV.W	[R2],R1
+; cbar.c   1070	#else  
+; cbar.c   1071	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1072	#endif
+; cbar.c   1073	                                                 
+; cbar.c   1074	  VideoDstPtr = &SRAMVideoPort + (( bank/4)-4) * 0x0800;	//Destination Pointer
+	SYMB	LINE, 1074
+	LSR.B	R0H,#02H
+	SYMB	LTIM, "bank", 1, 0, 2125
+	MOV.B	R1L,R0H
+	MOVS.B	R1H,#00H
+	ASL.W	R1,#0CH
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.W	R5,#SEG( _SRAMVideoPort+-16384 )
+	MOV.W	R4,#SOF( _SRAMVideoPort+-16384 )
+	ADD.W	R4,R2
+	MOV.W	[R7+6],R5
+	MOV.W	[R7+4],R4
+; cbar.c   1075	  VideoSrcPtr = &VideoSignalArray[ 0x800 * (long)signal];	//Source Pointer
+	SYMB	LINE, 1075
+	MOVS.B	R0H,#00H
+	MOVS.W	R1,#00H
+	SYMB	LTIM, "signal", 0, 0, 2125
+	ASL.D	R0,#0CH
+	MOV.W	R3,#SEG( _VideoSignalArray )
+	MOV.W	R2,#SOF( _VideoSignalArray )
+	ADD.W	R2,R0
+	ADDC.W	R3,R1
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 205
+; cbar.c   1076	
+; cbar.c   1077	  for ( i = 0; i < 2048; i++)
+	SYMB	LINE, 1077
+	MOV.W	R0,#00H
+	SYMB	LTIM, "i", 2, 0, 205
+_58:
+; cbar.c   1078	    *VideoDstPtr++ = *VideoSrcPtr++;
+	SYMB	LINE, 1078
+	MOV.W	R5,R3
+	MOV.W	R4,R2
+	MOV.W	[R7+2],R5
+	MOV.W	[R7],R4
+	MOV.B	CS,R5L
+	MOVC.W	R5,[R4+]
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 77
+	SYMB	LTIM, "VideoSrcPtr", -12, 130, 197
+	MOV.W	R3,[R7+6]
+	MOV.W	R2,[R7+4]
+	MOV.B	ES,R3L
+	MOV.W	[R2],R5
+	MOV.W	R3,[R7+2]
+	MOV.W	R2,[R7]
+	ADD.W	R2,#02H
+	ADDC.W	R3,#00H
+	SYMB	LTIM, "VideoSrcPtr", -12, 130, 69
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 205
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 77
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 205
+	ADD.W	[R7+4],#02H
+	SYMB	LINE, 1077
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	CMP.W	R0,#0800H
+	BLT	_58
+; cbar.c   1079	
+; cbar.c   1080	  test_vars.CBX.Status &= ~PS;                  // Clear PS bit again
+	SYMB	LINE, 1080
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	SYMB	LTIM, "i", 2, 0, 77
+	AND.W	R0,#0EFFFH
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1081	  cb_vars.CBX.Status &= ~PS;                  // Clear PS bit again
+	SYMB	LINE, 1081
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0EFFFH
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1082	#ifdef CLASSIC    
+; cbar.c   1083	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1083
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1084	#else  
+; cbar.c   1085	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1086	#endif
+; cbar.c   1087	
+; cbar.c   1088	  return( OK);
+	SYMB	LINE, 1088
+	MOV.W	R0,#0FFFFH
+; cbar.c   1089	}
+	SYMB	LINE, 1089
+	ADD.W	R7,#08H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 77
+	SYMB	EFUN
+; cbar.c   1090	
+; cbar.c   1091	/**************************************************************************/
+; cbar.c   1092	/* ESRAMVideoLoad                                    CBAR.C		 */
+; cbar.c   1093	/*                                                  			*/
+; cbar.c   1094	/* Author:   Kim Steffensen,                                   		*/
+; cbar.c   1095	/* Revised:                                                 		*/
+; cbar.c   1096	/*                                                  			*/
+; cbar.c   1097	/* Function: Copy video data to extended video RAM                        */
+; cbar.c   1098	/* Remarks:  S5,S4,S3 and S2 should be kept at ZERO while loading AND the */
+; cbar.c   1099	/*           interrupt system should NOT clear the PS bit.          	*/
+; cbar.c   1100	/* Returns:                                            			*/
+; cbar.c   1101	/* Updates:                                            			*/
+; cbar.c   1102	/**************************************************************************/
+; cbar.c   1103	int ESRAMVideoLoad( UC signal, UC bank)
+; cbar.c   1104	{
+	ALIGN	1
+	SYMB	LINE, 1104
+	PUBLIC	_ESRAMVideoLoad
+_ESRAMVideoLoad:
+	SYMB	TYPE, 497, 'X', 12, #16, 30, 2, #3, #3
+	SYMB	GFUN, "ESRAMVideoLoad", _ESRAMVideoLoad, #497, 0, 0, 48
+	SYMB	ALAB, _ESRAMVideoLoad, #497
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#08H
+	SYMB	SOFF, 12
+	SYMB	LTIM, "signal", 0, 0, 2253
+	SYMB	LTIM, "bank", 1, 0, 2253
+	SYMB	IDEN, "signal", 0, #3, 0, 2061
+	SYMB	IDEN, "bank", 1, #3, 0, 2061
+	SYMB	IDEN, "VideoDstPtr", -8, #494, 130, 5
+	SYMB	IDEN, "VideoSrcPtr", -1, #496, 130, 5
+	SYMB	LTIM, "VideoSrcPtr", -1, 0, 69
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+; cbar.c   1105	  volatile int *VideoDstPtr;
+; cbar.c   1106	  _ROM_  int *VideoSrcPtr;
+; cbar.c   1107	  int i;
+; cbar.c   1108	
+; cbar.c   1109	//  bit 12: PS(Bit 12 in status register)  PS ( 0:disable writing in SRAM, 1: enable writing in SRAM)
+; cbar.c   1110	
+; cbar.c   1111	  test_vars.CBX.Status |= PS;                    // Set PS bit while loading
+	SYMB	LINE, 1111
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	R1,[R1]
+	OR.W	R1,#01000H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R2,#SOF( _test_vars+20 )
+	MOV.W	[R2],R1
+; cbar.c   1112	  cb_vars.CBX.Status |= PS;                    // Set PS bit while loading
+	SYMB	LINE, 1112
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	R1,[R1]
+	OR.W	R1,#01000H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R1
+; cbar.c   1113	#ifdef CLASSIC    
+; cbar.c   1114	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1114
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R2,#SOF( _StatusPort )
+	MOV.W	[R2],R1
+; cbar.c   1115	#else  
+; cbar.c   1116	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1117	#endif
+; cbar.c   1118	                                                 
+; cbar.c   1119	  VideoDstPtr = &ESRAMVideoPort + (( bank/4)-4) * 0x0800;	//Destination Pointer
+	SYMB	LINE, 1119
+	LSR.B	R0H,#02H
+	SYMB	LTIM, "bank", 1, 0, 2125
+	MOV.B	R1L,R0H
+	MOVS.B	R1H,#00H
+	ASL.W	R1,#0CH
+	MOV.W	R2,R1
+	MOVS.W	R3,#00H
+	MOV.W	R5,#SEG( _ESRAMVideoPort+-16384 )
+	MOV.W	R4,#SOF( _ESRAMVideoPort+-16384 )
+	ADD.W	R4,R2
+	MOV.W	[R7+6],R5
+	MOV.W	[R7+4],R4
+; cbar.c   1120	  VideoSrcPtr = &VideoSignalArray[ 0x800 * (long)signal];	//Source Pointer
+	SYMB	LINE, 1120
+	MOVS.B	R0H,#00H
+	MOVS.W	R1,#00H
+	SYMB	LTIM, "signal", 0, 0, 2125
+	ASL.D	R0,#0CH
+	MOV.W	R3,#SEG( _VideoSignalArray )
+	MOV.W	R2,#SOF( _VideoSignalArray )
+	ADD.W	R2,R0
+	ADDC.W	R3,R1
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 205
+; cbar.c   1121	
+; cbar.c   1122	  for ( i = 0; i < 2048; i++)
+	SYMB	LINE, 1122
+	MOV.W	R0,#00H
+	SYMB	LTIM, "i", 2, 0, 205
+_60:
+; cbar.c   1123	    *VideoDstPtr++ = *VideoSrcPtr++;
+	SYMB	LINE, 1123
+	MOV.W	R5,R3
+	MOV.W	R4,R2
+	MOV.W	[R7+2],R5
+	MOV.W	[R7],R4
+	MOV.B	CS,R5L
+	MOVC.W	R5,[R4+]
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 77
+	SYMB	LTIM, "VideoSrcPtr", -12, 130, 197
+	MOV.W	R3,[R7+6]
+	MOV.W	R2,[R7+4]
+	MOV.B	ES,R3L
+	MOV.W	[R2],R5
+	MOV.W	R3,[R7+2]
+	MOV.W	R2,[R7]
+	ADD.W	R2,#02H
+	ADDC.W	R3,#00H
+	SYMB	LTIM, "VideoSrcPtr", -12, 130, 69
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 205
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 77
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 205
+	ADD.W	[R7+4],#02H
+	SYMB	LINE, 1122
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	CMP.W	R0,#0800H
+	BLT	_60
+; cbar.c   1124	
+; cbar.c   1125	  test_vars.CBX.Status &= ~PS;                  // Clear PS bit again
+	SYMB	LINE, 1125
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	SYMB	LTIM, "i", 2, 0, 77
+	AND.W	R0,#0EFFFH
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1126	  cb_vars.CBX.Status &= ~PS;                  // Clear PS bit again
+	SYMB	LINE, 1126
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0EFFFH
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1127	#ifdef CLASSIC    
+; cbar.c   1128	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1128
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1129	#else  
+; cbar.c   1130	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1131	#endif
+; cbar.c   1132	
+; cbar.c   1133	  return( OK);
+	SYMB	LINE, 1133
+	MOV.W	R0,#0FFFFH
+; cbar.c   1134	}
+	SYMB	LINE, 1134
+	ADD.W	R7,#08H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "VideoSrcPtr", 11, 0, 77
+	SYMB	EFUN
+; cbar.c   1135	
+; cbar.c   1136	/**************************************************************************/
+; cbar.c   1137	/* SRAMSoundLoad                                    CBAR.C */
+; cbar.c   1138	/*                                                  */
+; cbar.c   1139	/* Author:   Kim Engedahl, DEV, 000410                          */
+; cbar.c   1140	/* Revised:   000603, KEn, DEV                                 */
+; cbar.c   1141	/*                                                  */
+; cbar.c   1142	/* Function: Copy sound data to sound RAM                        */
+; cbar.c   1143	/* Remarks:                                             */
+; cbar.c   1144	/* Returns:                                            */
+; cbar.c   1145	/* Updates:                                            */
+; cbar.c   1146	/**************************************************************************/
+; cbar.c   1147	int SRAMSoundLoad( UC signal)
+; cbar.c   1148	{
+	ALIGN	1
+	SYMB	LINE, 1148
+	PUBLIC	_SRAMSoundLoad
+_SRAMSoundLoad:
+	SYMB	TYPE, 498, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "SRAMSoundLoad", _SRAMSoundLoad, #498, 0, 0, 48
+	SYMB	ALAB, _SRAMSoundLoad, #498
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	ADDS.W	R7,#08H
+	SYMB	SOFF, 12
+	SYMB	LTIM, "signal", 0, 0, 2253
+	SYMB	IDEN, "signal", 0, #3, 0, 2061
+	SYMB	IDEN, "SoundDstPtr", -8, #494, 130, 5
+	SYMB	IDEN, "SoundSrcPtr", -1, #496, 130, 5
+	SYMB	LTIM, "SoundSrcPtr", -1, 0, 69
+	SYMB	IDEN, "i", -1, #16, 130, 5
+	SYMB	LTIM, "i", -1, 0, 69
+; cbar.c   1149	  volatile int *SoundDstPtr;
+; cbar.c   1150	  _ROM_  int *SoundSrcPtr;
+; cbar.c   1151	  int i;
+; cbar.c   1152	
+; cbar.c   1153	  signal = ( signal == EmbAudioStereo1kHz);
+	SYMB	LINE, 1153
+	CMP.B	R0L,#02H
+	BNE	_63
+	MOVS.B	R1L,#01H
+	BR	_65
+_63:
+	MOVS.B	R1L,#00H
+_65:
+	SYMB	LTIM, "signal", 0, 0, 2125
+	SYMB	LTIM, "signal", 4, 0, 2253
+; cbar.c   1154	
+; cbar.c   1155	  test_vars.CBX.Status |= PS;                  // Set PS bit while loading
+	SYMB	LINE, 1155
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#01000H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R2,#SOF( _test_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c   1156	  cb_vars.CBX.Status |= PS;                  // Set PS bit while loading
+	SYMB	LINE, 1156
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#01000H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R2,#SOF( _cb_vars+20 )
+	MOV.W	[R2],R0
+; cbar.c   1157	#ifdef CLASSIC    
+; cbar.c   1158	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1158
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R2,#SOF( _StatusPort )
+	MOV.W	[R2],R0
+; cbar.c   1159	#else  
+; cbar.c   1160	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1161	#endif
+; cbar.c   1162	                                             
+; cbar.c   1163	  SoundDstPtr = &SRAMSoundPort;
+	SYMB	LINE, 1163
+	MOV.W	[R7+6],#SEG( _SRAMSoundPort )
+	MOV.W	[R7+4],#SOF( _SRAMSoundPort )
+; cbar.c   1164	  SoundSrcPtr = &SoundSignalArray[2304*signal];
+	SYMB	LINE, 1164
+	MOV.B	R0L,R1L
+	MOVS.B	R0H,#00H
+	MULU.W	R0,#01200H
+	MOVS.W	R1,#00H
+	SYMB	LTIM, "signal", 4, 0, 2125
+	MOV.W	R3,#SEG( _SoundSignalArray )
+	MOV.W	R2,#SOF( _SoundSignalArray )
+	ADD.W	R2,R0
+	ADDC.W	R3,R1
+	SYMB	LTIM, "SoundSrcPtr", 11, 0, 205
+; cbar.c   1165	
+; cbar.c   1166	  for ( i = 0; i < 2304; i++)
+	SYMB	LINE, 1166
+	MOV.W	R0,#00H
+	SYMB	LTIM, "i", 2, 0, 205
+_62:
+; cbar.c   1167	    *SoundDstPtr++ = *SoundSrcPtr++;
+	SYMB	LINE, 1167
+	MOV.W	R5,R3
+	MOV.W	R4,R2
+	MOV.W	[R7+2],R5
+	MOV.W	[R7],R4
+	MOV.B	CS,R5L
+	MOVC.W	R5,[R4+]
+	SYMB	LTIM, "SoundSrcPtr", 11, 0, 77
+	SYMB	LTIM, "SoundSrcPtr", -12, 130, 197
+	MOV.W	R3,[R7+6]
+	MOV.W	R2,[R7+4]
+	MOV.B	ES,R3L
+	MOV.W	[R2],R5
+	MOV.W	R3,[R7+2]
+	MOV.W	R2,[R7]
+	ADD.W	R2,#02H
+	ADDC.W	R3,#00H
+	SYMB	LTIM, "SoundSrcPtr", -12, 130, 69
+	SYMB	LTIM, "SoundSrcPtr", 11, 0, 205
+	SYMB	LTIM, "SoundSrcPtr", 11, 0, 77
+	SYMB	LTIM, "SoundSrcPtr", 11, 0, 205
+	ADD.W	[R7+4],#02H
+	SYMB	LINE, 1166
+	ADDS.W	R0,#01H
+	SYMB	LTIM, "i", 2, 0, 77
+	SYMB	LTIM, "i", 2, 0, 205
+	CMP.W	R0,#0900H
+	BLT	_62
+; cbar.c   1168	
+; cbar.c   1169	  test_vars.CBX.Status &= ~PS;                  // Clear PS bit again
+	SYMB	LINE, 1169
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	SYMB	LTIM, "i", 2, 0, 77
+	AND.W	R0,#0EFFFH
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1170	  cb_vars.CBX.Status &= ~PS;                  // Clear PS bit again
+	SYMB	LINE, 1170
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0EFFFH
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1171	#ifdef CLASSIC    
+; cbar.c   1172	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1172
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1173	#else  
+; cbar.c   1174	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1175	#endif
+; cbar.c   1176	
+; cbar.c   1177	  return( OK);
+	SYMB	LINE, 1177
+	MOV.W	R0,#0FFFFH
+; cbar.c   1178	}
+	SYMB	LINE, 1178
+	ADD.W	R7,#08H
+	SYMB	SOFF, 4
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "SoundSrcPtr", 11, 0, 77
+	SYMB	EFUN
+; cbar.c   1179	
+; cbar.c   1180	
+; cbar.c   1181	/**************************************************************************/
+; cbar.c   1182	/* CBDefaults                                                       CBAR.C  */
+; cbar.c   1183	/*                                                                        */
+; cbar.c   1184	/* Author:   Kim Engedahl, DEV, 000526                                    */
+; cbar.c   1185	/* Revised:   000617, KEn, DEV                                             */
+; cbar.c   1186	/*                                                                        */
+; cbar.c   1187	/* Function:                                                               */
+; cbar.c   1188	/* Remarks:                                                                */
+; cbar.c   1189	/* Returns:                                                                */
+; cbar.c   1190	/* Updates:                                                                */
+; cbar.c   1191	/**************************************************************************/
+; cbar.c   1192	void CBDefaults( void)
+; cbar.c   1193	{
+	ALIGN	1
+	SYMB	LINE, 1193
+	PUBLIC	_CBDefaults
+_CBDefaults:
+	SYMB	TYPE, 499, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "CBDefaults", _CBDefaults, #499, 0, 0, 0
+	SYMB	ALAB, _CBDefaults, #499
+; cbar.c   1194	  Settings.CBSetup.System = CBSetup.System = Calibration.ResetSystem;
+	SYMB	LINE, 1194
+	MOV.B	ES,#SEG( _Calibration+97 )
+	MOV.W	R0,#SOF( _Calibration+97 )
+	MOV.B	R0L,[R0]
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R1,#SOF( _CBSetup )
+	MOV.B	[R1],R0L
+	MOV.B	ES,#SEG( _Settings+32 )
+	MOV.W	R1,#SOF( _Settings+32 )
+	MOV.B	[R1],R0L
+; cbar.c   1195	
+; cbar.c   1196	  if ( CBSetup.System < NTSC_US)
+	SYMB	LINE, 1196
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#02H
+	BCC	_67
+; cbar.c   1197	    Settings.CBSetup.Pattern = CBSetup.Pattern = EBUCBar;
+	SYMB	LINE, 1197
+	MOV.B	ES,#SEG( _CBSetup+2 )
+	MOV.W	R0,#SOF( _CBSetup+2 )
+	MOV.W	[R0],#01H
+	MOV.B	ES,#SEG( _Settings+34 )
+	MOV.W	R0,#SOF( _Settings+34 )
+	MOV.W	[R0],#01H
+	BR	_68
+_67:
+; cbar.c   1198	  else
+; cbar.c   1199	    Settings.CBSetup.Pattern = CBSetup.Pattern = SMPTECBar;
+	SYMB	LINE, 1199
+	MOV.B	ES,#SEG( _CBSetup+2 )
+	MOV.W	R0,#SOF( _CBSetup+2 )
+	MOV.W	[R0],#00H
+	MOV.B	ES,#SEG( _Settings+34 )
+	MOV.W	R0,#SOF( _Settings+34 )
+	MOV.W	[R0],#00H
+_68:
+; cbar.c   1200	
+; cbar.c   1201	  Settings.CBSetup.Delay = CBSetup.Delay = 0;
+	SYMB	LINE, 1201
+	MOV.B	ES,#SEG( _CBSetup+4 )
+	MOV.W	R0,#SOF( _CBSetup+4 )
+	MOV.W	[R0+],#00H
+	MOV.W	[R0],#00H
+	MOV.B	ES,#SEG( _Settings+36 )
+	MOV.W	R0,#SOF( _Settings+36 )
+	MOV.W	[R0+],#00H
+	MOV.W	[R0],#00H
+; cbar.c   1202	  Settings.CBSetup.ScHPhase = CBSetup.ScHPhase = 0;
+	SYMB	LINE, 1202
+	MOV.B	ES,#SEG( _CBSetup+8 )
+	MOV.W	R0,#SOF( _CBSetup+8 )
+	MOV.W	[R0],#00H
+	MOV.B	ES,#SEG( _Settings+40 )
+	MOV.W	R0,#SOF( _Settings+40 )
+	MOV.W	[R0],#00H
+; cbar.c   1203	  Settings.CBSetup.EmbAudioSignal = CBSetup.EmbAudioSignal = EmbAudioOff;
+	SYMB	LINE, 1203
+	MOV.B	ES,#SEG( _CBSetup+10 )
+	MOV.W	R0,#SOF( _CBSetup+10 )
+	MOV.B	[R0],#00H
+	MOV.B	ES,#SEG( _Settings+42 )
+	MOV.W	R0,#SOF( _Settings+42 )
+	MOV.B	[R0],#00H
+; cbar.c   1204	
+; cbar.c   1205	  NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+	SYMB	LINE, 1205
+	MOV.W	R1,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	MOV.B	ES,#SEG( _SettingsPtr )
+	MOV.W	R2,#SOF( _SettingsPtr )
+	MOV.W	R2,[R2]
+	MOV.W	R3,#04AH
+	CALL	_NV_Store
+; cbar.c   1206	}
+	SYMB	LINE, 1206
+	RET
+	SYMB	EFUN
+; cbar.c   1207	
+; cbar.c   1208	/**************************************************************************/
+; cbar.c   1209	/* CBInit                                                           CBAR.C  */
+; cbar.c   1210	/*                                                                        */
+; cbar.c   1211	/* Author:   Kim Engedahl, DEV, 000322                                    */
+; cbar.c   1212	/* Revised:   0009145, KEn, DEV                                             */
+; cbar.c   1213	/*                                                                        */
+; cbar.c   1214	/* Function:                                                               */
+; cbar.c   1215	/* Remarks:                                                                 */
+; cbar.c   1216	/* Returns:                                                                */
+; cbar.c   1217	/* Updates:                                                                */
+; cbar.c   1218	/**************************************************************************/
+; cbar.c   1219	int CBInit( void)
+; cbar.c   1220	{
+	ALIGN	1
+	SYMB	LINE, 1220
+	PUBLIC	_CBInit
+_CBInit:
+	SYMB	TYPE, 500, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "CBInit", _CBInit, #500, 0, 0, 0
+	SYMB	ALAB, _CBInit, #500
+; cbar.c   1221	  cb_vars.CBX.SyncLinePtr = 0;
+	SYMB	LINE, 1221
+	MOV.B	ES,#SEG( _cb_vars+12 )
+	MOV.W	R0,#SOF( _cb_vars+12 )
+	MOV.B	[R0],#00H
+; cbar.c   1222	  cb_vars.CBX.TablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1222
+	MOV.B	ES,#SEG( _cb_vars )
+	MOV.W	R0,#SOF( _cb_vars )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1223	
+; cbar.c   1224	  cb_vars.CBX.NewPattern = FALSE;
+	SYMB	LINE, 1224
+	MOV.B	ES,#SEG( _cb_vars+18 )
+	MOV.W	R0,#SOF( _cb_vars+18 )
+	MOV.B	[R0],#00H
+; cbar.c   1225	  cb_vars.CBX.Blanking = TRUE;
+	SYMB	LINE, 1225
+	MOV.B	ES,#SEG( _cb_vars+17 )
+	MOV.W	R0,#SOF( _cb_vars+17 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1226	  cb_vars.CBX.SoundEnable = FALSE;
+	SYMB	LINE, 1226
+	MOV.B	ES,#SEG( _cb_vars+19 )
+	MOV.W	R0,#SOF( _cb_vars+19 )
+	MOV.B	[R0],#00H
+; cbar.c   1227	
+; cbar.c   1228	  test_vars.CBX.SyncLinePtr = 0;
+	SYMB	LINE, 1228
+	MOV.B	ES,#SEG( _test_vars+12 )
+	MOV.W	R0,#SOF( _test_vars+12 )
+	MOV.B	[R0],#00H
+; cbar.c   1229	  test_vars.CBX.TablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1229
+	MOV.B	ES,#SEG( _test_vars )
+	MOV.W	R0,#SOF( _test_vars )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1230	
+; cbar.c   1231	  test_vars.CBX.NewPattern = FALSE;
+	SYMB	LINE, 1231
+	MOV.B	ES,#SEG( _test_vars+18 )
+	MOV.W	R0,#SOF( _test_vars+18 )
+	MOV.B	[R0],#00H
+; cbar.c   1232	  test_vars.CBX.Blanking = TRUE;
+	SYMB	LINE, 1232
+	MOV.B	ES,#SEG( _test_vars+17 )
+	MOV.W	R0,#SOF( _test_vars+17 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1233	  test_vars.CBX.SoundEnable = FALSE;
+	SYMB	LINE, 1233
+	MOV.B	ES,#SEG( _test_vars+19 )
+	MOV.W	R0,#SOF( _test_vars+19 )
+	MOV.B	[R0],#00H
+; cbar.c   1234	
+; cbar.c   1235	  cb_vars.CBX.Status |= SYSSEL;
+	SYMB	LINE, 1235
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#040H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1236	  test_vars.CBX.Status |= SYSSEL;
+	SYMB	LINE, 1236
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#040H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1237	#ifdef CLASSIC    
+; cbar.c   1238	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1238
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1239	#else  
+; cbar.c   1240	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1241	#endif
+; cbar.c   1242	
+; cbar.c   1243	  cb_vars.CBX.SyncLineCnt = 1;                  // Interrupt in 1 line
+	SYMB	LINE, 1243
+	MOV.B	ES,#SEG( _cb_vars+11 )
+	MOV.W	R0,#SOF( _cb_vars+11 )
+	MOV.B	[R0],#01H
+; cbar.c   1244	  test_vars.CBX.SyncLineCnt = 1;                  // Interrupt in 1 line
+	SYMB	LINE, 1244
+	MOV.B	ES,#SEG( _test_vars+11 )
+	MOV.W	R0,#SOF( _test_vars+11 )
+	MOV.B	[R0],#01H
+; cbar.c   1245	
+; cbar.c   1246	  CBSetup.System = Settings.CBSetup.System;
+	SYMB	LINE, 1246
+	MOV.B	ES,#SEG( _Settings+32 )
+	MOV.W	R0,#SOF( _Settings+32 )
+	MOV.B	R0L,[R0]
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R1,#SOF( _CBSetup )
+	MOV.B	[R1],R0L
+; cbar.c   1247	  CBSetup.Pattern = Settings.CBSetup.Pattern;
+	SYMB	LINE, 1247
+	MOV.B	ES,#SEG( _Settings+34 )
+	MOV.W	R0,#SOF( _Settings+34 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _CBSetup+2 )
+	MOV.W	R1,#SOF( _CBSetup+2 )
+	MOV.W	[R1],R0
+; cbar.c   1248	  CBSetup.Delay = Settings.CBSetup.Delay;
+	SYMB	LINE, 1248
+	MOV.B	ES,#SEG( _Settings+36 )
+	MOV.W	R1,#SOF( _Settings+36 )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	MOV.B	ES,#SEG( _CBSetup+4 )
+	MOV.W	R2,#SOF( _CBSetup+4 )
+	MOV.W	[R2+],R0
+	MOV.W	[R2],R1
+; cbar.c   1249	  CBSetup.ScHPhase = Settings.CBSetup.ScHPhase;
+	SYMB	LINE, 1249
+	MOV.B	ES,#SEG( _Settings+40 )
+	MOV.W	R0,#SOF( _Settings+40 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _CBSetup+8 )
+	MOV.W	R1,#SOF( _CBSetup+8 )
+	MOV.W	[R1],R0
+; cbar.c   1250	  CBSetup.EmbAudioSignal = Settings.CBSetup.EmbAudioSignal;
+	SYMB	LINE, 1250
+	MOV.B	ES,#SEG( _Settings+42 )
+	MOV.W	R0,#SOF( _Settings+42 )
+	MOV.B	R0L,[R0]
+	MOV.B	ES,#SEG( _CBSetup+10 )
+	MOV.W	R1,#SOF( _CBSetup+10 )
+	MOV.B	[R1],R0L
+; cbar.c   1251	
+; cbar.c   1252	  return( 0);
+	SYMB	LINE, 1252
+	MOV.W	R0,#00H
+; cbar.c   1253	}
+	SYMB	LINE, 1253
+	RET
+	SYMB	EFUN
+; cbar.c   1254	
+; cbar.c   1255	/**************************************************************************/
+; cbar.c   1256	/* CBUpdate                                                          CBAR.C  */
+; cbar.c   1257	/*                                                                        */
+; cbar.c   1258	/* Author:   Kim Engedahl, DEV, 000413                                    */
+; cbar.c   1259	/* Revised:   000603, KEn, DEV                                             */
+; cbar.c   1260	/*                                                                        */
+; cbar.c   1261	/* Function:                                                               */
+; cbar.c   1262	/* Remarks:                                                                */
+; cbar.c   1263	/* Returns:                                                                */
+; cbar.c   1264	/* Updates:                                                                */
+; cbar.c   1265	/**************************************************************************/
+; cbar.c   1266	int CBUpdate( void)
+; cbar.c   1267	{
+	ALIGN	1
+	SYMB	LINE, 1267
+	PUBLIC	_CBUpdate
+_CBUpdate:
+	SYMB	TYPE, 501, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "CBUpdate", _CBUpdate, #501, 0, 0, 0
+	SYMB	ALAB, _CBUpdate, #501
+; cbar.c   1268	  SetCBSystem( CBSetup.System);      // Also updates pattern
+	SYMB	LINE, 1268
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	R0L,[R0]
+	CALL	_SetCBSystem
+; cbar.c   1269	
+; cbar.c   1270	  SetCBDelay( CBSetup.Delay);
+	SYMB	LINE, 1270
+	MOV.B	ES,#SEG( _CBSetup+4 )
+	MOV.W	R1,#SOF( _CBSetup+4 )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	CALL	_SetCBDelay
+; cbar.c   1271	  SetCBScHPhase( CBSetup.ScHPhase);
+	SYMB	LINE, 1271
+	MOV.B	ES,#SEG( _CBSetup+8 )
+	MOV.W	R0,#SOF( _CBSetup+8 )
+	MOV.W	R0,[R0]
+	CALL	_SetCBScHPhase
+; cbar.c   1272	  SetCBEmbAudioSignal( CBSetup.EmbAudioSignal);
+	SYMB	LINE, 1272
+	MOV.B	ES,#SEG( _CBSetup+10 )
+	MOV.W	R0,#SOF( _CBSetup+10 )
+	MOV.B	R0L,[R0]
+	CALL	_SetCBEmbAudioSignal
+; cbar.c   1273	
+; cbar.c   1274	  return( OK);
+	SYMB	LINE, 1274
+	MOV.W	R0,#0FFFFH
+; cbar.c   1275	}
+	SYMB	LINE, 1275
+	RET
+	SYMB	EFUN
+; cbar.c   1276	
+; cbar.c   1277	/**************************************************************************/
+; cbar.c   1278	/* SetCBPattern                                                     CBAR.C  */
+; cbar.c   1279	/*                                                                        */
+; cbar.c   1280	/* Author:   Kim Engedahl, DEV, 000331                                    */
+; cbar.c   1281	/* Revised:   000618, KEn, DEV                                             */
+; cbar.c   1282	/*                                                                        */
+; cbar.c   1283	/* Function:                                                               */
+; cbar.c   1284	/* Remarks:                                                                 */
+; cbar.c   1285	/* Returns:                                                                */
+; cbar.c   1286	/* Updates:                                                                */
+; cbar.c   1287	/**************************************************************************/
+; cbar.c   1288	int SetCBPattern( UI pattern)
+; cbar.c   1289	{
+	ALIGN	1
+	SYMB	LINE, 1289
+	PUBLIC	_SetCBPattern
+_SetCBPattern:
+	SYMB	TYPE, 502, 'X', 12, #16, 30, 1, #18
+	SYMB	GFUN, "SetCBPattern", _SetCBPattern, #502, 0, 0, 16
+	SYMB	ALAB, _SetCBPattern, #502
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	ADDS.W	R7,#0EH
+	SYMB	SOFF, 4
+	SYMB	IDEN, "pattern", -1, #18, 130, 2053
+	SYMB	LTIM, "pattern", -1, 0, 2117
+	SYMB	IDEN, "system", -1, #16, 130, 5
+	SYMB	LTIM, "system", -1, 0, 69
+; cbar.c   1290	  int system = CBSetup.System;
+	SYMB	LINE, 1290
+	MOV.W	[R7],R0
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	R0L,[R0]
+	MOV.B	R4L,R0L
+	MOVS.B	R4H,#00H
+	SYMB	LTIM, "system", 18, 0, 205
+; cbar.c   1291	
+; cbar.c   1292	  if ( ValidateCBPattern( system , &pattern) == FAIL)
+	SYMB	LINE, 1292
+	MOV.W	R0,R4
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	MOV.W	R2,R7
+	CALL	_ValidateCBPattern
+CBAR_IR	SEGMENT	HCODE INSEGMENT ROMDATA
+	RSEG	CBAR_IR
+	ALIGN	1
+__swtable152:
+	DW	SOF _71,SEG _71
+	DW	SOF _72,SEG _72
+	DW	SOF _73,SEG _73
+	DW	SOF _74,SEG _74
+	DW	SOF _76,SEG _76
+	DW	SOF _78,SEG _78
+	DW	SOF _79,SEG _79
+	DW	SOF _80,SEG _80
+	DW	SOF _82,SEG _82
+	DW	SOF _84,SEG _84
+	DW	SOF _85,SEG _85
+	DW	SOF _87,SEG _87
+	DW	SOF _89,SEG _89
+	DW	SOF _91,SEG _91
+	DW	SOF _93,SEG _93
+	DW	SOF _95,SEG _95
+	DW	SOF _97,SEG _97
+	DW	SOF _99,SEG _99
+	DW	SOF _101,SEG _101
+	DW	SOF _103,SEG _103
+	DW	SOF _105,SEG _105
+	DW	SOF _107,SEG _107
+	DW	SOF _109,SEG _109
+	RSEG	CBAR_PR
+	OR.W	R0,R0
+	BNE	_70
+; cbar.c   1293	    return( FAIL);
+	SYMB	LINE, 1293
+	MOV.W	R0,#00H
+	BR	_151
+_70:
+	SYMB	LTIM, "system", 18, 0, 77
+; cbar.c   1294	
+; cbar.c   1295	  Settings.ActivePreset = 0;
+	SYMB	LINE, 1295
+	MOV.B	ES,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	MOV.W	[R0],#00H
+; cbar.c   1296	
+; cbar.c   1297	  Settings.CBSetup.Pattern = CBSetup.Pattern = pattern;
+	SYMB	LINE, 1297
+	MOV.W	R0,[R7]
+	SYMB	LTIM, "pattern", 2, 0, 2253
+	MOV.B	ES,#SEG( _CBSetup+2 )
+	MOV.W	R1,#SOF( _CBSetup+2 )
+	MOV.W	[R1],R0
+	MOV.B	ES,#SEG( _Settings+34 )
+	MOV.W	R1,#SOF( _Settings+34 )
+	MOV.W	[R1],R0
+; cbar.c   1298	  NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+	SYMB	LINE, 1298
+	MOV.W	R1,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	SYMB	LTIM, "pattern", 2, 0, 2125
+	MOV.B	ES,#SEG( _SettingsPtr )
+	MOV.W	R2,#SOF( _SettingsPtr )
+	MOV.W	R2,[R2]
+	MOV.W	R3,#04AH
+	CALL	_NV_Store
+; cbar.c   1299	
+; cbar.c   1300	  cb_vars.CBX.Blanking = TRUE;
+	SYMB	LINE, 1300
+	MOV.B	ES,#SEG( _cb_vars+17 )
+	MOV.W	R0,#SOF( _cb_vars+17 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1301	  test_vars.CBX.Blanking = TRUE;
+	SYMB	LINE, 1301
+	MOV.B	ES,#SEG( _test_vars+17 )
+	MOV.W	R0,#SOF( _test_vars+17 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1302	
+; cbar.c   1303	  cb_vars.CBX.Status &= ~S5S4S3S2;                         // Blank line immediately
+	SYMB	LINE, 1303
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC3H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1304	  test_vars.CBX.Status &= ~S5S4S3S2;                         // Blank line immediately
+	SYMB	LINE, 1304
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC3H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1305	#ifdef CLASSIC    
+; cbar.c   1306	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1306
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+	SYMB	LTIM, "pattern", -4, 130, 2245
+; cbar.c   1307	#else  
+; cbar.c   1308	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1309	#endif
+; cbar.c   1310	
+; cbar.c   1311	  switch ( pattern)
+	SYMB	LINE, 1311
+	MOV.W	R1,[R7]
+	CMP.W	R1,#016H
+	BG	_150
+	ASL.W	R1,#02H
+	MOV.B	CS,#SEG( __swtable152 )
+	ADD.W	R1,#SOF( __swtable152 )
+	MOVC.W	R0,[R1+]
+	PUSH.W	R0
+	MOVC.W	R0,[R1+]
+	PUSH.W	R0
+	RET
+	SYMB	LTIM, "pattern", -4, 130, 2117
+	SYMB	LTIM, "pattern", 6, 0, 2253
+; cbar.c   1312	  {
+; cbar.c   1313	    case SMPTECBar:
+	SYMB	LINE, 1313
+_71:
+; cbar.c   1314	      SRAMVideoLoad( dSMPTECBar, SRAMBank1);
+	SYMB	LINE, 1314
+	MOV.B	R0L,#02H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+	SYMB	LTIM, "pattern", 6, 0, 2125
+; cbar.c   1315	      SRAMVideoLoad( dBlueBars, SRAMBank2);
+	SYMB	LINE, 1315
+	MOV.B	R0L,#03H
+	MOV.B	R0H,#014H
+	CALL	_SRAMVideoLoad
+; cbar.c   1316	      SRAMVideoLoad( dIWhiteQ, SRAMBank3);
+	SYMB	LINE, 1316
+	MOV.B	R0L,#04H
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1317	
+; cbar.c   1318	//KS. Emulates a 8 line/pixel text field ! 
+; cbar.c   1319	//Must be setup no matter whitch pattern is selected. 
+; cbar.c   1320	//Bank 5 -12 Can be initialised with the text lines at power 
+; cbar.c   1321	//up and when a new text line is entered by the user(via the front or the PC)  
+; cbar.c   1322	
+; cbar.c   1323	      SRAMVideoLoad( dWindow100, SRAMBank5);
+	SYMB	LINE, 1323
+	MOV.B	R0H,#020H
+	MOV.B	R0L,#021H
+	CALL	_SRAMVideoLoad
+; cbar.c   1324	      SRAMVideoLoad( dWindow20, SRAMBank6);
+	SYMB	LINE, 1324
+	MOV.B	R0H,#024H
+	MOV.B	R0L,#01FH
+	CALL	_SRAMVideoLoad
+; cbar.c   1325	      SRAMVideoLoad( dWindow15, SRAMBank7);
+	SYMB	LINE, 1325
+	MOV.B	R0H,#028H
+	MOV.B	R0L,#01DH
+	CALL	_SRAMVideoLoad
+; cbar.c   1326	      SRAMVideoLoad( dWindow10, SRAMBank8);
+	SYMB	LINE, 1326
+	MOV.B	R0H,#02CH
+	MOV.B	R0L,#02BH
+	CALL	_SRAMVideoLoad
+; cbar.c   1327	      SRAMVideoLoad( dWindow10, SRAMBank9);
+	SYMB	LINE, 1327
+	MOV.B	R0H,#030H
+	MOV.B	R0L,#02BH
+	CALL	_SRAMVideoLoad
+; cbar.c   1328	      SRAMVideoLoad( dWindow15, SRAMBank10);
+	SYMB	LINE, 1328
+	MOV.B	R0H,#034H
+	MOV.B	R0L,#01DH
+	CALL	_SRAMVideoLoad
+; cbar.c   1329	      SRAMVideoLoad( dWindow20, SRAMBank11);
+	SYMB	LINE, 1329
+	MOV.B	R0H,#038H
+	MOV.B	R0L,#01FH
+	CALL	_SRAMVideoLoad
+; cbar.c   1330	      SRAMVideoLoad( dWindow100, SRAMBank12);
+	SYMB	LINE, 1330
+	MOV.B	R0H,#03CH
+	MOV.B	R0L,#021H
+	CALL	_SRAMVideoLoad
+; cbar.c   1331	
+; cbar.c   1332	      cb_vars.CBX.newTablePtr = &SMPTECBarTable[0];
+	SYMB	LINE, 1332
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _SMPTECBarTable )
+	MOV.W	[R0],#SEG( _SMPTECBarTable )
+; cbar.c   1333	      test_vars.CBX.newTablePtr = &TEST_SMPTECBarTable[0];
+	SYMB	LINE, 1333
+	MOV.B	ES,#SEG( _test_vars+4 )
+	MOV.W	R0,#SOF( _test_vars+4 )
+	MOV.W	[R0+],#SOF( _TEST_SMPTECBarTable )
+	MOV.W	[R0],#SEG( _TEST_SMPTECBarTable )
+; cbar.c   1334	      break;
+	SYMB	LINE, 1334
+	BR	_150
+; cbar.c   1335	
+; cbar.c   1336	    case EBUCBar:
+	SYMB	LINE, 1336
+_72:
+; cbar.c   1337	      SRAMVideoLoad( dEBUCBar_625, SRAMBank1);
+	SYMB	LINE, 1337
+	MOV.B	R0L,#01H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1338	
+; cbar.c   1339	      cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1339
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1340	      break;
+	SYMB	LINE, 1340
+	BR	_150
+; cbar.c   1341	
+; cbar.c   1342	    case FCCCBar:
+	SYMB	LINE, 1342
+_73:
+; cbar.c   1343	      SRAMVideoLoad( dFCC_CBar_525, SRAMBank1);
+	SYMB	LINE, 1343
+	MOV.B	R0L,#029H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1344	
+; cbar.c   1345	      cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1345
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1346	      break;
+	SYMB	LINE, 1346
+	BR	_150
+; cbar.c   1347	
+; cbar.c   1348	    case EBUCBarITU:
+	SYMB	LINE, 1348
+_74:
+; cbar.c   1349	      SRAMVideoLoad( dEBUCBar_8bit_625, SRAMBank1);
+	SYMB	LINE, 1349
+	MOV.B	R0L,#00H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1350	
+; cbar.c   1351	      if ( system < NTSC_US)
+	SYMB	LINE, 1351
+	CMP.W	R4,#02H
+	BGE	_75
+; cbar.c   1352	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1352
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+	BR	_150
+_75:
+; cbar.c   1353	      else
+; cbar.c   1354	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1354
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1355	      break;
+	SYMB	LINE, 1355
+	BR	_150
+; cbar.c   1356	
+; cbar.c   1357	    case CBar100:
+	SYMB	LINE, 1357
+_76:
+; cbar.c   1358	      if ( system < NTSC_US)
+	SYMB	LINE, 1358
+	CMP.W	R4,#02H
+	BGE	_77
+; cbar.c   1359	      {
+; cbar.c   1360	        SRAMVideoLoad( dCBar100_625, SRAMBank1);
+	SYMB	LINE, 1360
+	MOV.B	R0L,#05H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1361	
+; cbar.c   1362	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1362
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1363	      }
+	SYMB	LINE, 1363
+	BR	_150
+_77:
+; cbar.c   1364	      else
+; cbar.c   1365	      {
+; cbar.c   1366	        SRAMVideoLoad( dFCC_CBar100_525, SRAMBank1);
+	SYMB	LINE, 1366
+	MOV.B	R0L,#02AH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1367	
+; cbar.c   1368	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1368
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1369	      }
+; cbar.c   1370	      break;
+	SYMB	LINE, 1370
+	BR	_150
+; cbar.c   1371	
+; cbar.c   1372	    case CBarGrey75:
+	SYMB	LINE, 1372
+_78:
+; cbar.c   1373	      SRAMVideoLoad( dCBar75_STD_625, SRAMBank1);
+	SYMB	LINE, 1373
+	MOV.B	R0L,#028H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1374	      SRAMVideoLoad( dGrey75_625, SRAMBank2);
+	SYMB	LINE, 1374
+	MOV.B	R0L,#06H
+	MOV.B	R0H,#014H
+	CALL	_SRAMVideoLoad
+; cbar.c   1375	  
+; cbar.c   1376	      cb_vars.CBX.newTablePtr = &PALSplitFieldTable[0];
+	SYMB	LINE, 1376
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALSplitFieldTable )
+	MOV.W	[R0],#SEG( _PALSplitFieldTable )
+; cbar.c   1377	      break;
+	SYMB	LINE, 1377
+	BR	_150
+; cbar.c   1378	
+; cbar.c   1379	    case CBarRed75:
+	SYMB	LINE, 1379
+_79:
+; cbar.c   1380	      SRAMVideoLoad( dEBUCBar_625, SRAMBank1);
+	SYMB	LINE, 1380
+	MOV.B	R0L,#01H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1381	      SRAMVideoLoad( dRed75_625, SRAMBank2);
+	SYMB	LINE, 1381
+	MOV.B	R0L,#07H
+	MOV.B	R0H,#014H
+	CALL	_SRAMVideoLoad
+; cbar.c   1382	
+; cbar.c   1383	      cb_vars.CBX.newTablePtr = &PALSplitFieldTable[0];
+	SYMB	LINE, 1383
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALSplitFieldTable )
+	MOV.W	[R0],#SEG( _PALSplitFieldTable )
+; cbar.c   1384	      break;
+	SYMB	LINE, 1384
+	BR	_150
+; cbar.c   1385	      
+; cbar.c   1386	    case Red75:
+	SYMB	LINE, 1386
+_80:
+; cbar.c   1387	      if ( system < NTSC_US)
+	SYMB	LINE, 1387
+	CMP.W	R4,#02H
+	BGE	_81
+; cbar.c   1388	      {
+; cbar.c   1389	        SRAMVideoLoad( dRed75_625, SRAMBank1);
+	SYMB	LINE, 1389
+	MOV.B	R0L,#07H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1390	
+; cbar.c   1391	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1391
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1392	      }
+	SYMB	LINE, 1392
+	BR	_150
+_81:
+; cbar.c   1393	      else
+; cbar.c   1394	      {
+; cbar.c   1395	        SRAMVideoLoad( dRed75_525, SRAMBank1);
+	SYMB	LINE, 1395
+	MOV.B	R0L,#08H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1396	
+; cbar.c   1397	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1397
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1398	      }
+; cbar.c   1399	      break;
+	SYMB	LINE, 1399
+	BR	_150
+; cbar.c   1400	
+; cbar.c   1401	    case Multiburst:
+	SYMB	LINE, 1401
+_82:
+; cbar.c   1402	      if ( system < NTSC_US)
+	SYMB	LINE, 1402
+	CMP.W	R4,#02H
+	BGE	_83
+; cbar.c   1403	      {
+; cbar.c   1404	        SRAMVideoLoad( dChroma_Multiburst, SRAMBank1);
+	SYMB	LINE, 1404
+	MOV.B	R0L,#09H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1405	
+; cbar.c   1406	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1406
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1407	      }
+	SYMB	LINE, 1407
+	BR	_150
+_83:
+; cbar.c   1408	      else
+; cbar.c   1409	      {
+; cbar.c   1410	        SRAMVideoLoad( dFCC_Multiburst_525, SRAMBank1);
+	SYMB	LINE, 1410
+	MOV.B	R0L,#0AH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1411	
+; cbar.c   1412	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1412
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1413	      }
+; cbar.c   1414	      break;
+	SYMB	LINE, 1414
+	BR	_150
+; cbar.c   1415	
+; cbar.c   1416	    case CCIR18:
+	SYMB	LINE, 1416
+_84:
+; cbar.c   1417	      SRAMVideoLoad( dCCIR18_625, SRAMBank1);
+	SYMB	LINE, 1417
+	MOV.B	R0L,#02FH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1418	
+; cbar.c   1419	      cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1419
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1420	      break;
+	SYMB	LINE, 1420
+	BR	_150
+; cbar.c   1421	
+; cbar.c   1422	    case Window10:
+	SYMB	LINE, 1422
+_85:
+; cbar.c   1423	      SRAMVideoLoad( dWindow50Marker, SRAMBank1);
+	SYMB	LINE, 1423
+	MOV.B	R0L,#01BH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1424	      SRAMVideoLoad( dMarkerLine, SRAMBank2);
+	SYMB	LINE, 1424
+	MOV.B	R0H,#014H
+	MOV.B	R0L,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1425	      SRAMVideoLoad( dMarker10, SRAMBank3);
+	SYMB	LINE, 1425
+	MOV.B	R0L,#02CH
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1426	      SRAMVideoLoad( dWindow10, SRAMBank4);
+	SYMB	LINE, 1426
+	MOV.B	R0L,#02BH
+	MOV.B	R0H,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1427	
+; cbar.c   1428	      if ( system < NTSC_US)
+	SYMB	LINE, 1428
+	CMP.W	R4,#02H
+	BGE	_86
+; cbar.c   1429	        cb_vars.CBX.newTablePtr = &PALWindowTable[0];
+	SYMB	LINE, 1429
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALWindowTable )
+	MOV.W	[R0],#SEG( _PALWindowTable )
+	BR	_150
+_86:
+; cbar.c   1430	      else
+; cbar.c   1431	        cb_vars.CBX.newTablePtr = &NTSCWindowTable[0];
+	SYMB	LINE, 1431
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCWindowTable )
+	MOV.W	[R0],#SEG( _NTSCWindowTable )
+; cbar.c   1432	      break;
+	SYMB	LINE, 1432
+	BR	_150
+; cbar.c   1433	
+; cbar.c   1434	    case Window15:
+	SYMB	LINE, 1434
+_87:
+; cbar.c   1435	      SRAMVideoLoad( dWindow50Marker, SRAMBank1);
+	SYMB	LINE, 1435
+	MOV.B	R0L,#01BH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1436	      SRAMVideoLoad( dMarkerLine, SRAMBank2);
+	SYMB	LINE, 1436
+	MOV.B	R0H,#014H
+	MOV.B	R0L,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1437	      SRAMVideoLoad( dMarker15, SRAMBank3);
+	SYMB	LINE, 1437
+	MOV.B	R0L,#01EH
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1438	      SRAMVideoLoad( dWindow15, SRAMBank4);
+	SYMB	LINE, 1438
+	MOV.B	R0L,#01DH
+	MOV.B	R0H,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1439	
+; cbar.c   1440	      if ( system < NTSC_US)                        
+	SYMB	LINE, 1440
+	CMP.W	R4,#02H
+	BGE	_88
+; cbar.c   1441	        cb_vars.CBX.newTablePtr = &PALWindowTable[0];
+	SYMB	LINE, 1441
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALWindowTable )
+	MOV.W	[R0],#SEG( _PALWindowTable )
+	BR	_150
+_88:
+; cbar.c   1442	      else
+; cbar.c   1443	        cb_vars.CBX.newTablePtr = &NTSCWindowTable[0];
+	SYMB	LINE, 1443
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCWindowTable )
+	MOV.W	[R0],#SEG( _NTSCWindowTable )
+; cbar.c   1444	      break;
+	SYMB	LINE, 1444
+	BR	_150
+; cbar.c   1445	
+; cbar.c   1446	    case Window20:
+	SYMB	LINE, 1446
+_89:
+; cbar.c   1447	      SRAMVideoLoad( dWindow50Marker, SRAMBank1);
+	SYMB	LINE, 1447
+	MOV.B	R0L,#01BH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1448	      SRAMVideoLoad( dMarkerLine, SRAMBank2);
+	SYMB	LINE, 1448
+	MOV.B	R0H,#014H
+	MOV.B	R0L,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1449	      SRAMVideoLoad( dMarker20, SRAMBank3);
+	SYMB	LINE, 1449
+	MOV.B	R0L,#020H
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1450	      SRAMVideoLoad( dWindow20, SRAMBank4);
+	SYMB	LINE, 1450
+	MOV.B	R0L,#01FH
+	MOV.B	R0H,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1451	
+; cbar.c   1452	      if ( system < NTSC_US)
+	SYMB	LINE, 1452
+	CMP.W	R4,#02H
+	BGE	_90
+; cbar.c   1453	        cb_vars.CBX.newTablePtr = &PALWindowTable[0];
+	SYMB	LINE, 1453
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALWindowTable )
+	MOV.W	[R0],#SEG( _PALWindowTable )
+	BR	_150
+_90:
+; cbar.c   1454	      else
+; cbar.c   1455	        cb_vars.CBX.newTablePtr = &NTSCWindowTable[0];
+	SYMB	LINE, 1455
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCWindowTable )
+	MOV.W	[R0],#SEG( _NTSCWindowTable )
+; cbar.c   1456	      break;
+	SYMB	LINE, 1456
+	BR	_150
+; cbar.c   1457	
+; cbar.c   1458	    case Window100:
+	SYMB	LINE, 1458
+_91:
+; cbar.c   1459	      SRAMVideoLoad( dWindow50Marker, SRAMBank1);
+	SYMB	LINE, 1459
+	MOV.B	R0L,#01BH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1460	      SRAMVideoLoad( dMarkerLine, SRAMBank2);
+	SYMB	LINE, 1460
+	MOV.B	R0H,#014H
+	MOV.B	R0L,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1461	      SRAMVideoLoad( dMarker100, SRAMBank3);
+	SYMB	LINE, 1461
+	MOV.B	R0L,#022H
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1462	      SRAMVideoLoad( dWindow100, SRAMBank4);
+	SYMB	LINE, 1462
+	MOV.B	R0L,#021H
+	MOV.B	R0H,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1463	
+; cbar.c   1464	      if ( system < NTSC_US)
+	SYMB	LINE, 1464
+	CMP.W	R4,#02H
+	BGE	_92
+; cbar.c   1465	        cb_vars.CBX.newTablePtr = &PALWindowTable[0];
+	SYMB	LINE, 1465
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALWindowTable )
+	MOV.W	[R0],#SEG( _PALWindowTable )
+	BR	_150
+_92:
+; cbar.c   1466	      else
+; cbar.c   1467	        cb_vars.CBX.newTablePtr = &NTSCWindowTable[0];
+	SYMB	LINE, 1467
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCWindowTable )
+	MOV.W	[R0],#SEG( _NTSCWindowTable )
+; cbar.c   1468	      break;
+	SYMB	LINE, 1468
+	BR	_150
+; cbar.c   1469	
+; cbar.c   1470	    case BlWh15kHz:
+	SYMB	LINE, 1470
+_93:
+; cbar.c   1471	      if ( system < NTSC_US)                        
+	SYMB	LINE, 1471
+	CMP.W	R4,#02H
+	BGE	_94
+; cbar.c   1472	      {
+; cbar.c   1473	        SRAMVideoLoad( dkHz15BlWh_625, SRAMBank1);
+	SYMB	LINE, 1473
+	MOV.B	R0L,#02DH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1474	
+; cbar.c   1475	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1475
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1476	      }
+	SYMB	LINE, 1476
+	BR	_150
+_94:
+; cbar.c   1477	      else
+; cbar.c   1478	      {
+; cbar.c   1479	        SRAMVideoLoad( dkHz15BlWh_525, SRAMBank1);
+	SYMB	LINE, 1479
+	MOV.B	R0L,#02EH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1480	
+; cbar.c   1481	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1481
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1482	      }
+; cbar.c   1483	      break;
+	SYMB	LINE, 1483
+	BR	_150
+; cbar.c   1484	
+; cbar.c   1485	    case White100:
+	SYMB	LINE, 1485
+_95:
+; cbar.c   1486	      if ( system < NTSC_US)
+	SYMB	LINE, 1486
+	CMP.W	R4,#02H
+	BGE	_96
+; cbar.c   1487	      {
+; cbar.c   1488	        SRAMVideoLoad( dWhiteLine_625, SRAMBank1);
+	SYMB	LINE, 1488
+	MOV.B	R0L,#0BH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1489	
+; cbar.c   1490	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1490
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1491	      }
+	SYMB	LINE, 1491
+	BR	_150
+_96:
+; cbar.c   1492	      else
+; cbar.c   1493	      {
+; cbar.c   1494	        SRAMVideoLoad( dWhiteLine_525, SRAMBank1);
+	SYMB	LINE, 1494
+	MOV.B	R0L,#0DH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1495	
+; cbar.c   1496	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1496
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1497	      }
+; cbar.c   1498	      break;
+	SYMB	LINE, 1498
+	BR	_150
+; cbar.c   1499	
+; cbar.c   1500	    case Black:
+	SYMB	LINE, 1500
+_97:
+; cbar.c   1501	      if ( system < NTSC_US)
+	SYMB	LINE, 1501
+	CMP.W	R4,#02H
+	BGE	_98
+; cbar.c   1502	        cb_vars.CBX.newTablePtr = &PALBlackTable[0];
+	SYMB	LINE, 1502
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALBlackTable )
+	MOV.W	[R0],#SEG( _PALBlackTable )
+	BR	_150
+_98:
+; cbar.c   1503	      else
+; cbar.c   1504	        cb_vars.CBX.newTablePtr = &NTSCBlackTable[0];
+	SYMB	LINE, 1504
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCBlackTable )
+	MOV.W	[R0],#SEG( _NTSCBlackTable )
+; cbar.c   1505	      break;
+	SYMB	LINE, 1505
+	BR	_150
+; cbar.c   1506	
+; cbar.c   1507	    case CheckField:
+	SYMB	LINE, 1507
+_99:
+; cbar.c   1508	      SRAMVideoLoad( dSDI_test_line1, SRAMBank1);
+	SYMB	LINE, 1508
+	MOV.B	R0L,#025H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1509	      SRAMVideoLoad( dSDI_test_line2, SRAMBank2);
+	SYMB	LINE, 1509
+	MOV.B	R0L,#026H
+	MOV.B	R0H,#014H
+	CALL	_SRAMVideoLoad
+; cbar.c   1510	      SRAMVideoLoad( dSDI_test_line3, SRAMBank3);
+	SYMB	LINE, 1510
+	MOV.B	R0L,#027H
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1511	
+; cbar.c   1512	      if ( system < NTSC_US)
+	SYMB	LINE, 1512
+	CMP.W	R4,#02H
+	BGE	_100
+; cbar.c   1513	        cb_vars.CBX.newTablePtr = &PALCheckfieldTable[0];
+	SYMB	LINE, 1513
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALCheckfieldTable )
+	MOV.W	[R0],#SEG( _PALCheckfieldTable )
+	BR	_150
+_100:
+; cbar.c   1514	      else
+; cbar.c   1515	        cb_vars.CBX.newTablePtr = &NTSCCheckfieldTable[0];
+	SYMB	LINE, 1515
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCCheckfieldTable )
+	MOV.W	[R0],#SEG( _NTSCCheckfieldTable )
+; cbar.c   1516	      break;
+	SYMB	LINE, 1516
+	BR	_150
+; cbar.c   1517	
+; cbar.c   1518	    case DigitalGrey:
+	SYMB	LINE, 1518
+_101:
+; cbar.c   1519	      if ( system < NTSC_US)
+	SYMB	LINE, 1519
+	CMP.W	R4,#02H
+	BGE	_102
+; cbar.c   1520	      {
+; cbar.c   1521	        SRAMVideoLoad( dDigitalGrey_625, SRAMBank1);
+	SYMB	LINE, 1521
+	MOV.B	R0L,#023H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1522	
+; cbar.c   1523	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1523
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1524	      }
+	SYMB	LINE, 1524
+	BR	_150
+_102:
+; cbar.c   1525	      else
+; cbar.c   1526	      {
+; cbar.c   1527	        SRAMVideoLoad( dDigitalGrey_525, SRAMBank1);
+	SYMB	LINE, 1527
+	MOV.B	R0L,#024H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1528	
+; cbar.c   1529	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1529
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1530	      }
+; cbar.c   1531	      break;
+	SYMB	LINE, 1531
+	BR	_150
+; cbar.c   1532	
+; cbar.c   1533	    case Stair5:
+	SYMB	LINE, 1533
+_103:
+; cbar.c   1534	      if ( system < NTSC_US)
+	SYMB	LINE, 1534
+	CMP.W	R4,#02H
+	BGE	_104
+; cbar.c   1535	      {
+; cbar.c   1536	        SRAMVideoLoad( dGreyScale5_625, SRAMBank1);
+	SYMB	LINE, 1536
+	MOV.B	R0L,#017H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1537	
+; cbar.c   1538	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1538
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1539	      }
+	SYMB	LINE, 1539
+	BR	_150
+_104:
+; cbar.c   1540	      else
+; cbar.c   1541	      {
+; cbar.c   1542	        SRAMVideoLoad( dGreyScale5_525, SRAMBank1);
+	SYMB	LINE, 1542
+	MOV.B	R0L,#018H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1543	
+; cbar.c   1544	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1544
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1545	      }
+; cbar.c   1546	      break;
+	SYMB	LINE, 1546
+	BR	_150
+; cbar.c   1547	
+; cbar.c   1548	    case Stair10:
+	SYMB	LINE, 1548
+_105:
+; cbar.c   1549	      if ( system < NTSC_US)
+	SYMB	LINE, 1549
+	CMP.W	R4,#02H
+	BGE	_106
+; cbar.c   1550	      {
+; cbar.c   1551	        SRAMVideoLoad( dGreyScale10_625, SRAMBank1);
+	SYMB	LINE, 1551
+	MOV.B	R0L,#019H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1552	
+; cbar.c   1553	        cb_vars.CBX.newTablePtr = &PALFullFieldTable[0];
+	SYMB	LINE, 1553
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALFullFieldTable )
+	MOV.W	[R0],#SEG( _PALFullFieldTable )
+; cbar.c   1554	      }
+	SYMB	LINE, 1554
+	BR	_150
+_106:
+; cbar.c   1555	      else
+; cbar.c   1556	      {
+; cbar.c   1557	        SRAMVideoLoad( dGreyScale10_525, SRAMBank1);
+	SYMB	LINE, 1557
+	MOV.B	R0L,#01AH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1558	
+; cbar.c   1559	        cb_vars.CBX.newTablePtr = &NTSCFullFieldTable[0];
+	SYMB	LINE, 1559
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCFullFieldTable )
+	MOV.W	[R0],#SEG( _NTSCFullFieldTable )
+; cbar.c   1560	      }
+; cbar.c   1561	      break;
+	SYMB	LINE, 1561
+	BR	_150
+; cbar.c   1562	
+; cbar.c   1563	    case Crosshatch:
+	SYMB	LINE, 1563
+_107:
+; cbar.c   1564	      if ( system < NTSC_US)
+	SYMB	LINE, 1564
+	CMP.W	R4,#02H
+	BGE	_108
+; cbar.c   1565	      {
+; cbar.c   1566	        SRAMVideoLoad( dCrossHatch19_625, SRAMBank1);
+	SYMB	LINE, 1566
+	MOV.B	R0L,#0CH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1567	        SRAMVideoLoad( dWhiteLine_625, SRAMBank2);
+	SYMB	LINE, 1567
+	MOV.B	R0L,#0BH
+	MOV.B	R0H,#014H
+	CALL	_SRAMVideoLoad
+; cbar.c   1568	
+; cbar.c   1569	        cb_vars.CBX.newTablePtr = &PALCrosshatchTable[0];
+	SYMB	LINE, 1569
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALCrosshatchTable )
+	MOV.W	[R0],#SEG( _PALCrosshatchTable )
+; cbar.c   1570	      }
+	SYMB	LINE, 1570
+	BR	_150
+_108:
+; cbar.c   1571	      else
+; cbar.c   1572	      {
+; cbar.c   1573	        SRAMVideoLoad( dCrossHatch17_525, SRAMBank1);
+	SYMB	LINE, 1573
+	MOV.B	R0L,#0EH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1574	        SRAMVideoLoad( dWhiteLine_525, SRAMBank2);
+	SYMB	LINE, 1574
+	MOV.B	R0L,#0DH
+	MOV.B	R0H,#014H
+	CALL	_SRAMVideoLoad
+; cbar.c   1575	
+; cbar.c   1576	        cb_vars.CBX.newTablePtr = &NTSCCrosshatchTable[0];
+	SYMB	LINE, 1576
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCCrosshatchTable )
+	MOV.W	[R0],#SEG( _NTSCCrosshatchTable )
+; cbar.c   1577	      }
+; cbar.c   1578	      break;
+	SYMB	LINE, 1578
+	BR	_150
+; cbar.c   1579	
+; cbar.c   1580	    case PLUGE:
+	SYMB	LINE, 1580
+_109:
+; cbar.c   1581	      if ( system < NTSC_US)
+	SYMB	LINE, 1581
+	CMP.W	R4,#02H
+	BGE	_110
+; cbar.c   1582	      {
+; cbar.c   1583	        SRAMVideoLoad( dPlugeWhite_625, SRAMBank1);
+	SYMB	LINE, 1583
+	MOV.B	R0L,#0FH
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1584	        SRAMVideoLoad( dPlugeGreyC_625, SRAMBank2);
+	SYMB	LINE, 1584
+	MOV.B	R0H,#014H
+	MOV.B	R0L,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1585	        SRAMVideoLoad( dPlugeGreyD_625, SRAMBank3);
+	SYMB	LINE, 1585
+	MOV.B	R0L,#011H
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1586	        SRAMVideoLoad( dPlugeGreyE_625, SRAMBank4);
+	SYMB	LINE, 1586
+	MOV.B	R0L,#012H
+	MOV.B	R0H,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1587	
+; cbar.c   1588	        cb_vars.CBX.newTablePtr = &PALPLUGETable[0];
+	SYMB	LINE, 1588
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _PALPLUGETable )
+	MOV.W	[R0],#SEG( _PALPLUGETable )
+; cbar.c   1589	      }
+	SYMB	LINE, 1589
+	BR	_150
+_110:
+; cbar.c   1590	      else
+; cbar.c   1591	      {
+; cbar.c   1592	        SRAMVideoLoad( dPlugeWhite_525, SRAMBank1);
+	SYMB	LINE, 1592
+	MOV.B	R0L,#013H
+	MOV.B	R0H,#010H
+	CALL	_SRAMVideoLoad
+; cbar.c   1593	        SRAMVideoLoad( dPlugeGreyC_525, SRAMBank2);
+	SYMB	LINE, 1593
+	MOV.B	R0H,#014H
+	MOV.B	R0L,R0H
+	CALL	_SRAMVideoLoad
+; cbar.c   1594	        SRAMVideoLoad( dPlugeGreyD_525, SRAMBank3);
+	SYMB	LINE, 1594
+	MOV.B	R0L,#015H
+	MOV.B	R0H,#018H
+	CALL	_SRAMVideoLoad
+; cbar.c   1595	        SRAMVideoLoad( dPlugeGreyE_525, SRAMBank4);
+	SYMB	LINE, 1595
+	MOV.B	R0L,#016H
+	MOV.B	R0H,#01CH
+	CALL	_SRAMVideoLoad
+; cbar.c   1596	
+; cbar.c   1597	        cb_vars.CBX.newTablePtr = &NTSCPLUGETable[0];
+	SYMB	LINE, 1597
+	MOV.B	ES,#SEG( _cb_vars+4 )
+	MOV.W	R0,#SOF( _cb_vars+4 )
+	MOV.W	[R0+],#SOF( _NTSCPLUGETable )
+	MOV.W	[R0],#SEG( _NTSCPLUGETable )
+; cbar.c   1598	      }
+; cbar.c   1599	      break;
+; cbar.c   1600	  }
+	SYMB	LINE, 1600
+_150:
+; cbar.c   1601	
+; cbar.c   1602	  test_vars.CBX.NewPattern = TRUE;
+	SYMB	LINE, 1602
+	MOV.B	ES,#SEG( _test_vars+18 )
+	MOV.W	R0,#SOF( _test_vars+18 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1603	  cb_vars.CBX.NewPattern = TRUE;
+	SYMB	LINE, 1603
+	MOV.B	ES,#SEG( _cb_vars+18 )
+	MOV.W	R0,#SOF( _cb_vars+18 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1604	
+; cbar.c   1605	  return( OK);
+	SYMB	LINE, 1605
+	MOV.W	R0,#0FFFFH
+; cbar.c   1606	}
+	SYMB	LINE, 1606
+_151:
+	ADDS.W	R7,#02H
+	SYMB	SOFF, 2
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; cbar.c   1607	
+; cbar.c   1608	/**************************************************************************/
+; cbar.c   1609	/* SetCBSystem                                     CBAR.C  */
+; cbar.c   1610	/*                                                  */
+; cbar.c   1611	/* Author:   Kim Engedahl, DEV, 000331                          */
+; cbar.c   1612	/* Revised:   000705, KEn, DEV                                 */
+; cbar.c   1613	/*                                                  */
+; cbar.c   1614	/* Function:                                           */
+; cbar.c   1615	/* Remarks:                                            */
+; cbar.c   1616	/* Returns:                                            */
+; cbar.c   1617	/* Updates:                                              */
+; cbar.c   1618	/**************************************************************************/
+; cbar.c   1619	int SetCBSystem( UC system)
+; cbar.c   1620	{
+	ALIGN	1
+	SYMB	LINE, 1620
+	PUBLIC	_SetCBSystem
+_SetCBSystem:
+	SYMB	TYPE, 503, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "SetCBSystem", _SetCBSystem, #503, 0, 0, 16
+	SYMB	ALAB, _SetCBSystem, #503
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	SYMB	LTIM, "system", 0, 0, 2253
+	SYMB	IDEN, "system", 0, #3, 0, 2061
+; cbar.c   1621	  Settings.ActivePreset = 0;
+	SYMB	LINE, 1621
+	MOV.B	ES,#SEG( _Settings )
+	MOV.W	R1,#SOF( _Settings )
+	MOV.W	[R1],#00H
+; cbar.c   1622	
+; cbar.c   1623	  Settings.CBSetup.System = CBSetup.System = system;
+	SYMB	LINE, 1623
+	MOV.B	R4L,R0L
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	[R0],R4L
+	SYMB	LTIM, "system", 0, 0, 2125
+	SYMB	LTIM, "system", 16, 0, 2253
+	MOV.B	ES,#SEG( _Settings+32 )
+	MOV.W	R0,#SOF( _Settings+32 )
+	MOV.B	[R0],R4L
+; cbar.c   1624	  NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+	SYMB	LINE, 1624
+	MOV.W	R1,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	MOV.B	ES,#SEG( _SettingsPtr )
+	MOV.W	R2,#SOF( _SettingsPtr )
+	MOV.W	R2,[R2]
+	MOV.W	R3,#04AH
+	CALL	_NV_Store
+; cbar.c   1625	
+; cbar.c   1626	  if ( system < NTSC_US)
+	SYMB	LINE, 1626
+	CMP.B	R4L,#02H
+	BCC	_170
+; cbar.c   1627	  {
+; cbar.c   1628	    test_vars.CBX.Status &= ~SYSSEL;
+	SYMB	LINE, 1628
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFBFH
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1629	    cb_vars.CBX.Status &= ~SYSSEL;
+	SYMB	LINE, 1629
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFBFH
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1630	#ifdef CLASSIC    
+; cbar.c   1631	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1631
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1632	#else  
+; cbar.c   1633	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1634	#endif
+; cbar.c   1635	
+; cbar.c   1636	    WriteCBGain( Calibration.CBCalibration.GainG);
+	SYMB	LINE, 1636
+	MOV.B	ES,#SEG( _Calibration+215 )
+	MOV.W	R0,#SOF( _Calibration+215 )
+	MOV.B	R0L,[R0]
+	CALL	_WriteCBGain
+; cbar.c   1637	    WriteCBChromaGain( Calibration.CBCalibration.ChromaGainG);
+	SYMB	LINE, 1637
+	MOV.B	ES,#SEG( _Calibration+216 )
+	MOV.W	R0,#SOF( _Calibration+216 )
+	MOV.B	R0L,[R0]
+	CALL	_WriteCBChromaGain
+; cbar.c   1638	  }
+	SYMB	LINE, 1638
+	BR	_171
+_170:
+; cbar.c   1639	  else
+; cbar.c   1640	  {
+; cbar.c   1641	    test_vars.CBX.Status |= SYSSEL;
+	SYMB	LINE, 1641
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#040H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1642	    cb_vars.CBX.Status |= SYSSEL;
+	SYMB	LINE, 1642
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#040H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1643	#ifdef CLASSIC    
+; cbar.c   1644	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1644
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1645	#else  
+; cbar.c   1646	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1647	#endif
+; cbar.c   1648	
+; cbar.c   1649	    WriteCBGain( Calibration.CBCalibration.GainM);
+	SYMB	LINE, 1649
+	MOV.B	ES,#SEG( _Calibration+217 )
+	MOV.W	R0,#SOF( _Calibration+217 )
+	MOV.B	R0L,[R0]
+	CALL	_WriteCBGain
+; cbar.c   1650	    WriteCBChromaGain( Calibration.CBCalibration.ChromaGainM);
+	SYMB	LINE, 1650
+	MOV.B	ES,#SEG( _Calibration+218 )
+	MOV.W	R0,#SOF( _Calibration+218 )
+	MOV.B	R0L,[R0]
+	CALL	_WriteCBChromaGain
+; cbar.c   1651	  }
+	SYMB	LINE, 1651
+_171:
+; cbar.c   1652	
+; cbar.c   1653	
+; cbar.c   1654	  tvp6k_system( system);  // Initialise the composite output
+	SYMB	LINE, 1654
+	MOV.B	R0L,R4L
+	MOVS.B	R0H,#00H
+	CALL	_tvp6k_system
+; cbar.c   1655	
+; cbar.c   1656	                          // Validate pattern and change if invalid in new system                                    
+; cbar.c   1657	  ValidateCBPattern( system , &CBSetup.Pattern);
+	SYMB	LINE, 1657
+	MOV.W	R3,#SEG( _CBSetup+2 )
+	MOV.W	R2,#SOF( _CBSetup+2 )
+	MOV.B	R0L,R4L
+	SYMB	LTIM, "system", 16, 0, 2125
+	SYMB	LTIM, "system", 0, 0, 2253
+	CALL	_ValidateCBPattern
+	SYMB	LTIM, "system", 0, 0, 2125
+	SYMB	LTIM, "system", 16, 0, 2253
+; cbar.c   1658	
+; cbar.c   1659	                          // This one initialises TablePtr;
+; cbar.c   1660	  SetCBPattern( CBSetup.Pattern);
+	SYMB	LINE, 1660
+	MOV.B	ES,#SEG( _CBSetup+2 )
+	MOV.W	R0,#SOF( _CBSetup+2 )
+	MOV.W	R0,[R0]
+	CALL	_SetCBPattern
+; cbar.c   1661	
+; cbar.c   1662	  SetCBScHPhase( CBSetup.ScHPhase);
+	SYMB	LINE, 1662
+	MOV.B	ES,#SEG( _CBSetup+8 )
+	MOV.W	R0,#SOF( _CBSetup+8 )
+	MOV.W	R0,[R0]
+	CALL	_SetCBScHPhase
+; cbar.c   1663	
+; cbar.c   1664	  LEDSet( CBPALLED, system < NTSC_US);
+	SYMB	LINE, 1664
+	MOV.W	R0,#040H
+	CMP.B	R4L,#02H
+	BCC	_173
+	MOVS.W	R1,#01H
+	BR	_175
+_173:
+	MOVS.W	R1,#00H
+_175:
+	CALL	_LEDSet
+; cbar.c   1665	  LEDSet( CBNTSCLED, system >= NTSC_US);
+	SYMB	LINE, 1665
+	MOV.W	R0,#080H
+	CMP.B	R4L,#02H
+	BCS	_176
+	MOVS.W	R1,#01H
+	BR	_178
+_176:
+	MOVS.W	R1,#00H
+_178:
+	CALL	_LEDSet
+; cbar.c   1666	
+; cbar.c   1667	  return( OK);
+	SYMB	LINE, 1667
+	MOV.W	R0,#0FFFFH
+; cbar.c   1668	}
+	SYMB	LINE, 1668
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "system", 16, 0, 2125
+	SYMB	EFUN
+; cbar.c   1669	
+; cbar.c   1670	/**************************************************************************/
+; cbar.c   1671	/* SetCBDelay                                                       CBAR.C  */
+; cbar.c   1672	/*                                                                        */
+; cbar.c   1673	/* Author:   Kim Engedahl, DEV, 000331                                    */
+; cbar.c   1674	/* Revised:   001009, KEn, DEV                                             */
+; cbar.c   1675	/*                                                                        */
+; cbar.c   1676	/* Function:                                                               */
+; cbar.c   1677	/* Remarks:   CB Delay resolution is 37ns                                  */
+; cbar.c   1678	/* Returns:                                                                */
+; cbar.c   1679	/* Updates:                                                                */
+; cbar.c   1680	/**************************************************************************/
+; cbar.c   1681	int SetCBDelay( UL delay)
+; cbar.c   1682	  {
+	ALIGN	1
+	SYMB	LINE, 1682
+	PUBLIC	_SetCBDelay
+_SetCBDelay:
+	SYMB	TYPE, 504, 'X', 12, #16, 30, 1, #7
+	SYMB	GFUN, "SetCBDelay", _SetCBDelay, #504, 0, 0, 48
+	SYMB	ALAB, _SetCBDelay, #504
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	SYMB	LTIM, "delay", 3, 0, 2253
+	SYMB	IDEN, "delay", 3, #7, 0, 2061
+	SYMB	IDEN, "tmpOffset", -1, #7, 130, 5
+	SYMB	LTIM, "tmpOffset", -1, 0, 69
+; cbar.c   1683	  UL tmpOffset;
+; cbar.c   1684	
+; cbar.c   1685	  Settings.ActivePreset = 0;
+	SYMB	LINE, 1685
+	MOV.B	ES,#SEG( _Settings )
+	MOV.W	R2,#SOF( _Settings )
+	MOV.W	[R2],#00H
+; cbar.c   1686	
+; cbar.c   1687	  Settings.CBSetup.Delay = CBSetup.Delay = delay;
+	SYMB	LINE, 1687
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	MOV.B	ES,#SEG( _CBSetup+4 )
+	MOV.W	R0,#SOF( _CBSetup+4 )
+	MOV.W	[R0+],R4
+	MOV.W	[R0],R5
+	SYMB	LTIM, "delay", 3, 0, 2125
+	SYMB	LTIM, "delay", 19, 0, 2253
+	MOV.B	ES,#SEG( _Settings+36 )
+	MOV.W	R0,#SOF( _Settings+36 )
+	MOV.W	[R0+],R4
+	MOV.W	[R0],R5
+; cbar.c   1688	  NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+	SYMB	LINE, 1688
+	MOV.W	R1,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	MOV.B	ES,#SEG( _SettingsPtr )
+	MOV.W	R2,#SOF( _SettingsPtr )
+	MOV.W	R2,[R2]
+	MOV.W	R3,#04AH
+	CALL	_NV_Store
+; cbar.c   1689	
+; cbar.c   1690	  // Divide GenlockSetup.Delay with 256 as the resulotion is 27ns/256 whereas the
+; cbar.c   1691	  //  resolution of the TSG is 37ns.
+; cbar.c   1692	  tmpOffset = delay + GenlockSetup.Delay/256;
+	SYMB	LINE, 1692
+	MOV.B	ES,#SEG( _GenlockSetup+2 )
+	MOV.W	R1,#SOF( _GenlockSetup+2 )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	LSR.D	R0,#08H
+	ADD.W	R4,R0
+	ADDC.W	R5,R1
+	SYMB	LTIM, "delay", 19, 0, 2125
+	MOV.W	R3,R5
+	MOV.W	R2,R4
+	SYMB	LTIM, "tmpOffset", 11, 0, 205
+; cbar.c   1693	
+; cbar.c   1694	  if ( CBSetup.System < NTSC_US)
+	SYMB	LINE, 1694
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#02H
+	BCC	_179
+; cbar.c   1695	    {
+; cbar.c   1696	    tmpOffset += Calibration.CBCalibration.PhaseG;
+	SYMB	LINE, 1696
+	MOV.B	ES,#SEG( _Calibration+204 )
+	MOV.W	R3,#SOF( _Calibration+204 )
+	MOV.W	R2,[R3+]
+	MOV.W	R3,[R3]
+	SYMB	LTIM, "tmpOffset", 11, 0, 77
+	ADD.W	R4,R2
+	ADDC.W	R5,R3
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	SYMB	LTIM, "tmpOffset", 3, 0, 205
+; cbar.c   1697	
+; cbar.c   1698	    tmpOffset %= 4320000L;            // 4*625*1728
+	SYMB	LINE, 1698
+	MOV.W	R3,#041H
+	MOV.W	R2,#0EB00H
+	FCALL	__UMODL
+	SYMB	LTIM, "tmpOffset", 3, 0, 77
+	SYMB	LTIM, "tmpOffset", 3, 0, 205
+; cbar.c   1699	
+; cbar.c   1700	    LineOffset = 0xFFFF - ( tmpOffset / 1728L);        
+	SYMB	LINE, 1700
+	MOV.W	R3,#00H
+	MOV.W	R2,#06C0H
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	FCALL	__UDIVL
+	SYMB	LTIM, "tmpOffset", 3, 0, 77
+	SYMB	LTIM, "tmpOffset", 19, 0, 205
+	MOV.W	R1,#0FFFFH
+	SUB.W	R1,R0
+	MOV.W	_LineOffset,R1
+; cbar.c   1701	    PhaseOffset = 1727 - ( tmpOffset % 1728L);
+	SYMB	LINE, 1701
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	MOV.W	R3,#00H
+	MOV.W	R2,#06C0H
+	FCALL	__UMODL
+	SYMB	LTIM, "tmpOffset", 19, 0, 77
+	SYMB	LTIM, "tmpOffset", 3, 0, 205
+	SYMB	LTIM, "tmpOffset", 3, 0, 77
+	MOV.W	R1,#06BFH
+	SUB.W	R1,R0
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R0,#SOF( _PhaseOffset )
+	MOV.W	[R0],R1
+; cbar.c   1702	    }
+	SYMB	LINE, 1702
+	BR	_181
+_179:
+	SYMB	LTIM, "tmpOffset", 11, 0, 205
+; cbar.c   1703	  else 
+; cbar.c   1704	    {
+; cbar.c   1705	    tmpOffset += Calibration.CBCalibration.PhaseM;
+	SYMB	LINE, 1705
+	MOV.B	ES,#SEG( _Calibration+210 )
+	MOV.W	R1,#SOF( _Calibration+210 )
+	MOV.W	R0,[R1+]
+	MOV.W	R1,[R1]
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	SYMB	LTIM, "tmpOffset", 11, 0, 77
+	SYMB	LTIM, "tmpOffset", 3, 0, 205
+; cbar.c   1706	
+; cbar.c   1707	    tmpOffset %= 1801800L;            // 2*525*1716
+	SYMB	LINE, 1707
+	MOV.W	R3,#01BH
+	MOV.W	R2,#07E48H
+	FCALL	__UMODL
+	SYMB	LTIM, "tmpOffset", 3, 0, 77
+	SYMB	LTIM, "tmpOffset", 3, 0, 205
+; cbar.c   1708	
+; cbar.c   1709	    LineOffset = 0xFFFF - ( tmpOffset / 1716L);        
+	SYMB	LINE, 1709
+	MOV.W	R3,#00H
+	MOV.W	R2,#06B4H
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	FCALL	__UDIVL
+	SYMB	LTIM, "tmpOffset", 3, 0, 77
+	SYMB	LTIM, "tmpOffset", 19, 0, 205
+	MOV.W	R1,#0FFFFH
+	SUB.W	R1,R0
+	MOV.W	_LineOffset,R1
+; cbar.c   1710	    PhaseOffset = 1715 - ( tmpOffset % 1716L);
+	SYMB	LINE, 1710
+	MOV.W	R3,#00H
+	MOV.W	R2,#06B4H
+	MOV.W	R1,R5
+	MOV.W	R0,R4
+	FCALL	__UMODL
+	SYMB	LTIM, "tmpOffset", 19, 0, 77
+	SYMB	LTIM, "tmpOffset", 3, 0, 205
+	SYMB	LTIM, "tmpOffset", 3, 0, 77
+	MOV.W	R1,#06B3H
+	SUB.W	R1,R0
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R0,#SOF( _PhaseOffset )
+	MOV.W	[R0],R1
+; cbar.c   1711	
+; cbar.c   1712	    if ( PhaseOffset > 1687)
+	SYMB	LINE, 1712
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R0,#SOF( _PhaseOffset )
+	MOV.W	R0,[R0]
+	CMP.W	R0,#0697H
+	BLE	_181
+; cbar.c   1713	      PhaseOffset += 12;
+	SYMB	LINE, 1713
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R0,#SOF( _PhaseOffset )
+	MOV.W	R0,[R0]
+	ADD.W	R0,#0CH
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R1,#SOF( _PhaseOffset )
+	MOV.W	[R1],R0
+; cbar.c   1714	    }
+	SYMB	LINE, 1714
+_181:
+; cbar.c   1715	
+; cbar.c   1716	  if ( PhaseOffset >= 1443)
+	SYMB	LINE, 1716
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R0,#SOF( _PhaseOffset )
+	MOV.W	R0,[R0]
+	CMP.W	R0,#05A3H
+	BLT	_182
+; cbar.c   1717	    {
+; cbar.c   1718	    test_vars.CBX.Status |= PHASEREGSEL;        // Set Phase Register Select
+	SYMB	LINE, 1718
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#04000H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1719	    cb_vars.CBX.Status |= PHASEREGSEL;        // Set Phase Register Select
+	SYMB	LINE, 1719
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	OR.W	R0,#04000H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1720	    }
+	SYMB	LINE, 1720
+	BR	_183
+_182:
+; cbar.c   1721	  else   
+; cbar.c   1722	    { 
+; cbar.c   1723	    test_vars.CBX.Status &= ~PHASEREGSEL;        // Clear Phase Register Select
+	SYMB	LINE, 1723
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0BFFFH
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1724	    cb_vars.CBX.Status &= ~PHASEREGSEL;        // Clear Phase Register Select
+	SYMB	LINE, 1724
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0BFFFH
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1725	    }
+	SYMB	LINE, 1725
+_183:
+; cbar.c   1726	#ifdef CLASSIC    
+; cbar.c   1727	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1727
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1728	#else  
+; cbar.c   1729	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1730	#endif
+; cbar.c   1731	  HOffsetPort = PhaseOffset;
+	SYMB	LINE, 1731
+	MOV.B	ES,#SEG( _PhaseOffset )
+	MOV.W	R0,#SOF( _PhaseOffset )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _HOffsetPort )
+	MOV.W	R1,#SOF( _HOffsetPort )
+	MOV.W	[R1],R0
+; cbar.c   1732	
+; cbar.c   1733	  return( OK);
+	SYMB	LINE, 1733
+	MOV.W	R0,#0FFFFH
+; cbar.c   1734	}
+	SYMB	LINE, 1734
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; cbar.c   1735	
+; cbar.c   1736	/**************************************************************************/
+; cbar.c   1737	/* SetCBScHPhase                                                   CBAR.C  */
+; cbar.c   1738	/*                                                                        */
+; cbar.c   1739	/* Author:   Kim Engedahl, DEV, 000331                                    */
+; cbar.c   1740	/* Revised:   000618, KEn, DEV                                             */
+; cbar.c   1741	/*                                                                        */
+; cbar.c   1742	/* Function:                                                               */
+; cbar.c   1743	/* Remarks:   Note that the resolution is different from BlackBurst, (1.4).*/
+; cbar.c   1744	/* Returns:                                                                */
+; cbar.c   1745	/* Updates:                                                                */
+; cbar.c   1746	/**************************************************************************/
+; cbar.c   1747	int SetCBScHPhase( int schphase)
+; cbar.c   1748	{
+	ALIGN	1
+	SYMB	LINE, 1748
+	PUBLIC	_SetCBScHPhase
+_SetCBScHPhase:
+	SYMB	TYPE, 505, 'X', 12, #16, 30, 1, #16
+	SYMB	GFUN, "SetCBScHPhase", _SetCBScHPhase, #505, 0, 0, 16
+	SYMB	ALAB, _SetCBScHPhase, #505
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	ADDS.W	R7,#0EH
+	SYMB	SOFF, 4
+	SYMB	LTIM, "schphase", 2, 0, 2253
+	SYMB	IDEN, "schphase", 2, #16, 0, 2061
+	SYMB	IDEN, "tmp", -1, #6, 130, 5
+	SYMB	LTIM, "tmp", -1, 0, 69
+	SYMB	TYPE, 506, 'Z', #3, 1
+	SYMB	IDEN, "buffer", -4, #506, 130, 5
+; cbar.c   1749	  long tmp;
+; cbar.c   1750	  UC buffer[2];
+; cbar.c   1751	
+; cbar.c   1752	  Settings.ActivePreset = 0;
+	SYMB	LINE, 1752
+	MOV.B	ES,#SEG( _Settings )
+	MOV.W	R1,#SOF( _Settings )
+	MOV.W	[R1],#00H
+; cbar.c   1753	
+; cbar.c   1754	  Settings.CBSetup.ScHPhase = CBSetup.ScHPhase = schphase;
+	SYMB	LINE, 1754
+	MOV.W	R4,R0
+	MOV.B	ES,#SEG( _CBSetup+8 )
+	MOV.W	R0,#SOF( _CBSetup+8 )
+	MOV.W	[R0],R4
+	SYMB	LTIM, "schphase", 2, 0, 2125
+	SYMB	LTIM, "schphase", 18, 0, 2253
+	MOV.B	ES,#SEG( _Settings+40 )
+	MOV.W	R0,#SOF( _Settings+40 )
+	MOV.W	[R0],R4
+; cbar.c   1755	  NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+	SYMB	LINE, 1755
+	MOV.W	R1,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	MOV.B	ES,#SEG( _SettingsPtr )
+	MOV.W	R2,#SOF( _SettingsPtr )
+	MOV.W	R2,[R2]
+	MOV.W	R3,#04AH
+	CALL	_NV_Store
+; cbar.c   1756	  
+; cbar.c   1757	  if ( CBSetup.System < NTSC_US)
+	SYMB	LINE, 1757
+	MOV.B	ES,#SEG( _CBSetup )
+	MOV.W	R0,#SOF( _CBSetup )
+	MOV.B	R0L,[R0]
+	CMP.B	R0L,#02H
+	BCC	_187
+; cbar.c   1758	    tmp = (long) Calibration.CBCalibration.ScHPhaseG;
+	SYMB	LINE, 1758
+	MOV.B	ES,#SEG( _Calibration+208 )
+	MOV.W	R0,#SOF( _Calibration+208 )
+	MOV.B	R0L,[R0]
+	MOVS.B	R0H,#00H
+	MOVS.W	R1,#00H
+	SYMB	LTIM, "tmp", 3, 0, 205
+	BR	_188
+_187:
+; cbar.c   1759	  else 
+; cbar.c   1760	    tmp = (long) Calibration.CBCalibration.ScHPhaseM;
+	SYMB	LINE, 1760
+	MOV.B	ES,#SEG( _Calibration+214 )
+	MOV.W	R0,#SOF( _Calibration+214 )
+	MOV.B	R0L,[R0]
+	SYMB	LTIM, "tmp", 3, 0, 77
+	MOVS.B	R0H,#00H
+	MOVS.W	R1,#00H
+	SYMB	LTIM, "tmp", 3, 0, 205
+_188:
+; cbar.c   1761	
+; cbar.c   1762	  tmp += (long) schphase;
+	SYMB	LINE, 1762
+	MOV.W	R2,R4
+	SEXT.W	R3
+	ADD.W	R0,R2
+	ADDC.W	R1,R3
+	SYMB	LTIM, "tmp", 3, 0, 77
+	SYMB	LTIM, "tmp", 3, 0, 205
+; cbar.c   1763	
+; cbar.c   1764	  if ( tmp < 0)                      // -1 deg equ. 359 deg a.s.f.
+	SYMB	LINE, 1764
+	CMP.W	R1,#00H
+	BGT	_189
+	BLT	_191
+	CMP.W	R0,#00H
+	BCC	_189
+_191:
+; cbar.c   1765	    tmp += 360;
+	SYMB	LINE, 1765
+	ADD.W	R0,#0168H
+	ADDC.W	R1,#00H
+	SYMB	LTIM, "tmp", 3, 0, 77
+	SYMB	LTIM, "tmp", 3, 0, 205
+_189:
+; cbar.c   1766	
+; cbar.c   1767	  tmp *= 256;
+	SYMB	LINE, 1767
+	ASL.D	R0,#08H
+	SYMB	LTIM, "tmp", 3, 0, 77
+	SYMB	LTIM, "tmp", 3, 0, 205
+; cbar.c   1768	  tmp /= 360;                        // tmp = ( ScHPhase*256)/360;
+	SYMB	LINE, 1768
+	MOV.W	R3,#00H
+	MOV.W	R2,#0168H
+	FCALL	__SDIVL
+	SYMB	LTIM, "tmp", 3, 0, 77
+	SYMB	LTIM, "tmp", 3, 0, 205
+; cbar.c   1769	
+; cbar.c   1770	  buffer[0] = C_PHASE_address;
+	SYMB	LINE, 1770
+	MOV.B	[R7],#05AH
+	SYMB	LTIM, "tmp", 3, 0, 77
+; cbar.c   1771	  buffer[1] = tmp & 0xFF;
+	SYMB	LINE, 1771
+	AND.B	R0L,#0FFH
+	MOV.B	[R7+1],R0L
+; cbar.c   1772	  
+; cbar.c   1773	  return( TransmitIIC( TVP6K_IIC_address, 2, buffer, IIC_PTV));
+	SYMB	LINE, 1773
+	MOV.B	R0L,#040H
+	MOV.B	R0H,#02H
+	MOV.B	R3L,#SEG( __lc_bs )
+	XOR.B	R3H,R3H
+	MOV.W	R2,R7
+	MOV.B	R1L,#00H
+	CALL	_TransmitIIC
+; cbar.c   1774	}
+	SYMB	LINE, 1774
+	ADDS.W	R7,#02H
+	SYMB	SOFF, 2
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "schphase", 18, 0, 2125
+	SYMB	EFUN
+; cbar.c   1775	
+; cbar.c   1776	/**************************************************************************/
+; cbar.c   1777	/* SetCBEmbAudioSignal                                             CBAR.C  */
+; cbar.c   1778	/*                                                                        */
+; cbar.c   1779	/* Author:   Kim Engedahl, DEV, 000331                                    */
+; cbar.c   1780	/* Revised:   000618, KEn, DEV                                             */
+; cbar.c   1781	/*                                                                        */
+; cbar.c   1782	/* Function:                                                               */
+; cbar.c   1783	/* Remarks:                                                                */
+; cbar.c   1784	/* Returns:                                                                */
+; cbar.c   1785	/* Updates:                                                                */
+; cbar.c   1786	/**************************************************************************/
+; cbar.c   1787	int SetCBEmbAudioSignal( UC signal)
+; cbar.c   1788	{
+	ALIGN	1
+	SYMB	LINE, 1788
+	PUBLIC	_SetCBEmbAudioSignal
+_SetCBEmbAudioSignal:
+	SYMB	TYPE, 508, 'X', 12, #16, 30, 1, #3
+	SYMB	GFUN, "SetCBEmbAudioSignal", _SetCBEmbAudioSignal, #508, 0, 0, 16
+	SYMB	ALAB, _SetCBEmbAudioSignal, #508
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	SYMB	LTIM, "signal", 0, 0, 2253
+	SYMB	IDEN, "signal", 0, #3, 0, 2061
+; cbar.c   1789	  Settings.ActivePreset = 0;
+	SYMB	LINE, 1789
+	MOV.B	ES,#SEG( _Settings )
+	MOV.W	R1,#SOF( _Settings )
+	MOV.W	[R1],#00H
+; cbar.c   1790	
+; cbar.c   1791	  Settings.CBSetup.EmbAudioSignal = CBSetup.EmbAudioSignal = signal;
+	SYMB	LINE, 1791
+	MOV.B	R4L,R0L
+	MOV.B	ES,#SEG( _CBSetup+10 )
+	MOV.W	R0,#SOF( _CBSetup+10 )
+	MOV.B	[R0],R4L
+	SYMB	LTIM, "signal", 0, 0, 2125
+	SYMB	LTIM, "signal", 16, 0, 2253
+	MOV.B	ES,#SEG( _Settings+42 )
+	MOV.W	R0,#SOF( _Settings+42 )
+	MOV.B	[R0],R4L
+; cbar.c   1792	  NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+	SYMB	LINE, 1792
+	MOV.W	R1,#SEG( _Settings )
+	MOV.W	R0,#SOF( _Settings )
+	MOV.B	ES,#SEG( _SettingsPtr )
+	MOV.W	R2,#SOF( _SettingsPtr )
+	MOV.W	R2,[R2]
+	MOV.W	R3,#04AH
+	CALL	_NV_Store
+; cbar.c   1793	
+; cbar.c   1794	  if ( signal == EmbAudioOff)
+	SYMB	LINE, 1794
+	OR.B	R4L,R4L
+	BNE	_192
+; cbar.c   1795	    {
+; cbar.c   1796	    test_vars.CBX.SoundEnable = FALSE;
+	SYMB	LINE, 1796
+	MOV.B	ES,#SEG( _test_vars+19 )
+	MOV.W	R0,#SOF( _test_vars+19 )
+	MOV.B	[R0],#00H
+; cbar.c   1797	    cb_vars.CBX.SoundEnable = FALSE;
+	SYMB	LINE, 1797
+	MOV.B	ES,#SEG( _cb_vars+19 )
+	MOV.W	R0,#SOF( _cb_vars+19 )
+	MOV.B	[R0],#00H
+; cbar.c   1798	    }
+	SYMB	LINE, 1798
+	BR	_193
+_192:
+	SYMB	LTIM, "signal", 16, 0, 2125
+	SYMB	LTIM, "signal", 16, 0, 2253
+; cbar.c   1799	  else
+; cbar.c   1800	    {
+; cbar.c   1801	    test_vars.CBX.SoundEnable = TRUE;
+	SYMB	LINE, 1801
+	MOV.B	ES,#SEG( _test_vars+19 )
+	MOV.W	R0,#SOF( _test_vars+19 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1802	    cb_vars.CBX.SoundEnable = TRUE;
+	SYMB	LINE, 1802
+	MOV.B	ES,#SEG( _cb_vars+19 )
+	MOV.W	R0,#SOF( _cb_vars+19 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1803	
+; cbar.c   1804	    test_vars.CBX.Blanking = TRUE;                  // Blank line while loading SRAM
+	SYMB	LINE, 1804
+	MOV.B	ES,#SEG( _test_vars+17 )
+	MOV.W	R0,#SOF( _test_vars+17 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1805	    cb_vars.CBX.Blanking = TRUE;                  // Blank line while loading SRAM
+	SYMB	LINE, 1805
+	MOV.B	ES,#SEG( _cb_vars+17 )
+	MOV.W	R0,#SOF( _cb_vars+17 )
+	MOV.B	[R0],#0FFH
+; cbar.c   1806	
+; cbar.c   1807	    test_vars.CBX.Status &= ~S5S4S3S2;             // Blank the line immediately
+	SYMB	LINE, 1807
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R0,#SOF( _test_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC3H
+	MOV.B	ES,#SEG( _test_vars+20 )
+	MOV.W	R1,#SOF( _test_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1808	    cb_vars.CBX.Status &= ~S5S4S3S2;             // Blank the line immediately
+	SYMB	LINE, 1808
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R0,#SOF( _cb_vars+20 )
+	MOV.W	R0,[R0]
+	AND.W	R0,#0FFC3H
+	MOV.B	ES,#SEG( _cb_vars+20 )
+	MOV.W	R1,#SOF( _cb_vars+20 )
+	MOV.W	[R1],R0
+; cbar.c   1809	#ifdef CLASSIC    
+; cbar.c   1810	  StatusPort = cb_vars.CBX.Status;
+	SYMB	LINE, 1810
+	MOV.B	ES,#SEG( _StatusPort )
+	MOV.W	R1,#SOF( _StatusPort )
+	MOV.W	[R1],R0
+; cbar.c   1811	#else  
+; cbar.c   1812	  StatusPort = test_vars.CBX.Status;
+; cbar.c   1813	#endif
+; cbar.c   1814	
+; cbar.c   1815	    SRAMSoundLoad( signal);           // Download sound information
+	SYMB	LINE, 1815
+	MOV.B	R0L,R4L
+	CALL	_SRAMSoundLoad
+	SYMB	LTIM, "signal", 16, 0, 2125
+	SYMB	LTIM, "signal", 0, 0, 2253
+	SYMB	LTIM, "signal", 0, 0, 2125
+; cbar.c   1816	
+; cbar.c   1817	    test_vars.CBX.Blanking = FALSE;
+	SYMB	LINE, 1817
+	MOV.B	ES,#SEG( _test_vars+17 )
+	MOV.W	R0,#SOF( _test_vars+17 )
+	MOV.B	[R0],#00H
+; cbar.c   1818	    cb_vars.CBX.Blanking = FALSE;
+	SYMB	LINE, 1818
+	MOV.B	ES,#SEG( _cb_vars+17 )
+	MOV.W	R0,#SOF( _cb_vars+17 )
+	MOV.B	[R0],#00H
+; cbar.c   1819	    }
+	SYMB	LINE, 1819
+_193:
+; cbar.c   1820	
+; cbar.c   1821	  return( OK);
+	SYMB	LINE, 1821
+	MOV.W	R0,#0FFFFH
+; cbar.c   1822	}
+	SYMB	LINE, 1822
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; cbar.c   1823	
+; cbar.c   1824	/**************************************************************************/
+; cbar.c   1825	/* ValidateCBPattern                                                CBAR.C  */
+; cbar.c   1826	/*                                                                        */
+; cbar.c   1827	/* Author:   Kim Engedahl, DEV, 000405                                    */
+; cbar.c   1828	/* Revised:   000603, KEn, DEV                                             */
+; cbar.c   1829	/*                                                                        */
+; cbar.c   1830	/* Function:                                                               */
+; cbar.c   1831	/* Remarks:                                                                 */
+; cbar.c   1832	/* Returns:                                                                */
+; cbar.c   1833	/* Updates:                                                                */
+; cbar.c   1834	/**************************************************************************/
+; cbar.c   1835	int ValidateCBPattern( UC system, UI *pattern)
+; cbar.c   1836	{
+	ALIGN	1
+	SYMB	LINE, 1836
+	PUBLIC	_ValidateCBPattern
+_ValidateCBPattern:
+	SYMB	TYPE, 510, 'n', #18, 130
+	SYMB	TYPE, 511, 'P', #510
+	SYMB	TYPE, 509, 'X', 12, #16, 30, 2, #3, #511
+	SYMB	GFUN, "ValidateCBPattern", _ValidateCBPattern, #509, 0, 0, 0
+	SYMB	ALAB, _ValidateCBPattern, #509
+	SYMB	LTIM, "system", 0, 0, 2253
+	SYMB	LTIM, "pattern", 11, 0, 2253
+	SYMB	IDEN, "system", 0, #3, 0, 2061
+	SYMB	IDEN, "pattern", 11, #511, 0, 2061
+; cbar.c   1837	  if ( system < NTSC_US)
+	SYMB	LINE, 1837
+	CMP.B	R0L,#02H
+	BCC	_197
+; cbar.c   1838	  {
+; cbar.c   1839	    switch ( *pattern)
+	SYMB	LINE, 1839
+	MOV.B	ES,R3L
+	MOV.W	R0,[R2]
+	SYMB	LTIM, "system", 0, 0, 2125
+	CMP.W	R0,#00H
+	BEQ	_196
+	CMP.W	R0,#02H
+	BEQ	_196
+	BR	_194
+; cbar.c   1840	    {
+; cbar.c   1841	      case SMPTECBar:
+; cbar.c   1842	      case FCCCBar:
+; cbar.c   1843	        *pattern = EBUCBar;
+; cbar.c   1844	        break;
+; cbar.c   1845	
+; cbar.c   1846	      default:
+	SYMB	LINE, 1846
+_194:
+; cbar.c   1847	        return( OK);
+	SYMB	LINE, 1847
+	MOV.W	R0,#0FFFFH
+	RET
+	SYMB	LINE, 1842
+_196:
+	SYMB	LTIM, "pattern", 11, 0, 2125
+	SYMB	LTIM, "pattern", 11, 0, 2253
+	SYMB	LINE, 1843
+	MOV.B	ES,R3L
+	MOV.W	[R2],#01H
+; cbar.c   1848	    }
+; cbar.c   1849	  }
+	SYMB	LINE, 1849
+	BR	_204
+_197:
+	SYMB	LTIM, "pattern", 11, 0, 2125
+	SYMB	LTIM, "pattern", 11, 0, 2253
+; cbar.c   1850	  else
+; cbar.c   1851	  {
+; cbar.c   1852	    switch ( *pattern)
+	SYMB	LINE, 1852
+	MOV.B	ES,R3L
+	MOV.W	R0,[R2]
+	CMP.W	R0,#01H
+	BEQ	_202
+	CMP.W	R0,#05H
+	BEQ	_202
+	CMP.W	R0,#06H
+	BEQ	_202
+	CMP.W	R0,#09H
+	BEQ	_198
+	BR	_199
+; cbar.c   1853	    {
+; cbar.c   1854	      case EBUCBar:
+; cbar.c   1855	      case CBarGrey75:
+; cbar.c   1856	      case CBarRed75:
+; cbar.c   1857	        *pattern = SMPTECBar;
+; cbar.c   1858	        break;
+; cbar.c   1859	
+; cbar.c   1860	      case CCIR18:
+	SYMB	LINE, 1860
+_198:
+; cbar.c   1861	        *pattern = Multiburst;
+	SYMB	LINE, 1861
+	MOV.B	ES,R3L
+	MOV.W	[R2],#08H
+; cbar.c   1862	        break;
+	SYMB	LINE, 1862
+	BR	_204
+; cbar.c   1863	
+; cbar.c   1864	      default:
+	SYMB	LINE, 1864
+_199:
+; cbar.c   1865	        return( OK);
+	SYMB	LINE, 1865
+	MOV.W	R0,#0FFFFH
+	RET
+	SYMB	LINE, 1856
+_202:
+	SYMB	LTIM, "pattern", 11, 0, 2125
+	SYMB	LTIM, "pattern", 11, 0, 2253
+	SYMB	LINE, 1857
+	MOV.B	ES,R3L
+	MOV.W	[R2],#00H
+; cbar.c   1866	    }
+; cbar.c   1867	  }
+	SYMB	LINE, 1867
+_204:
+; cbar.c   1868	
+; cbar.c   1869	  return( FAIL);
+	SYMB	LINE, 1869
+	MOV.W	R0,#00H
+; cbar.c   1870	}
+	SYMB	LINE, 1870
+_206:
+	RET
+	SYMB	LTIM, "pattern", 11, 0, 2125
+	SYMB	EFUN
+; cbar.c   1871	
+	SYMB	ENDF
+
+	EXTRN	HCODE(__UMODL)
+	SYMB	IDEN, "test_vars", _test_vars, #488, 130, 0
+	SYMB	ALAB, _test_vars, #488
+	RSEG	CBAR_CLR_FA
+	PUBLIC	_test_vars
+	ALIGN	1
+_test_vars:	DS	22
+	SYMB	TYPE, 513, 'n', #3, 130
+	SYMB	TYPE, 514, 'P', #513
+	SYMB	TYPE, 512, 'X', 12, #16, 30, 4, #3, #3, #514, #3
+	SYMB	ALAB, _TransmitIIC, #512
+	EXTRN	HCODE(_TransmitIIC)
+	SYMB	IDEN, "StatusPort", _StatusPort, #16, 130, 0
+	SYMB	ALAB, _StatusPort, #16
+	HSEG AT 06A000H
+	PUBLIC	_StatusPort
+	ALIGN	1
+_StatusPort:	DS	2
+	SYMB	IDEN, "HOffsetPort", _HOffsetPort, #16, 130, 0
+	SYMB	ALAB, _HOffsetPort, #16
+	HSEG AT 06A004H
+	PUBLIC	_HOffsetPort
+	ALIGN	1
+_HOffsetPort:	DS	2
+	SYMB	ALAB, _TestLEDMirror, #18
+	EXTRN	HDATA(_TestLEDMirror)
+	SYMB	TYPE, 515, 'X', 12, #16, 30, 1, #16
+	SYMB	ALAB, _tvp6k_system, #515
+	EXTRN	HCODE(_tvp6k_system)
+	SYMB	IDEN, "CBSetup", _CBSetup, #445, 130, 0
+	SYMB	ALAB, _CBSetup, #445
+	RSEG	CBAR_CLR_FA
+	PUBLIC	_CBSetup
+	ALIGN	1
+_CBSetup:	DS	12
+	SYMB	TYPE, 516, 'X', 12, #16, 30, 2, #18, #447
+	SYMB	ALAB, _LEDSet, #516
+	EXTRN	HCODE(_LEDSet)
+	SYMB	IDEN, "SRAMVideoPort", _SRAMVideoPort, #16, 130, 0
+	SYMB	ALAB, _SRAMVideoPort, #16
+	HSEG AT 044000H
+	PUBLIC	_SRAMVideoPort
+	ALIGN	1
+_SRAMVideoPort:	DS	2
+	SYMB	TYPE, 517, 'Z', #16, 4607
+	SYMB	IDEN, "SoundSignalArray", _SoundSignalArray, #517, 129, 0
+	SYMB	ALAB, _SoundSignalArray, #517
+	HCSEG AT 04A000H
+	PUBLIC	_SoundSignalArray
+	ALIGN	1
+_SoundSignalArray:	DS	9216
+	SYMB	TYPE, 519, 'X', 12, #16, 30, 3, #3, #3, #3
+	SYMB	ALAB, _Write_AD8402, #519
+	EXTRN	HCODE(_Write_AD8402)
+	SYMB	ALAB, _SettingsPtr, #448
+	EXTRN	HDATA(_SettingsPtr)
+	SYMB	IDEN, "PhaseOffset", _PhaseOffset, #16, 130, 0
+	SYMB	ALAB, _PhaseOffset, #16
+	RSEG	CBAR_CLR_FA
+	PUBLIC	_PhaseOffset
+	ALIGN	1
+_PhaseOffset:	DS	2
+	SYMB	IDEN, "LEDPort", _LEDPort, #18, 130, 0
+	SYMB	ALAB, _LEDPort, #18
+	HSEG AT 06A00CH
+	PUBLIC	_LEDPort
+	ALIGN	1
+_LEDPort:	DS	2
+	SYMB	ALAB, _GenlockSetup, #450
+	EXTRN	HDATA(_GenlockSetup)
+	SYMB	ALAB, _Settings, #466
+	EXTRN	HDATA(_Settings)
+	SYMB	ALAB, _LEDMirror, #18
+	EXTRN	HDATA(_LEDMirror)
+	SYMB	TYPE, 520, 'X', 12, #16, 30, 3, #284, #448, #16
+	SYMB	ALAB, _NV_Store, #520
+	EXTRN	HCODE(_NV_Store)
+	SYMB	ALAB, _Calibration, #476
+	EXTRN	HDATA(_Calibration)
+	SYMB	TYPE, 521, 'Z', #16, 98303
+	SYMB	IDEN, "VideoSignalArray", _VideoSignalArray, #521, 129, 0
+	SYMB	ALAB, _VideoSignalArray, #521
+	HCSEG AT 050000H
+	PUBLIC	_VideoSignalArray
+	ALIGN	1
+_VideoSignalArray:	DS	196608
+	SYMB	IDEN, "TestLEDPort", _TestLEDPort, #18, 130, 0
+	SYMB	ALAB, _TestLEDPort, #18
+	HSEG AT 06A014H
+	PUBLIC	_TestLEDPort
+	ALIGN	1
+_TestLEDPort:	DS	2
+	EXTRN	IDATA(__lc_bs)
+	SYMB	IDEN, "cb_vars", _cb_vars, #488, 130, 0
+	SYMB	ALAB, _cb_vars, #488
+	RSEG	CBAR_CLR_FA
+	PUBLIC	_cb_vars
+	ALIGN	1
+_cb_vars:	DS	22
+	EXTRN	HCODE(__SDIVL)
+	SYMB	IDEN, "SRAMSoundPort", _SRAMSoundPort, #16, 130, 0
+	SYMB	ALAB, _SRAMSoundPort, #16
+	HSEG AT 040000H
+	PUBLIC	_SRAMSoundPort
+	ALIGN	1
+_SRAMSoundPort:	DS	2
+	SYMB	IDEN, "ESRAMVideoPort", _ESRAMVideoPort, #16, 130, 0
+	SYMB	ALAB, _ESRAMVideoPort, #16
+	HSEG AT 054000H
+	PUBLIC	_ESRAMVideoPort
+	ALIGN	1
+_ESRAMVideoPort:	DS	2
+	SYMB	IDEN, "TimeTickCounter", _TimeTickCounter, #18, 130, 0
+	SYMB	ALAB, _TimeTickCounter, #18
+CBAR_CLR_NE@DS	SEGMENT	DATA JOIN CLEAR
+	RSEG	CBAR_CLR_NE@DS
+	PUBLIC	_TimeTickCounter
+	ALIGN	1
+_TimeTickCounter:	DS	2
+	EXTRN	HCODE(__UDIVL)
+	SYMB	IDEN, "ChromaGainPort", _ChromaGainPort, #16, 130, 0
+	SYMB	ALAB, _ChromaGainPort, #16
+	HSEG AT 06A008H
+	PUBLIC	_ChromaGainPort
+	ALIGN	1
+_ChromaGainPort:	DS	2
+	SYMB	IDEN, "LineOffset", _LineOffset, #16, 130, 0
+	SYMB	ALAB, _LineOffset, #16
+	RSEG	CBAR_CLR_NE@DS
+	PUBLIC	_LineOffset
+	ALIGN	1
+_LineOffset:	DS	2
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'WriteCBGain', 'Write_AD8402'
+	CALLS	'CBDefaults', 'NV_Store'
+	CALLS	'CBUpdate', 'SetCBSystem'
+	CALLS	'CBUpdate', 'SetCBDelay'
+	CALLS	'CBUpdate', 'SetCBScHPhase'
+	CALLS	'CBUpdate', 'SetCBEmbAudioSignal'
+	CALLS	'SetCBPattern', 'ValidateCBPattern'
+	CALLS	'SetCBPattern', 'NV_Store'
+	CALLS	'SetCBPattern', 'SRAMVideoLoad'
+	CALLS	'SetCBSystem', 'NV_Store'
+	CALLS	'SetCBSystem', 'WriteCBGain'
+	CALLS	'SetCBSystem', 'WriteCBChromaGain'
+	CALLS	'SetCBSystem', 'WriteCBGain'
+	CALLS	'SetCBSystem', 'WriteCBChromaGain'
+	CALLS	'SetCBSystem', 'tvp6k_system'
+	CALLS	'SetCBSystem', 'ValidateCBPattern'
+	CALLS	'SetCBSystem', 'SetCBPattern'
+	CALLS	'SetCBSystem', 'SetCBScHPhase'
+	CALLS	'SetCBSystem', 'LEDSet'
+	CALLS	'SetCBDelay', 'NV_Store'
+	CALLS	'SetCBScHPhase', 'NV_Store'
+	CALLS	'SetCBScHPhase', 'TransmitIIC'
+	CALLS	'SetCBEmbAudioSignal', 'NV_Store'
+	CALLS	'SetCBEmbAudioSignal', 'SRAMSoundLoad'
+	END

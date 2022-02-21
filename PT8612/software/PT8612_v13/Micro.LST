@@ -1,0 +1,1729 @@
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE MICRO
+OBJECT MODULE PLACED IN Micro.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe Micro.c DB OE LARGE
+
+line level    source
+
+   1          /*****************************************************************************
+   2          * file:         micro.c
+   3          * abstract:     This file contains the function, xsvfExecute(),
+   4          *               call for interpreting the XSVF commands.
+   5          * Usage:        Call xsvfExecute() to process XSVF data.
+   6          *               The XSVF data is retrieved by readByte() in ports.c
+   7          *               Remove the main function if you already have one.
+   8          * Options:      XSVF_SUPPORT_COMPRESSION
+   9          *                   This define supports the XC9500/XL compression scheme.
+  10          *                   This define adds support for XSDRINC and XSETSDRMASKS.
+  11          *               XSVF_SUPPORT_ERRORCODES
+  12          *                   This define causes the xsvfExecute function to return
+  13          *                   an error code for specific errors.  See error codes below.
+  14          *                   If this is not defined, the return value defaults to the
+  15          *                   legacy values for backward compatibility:
+  16          *                   1 = success;  0 = failure.
+  17          * Debugging:    DEBUG_MODE (Legacy name)
+  18          *               Define DEBUG_MODE to compile with debugging features.
+  19          *               Both micro.c and ports.c must be compiled with the DEBUG_MODE
+  20          *               defined to enable the standalone main implementation in
+  21          *               micro.c that reads XSVF from a file.
+  22          * History:      v2.00   - Original XSVF implementation.
+  23          *               v4.04   - Added delay at end of XSIR for XC18v00 support.
+  24          *                         Added new commands for CoolRunner support:
+  25          *                         XSTATE, XENDIR, XENDDR
+  26          *               v4.05   - Cleanup micro.c but leave ports.c intact.
+  27          *               v4.06   - Fix xsvfGotoTapState for retry transition.
+  28          *               v4.07   - Update example waitTime implementations for
+  29          *                         compatibility with Virtex-II.
+  30          *               v4.10   - Add new XSIR2 command that supports a 2-byte
+  31          *                         IR-length parameter for IR shifts > 255 bits.
+  32          *               v4.11   - No change.  Update version to match SVF2XSVF xlator.
+  33          *               v4.14   - Added XCOMMENT.
+  34          *               v5.00   - Improve XSTATE support.
+  35          *                         Added XWAIT.
+  36          *               v5.01   - make sure that TCK is low during RUNTEST wait for
+  37          *                         XC18V00/XCF00 support.  Only change is in PORTS.C
+  38          *                         waitTime() function for implementations that do NOT
+  39          *                         pulse TCK during the waitTime.
+  40          #define DEBUG_MODE
+  41          *****************************************************************************/
+  42          /*============================================================================
+  43          * #pragmas
+  44          ============================================================================*/
+  45          /*============================================================================
+  46          * #include files
+  47          ============================================================================*/
+  48          #include "define.h"
+  49          #include "micro.h"
+  50          #include "lenval.h"
+  51          #include "ports.h"
+  52          
+  53          
+  54          /*============================================================================
+  55          * XSVF #define
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 2   
+
+  56          ============================================================================*/
+  57          
+  58          #define XSVF_VERSION    "0.01"
+  59          
+  60          /*****************************************************************************
+  61          * Define:       XSVF_SUPPORT_COMPRESSION
+  62          * Description:  Define this to support the XC9500/XL XSVF data compression
+  63          *               scheme.
+  64          *               Code size can be reduced by NOT supporting this feature.
+  65          *               However, you must use the -nc (no compress) option when
+  66          *               translating SVF to XSVF using the SVF2XSVF translator.
+  67          *               Corresponding, uncompressed XSVF may be larger.
+  68          *****************************************************************************/
+  69          //#ifndef XSVF_SUPPORT_COMPRESSION
+  70          //    #define XSVF_SUPPORT_COMPRESSION    0
+  71          //#endif
+  72          
+  73          /*****************************************************************************
+  74          * Define:       XSVF_SUPPORT_ERRORCODES
+  75          * Description:  Define this to support the new XSVF error codes.
+  76          *               (The original XSVF player just returned 1 for success and
+  77          *               0 for an unspecified failure.)
+  78          *****************************************************************************/
+  79          
+  80          #define XSVF_ERRORCODE(errorCode) errorCode
+  81          
+  82          
+  83          /*****************************************************************************
+  84          * Define:       XSVF_MAIN
+  85          * Description:  Define this to compile with a main function for standalone
+  86          *               debugging.
+  87          *****************************************************************************/
+  88          #ifndef XSVF_MAIN
+  89              #ifdef DEBUG_MODE
+                      #define XSVF_MAIN   1
+                  #endif  /* DEBUG_MODE */
+  92          #endif  /* XSVF_MAIN */
+  93          
+  94          
+  95          /*============================================================================
+  96          * DEBUG_MODE #define
+  97          ============================================================================*/
+  98          
+  99          #ifdef  DEBUG_MODE
+                  #define XSVFDBG_PRINTF(iDebugLevel,pzFormat) \
+                              { if (xsvf_iDebugLevel >= iDebugLevel) \
+                                  printf(pzFormat); }
+                  #define XSVFDBG_PRINTF1(iDebugLevel,pzFormat,arg1) \
+                              { if (xsvf_iDebugLevel >= iDebugLevel) \
+                                  printf(pzFormat, arg1); }
+                  #define XSVFDBG_PRINTF2(iDebugLevel,pzFormat,arg1,arg2) \
+                              { if (xsvf_iDebugLevel >= iDebugLevel) \
+                                  printf(pzFormat, arg1, arg2); }
+                  #define XSVFDBG_PRINTF3(iDebugLevel,pzFormat,arg1,arg2,arg3) \
+                              { if (xsvf_iDebugLevel >= iDebugLevel) \
+                                  printf(pzFormat, arg1, arg2, arg3); }
+                  #define XSVFDBG_PRINTLENVAL(iDebugLevel,plenVal) \
+                              { if (xsvf_iDebugLevel >= iDebugLevel) \
+                                  xsvfPrintLenVal(plenVal); }
+              #else   /* !DEBUG_MODE */
+ 116              #define XSVFDBG_PRINTF(iDebugLevel,pzFormat)
+ 117              #define XSVFDBG_PRINTF1(iDebugLevel,pzFormat,arg1)
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 3   
+
+ 118              #define XSVFDBG_PRINTF2(iDebugLevel,pzFormat,arg1,arg2)
+ 119              #define XSVFDBG_PRINTF3(iDebugLevel,pzFormat,arg1,arg2,arg3)
+ 120              #define XSVFDBG_PRINTLENVAL(iDebugLevel,plenVal)
+ 121          #endif  /* DEBUG_MODE */
+ 122          
+ 123          
+ 124          /*============================================================================
+ 125          * XSVF Type Declarations
+ 126          ============================================================================*/
+ 127          
+ 128          /*****************************************************************************
+ 129          * Struct:       SXsvfInfo
+ 130          * Description:  This structure contains all of the data used during the
+ 131          *               execution of the XSVF.  Some data is persistent, predefined
+ 132          *               information (e.g. lRunTestTime).  The bulk of this struct's
+ 133          *               size is due to the lenVal structs (defined in lenval.h)
+ 134          *               which contain buffers for the active shift data.  The MAX_LEN
+ 135          *               #define in lenval.h defines the size of these buffers.
+ 136          *               These buffers must be large enough to store the longest
+ 137          *               shift data in your XSVF file.  For example:
+ 138          *                   MAX_LEN >= (longest_shift_data_in_bits / 8)
+ 139          *               Because the lenVal struct dominates the space usage of this
+ 140          *               struct, the rough size of this struct is:
+ 141          *                   sizeof(SXsvfInfo) ~= MAX_LEN * 7 (number of lenVals)
+ 142          *               xsvfInitialize() contains initialization code for the data
+ 143          *               in this struct.
+ 144          *               xsvfCleanup() contains cleanup code for the data in this
+ 145          *               struct.
+ 146          *****************************************************************************/
+ 147          typedef struct tagSXsvfInfo
+ 148          {
+ 149              /* XSVF status information */
+ 150              unsigned char   ucComplete;         /* 0 = running; 1 = complete */
+ 151              unsigned char   ucCommand;          /* Current XSVF command byte */
+ 152              long            lCommandCount;      /* Number of commands processed */
+ 153              int             iErrorCode;         /* An error code. 0 = no error. */
+ 154          
+ 155              /* TAP state/sequencing information */
+ 156              unsigned char   ucTapState;         /* Current TAP state */
+ 157              unsigned char   ucEndIR;            /* ENDIR TAP state (See SVF) */
+ 158              unsigned char   ucEndDR;            /* ENDDR TAP state (See SVF) */
+ 159          
+ 160              /* RUNTEST information */
+ 161              unsigned char   ucMaxRepeat;        /* Max repeat loops (for xc9500/xl) */
+ 162              long            lRunTestTime;       /* Pre-specified RUNTEST time (usec) */
+ 163          
+ 164              /* Shift Data Info and Buffers */
+ 165              long            lShiftLengthBits;   /* Len. current shift data in bits */
+ 166              short           sShiftLengthBytes;  /* Len. current shift data in bytes */
+ 167          
+ 168              lenVal          lvTdi;              /* Current TDI shift data */
+ 169              lenVal          lvTdoExpected;      /* Expected TDO shift data */
+ 170              lenVal          lvTdoCaptured;      /* Captured TDO shift data */
+ 171              lenVal          lvTdoMask;          /* TDO mask: 0=dontcare; 1=compare */
+ 172          
+ 173          } SXsvfInfo;
+ 174          
+ 175          /* Declare pointer to functions that perform XSVF commands */
+ 176          typedef int (*TXsvfDoCmdFuncPtr)(SXsvfInfo*);
+ 177          
+ 178          
+ 179          /*============================================================================
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 4   
+
+ 180          * XSVF Command Bytes
+ 181          ============================================================================*/
+ 182          
+ 183          /* encodings of xsvf instructions */
+ 184          #define XCOMPLETE        0
+ 185          #define XTDOMASK         1
+ 186          #define XSIR             2
+ 187          #define XSDR             3
+ 188          #define XRUNTEST         4
+ 189          /* Reserved              5 */
+ 190          /* Reserved              6 */
+ 191          #define XREPEAT          7
+ 192          #define XSDRSIZE         8
+ 193          #define XSDRTDO          9
+ 194          #define XSETSDRMASKS     10
+ 195          #define XSDRINC          11
+ 196          #define XSDRB            12
+ 197          #define XSDRC            13
+ 198          #define XSDRE            14
+ 199          #define XSDRTDOB         15
+ 200          #define XSDRTDOC         16
+ 201          #define XSDRTDOE         17
+ 202          #define XSTATE           18         /* 4.00 */
+ 203          #define XENDIR           19         /* 4.04 */
+ 204          #define XENDDR           20         /* 4.04 */
+ 205          #define XSIR2            21         /* 4.10 */
+ 206          #define XCOMMENT         22         /* 4.14 */
+ 207          #define XWAIT            23         /* 5.00 */
+ 208          /* Insert new commands here */
+ 209          /* and add corresponding xsvfDoCmd function to xsvf_pfDoCmd below. */
+ 210          #define XLASTCMD         24         /* Last command marker */
+ 211          
+ 212          
+ 213          /*============================================================================
+ 214          * XSVF Command Parameter Values
+ 215          ============================================================================*/
+ 216          
+ 217          #define XSTATE_RESET     0          /* 4.00 parameter for XSTATE */
+ 218          #define XSTATE_RUNTEST   1          /* 4.00 parameter for XSTATE */
+ 219          
+ 220          #define XENDXR_RUNTEST   0          /* 4.04 parameter for XENDIR/DR */
+ 221          #define XENDXR_PAUSE     1          /* 4.04 parameter for XENDIR/DR */
+ 222          
+ 223          /* TAP states */
+ 224          #define XTAPSTATE_RESET     0x00
+ 225          #define XTAPSTATE_RUNTEST   0x01    /* a.k.a. IDLE */
+ 226          #define XTAPSTATE_SELECTDR  0x02
+ 227          #define XTAPSTATE_CAPTUREDR 0x03
+ 228          #define XTAPSTATE_SHIFTDR   0x04
+ 229          #define XTAPSTATE_EXIT1DR   0x05
+ 230          #define XTAPSTATE_PAUSEDR   0x06
+ 231          #define XTAPSTATE_EXIT2DR   0x07
+ 232          #define XTAPSTATE_UPDATEDR  0x08
+ 233          #define XTAPSTATE_IRSTATES  0x09    /* All IR states begin here */
+ 234          #define XTAPSTATE_SELECTIR  0x09
+ 235          #define XTAPSTATE_CAPTUREIR 0x0A
+ 236          #define XTAPSTATE_SHIFTIR   0x0B
+ 237          #define XTAPSTATE_EXIT1IR   0x0C
+ 238          #define XTAPSTATE_PAUSEIR   0x0D
+ 239          #define XTAPSTATE_EXIT2IR   0x0E
+ 240          #define XTAPSTATE_UPDATEIR  0x0F
+ 241          
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 5   
+
+ 242          /*============================================================================
+ 243          * XSVF Function Prototypes
+ 244          ============================================================================*/
+ 245          
+ 246          int xsvfDoIllegalCmd(SXsvfInfo* pXsvfInfo);   /* Illegal command function */
+ 247          int xsvfDoXCOMPLETE(SXsvfInfo* pXsvfInfo);
+ 248          int xsvfDoXTDOMASK(SXsvfInfo* pXsvfInfo);
+ 249          int xsvfDoXSIR(SXsvfInfo* pXsvfInfo);
+ 250          int xsvfDoXSIR2(SXsvfInfo* pXsvfInfo);
+ 251          int xsvfDoXSDR(SXsvfInfo* pXsvfInfo);
+ 252          int xsvfDoXRUNTEST(SXsvfInfo* pXsvfInfo);
+ 253          int xsvfDoXREPEAT(SXsvfInfo* pXsvfInfo);
+ 254          int xsvfDoXSDRSIZE(SXsvfInfo* pXsvfInfo);
+ 255          int xsvfDoXSDRTDO(SXsvfInfo* pXsvfInfo);
+ 256          int xsvfDoXSETSDRMASKS(SXsvfInfo* pXsvfInfo);
+ 257          int xsvfDoXSDRINC(SXsvfInfo* pXsvfInfo);
+ 258          int xsvfDoXSDRBCE(SXsvfInfo* pXsvfInfo);
+ 259          int xsvfDoXSDRTDOBCE(SXsvfInfo* pXsvfInfo);
+ 260          int xsvfDoXSTATE(SXsvfInfo* pXsvfInfo);
+ 261          int xsvfDoXENDXR(SXsvfInfo* pXsvfInfo);
+ 262          int xsvfDoXCOMMENT(SXsvfInfo* pXsvfInfo);
+ 263          int xsvfDoXWAIT(SXsvfInfo* pXsvfInfo);
+ 264          /* Insert new command functions here */
+ 265          
+ 266          /*============================================================================
+ 267          * XSVF Global Variables
+ 268          ============================================================================*/
+ 269          
+ 270          /* Array of XSVF command functions.  Must follow command byte value order! */
+ 271          /* If your compiler cannot take this form, then convert to a switch statement*/
+ 272          TXsvfDoCmdFuncPtr   xsvf_pfDoCmd[]  =
+ 273            {
+ 274            xsvfDoXCOMPLETE,        /*  0 */
+ 275            xsvfDoXTDOMASK,         /*  1 */
+ 276            xsvfDoXSIR,             /*  2 */
+ 277            xsvfDoXSDR,             /*  3 */
+ 278            xsvfDoXRUNTEST,         /*  4 */
+ 279            xsvfDoIllegalCmd,       /*  5 */
+ 280            xsvfDoIllegalCmd,       /*  6 */
+ 281            xsvfDoXREPEAT,          /*  7 */
+ 282            xsvfDoXSDRSIZE,         /*  8 */
+ 283            xsvfDoXSDRTDO,          /*  9 */
+ 284            xsvfDoIllegalCmd,       /* 10 */
+ 285            xsvfDoIllegalCmd,       /* 11 */
+ 286            xsvfDoXSDRBCE,          /* 12 */
+ 287            xsvfDoXSDRBCE,          /* 13 */
+ 288            xsvfDoXSDRBCE,          /* 14 */
+ 289            xsvfDoXSDRTDOBCE,       /* 15 */
+ 290            xsvfDoXSDRTDOBCE,       /* 16 */
+ 291            xsvfDoXSDRTDOBCE,       /* 17 */
+ 292            xsvfDoXSTATE,           /* 18 */
+ 293            xsvfDoXENDXR,           /* 19 */
+ 294            xsvfDoXENDXR,           /* 20 */
+ 295            xsvfDoXSIR2,            /* 21 */
+ 296            xsvfDoXCOMMENT,         /* 22 */
+ 297            xsvfDoXWAIT             /* 23 */
+ 298            /* Insert new command functions here */
+ 299            };
+ 300          
+ 301          
+ 302          
+ 303          #ifdef  DEBUG_MODE
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 6   
+
+              code char* xsvf_pzCommandName[]  =
+                {
+                "XCOMPLETE",
+                "XTDOMASK",
+                "XSIR",
+                "XSDR",
+                "XRUNTEST",
+                "Reserved5",
+                "Reserved6",
+                "XREPEAT",
+                "XSDRSIZE",
+                "XSDRTDO",
+                "XSETSDRMASKS",
+                "XSDRINC",
+                "XSDRB",
+                "XSDRC",
+                "XSDRE",
+                "XSDRTDOB",
+                "XSDRTDOC",
+                "XSDRTDOE",
+                "XSTATE",
+                "XENDIR",
+                "XENDDR",
+                "XSIR2",
+                "XCOMMENT",
+                "XWAIT"
+                };
+              
+                  char*   xsvf_pzErrorName[]  =
+                  {
+                      "No error",
+                      "ERROR:  Unknown",
+                      "ERROR:  TDO mismatch",
+                      "ERROR:  TDO mismatch and exceeded max retries",
+                      "ERROR:  Unsupported XSVF command",
+                      "ERROR:  Illegal state specification",
+                      "ERROR:  Data overflows allocated MAX_LEN buffer size"
+                  };
+              
+                  char*   xsvf_pzTapState[] =
+                  {
+                      "RESET",        /* 0x00 */
+                      "RUNTEST/IDLE", /* 0x01 */
+                      "DRSELECT",     /* 0x02 */
+                      "DRCAPTURE",    /* 0x03 */
+                      "DRSHIFT",      /* 0x04 */
+                      "DREXIT1",      /* 0x05 */
+                      "DRPAUSE",      /* 0x06 */
+                      "DREXIT2",      /* 0x07 */
+                      "DRUPDATE",     /* 0x08 */
+                      "IRSELECT",     /* 0x09 */
+                      "IRCAPTURE",    /* 0x0A */
+                      "IRSHIFT",      /* 0x0B */
+                      "IREXIT1",      /* 0x0C */
+                      "IRPAUSE",      /* 0x0D */
+                      "IREXIT2",      /* 0x0E */
+                      "IRUPDATE"      /* 0x0F */
+                  };
+              #endif  /* DEBUG_MODE */
+ 363          
+ 364          #ifdef DEBUG_MODE
+                  FILE* in;   /* Legacy DEBUG_MODE file pointer */
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 7   
+
+                  int xsvf_iDebugLevel;
+              #endif /* DEBUG_MODE */
+ 368          
+ 369          
+ 370          #if 0
+              /*============================================================================
+              * main
+              ============================================================================*/
+              
+              /*****************************************************************************
+              * Function:     main
+              * Description:  main function.
+              *               Specified here for creating stand-alone debug executable.
+              *               Embedded users should call xsvfExecute() directly.
+              * Parameters:   iArgc    - number of command-line arguments.
+              *               ppzArgv  - array of ptrs to strings (command-line arguments).
+              * Returns:      int      - Legacy return value:  1 = success; 0 = error.
+              #ifdef XSVF_MAIN
+              #endif
+              *****************************************************************************/
+              void main(void)
+                {
+                int     iErrorCode;
+                int     i;
+                
+                iErrorCode = XSVF_ERRORCODE(XSVF_ERROR_NONE); /* 0 */
+                
+                setPort(TMS, 1);
+                
+                /* Execute the XSVF in the file */
+                iErrorCode  = xsvfExecute();
+                }
+              #endif
+ 399          
+ 400          /*============================================================================
+ 401          * Utility Functions
+ 402          ============================================================================*/
+ 403          
+ 404          
+ 405          /*****************************************************************************
+ 406          * Function:     xsvfInfoInit
+ 407          * Description:  Initialize the xsvfInfo data.
+ 408          * Parameters:   pXsvfInfo   - ptr to the XSVF info structure.
+ 409          * Returns:      int         - 0 = success; otherwise error.
+ 410          *****************************************************************************/
+ 411          int xsvfInfoInit(SXsvfInfo* pXsvfInfo)
+ 412            {
+ 413   1        XSVFDBG_PRINTF1(4, "    sizeof(SXsvfInfo) = %d bytes\n",
+ 414   1                        sizeof(SXsvfInfo));
+ 415   1        
+ 416   1        pXsvfInfo->ucComplete       = 0;
+ 417   1        pXsvfInfo->ucCommand        = XCOMPLETE;
+ 418   1        pXsvfInfo->lCommandCount    = 0;
+ 419   1        pXsvfInfo->iErrorCode       = XSVF_ERROR_NONE;
+ 420   1        pXsvfInfo->ucMaxRepeat      = 0;
+ 421   1        pXsvfInfo->ucTapState       = XTAPSTATE_RESET;
+ 422   1        pXsvfInfo->ucEndIR          = XTAPSTATE_RUNTEST;
+ 423   1        pXsvfInfo->ucEndDR          = XTAPSTATE_RUNTEST;
+ 424   1        pXsvfInfo->lShiftLengthBits = 0L;
+ 425   1        pXsvfInfo->sShiftLengthBytes= 0;
+ 426   1        pXsvfInfo->lRunTestTime     = 0L;
+ 427   1        
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 8   
+
+ 428   1        return(0);
+ 429   1        }
+ 430            
+ 431          /*****************************************************************************
+ 432          * Function:     xsvfGetAsNumBytes
+ 433          * Description:  Calculate the number of bytes the given number of bits
+ 434          *               consumes.
+ 435          * Parameters:   lNumBits    - the number of bits.
+ 436          * Returns:      short       - the number of bytes to store the number of bits.
+ 437          *****************************************************************************/
+ 438          short xsvfGetAsNumBytes(long lNumBits)
+ 439          {
+ 440   1          return((short)((lNumBits + 7L) / 8L));
+ 441   1      }
+ 442          
+ 443          /*****************************************************************************
+ 444          * Function:     xsvfTmsTransition
+ 445          * Description:  Apply TMS and transition TAP controller by applying one TCK
+ 446          *               cycle.
+ 447          * Parameters:   sTms    - new TMS value.
+ 448          * Returns:      void.
+ 449          *****************************************************************************/
+ 450          void xsvfTmsTransition(short sTms)
+ 451          {
+ 452   1          setPort(TMS, (UC)sTms);
+ 453   1          setPort(TCK, 0);
+ 454   1          setPort(TCK, 1);
+ 455   1      }
+ 456          
+ 457          /*****************************************************************************
+ 458          * Function:     xsvfGotoTapState
+ 459          * Description:  From the current TAP state, go to the named TAP state.
+ 460          *               A target state of RESET ALWAYS causes TMS reset sequence.
+ 461          *               All SVF standard stable state paths are supported.
+ 462          *               All state transitions are supported except for the following
+ 463          *               which cause an XSVF_ERROR_ILLEGALSTATE:
+ 464          *                   - Target==DREXIT2;  Start!=DRPAUSE
+ 465          *                   - Target==IREXIT2;  Start!=IRPAUSE
+ 466          * Parameters:   pucTapState     - Current TAP state; returns final TAP state.
+ 467          *               ucTargetState   - New target TAP state.
+ 468          * Returns:      int             - 0 = success; otherwise error.
+ 469          *****************************************************************************/
+ 470          int xsvfGotoTapState(unsigned char*   pucTapState,
+ 471                                unsigned char    ucTargetState)
+ 472          {
+ 473   1          int i;
+ 474   1          int iErrorCode;
+ 475   1      
+ 476   1          iErrorCode  = XSVF_ERROR_NONE;
+ 477   1          if (ucTargetState == XTAPSTATE_RESET)
+ 478   1          {
+ 479   2              /* If RESET, always perform TMS reset sequence to reset/sync TAPs */
+ 480   2              xsvfTmsTransition(1);
+ 481   2              for (i = 0; i < 5; ++i)
+ 482   2              {
+ 483   3                  setPort(TCK, 0);
+ 484   3                  setPort(TCK, 1);
+ 485   3              }
+ 486   2              *pucTapState    = XTAPSTATE_RESET;
+ 487   2              XSVFDBG_PRINTF(3, "   TMS Reset Sequence -> Test-Logic-Reset\n");
+ 488   2              XSVFDBG_PRINTF1(3, "   TAP State = %s\n",
+ 489   2                               xsvf_pzTapState[ *pucTapState ]);
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 9   
+
+ 490   2          }
+ 491   1          else if ((ucTargetState != *pucTapState) &&
+ 492   1                    (((ucTargetState == XTAPSTATE_EXIT2DR) && (*pucTapState != XTAPSTATE_PAUSEDR)) ||
+ 493   1                      ((ucTargetState == XTAPSTATE_EXIT2IR) && (*pucTapState != XTAPSTATE_PAUSEIR))))
+ 494   1          {
+ 495   2              /* Trap illegal TAP state path specification */
+ 496   2              iErrorCode      = XSVF_ERROR_ILLEGALSTATE;
+ 497   2          }
+ 498   1          else
+ 499   1          {
+ 500   2              if (ucTargetState == *pucTapState)
+ 501   2              {
+ 502   3                  /* Already in target state.  Do nothing except when in DRPAUSE
+ 503   3                     or in IRPAUSE to comply with SVF standard */
+ 504   3                  if (ucTargetState == XTAPSTATE_PAUSEDR)
+ 505   3                  {
+ 506   4                      xsvfTmsTransition(1);
+ 507   4                      *pucTapState    = XTAPSTATE_EXIT2DR;
+ 508   4                      XSVFDBG_PRINTF1(3, "   TAP State = %s\n",
+ 509   4                                       xsvf_pzTapState[ *pucTapState ]);
+ 510   4                  }
+ 511   3                  else if (ucTargetState == XTAPSTATE_PAUSEIR)
+ 512   3                  {
+ 513   4                      xsvfTmsTransition(1);
+ 514   4                      *pucTapState    = XTAPSTATE_EXIT2IR;
+ 515   4                      XSVFDBG_PRINTF1(3, "   TAP State = %s\n",
+ 516   4                                       xsvf_pzTapState[ *pucTapState ]);
+ 517   4                  }
+ 518   3              }
+ 519   2      
+ 520   2              /* Perform TAP state transitions to get to the target state */
+ 521   2              while (ucTargetState != *pucTapState)
+ 522   2              {
+ 523   3                  switch (*pucTapState)
+ 524   3                  {
+ 525   4                  case XTAPSTATE_RESET:
+ 526   4                      xsvfTmsTransition(0);
+ 527   4                      *pucTapState    = XTAPSTATE_RUNTEST;
+ 528   4                      break;
+ 529   4                  case XTAPSTATE_RUNTEST:
+ 530   4                      xsvfTmsTransition(1);
+ 531   4                      *pucTapState    = XTAPSTATE_SELECTDR;
+ 532   4                      break;
+ 533   4                  case XTAPSTATE_SELECTDR:
+ 534   4                      if (ucTargetState >= XTAPSTATE_IRSTATES)
+ 535   4                      {
+ 536   5                          xsvfTmsTransition(1);
+ 537   5                          *pucTapState    = XTAPSTATE_SELECTIR;
+ 538   5                      }
+ 539   4                      else
+ 540   4                      {
+ 541   5                          xsvfTmsTransition(0);
+ 542   5                          *pucTapState    = XTAPSTATE_CAPTUREDR;
+ 543   5                      }
+ 544   4                      break;
+ 545   4                  case XTAPSTATE_CAPTUREDR:
+ 546   4                      if (ucTargetState == XTAPSTATE_SHIFTDR)
+ 547   4                      {
+ 548   5                          xsvfTmsTransition(0);
+ 549   5                          *pucTapState    = XTAPSTATE_SHIFTDR;
+ 550   5                      }
+ 551   4                      else
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 10  
+
+ 552   4                      {
+ 553   5                          xsvfTmsTransition(1);
+ 554   5                          *pucTapState    = XTAPSTATE_EXIT1DR;
+ 555   5                      }
+ 556   4                      break;
+ 557   4                  case XTAPSTATE_SHIFTDR:
+ 558   4                      xsvfTmsTransition(1);
+ 559   4                      *pucTapState    = XTAPSTATE_EXIT1DR;
+ 560   4                      break;
+ 561   4                  case XTAPSTATE_EXIT1DR:
+ 562   4                      if (ucTargetState == XTAPSTATE_PAUSEDR)
+ 563   4                      {
+ 564   5                          xsvfTmsTransition(0);
+ 565   5                          *pucTapState    = XTAPSTATE_PAUSEDR;
+ 566   5                      }
+ 567   4                      else
+ 568   4                      {
+ 569   5                          xsvfTmsTransition(1);
+ 570   5                          *pucTapState    = XTAPSTATE_UPDATEDR;
+ 571   5                      }
+ 572   4                      break;
+ 573   4                  case XTAPSTATE_PAUSEDR:
+ 574   4                      xsvfTmsTransition(1);
+ 575   4                      *pucTapState    = XTAPSTATE_EXIT2DR;
+ 576   4                      break;
+ 577   4                  case XTAPSTATE_EXIT2DR:
+ 578   4                      if (ucTargetState == XTAPSTATE_SHIFTDR)
+ 579   4                      {
+ 580   5                          xsvfTmsTransition(0);
+ 581   5                          *pucTapState    = XTAPSTATE_SHIFTDR;
+ 582   5                      }
+ 583   4                      else
+ 584   4                      {
+ 585   5                          xsvfTmsTransition(1);
+ 586   5                          *pucTapState    = XTAPSTATE_UPDATEDR;
+ 587   5                      }
+ 588   4                      break;
+ 589   4                  case XTAPSTATE_UPDATEDR:
+ 590   4                      if (ucTargetState == XTAPSTATE_RUNTEST)
+ 591   4                      {
+ 592   5                          xsvfTmsTransition(0);
+ 593   5                          *pucTapState    = XTAPSTATE_RUNTEST;
+ 594   5                      }
+ 595   4                      else
+ 596   4                      {
+ 597   5                          xsvfTmsTransition(1);
+ 598   5                          *pucTapState    = XTAPSTATE_SELECTDR;
+ 599   5                      }
+ 600   4                      break;
+ 601   4                  case XTAPSTATE_SELECTIR:
+ 602   4                      xsvfTmsTransition(0);
+ 603   4                      *pucTapState    = XTAPSTATE_CAPTUREIR;
+ 604   4                      break;
+ 605   4                  case XTAPSTATE_CAPTUREIR:
+ 606   4                      if (ucTargetState == XTAPSTATE_SHIFTIR)
+ 607   4                      {
+ 608   5                          xsvfTmsTransition(0);
+ 609   5                          *pucTapState    = XTAPSTATE_SHIFTIR;
+ 610   5                      }
+ 611   4                      else
+ 612   4                      {
+ 613   5                          xsvfTmsTransition(1);
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 11  
+
+ 614   5                          *pucTapState    = XTAPSTATE_EXIT1IR;
+ 615   5                      }
+ 616   4                      break;
+ 617   4                  case XTAPSTATE_SHIFTIR:
+ 618   4                      xsvfTmsTransition(1);
+ 619   4                      *pucTapState    = XTAPSTATE_EXIT1IR;
+ 620   4                      break;
+ 621   4                  case XTAPSTATE_EXIT1IR:
+ 622   4                      if (ucTargetState == XTAPSTATE_PAUSEIR)
+ 623   4                      {
+ 624   5                          xsvfTmsTransition(0);
+ 625   5                          *pucTapState    = XTAPSTATE_PAUSEIR;
+ 626   5                      }
+ 627   4                      else
+ 628   4                      {
+ 629   5                          xsvfTmsTransition(1);
+ 630   5                          *pucTapState    = XTAPSTATE_UPDATEIR;
+ 631   5                      }
+ 632   4                      break;
+ 633   4                  case XTAPSTATE_PAUSEIR:
+ 634   4                      xsvfTmsTransition(1);
+ 635   4                      *pucTapState    = XTAPSTATE_EXIT2IR;
+ 636   4                      break;
+ 637   4                  case XTAPSTATE_EXIT2IR:
+ 638   4                      if (ucTargetState == XTAPSTATE_SHIFTIR)
+ 639   4                      {
+ 640   5                          xsvfTmsTransition(0);
+ 641   5                          *pucTapState    = XTAPSTATE_SHIFTIR;
+ 642   5                      }
+ 643   4                      else
+ 644   4                      {
+ 645   5                          xsvfTmsTransition(1);
+ 646   5                          *pucTapState    = XTAPSTATE_UPDATEIR;
+ 647   5                      }
+ 648   4                      break;
+ 649   4                  case XTAPSTATE_UPDATEIR:
+ 650   4                      if (ucTargetState == XTAPSTATE_RUNTEST)
+ 651   4                      {
+ 652   5                          xsvfTmsTransition(0);
+ 653   5                          *pucTapState    = XTAPSTATE_RUNTEST;
+ 654   5                      }
+ 655   4                      else
+ 656   4                      {
+ 657   5                          xsvfTmsTransition(1);
+ 658   5                          *pucTapState    = XTAPSTATE_SELECTDR;
+ 659   5                      }
+ 660   4                      break;
+ 661   4                  default:
+ 662   4                      iErrorCode      = XSVF_ERROR_ILLEGALSTATE;
+ 663   4                      *pucTapState    = ucTargetState;    /* Exit while loop */
+ 664   4                      break;
+ 665   4                  }
+ 666   3                  XSVFDBG_PRINTF1(3, "   TAP State = %s\n",
+ 667   3                                   xsvf_pzTapState[ *pucTapState ]);
+ 668   3              }
+ 669   2          }
+ 670   1      
+ 671   1          return(iErrorCode);
+ 672   1      }
+ 673          
+ 674          /*****************************************************************************
+ 675          * Function:     xsvfShiftOnly
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 12  
+
+ 676          * Description:  Assumes that starting TAP state is SHIFT-DR or SHIFT-IR.
+ 677          *               Shift the given TDI data into the JTAG scan chain.
+ 678          *               Optionally, save the TDO data shifted out of the scan chain.
+ 679          *               Last shift cycle is special:  capture last TDO, set last TDI,
+ 680          *               but does not pulse TCK.  Caller must pulse TCK and optionally
+ 681          *               set TMS=1 to exit shift state.
+ 682          * Parameters:   lNumBits        - number of bits to shift.
+ 683          *               plvTdi          - ptr to lenval for TDI data.
+ 684          *               plvTdoCaptured  - ptr to lenval for storing captured TDO data.
+ 685          *               iExitShift      - 1=exit at end of shift; 0=stay in Shift-DR.
+ 686          * Returns:      void.
+ 687          *****************************************************************************/
+ 688          void xsvfShiftOnly(long    lNumBits,
+ 689                              lenVal* plvTdi,
+ 690                              lenVal* plvTdoCaptured,
+ 691                              int     iExitShift)
+ 692          {
+ 693   1          unsigned char*  pucTdi;
+ 694   1          unsigned char*  pucTdo;
+ 695   1          unsigned char   ucTdiByte;
+ 696   1          unsigned char   ucTdoByte;
+ 697   1          unsigned char   ucTdoBit;
+ 698   1          int             i;
+ 699   1      
+ 700   1          /* assert(((lNumBits + 7) / 8) == plvTdi->len); */
+ 701   1      
+ 702   1          /* Initialize TDO storage len == TDI len */
+ 703   1          pucTdo  = 0;
+ 704   1          if (plvTdoCaptured)
+ 705   1          {
+ 706   2              plvTdoCaptured->len = plvTdi->len;
+ 707   2              pucTdo              = plvTdoCaptured->val + plvTdi->len;
+ 708   2          }
+ 709   1      
+ 710   1          /* Shift LSB first.  val[N-1] == LSB.  val[0] == MSB. */
+ 711   1          pucTdi  = plvTdi->val + plvTdi->len;
+ 712   1          while (lNumBits)
+ 713   1          {
+ 714   2              /* Process on a byte-basis */
+ 715   2              ucTdiByte   = (*(--pucTdi));
+ 716   2              ucTdoByte   = 0;
+ 717   2              for (i = 0; (lNumBits && (i < 8)); ++i)
+ 718   2              {
+ 719   3                  --lNumBits;
+ 720   3                  if (iExitShift && !lNumBits)
+ 721   3                  {
+ 722   4                      /* Exit Shift-DR state */
+ 723   4                      setPort(TMS, 1);
+ 724   4                  }
+ 725   3      
+ 726   3                  /* Set the new TDI value */
+ 727   3                  setPort(TDI, (UC)(ucTdiByte & 1));
+ 728   3                  ucTdiByte   >>= 1;
+ 729   3      
+ 730   3                  /* Set TCK low */
+ 731   3                  setPort(TCK, 0);
+ 732   3      
+ 733   3                  if (pucTdo)
+ 734   3                  {
+ 735   4                      /* Save the TDO value */
+ 736   4                      ucTdoBit    = readTDOBit();
+ 737   4                      ucTdoByte   |= (ucTdoBit << i);
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 13  
+
+ 738   4                  }
+ 739   3      
+ 740   3                  /* Set TCK high */
+ 741   3                  setPort(TCK, 1);
+ 742   3              }
+ 743   2      
+ 744   2              /* Save the TDO byte value */
+ 745   2              if (pucTdo)
+ 746   2              {
+ 747   3                  (*(--pucTdo))   = ucTdoByte;
+ 748   3              }
+ 749   2          }
+ 750   1      }
+ 751          
+ 752          /*****************************************************************************
+ 753          * Function:     xsvfShift
+ 754          * Description:  Goes to the given starting TAP state.
+ 755          *               Calls xsvfShiftOnly to shift in the given TDI data and
+ 756          *               optionally capture the TDO data.
+ 757          *               Compares the TDO captured data against the TDO expected
+ 758          *               data.
+ 759          *               If a data mismatch occurs, then executes the exception
+ 760          *               handling loop upto ucMaxRepeat times.
+ 761          * Parameters:   pucTapState     - Ptr to current TAP state.
+ 762          *               ucStartState    - Starting shift state: Shift-DR or Shift-IR.
+ 763          *               lNumBits        - number of bits to shift.
+ 764          *               plvTdi          - ptr to lenval for TDI data.
+ 765          *               plvTdoCaptured  - ptr to lenval for storing TDO data.
+ 766          *               plvTdoExpected  - ptr to expected TDO data.
+ 767          *               plvTdoMask      - ptr to TDO mask.
+ 768          *               ucEndState      - state in which to end the shift.
+ 769          *               lRunTestTime    - amount of time to wait after the shift.
+ 770          *               ucMaxRepeat     - Maximum number of retries on TDO mismatch.
+ 771          * Returns:      int             - 0 = success; otherwise TDO mismatch.
+ 772          * Notes:        XC9500XL-only Optimization:
+ 773          *               Skip the waitTime() if plvTdoMask->val[0:plvTdoMask->len-1]
+ 774          *               is NOT all zeros and sMatch==1.
+ 775          *****************************************************************************/
+ 776          int xsvfShift(unsigned char*   pucTapState,
+ 777                         unsigned char    ucStartState,
+ 778                         long             lNumBits,
+ 779                         lenVal*          plvTdi,
+ 780                         lenVal*          plvTdoCaptured,
+ 781                         lenVal*          plvTdoExpected,
+ 782                         lenVal*          plvTdoMask,
+ 783                         unsigned char    ucEndState,
+ 784                         long             lRunTestTime,
+ 785                         unsigned char    ucMaxRepeat)
+ 786          {
+ 787   1          int             iErrorCode;
+ 788   1          int             iMismatch;
+ 789   1          unsigned char   ucRepeat;
+ 790   1          int             iExitShift;
+ 791   1      
+ 792   1          iErrorCode  = XSVF_ERROR_NONE;
+ 793   1          iMismatch   = 0;
+ 794   1          ucRepeat    = 0;
+ 795   1          iExitShift  = (ucStartState != ucEndState);
+ 796   1      
+ 797   1          XSVFDBG_PRINTF1(3, "   Shift Length = %ld\n", lNumBits);
+ 798   1          XSVFDBG_PRINTF(4, "    TDI          = ");
+ 799   1          XSVFDBG_PRINTLENVAL(4, plvTdi);
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 14  
+
+ 800   1          XSVFDBG_PRINTF(4, "\n");
+ 801   1          XSVFDBG_PRINTF(4, "    TDO Expected = ");
+ 802   1          XSVFDBG_PRINTLENVAL(4, plvTdoExpected);
+ 803   1          XSVFDBG_PRINTF(4, "\n");
+ 804   1      
+ 805   1          if (!lNumBits)
+ 806   1          {
+ 807   2              /* Compatibility with XSVF2.00:  XSDR 0 = no shift, but wait in RTI */
+ 808   2              if (lRunTestTime)
+ 809   2              {
+ 810   3                  /* Wait for prespecified XRUNTEST time */
+ 811   3                  xsvfGotoTapState(pucTapState, XTAPSTATE_RUNTEST);
+ 812   3                  XSVFDBG_PRINTF1(3, "   Wait = %ld usec\n", lRunTestTime);
+ 813   3                  waitTime(lRunTestTime);
+ 814   3              }
+ 815   2          }
+ 816   1          else
+ 817   1          {
+ 818   2              do
+ 819   2              {
+ 820   3                  /* Goto Shift-DR or Shift-IR */
+ 821   3                  xsvfGotoTapState(pucTapState, ucStartState);
+ 822   3      
+ 823   3                  /* Shift TDI and capture TDO */
+ 824   3                  xsvfShiftOnly(lNumBits, plvTdi, plvTdoCaptured, iExitShift);
+ 825   3      
+ 826   3                  if (plvTdoExpected)
+ 827   3                  {
+ 828   4                      /* Compare TDO data to expected TDO data */
+ 829   4                      iMismatch   = !EqualLenVal(plvTdoExpected,
+ 830   4                                                  plvTdoCaptured,
+ 831   4                                                  plvTdoMask);
+ 832   4                  }
+ 833   3      
+ 834   3                  if (iExitShift)
+ 835   3                  {
+ 836   4                      /* Update TAP state:  Shift->Exit */
+ 837   4                      ++(*pucTapState);
+ 838   4                      XSVFDBG_PRINTF1(3, "   TAP State = %s\n",
+ 839   4                                       xsvf_pzTapState[ *pucTapState ]);
+ 840   4      
+ 841   4                      if (iMismatch && lRunTestTime && (ucRepeat < ucMaxRepeat))
+ 842   4                      {
+ 843   5                          XSVFDBG_PRINTF(4, "    TDO Expected = ");
+ 844   5                          XSVFDBG_PRINTLENVAL(4, plvTdoExpected);
+ 845   5                          XSVFDBG_PRINTF(4, "\n");
+ 846   5                          XSVFDBG_PRINTF(4, "    TDO Captured = ");
+ 847   5                          XSVFDBG_PRINTLENVAL(4, plvTdoCaptured);
+ 848   5                          XSVFDBG_PRINTF(4, "\n");
+ 849   5                          XSVFDBG_PRINTF(4, "    TDO Mask     = ");
+ 850   5                          XSVFDBG_PRINTLENVAL(4, plvTdoMask);
+ 851   5                          XSVFDBG_PRINTF(4, "\n");
+ 852   5                          XSVFDBG_PRINTF1(3, "   Retry #%d\n", (ucRepeat + 1));
+ 853   5                          /* Do exception handling retry - ShiftDR only */
+ 854   5                          xsvfGotoTapState(pucTapState, XTAPSTATE_PAUSEDR);
+ 855   5                          /* Shift 1 extra bit */
+ 856   5                          xsvfGotoTapState(pucTapState, XTAPSTATE_SHIFTDR);
+ 857   5                          /* Increment RUNTEST time by an additional 25% */
+ 858   5                          lRunTestTime    += (lRunTestTime >> 2);
+ 859   5                      }
+ 860   4                      else
+ 861   4                      {
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 15  
+
+ 862   5                          /* Do normal exit from Shift-XR */
+ 863   5                          xsvfGotoTapState(pucTapState, ucEndState);
+ 864   5                      }
+ 865   4      
+ 866   4                      if (lRunTestTime)
+ 867   4                      {
+ 868   5                          /* Wait for prespecified XRUNTEST time */
+ 869   5                          xsvfGotoTapState(pucTapState, XTAPSTATE_RUNTEST);
+ 870   5                          XSVFDBG_PRINTF1(3, "   Wait = %ld usec\n", lRunTestTime);
+ 871   5                          waitTime(lRunTestTime);
+ 872   5                      }
+ 873   4                  }
+ 874   3              } while (iMismatch && (ucRepeat++ < ucMaxRepeat));
+ 875   2          }
+ 876   1      
+ 877   1          if (iMismatch)
+ 878   1          {
+ 879   2              XSVFDBG_PRINTF(1, " TDO Expected = ");
+ 880   2              XSVFDBG_PRINTLENVAL(1, plvTdoExpected);
+ 881   2              XSVFDBG_PRINTF(1, "\n");
+ 882   2              XSVFDBG_PRINTF(1, " TDO Captured = ");
+ 883   2              XSVFDBG_PRINTLENVAL(1, plvTdoCaptured);
+ 884   2              XSVFDBG_PRINTF(1, "\n");
+ 885   2              XSVFDBG_PRINTF(1, " TDO Mask     = ");
+ 886   2              XSVFDBG_PRINTLENVAL(1, plvTdoMask);
+ 887   2              XSVFDBG_PRINTF(1, "\n");
+ 888   2              if (ucMaxRepeat && (ucRepeat > ucMaxRepeat))
+ 889   2              {
+ 890   3                  iErrorCode  = XSVF_ERROR_MAXRETRIES;
+ 891   3              }
+ 892   2              else
+ 893   2              {
+ 894   3                  iErrorCode  = XSVF_ERROR_TDOMISMATCH;
+ 895   3              }
+ 896   2          }
+ 897   1      
+ 898   1          return(iErrorCode);
+ 899   1      }
+ 900          
+ 901          /*****************************************************************************
+ 902          * Function:     xsvfBasicXSDRTDO
+ 903          * Description:  Get the XSDRTDO parameters and execute the XSDRTDO command.
+ 904          *               This is the common function for all XSDRTDO commands.
+ 905          * Parameters:   pucTapState         - Current TAP state.
+ 906          *               lShiftLengthBits    - number of bits to shift.
+ 907          *               sShiftLengthBytes   - number of bytes to read.
+ 908          *               plvTdi              - ptr to lenval for TDI data.
+ 909          *               lvTdoCaptured       - ptr to lenval for storing TDO data.
+ 910          *               iEndState           - state in which to end the shift.
+ 911          *               lRunTestTime        - amount of time to wait after the shift.
+ 912          *               ucMaxRepeat         - maximum xc9500/xl retries.
+ 913          * Returns:      int                 - 0 = success; otherwise TDO mismatch.
+ 914          *****************************************************************************/
+ 915          int xsvfBasicXSDRTDO(unsigned char*    pucTapState,
+ 916                                long              lShiftLengthBits,
+ 917                                short             sShiftLengthBytes,
+ 918                                lenVal*           plvTdi,
+ 919                                lenVal*           plvTdoCaptured,
+ 920                                lenVal*           plvTdoExpected,
+ 921                                lenVal*           plvTdoMask,
+ 922                                unsigned char     ucEndState,
+ 923                                long              lRunTestTime,
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 16  
+
+ 924                                unsigned char     ucMaxRepeat)
+ 925          {
+ 926   1          readVal(plvTdi, sShiftLengthBytes);
+ 927   1          if (plvTdoExpected)
+ 928   1          {
+ 929   2              readVal(plvTdoExpected, sShiftLengthBytes);
+ 930   2          }
+ 931   1          return(xsvfShift(pucTapState, XTAPSTATE_SHIFTDR, lShiftLengthBits,
+ 932   1                             plvTdi, plvTdoCaptured, plvTdoExpected, plvTdoMask,
+ 933   1                             ucEndState, lRunTestTime, ucMaxRepeat));
+ 934   1      }
+ 935          
+ 936          /*****************************************************************************
+ 937          * Function:     xsvfDoSDRMasking
+ 938          * Description:  Update the data value with the next XSDRINC data and address.
+ 939          * Example:      dataVal=0x01ff, nextData=0xab, addressMask=0x0100,
+ 940          *               dataMask=0x00ff, should set dataVal to 0x02ab
+ 941          * Parameters:   plvTdi          - The current TDI value.
+ 942          *               plvNextData     - the next data value.
+ 943          *               plvAddressMask  - the address mask.
+ 944          *               plvDataMask     - the data mask.
+ 945          * Returns:      void.
+ 946          *****************************************************************************/
+ 947          
+ 948          /*============================================================================
+ 949          * XSVF Command Functions (type = TXsvfDoCmdFuncPtr)
+ 950          * These functions update pXsvfInfo->iErrorCode only on an error.
+ 951          * Otherwise, the error code is left alone.
+ 952          * The function returns the error code from the function.
+ 953          ============================================================================*/
+ 954          
+ 955          /*****************************************************************************
+ 956          * Function:     xsvfDoIllegalCmd
+ 957          * Description:  Function place holder for illegal/unsupported commands.
+ 958          * Parameters:   pXsvfInfo   - XSVF information pointer.
+ 959          * Returns:      int         - 0 = success;  non-zero = error.
+ 960          *****************************************************************************/
+ 961          int xsvfDoIllegalCmd(SXsvfInfo* pXsvfInfo)
+ 962          {
+ 963   1          XSVFDBG_PRINTF2(0, "ERROR:  Encountered unsupported command #%d (%s)\n",
+ 967   1                           ((unsigned int)(pXsvfInfo->ucCommand)),
+ 967   1                           ((pXsvfInfo->ucCommand < XLASTCMD)
+ 967   1                            ? (xsvf_pzCommandName[pXsvfInfo->ucCommand])
+ 967   1                            : "Unknown"));
+ 968   1          pXsvfInfo->iErrorCode   = XSVF_ERROR_ILLEGALCMD;
+ 969   1          return(pXsvfInfo->iErrorCode);
+ 970   1      }
+ 971          
+ 972          /*****************************************************************************
+ 973          * Function:     xsvfDoXCOMPLETE
+ 974          * Description:  XCOMPLETE (no parameters)
+ 975          *               Update complete status for XSVF player.
+ 976          * Parameters:   pXsvfInfo   - XSVF information pointer.
+ 977          * Returns:      int         - 0 = success;  non-zero = error.
+ 978          *****************************************************************************/
+ 979          int xsvfDoXCOMPLETE(SXsvfInfo* pXsvfInfo)
+ 980            {
+ 981   1        pXsvfInfo->ucComplete   = 1;
+ 982   1        //printf("xsvfDoXCOMPLETE here.\n");
+ 983   1        return(XSVF_ERROR_NONE);
+ 984   1        }
+ 985          
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 17  
+
+ 986          /*****************************************************************************
+ 987          * Function:     xsvfDoXTDOMASK
+ 988          * Description:  XTDOMASK <lenVal.TdoMask[XSDRSIZE]>
+ 989          *               Prespecify the TDO compare mask.
+ 990          * Parameters:   pXsvfInfo   - XSVF information pointer.
+ 991          * Returns:      int         - 0 = success;  non-zero = error.
+ 992          *****************************************************************************/
+ 993          int xsvfDoXTDOMASK(SXsvfInfo* pXsvfInfo)
+ 994          {
+ 995   1          readVal(&(pXsvfInfo->lvTdoMask), pXsvfInfo->sShiftLengthBytes);
+ 996   1          XSVFDBG_PRINTF(4, "    TDO Mask     = ");
+ 997   1          XSVFDBG_PRINTLENVAL(4, &(pXsvfInfo->lvTdoMask));
+ 998   1          XSVFDBG_PRINTF(4, "\n");
+ 999   1          return(XSVF_ERROR_NONE);
+1000   1      }
+1001          
+1002          /*****************************************************************************
+1003          * Function:     xsvfDoXSIR
+1004          * Description:  XSIR <(byte)shiftlen> <lenVal.TDI[shiftlen]>
+1005          *               Get the instruction and shift the instruction into the TAP.
+1006          *               If prespecified XRUNTEST!=0, goto RUNTEST and wait after
+1007          *               the shift for XRUNTEST usec.
+1008          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1009          * Returns:      int         - 0 = success;  non-zero = error.
+1010          *****************************************************************************/
+1011          int xsvfDoXSIR(SXsvfInfo* pXsvfInfo)
+1012            {
+1013   1        unsigned char   ucShiftIrBits;
+1014   1        short           sShiftIrBytes;
+1015   1        int             iErrorCode;
+1016   1        
+1017   1        /* Get the shift length and store */
+1018   1        readByte(&ucShiftIrBits);
+1019   1        sShiftIrBytes   = xsvfGetAsNumBytes(ucShiftIrBits);
+1020   1        XSVFDBG_PRINTF1(3, "   XSIR length = %d\n",
+1021   1                         ((unsigned int)ucShiftIrBits));
+1022   1        
+1023   1        if (sShiftIrBytes > MAX_LEN)
+1024   1          {
+1025   2          iErrorCode  = XSVF_ERROR_DATAOVERFLOW;
+1026   2          }
+1027   1        else
+1028   1          {
+1029   2          /* Get and store instruction to shift in */
+1030   2          readVal(&(pXsvfInfo->lvTdi), xsvfGetAsNumBytes(ucShiftIrBits));
+1031   2          
+1032   2          /* Shift the data */
+1033   2          iErrorCode  = xsvfShift(&(pXsvfInfo->ucTapState), XTAPSTATE_SHIFTIR,
+1034   2                                   ucShiftIrBits, &(pXsvfInfo->lvTdi),
+1035   2                                   /*plvTdoCaptured*/0, /*plvTdoExpected*/0,
+1036   2                                   /*plvTdoMask*/0, pXsvfInfo->ucEndIR,
+1037   2                                   pXsvfInfo->lRunTestTime, /*ucMaxRepeat*/0);
+1038   2          }
+1039   1        
+1040   1        if (iErrorCode != XSVF_ERROR_NONE)
+1041   1          {
+1042   2          pXsvfInfo->iErrorCode   = iErrorCode;
+1043   2          }
+1044   1        return(iErrorCode);
+1045   1        }
+1046          
+1047          /*****************************************************************************
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 18  
+
+1048          * Function:     xsvfDoXSIR2
+1049          * Description:  XSIR <(2-byte)shiftlen> <lenVal.TDI[shiftlen]>
+1050          *               Get the instruction and shift the instruction into the TAP.
+1051          *               If prespecified XRUNTEST!=0, goto RUNTEST and wait after
+1052          *               the shift for XRUNTEST usec.
+1053          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1054          * Returns:      int         - 0 = success;  non-zero = error.
+1055          *****************************************************************************/
+1056          int xsvfDoXSIR2(SXsvfInfo* pXsvfInfo)
+1057          {
+1058   1          long            lShiftIrBits;
+1059   1          short           sShiftIrBytes;
+1060   1          int             iErrorCode;
+1061   1      
+1062   1          /* Get the shift length and store */
+1063   1          readVal(&(pXsvfInfo->lvTdi), 2);
+1064   1          lShiftIrBits    = value(&(pXsvfInfo->lvTdi));
+1065   1          sShiftIrBytes   = xsvfGetAsNumBytes(lShiftIrBits);
+1066   1          XSVFDBG_PRINTF1(3, "   XSIR2 length = %d\n", lShiftIrBits);
+1067   1      
+1068   1          if (sShiftIrBytes > MAX_LEN)
+1069   1          {
+1070   2              iErrorCode  = XSVF_ERROR_DATAOVERFLOW;
+1071   2          }
+1072   1          else
+1073   1          {
+1074   2              /* Get and store instruction to shift in */
+1075   2              readVal(&(pXsvfInfo->lvTdi), xsvfGetAsNumBytes(lShiftIrBits));
+1076   2      
+1077   2              /* Shift the data */
+1078   2              iErrorCode  = xsvfShift(&(pXsvfInfo->ucTapState), XTAPSTATE_SHIFTIR,
+1079   2                                       lShiftIrBits, &(pXsvfInfo->lvTdi),
+1080   2                                       /*plvTdoCaptured*/0, /*plvTdoExpected*/0,
+1081   2                                       /*plvTdoMask*/0, pXsvfInfo->ucEndIR,
+1082   2                                       pXsvfInfo->lRunTestTime, /*ucMaxRepeat*/0);
+1083   2          }
+1084   1      
+1085   1          if (iErrorCode != XSVF_ERROR_NONE)
+1086   1          {
+1087   2              pXsvfInfo->iErrorCode   = iErrorCode;
+1088   2          }
+1089   1          return(iErrorCode);
+1090   1      }
+1091          
+1092          /*****************************************************************************
+1093          * Function:     xsvfDoXSDR
+1094          * Description:  XSDR <lenVal.TDI[XSDRSIZE]>
+1095          *               Shift the given TDI data into the JTAG scan chain.
+1096          *               Compare the captured TDO with the expected TDO from the
+1097          *               previous XSDRTDO command using the previously specified
+1098          *               XTDOMASK.
+1099          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1100          * Returns:      int         - 0 = success;  non-zero = error.
+1101          *****************************************************************************/
+1102          int xsvfDoXSDR(SXsvfInfo* pXsvfInfo)
+1103          {
+1104   1          int iErrorCode;
+1105   1          readVal(&(pXsvfInfo->lvTdi), pXsvfInfo->sShiftLengthBytes);
+1106   1          /* use TDOExpected from last XSDRTDO instruction */
+1107   1          iErrorCode  = xsvfShift(&(pXsvfInfo->ucTapState), XTAPSTATE_SHIFTDR,
+1108   1                                   pXsvfInfo->lShiftLengthBits, &(pXsvfInfo->lvTdi),
+1109   1                                   &(pXsvfInfo->lvTdoCaptured),
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 19  
+
+1110   1                                   &(pXsvfInfo->lvTdoExpected),
+1111   1                                   &(pXsvfInfo->lvTdoMask), pXsvfInfo->ucEndDR,
+1112   1                                   pXsvfInfo->lRunTestTime, pXsvfInfo->ucMaxRepeat);
+1113   1          if (iErrorCode != XSVF_ERROR_NONE)
+1114   1          {
+1115   2              pXsvfInfo->iErrorCode   = iErrorCode;
+1116   2          }
+1117   1          return(iErrorCode);
+1118   1      }
+1119          
+1120          /*****************************************************************************
+1121          * Function:     xsvfDoXRUNTEST
+1122          * Description:  XRUNTEST <uint32>
+1123          *               Prespecify the XRUNTEST wait time for shift operations.
+1124          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1125          * Returns:      int         - 0 = success;  non-zero = error.
+1126          *****************************************************************************/
+1127          int xsvfDoXRUNTEST(SXsvfInfo* pXsvfInfo)
+1128          {
+1129   1          readVal(&(pXsvfInfo->lvTdi), 4);
+1130   1          pXsvfInfo->lRunTestTime = value(&(pXsvfInfo->lvTdi));
+1131   1          XSVFDBG_PRINTF1(3, "   XRUNTEST = %ld\n", pXsvfInfo->lRunTestTime);
+1132   1          return(XSVF_ERROR_NONE);
+1133   1      }
+1134          
+1135          /*****************************************************************************
+1136          * Function:     xsvfDoXREPEAT
+1137          * Description:  XREPEAT <byte>
+1138          *               Prespecify the maximum number of XC9500/XL retries.
+1139          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1140          * Returns:      int         - 0 = success;  non-zero = error.
+1141          *****************************************************************************/
+1142          int xsvfDoXREPEAT(SXsvfInfo* pXsvfInfo)
+1143          {
+1144   1          readByte(&(pXsvfInfo->ucMaxRepeat));
+1145   1          XSVFDBG_PRINTF1(3, "   XREPEAT = %d\n",
+1146   1                           ((unsigned int)(pXsvfInfo->ucMaxRepeat)));
+1147   1          return(XSVF_ERROR_NONE);
+1148   1      }
+1149          
+1150          /*****************************************************************************
+1151          * Function:     xsvfDoXSDRSIZE
+1152          * Description:  XSDRSIZE <uint32>
+1153          *               Prespecify the XRUNTEST wait time for shift operations.
+1154          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1155          * Returns:      int         - 0 = success;  non-zero = error.
+1156          *****************************************************************************/
+1157          int xsvfDoXSDRSIZE(SXsvfInfo* pXsvfInfo)
+1158          {
+1159   1          int iErrorCode;
+1160   1          iErrorCode  = XSVF_ERROR_NONE;
+1161   1          readVal(&(pXsvfInfo->lvTdi), 4);
+1162   1          pXsvfInfo->lShiftLengthBits = value(&(pXsvfInfo->lvTdi));
+1163   1          pXsvfInfo->sShiftLengthBytes= xsvfGetAsNumBytes(pXsvfInfo->lShiftLengthBits);
+1164   1          XSVFDBG_PRINTF1(3, "   XSDRSIZE = %ld\n", pXsvfInfo->lShiftLengthBits);
+1165   1          if (pXsvfInfo->sShiftLengthBytes > MAX_LEN)
+1166   1          {
+1167   2              iErrorCode  = XSVF_ERROR_DATAOVERFLOW;
+1168   2              pXsvfInfo->iErrorCode   = iErrorCode;
+1169   2          }
+1170   1          return(iErrorCode);
+1171   1      }
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 20  
+
+1172          
+1173          /*****************************************************************************
+1174          * Function:     xsvfDoXSDRTDO
+1175          * Description:  XSDRTDO <lenVal.TDI[XSDRSIZE]> <lenVal.TDO[XSDRSIZE]>
+1176          *               Get the TDI and expected TDO values.  Then, shift.
+1177          *               Compare the expected TDO with the captured TDO using the
+1178          *               prespecified XTDOMASK.
+1179          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1180          * Returns:      int         - 0 = success;  non-zero = error.
+1181          *****************************************************************************/
+1182          int xsvfDoXSDRTDO(SXsvfInfo* pXsvfInfo)
+1183            {
+1184   1        int iErrorCode;
+1185   1        iErrorCode  = xsvfBasicXSDRTDO(&(pXsvfInfo->ucTapState),
+1186   1                                        pXsvfInfo->lShiftLengthBits,
+1187   1                                        pXsvfInfo->sShiftLengthBytes,
+1188   1                                        &(pXsvfInfo->lvTdi),
+1189   1                                        &(pXsvfInfo->lvTdoCaptured),
+1190   1                                        &(pXsvfInfo->lvTdoExpected),
+1191   1                                        &(pXsvfInfo->lvTdoMask),
+1192   1                                        pXsvfInfo->ucEndDR,
+1193   1                                        pXsvfInfo->lRunTestTime,
+1194   1                                        pXsvfInfo->ucMaxRepeat);
+1195   1        if (iErrorCode != XSVF_ERROR_NONE)
+1196   1          {
+1197   2          pXsvfInfo->iErrorCode   = iErrorCode;
+1198   2          }
+1199   1        return(iErrorCode);
+1200   1        }
+1201          
+1202          
+1203          /*****************************************************************************
+1204          * Function:     xsvfDoXSDRBCE
+1205          * Description:  XSDRB/XSDRC/XSDRE <lenVal.TDI[XSDRSIZE]>
+1206          *               If not already in SHIFTDR, goto SHIFTDR.
+1207          *               Shift the given TDI data into the JTAG scan chain.
+1208          *               Ignore TDO.
+1209          *               If cmd==XSDRE, then goto ENDDR.  Otherwise, stay in ShiftDR.
+1210          *               XSDRB, XSDRC, and XSDRE are the same implementation.
+1211          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1212          * Returns:      int         - 0 = success;  non-zero = error.
+1213          *****************************************************************************/
+1214          int xsvfDoXSDRBCE(SXsvfInfo* pXsvfInfo)
+1215            {
+1216   1        unsigned char   ucEndDR;
+1217   1        int             iErrorCode;
+1218   1        ucEndDR = (unsigned char)((pXsvfInfo->ucCommand == XSDRE) ? pXsvfInfo->ucEndDR : XTAPSTATE_SHIFTDR);
+1219   1        iErrorCode  = xsvfBasicXSDRTDO(&(pXsvfInfo->ucTapState),
+1220   1                                        pXsvfInfo->lShiftLengthBits,
+1221   1                                        pXsvfInfo->sShiftLengthBytes,
+1222   1                                        &(pXsvfInfo->lvTdi),
+1223   1                                        /*plvTdoCaptured*/0, /*plvTdoExpected*/0,
+1224   1                                        /*plvTdoMask*/0, ucEndDR,
+1225   1                                        /*lRunTestTime*/0, /*ucMaxRepeat*/0);
+1226   1        if (iErrorCode != XSVF_ERROR_NONE)
+1227   1          {
+1228   2          pXsvfInfo->iErrorCode   = iErrorCode;
+1229   2          }
+1230   1        return(iErrorCode);
+1231   1        }
+1232          
+1233          /*****************************************************************************
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 21  
+
+1234          * Function:     xsvfDoXSDRTDOBCE
+1235          * Description:  XSDRB/XSDRC/XSDRE <lenVal.TDI[XSDRSIZE]> <lenVal.TDO[XSDRSIZE]>
+1236          *               If not already in SHIFTDR, goto SHIFTDR.
+1237          *               Shift the given TDI data into the JTAG scan chain.
+1238          *               Compare TDO, but do NOT use XTDOMASK.
+1239          *               If cmd==XSDRTDOE, then goto ENDDR.  Otherwise, stay in ShiftDR.
+1240          *               XSDRTDOB, XSDRTDOC, and XSDRTDOE are the same implementation.
+1241          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1242          * Returns:      int         - 0 = success;  non-zero = error.
+1243          *****************************************************************************/
+1244          int xsvfDoXSDRTDOBCE(SXsvfInfo* pXsvfInfo)
+1245          {
+1246   1          unsigned char   ucEndDR;
+1247   1          int             iErrorCode;
+1248   1          ucEndDR = (unsigned char)((pXsvfInfo->ucCommand == XSDRTDOE) ?
+1249   1                                      pXsvfInfo->ucEndDR : XTAPSTATE_SHIFTDR);
+1250   1          iErrorCode  = xsvfBasicXSDRTDO(&(pXsvfInfo->ucTapState),
+1251   1                                          pXsvfInfo->lShiftLengthBits,
+1252   1                                          pXsvfInfo->sShiftLengthBytes,
+1253   1                                          &(pXsvfInfo->lvTdi),
+1254   1                                          &(pXsvfInfo->lvTdoCaptured),
+1255   1                                          &(pXsvfInfo->lvTdoExpected),
+1256   1                                          /*plvTdoMask*/0, ucEndDR,
+1257   1                                          /*lRunTestTime*/0, /*ucMaxRepeat*/0);
+1258   1          if (iErrorCode != XSVF_ERROR_NONE)
+1259   1          {
+1260   2              pXsvfInfo->iErrorCode   = iErrorCode;
+1261   2          }
+1262   1          return(iErrorCode);
+1263   1      }
+1264          
+1265          /*****************************************************************************
+1266          * Function:     xsvfDoXSTATE
+1267          * Description:  XSTATE <byte>
+1268          *               <byte> == XTAPSTATE;
+1269          *               Get the state parameter and transition the TAP to that state.
+1270          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1271          * Returns:      int         - 0 = success;  non-zero = error.
+1272          *****************************************************************************/
+1273          int xsvfDoXSTATE(SXsvfInfo* pXsvfInfo)
+1274          {
+1275   1          unsigned char   ucNextState;
+1276   1          int             iErrorCode;
+1277   1          readByte(&ucNextState);
+1278   1          iErrorCode  = xsvfGotoTapState(&(pXsvfInfo->ucTapState), ucNextState);
+1279   1          if (iErrorCode != XSVF_ERROR_NONE)
+1280   1          {
+1281   2              pXsvfInfo->iErrorCode   = iErrorCode;
+1282   2          }
+1283   1          return(iErrorCode);
+1284   1      }
+1285          
+1286          /*****************************************************************************
+1287          * Function:     xsvfDoXENDXR
+1288          * Description:  XENDIR/XENDDR <byte>
+1289          *               <byte>:  0 = RUNTEST;  1 = PAUSE.
+1290          *               Get the prespecified XENDIR or XENDDR.
+1291          *               Both XENDIR and XENDDR use the same implementation.
+1292          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1293          * Returns:      int         - 0 = success;  non-zero = error.
+1294          *****************************************************************************/
+1295          int xsvfDoXENDXR(SXsvfInfo* pXsvfInfo)
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 22  
+
+1296          {
+1297   1          int             iErrorCode;
+1298   1          unsigned char   ucEndState;
+1299   1      
+1300   1          iErrorCode  = XSVF_ERROR_NONE;
+1301   1          readByte(&ucEndState);
+1302   1          if ((ucEndState != XENDXR_RUNTEST) && (ucEndState != XENDXR_PAUSE))
+1303   1          {
+1304   2              iErrorCode  = XSVF_ERROR_ILLEGALSTATE;
+1305   2          }
+1306   1          else
+1307   1          {
+1308   2      
+1309   2          if (pXsvfInfo->ucCommand == XENDIR)
+1310   2          {
+1311   3                  if (ucEndState == XENDXR_RUNTEST)
+1312   3                  {
+1313   4                      pXsvfInfo->ucEndIR  = XTAPSTATE_RUNTEST;
+1314   4                  }
+1315   3                  else
+1316   3                  {
+1317   4                      pXsvfInfo->ucEndIR  = XTAPSTATE_PAUSEIR;
+1318   4                  }
+1319   3                  XSVFDBG_PRINTF1(3, "   ENDIR State = %s\n",
+1320   3                                   xsvf_pzTapState[ pXsvfInfo->ucEndIR ]);
+1321   3              }
+1322   2          else    /* XENDDR */
+1323   2          {
+1324   3                  if (ucEndState == XENDXR_RUNTEST)
+1325   3                  {
+1326   4                      pXsvfInfo->ucEndDR  = XTAPSTATE_RUNTEST;
+1327   4                  }
+1328   3          else
+1329   3          {
+1330   4                      pXsvfInfo->ucEndDR  = XTAPSTATE_PAUSEDR;
+1331   4                  }
+1332   3                  XSVFDBG_PRINTF1(3, "   ENDDR State = %s\n",
+1333   3                                   xsvf_pzTapState[ pXsvfInfo->ucEndDR ]);
+1334   3              }
+1335   2          }
+1336   1      
+1337   1          if (iErrorCode != XSVF_ERROR_NONE)
+1338   1          {
+1339   2              pXsvfInfo->iErrorCode   = iErrorCode;
+1340   2          }
+1341   1          return(iErrorCode);
+1342   1      }
+1343          
+1344          /*****************************************************************************
+1345          * Function:     xsvfDoXCOMMENT
+1346          * Description:  XCOMMENT <text string ending in \0>
+1347          *               <text string ending in \0> == text comment;
+1348          *               Arbitrary comment embedded in the XSVF.
+1349          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1350          * Returns:      int         - 0 = success;  non-zero = error.
+1351          *****************************************************************************/
+1352          int xsvfDoXCOMMENT(SXsvfInfo* pXsvfInfo)
+1353            {
+1354   1        /* Use the comment for debugging */
+1355   1        /* Otherwise, read through the comment to the end '\0' and ignore */
+1356   1        unsigned char   ucText;
+1357   1        
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 23  
+
+1358   1        do
+1359   1          {
+1360   2          readByte(&ucText);
+1361   2          } while (ucText);
+1362   1        
+1363   1        pXsvfInfo->iErrorCode   = XSVF_ERROR_NONE;
+1364   1        
+1365   1        return(pXsvfInfo->iErrorCode);
+1366   1        }
+1367          
+1368          /*****************************************************************************
+1369          * Function:     xsvfDoXWAIT
+1370          * Description:  XWAIT <wait_state> <end_state> <wait_time>
+1371          *               If not already in <wait_state>, then go to <wait_state>.
+1372          *               Wait in <wait_state> for <wait_time> microseconds.
+1373          *               Finally, if not already in <end_state>, then goto <end_state>.
+1374          * Parameters:   pXsvfInfo   - XSVF information pointer.
+1375          * Returns:      int         - 0 = success;  non-zero = error.
+1376          *****************************************************************************/
+1377          int xsvfDoXWAIT(SXsvfInfo* pXsvfInfo)
+1378          {
+1379   1          unsigned char   ucWaitState;
+1380   1          unsigned char   ucEndState;
+1381   1          long            lWaitTime;
+1382   1      
+1383   1          /* Get Parameters */
+1384   1          /* <wait_state> */
+1385   1          readVal(&(pXsvfInfo->lvTdi), 1);
+1386   1          ucWaitState = pXsvfInfo->lvTdi.val[0];
+1387   1      
+1388   1          /* <end_state> */
+1389   1          readVal(&(pXsvfInfo->lvTdi), 1);
+1390   1          ucEndState = pXsvfInfo->lvTdi.val[0];
+1391   1      
+1392   1          /* <wait_time> */
+1393   1          readVal(&(pXsvfInfo->lvTdi), 4);
+1394   1          lWaitTime = value(&(pXsvfInfo->lvTdi));
+1395   1          XSVFDBG_PRINTF2(3, "   XWAIT:  state = %s; time = %ld\n",
+1396   1                           xsvf_pzTapState[ ucWaitState ], lWaitTime);
+1397   1      
+1398   1          /* If not already in <wait_state>, go to <wait_state> */
+1399   1          if (pXsvfInfo->ucTapState != ucWaitState)
+1400   1          {
+1401   2              xsvfGotoTapState(&(pXsvfInfo->ucTapState), ucWaitState);
+1402   2          }
+1403   1      
+1404   1          /* Wait for <wait_time> microseconds */
+1405   1          waitTime(lWaitTime);
+1406   1      
+1407   1          /* If not already in <end_state>, go to <end_state> */
+1408   1          if (pXsvfInfo->ucTapState != ucEndState)
+1409   1          {
+1410   2              xsvfGotoTapState(&(pXsvfInfo->ucTapState), ucEndState);
+1411   2          }
+1412   1      
+1413   1          return(XSVF_ERROR_NONE);
+1414   1      }
+1415          
+1416          
+1417          /*============================================================================
+1418          * Execution Control Functions
+1419          ============================================================================*/
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 24  
+
+1420          
+1421          /*****************************************************************************
+1422          * Function:     xsvfInitialize
+1423          * Description:  Initialize the xsvf player.
+1424          *               Call this before running the player to initialize the data
+1425          *               in the SXsvfInfo struct.
+1426          *               xsvfCleanup is called to clean up the data in SXsvfInfo
+1427          *               after the XSVF is played.
+1428          * Parameters:   pXsvfInfo   - ptr to the XSVF information.
+1429          * Returns:      int - 0 = success; otherwise error.
+1430          *****************************************************************************/
+1431          int xsvfInitialize(SXsvfInfo* pXsvfInfo)
+1432            {
+1433   1        /* Initialize values */
+1434   1        pXsvfInfo->iErrorCode   = xsvfInfoInit(pXsvfInfo);
+1435   1        
+1436   1        if (!pXsvfInfo->iErrorCode)
+1437   1          {
+1438   2          /* Initialize the TAPs */
+1439   2          pXsvfInfo->iErrorCode   = xsvfGotoTapState(&(pXsvfInfo->ucTapState),
+1440   2                                                     XTAPSTATE_RESET);
+1441   2          }
+1442   1        return(pXsvfInfo->iErrorCode);
+1443   1        }
+1444          
+1445          /*****************************************************************************
+1446          * Function:     xsvfRun
+1447          * Description:  Run the xsvf player for a single command and return.
+1448          *               First, call xsvfInitialize.
+1449          *               Then, repeatedly call this function until an error is detected
+1450          *               or until the pXsvfInfo->ucComplete variable is non-zero.
+1451          *               Finally, call xsvfCleanup to cleanup any remnants.
+1452          * Parameters:   pXsvfInfo   - ptr to the XSVF information.
+1453          * Returns:      int         - 0 = success; otherwise error.
+1454          *****************************************************************************/
+1455          int xsvfRun(SXsvfInfo* pXsvfInfo)
+1456            {
+1457   1      
+1458   1        /* Process the XSVF commands */
+1459   1        if ((!pXsvfInfo->iErrorCode) && (!pXsvfInfo->ucComplete))
+1460   1          {
+1461   2         //printf("Running....\n");
+1462   2         /* read 1 byte for the instruction */
+1463   2          readByte(&(pXsvfInfo->ucCommand));
+1464   2         //printf("Byte Read = %d\n", (int) pXsvfInfo->ucCommand);
+1465   2          ++(pXsvfInfo->lCommandCount);
+1466   2      #if 1
+1467   2          /* Execute the command.  Func sets error code.    */
+1468   2          /* If your compiler cannot take this form,        */
+1469   2          /* then convert to a switch statement             */
+1470   2          /* We do not use function pointers below          */
+1471   2          /* xsvf_pfDoCmd[pXsvfInfo->ucCommand](pXsvfInfo); */
+1472   2      
+1473   2          switch (pXsvfInfo->ucCommand)
+1474   2            {
+1475   3            case XCOMPLETE:                  /*  0 */
+1476   3              xsvfDoXCOMPLETE(pXsvfInfo);    /*  0 */
+1477   3              break;
+1478   3            case XTDOMASK:                   /*  1 */
+1479   3              xsvfDoXTDOMASK(pXsvfInfo);     /*  1 */
+1480   3              break;
+1481   3            case XSIR:                       /*  2 */
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 25  
+
+1482   3              xsvfDoXSIR(pXsvfInfo);         /*  2 */
+1483   3              break;
+1484   3            case XSDR:                       /*  3 */
+1485   3              xsvfDoXSDR(pXsvfInfo);         /*  3 */
+1486   3              break;
+1487   3            case XRUNTEST:                   /*  4 */
+1488   3              xsvfDoXRUNTEST(pXsvfInfo);     /*  4 */
+1489   3              break;
+1490   3            case XREPEAT:                    /*  7 */
+1491   3              xsvfDoXREPEAT(pXsvfInfo);      /*  7 */
+1492   3              break;
+1493   3            case XSDRSIZE:                   /*  8 */
+1494   3              xsvfDoXSDRSIZE(pXsvfInfo);     /*  8 */
+1495   3              break;
+1496   3            case XSDRTDO:                    /*  9 */
+1497   3              xsvfDoXSDRTDO(pXsvfInfo);      /*  9 */
+1498   3              break;
+1499   3            case XSETSDRMASKS:               /* 10 */
+1500   3              xsvfDoIllegalCmd(pXsvfInfo);   /* 10 */
+1501   3              break;
+1502   3            case XSDRINC:                    /* 11 */
+1503   3              xsvfDoIllegalCmd(pXsvfInfo);   /* 11 */
+1504   3              break;
+1505   3            case XSDRB:                      /* 12 */
+1506   3              xsvfDoXSDRBCE(pXsvfInfo);      /* 12 */
+1507   3              break;
+1508   3            case XSDRC:                      /* 13 */
+1509   3              xsvfDoXSDRBCE(pXsvfInfo);      /* 13 */
+1510   3              break;
+1511   3            case XSDRE:                      /* 14 */
+1512   3              xsvfDoXSDRBCE(pXsvfInfo);      /* 14 */
+1513   3              break;
+1514   3            case XSDRTDOB:                   /* 15 */
+1515   3              xsvfDoXSDRTDOBCE(pXsvfInfo);   /* 15 */
+1516   3              break;
+1517   3            case XSDRTDOC:                   /* 16 */
+1518   3              xsvfDoXSDRTDOBCE(pXsvfInfo);   /* 16 */
+1519   3              break;
+1520   3            case XSDRTDOE:                   /* 17 */
+1521   3              xsvfDoXSDRTDOBCE(pXsvfInfo);   /* 17 */
+1522   3              break;
+1523   3            case XSTATE:                     /* 18 */
+1524   3              xsvfDoXSTATE(pXsvfInfo);       /* 18 */
+1525   3              break;
+1526   3            case XENDIR:                     /* 19 */
+1527   3              xsvfDoXENDXR(pXsvfInfo);       /* 19 */
+1528   3              break;
+1529   3            case XENDDR:                     /* 20 */
+1530   3              xsvfDoXENDXR(pXsvfInfo);       /* 20 */
+1531   3              break;
+1532   3            case XSIR2:                      /* 21 */
+1533   3              xsvfDoXSIR2(pXsvfInfo);        /* 21 */
+1534   3              break;
+1535   3            case XCOMMENT:                   /* 22 */
+1536   3              xsvfDoXCOMMENT(pXsvfInfo);     /* 22 */
+1537   3              break;
+1538   3            case XWAIT:                      /* 23 */
+1539   3              xsvfDoXWAIT(pXsvfInfo);        /* 23 */
+1540   3              break;
+1541   3            default:
+1542   3              /* Illegal command value.  Func sets error code. */
+1543   3              xsvfDoIllegalCmd(pXsvfInfo);
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 26  
+
+1544   3              break;
+1545   3            }
+1546   2      #else
+                  if (pXsvfInfo->ucCommand < XLASTCMD)
+                    {
+                    /* Execute the command.  Func sets error code.
+                    printf("Command = %s\n",
+                                     xsvf_pzCommandName[pXsvfInfo->ucCommand]); */
+                    /* If your compiler cannot take this form,
+                       then convert to a switch statement */
+                    xsvf_pfDoCmd[pXsvfInfo->ucCommand](pXsvfInfo);
+                    }
+                  else
+                    {
+                    /* Illegal command value.  Func sets error code. */
+                    xsvfDoIllegalCmd(pXsvfInfo);
+                    }
+              #endif
+1562   2          }
+1563   1        return(pXsvfInfo->iErrorCode);
+1564   1        }
+1565          
+1566          #if 0
+                  /* Execute the command.  Func sets error code.    */
+                  /* If your compiler cannot take this form,        */
+                  /* then convert to a switch statement             */
+                  /* We do not use function pointers below          */
+                  /* xsvf_pfDoCmd[pXsvfInfo->ucCommand](pXsvfInfo); */
+              
+                  switch (pXsvfInfo->ucCommand)
+                    {
+                    case XCOMPLETE:                  /*  0 */
+                      xsvfDoXCOMPLETE(pXsvfInfo);    /*  0 */
+                    case XTDOMASK:                   /*  1 */
+                      xsvfDoXTDOMASK(pXsvfInfo);     /*  1 */
+                    case XSIR:                       /*  2 */
+                      xsvfDoXSIR(pXsvfInfo);         /*  2 */
+                    case XSDR:                       /*  3 */
+                      xsvfDoXSDR(pXsvfInfo);         /*  3 */
+                    case XRUNTEST:                   /*  4 */
+                      xsvfDoXRUNTEST(pXsvfInfo);     /*  4 */
+                    case XREPEAT:                    /*  7 */
+                      xsvfDoXREPEAT(pXsvfInfo);      /*  7 */
+                    case XSDRSIZE:                   /*  8 */
+                      xsvfDoXSDRSIZE(pXsvfInfo);     /*  8 */
+                    case XSDRTDO:                    /*  9 */
+                      xsvfDoXSDRTDO(pXsvfInfo);      /*  9 */
+                    case XSETSDRMASKS:               /* 10 */
+                      xsvfDoIllegalCmd(pXsvfInfo);   /* 10 */
+                    case XSDRINC:                    /* 11 */
+                      xsvfDoIllegalCmd(pXsvfInfo);   /* 11 */
+                    case XSDRB:                      /* 12 */
+                      xsvfDoXSDRBCE(pXsvfInfo);      /* 12 */
+                    case XSDRC:                      /* 13 */
+                      xsvfDoXSDRBCE(pXsvfInfo);      /* 13 */
+                    case XSDRE:                      /* 14 */
+                      xsvfDoXSDRBCE(pXsvfInfo);      /* 14 */
+                    case XSDRTDOB:                   /* 15 */
+                      xsvfDoXSDRTDOBCE(pXsvfInfo);   /* 15 */
+                    case XSDRTDOC:                   /* 16 */
+                      xsvfDoXSDRTDOBCE(pXsvfInfo);   /* 16 */
+                    case XSDRTDOE:                   /* 17 */
+C51 COMPILER V7.10   MICRO                                                                 02/22/2013 13:25:15 PAGE 27  
+
+                      xsvfDoXSDRTDOBCE(pXsvfInfo);   /* 17 */
+                    case XSTATE:                     /* 18 */
+                      xsvfDoXSTATE(pXsvfInfo);       /* 18 */
+                    case XENDIR:                     /* 19 */
+                      xsvfDoXENDXR(pXsvfInfo);       /* 19 */
+                    case XENDDR:                     /* 20 */
+                      xsvfDoXENDXR(pXsvfInfo);       /* 20 */
+                    case XSIR2:                      /* 21 */
+                      xsvfDoXSIR2(pXsvfInfo);        /* 21 */
+                    case XCOMMENT:                   /* 22 */
+                      xsvfDoXCOMMENT(pXsvfInfo);     /* 22 */
+                    case XWAIT:                      /* 23 */
+                      xsvfDoXWAIT(pXsvfInfo);        /* 23 */
+                    default:
+                      /* Illegal command value.  Func sets error code. */
+                      xsvfDoIllegalCmd(pXsvfInfo);
+                    }
+              #endif
+1624          /*============================================================================
+1625          * xsvfExecute() - The primary entry point to the XSVF player
+1626          ============================================================================*/
+1627          
+1628          /*****************************************************************************
+1629          * Function:     xsvfExecute
+1630          * Description:  Process, interpret, and apply the XSVF commands.
+1631          *               See port.c:readByte for source of XSVF data.
+1632          * Parameters:   none.
+1633          * Returns:      int - Legacy result values:  1 == success;  0 == failed.
+1634          *****************************************************************************/
+1635          int xsvfExecute(void)
+1636            {
+1637   1        SXsvfInfo   xsvfInfo;
+1638   1        
+1639   1        
+1640   1        xsvfInitialize(&xsvfInfo);
+1641   1        
+1642   1        while (!xsvfInfo.iErrorCode && (!xsvfInfo.ucComplete))
+1643   1          {
+1644   2          xsvfRun(&xsvfInfo);
+1645   2          }
+1646   1      #if 0
+                return (1);
+              #else
+1649   1        //printf("xsvfExecute = %d\n", xsvfInfo.iErrorCode);
+1650   1        return(XSVF_ERRORCODE(xsvfInfo.iErrorCode));
+1651   1      #endif
+1652   1        }
+1653          
+1654          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   5270    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     72     325
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

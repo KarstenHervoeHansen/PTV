@@ -1,0 +1,1860 @@
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE RS232
+OBJECT MODULE PLACED IN Rs232.OBJ
+COMPILER INVOKED BY: C:\CYGNAL\IDEfiles\C51\BIN\C51.exe Rs232.c DB OE CD OPTIMIZE(9,SPEED) SMALL
+
+stmt level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2003                                           */
+   3          /*  Project:  PT8640 Trilevel HDTV generator, using 8051F231 Cygnal        */
+   4          /*            processor.                                                   */
+   5          /*  Module:   RS232.C                                                      */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     15.10.2003                                                   */
+   8          /*  Status:   Version 1.0                                                  */
+   9          /*  Purpose:  This module implements serial communication routines used to */
+  10          /*            communicate with PT5230 Master.  The following command set   */
+  11          /*            is implemented:                                              */
+  12          /*               Function           Command       Response                 */
+  13          /*                                                                         */           
+  14          /*             Set unit address      TA <uc>;       <uc>;                  */
+  15          /*             Read unit address     TA ?           <uc>;                  */
+  16          /*                                                                         */
+  17          /*                                                                         */
+  18          /*             Write User Text       TW <uc>,<str[<11]>                    */
+  19          /*                                                                         */
+  20          /*             Read User Text        TR <uc>?                              */
+  21          /*                                                                         */
+  22          /*             Read HW vers          TH ?           <ui>;                  */
+  23          /*                                                                         */
+  24          /*             Read SW vers          TI ?           <ui>;                  */
+  25          /*                                                                         */
+  26          /*             Read HW info          TT ?           <ui>;                  */
+  27          /*                                                                         */
+  28          /*             Read TLG samples      TJ ?           <ul>;                  */
+  29          /*                                                                         */
+  30          /*             The above command set is similar to that of PT9633 SDI TPG  */ 
+  31          /*             described in commands.doc.                                  */
+  32          /*                                                                         */
+  33          /* Changes:                                                                */
+  34          /* 15.10.03: This module is taken from 8633 source code, as is.  It was    */
+  35          /*           modified only to fit 8051F231 definitions.                    */
+  36          /*  Note:    F231 has 8K Flash and 255 bytes of RAM and no  XRAM           */
+  37          /*                                                                         */
+  38          /*           To issue these commands from an external PC connected to      */
+  39          /*           Master, we use the following FACTORY commands:                */
+  40          /*           :FACT:V24C:ADDR BBU_x;COMM 'TH?';   to get HW version         */
+  41          /*           :FACT:V24C:ADDR BBU_x;COMM 'TW',1,'string'; to write u.s 1    */
+  42          /*           :FACT:V24C:ADDR BBU_x;COMM 'TR?',1; to get user string 1      */
+  43          /*           ... etc.                                                      */
+  44          /*           We use BBU_x because the TLG after it is found to be          */
+  45          /*           installed, gets its address changed to bbux_addr              */
+  46          /*                                                                         */
+  47          /*      KU number is read by master as string as follows:                  */
+  48          /*      ascPtr = RecStr(address, "HR", ProductKUNo_addr/10, &error);       */
+  49          /*      where ProductKUNo_addr/10 = 2.                                     */
+  50          /*      KU number is stored as user string nr. 2.                          */
+  51          /***************************************************************************/
+  52          
+  53          
+  54          #include "f200.h"
+  55          #include "define.h"
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 2   
+
+  56          #include "rs232.h"
+  57          #include "spi_mod1.h"
+  58          #include "eeprom.h"
+  59          
+  60          
+  61          #define IdleState              0x00
+  62          #define DataState              0x01
+  63          #define QuoteState             0x02    /* MUST be DataState XOR 03H */
+  64          #define DelState               0x03
+  65          
+  66          /* use the condition below to allow debugging.  If DefaultTLG_addr = 0x13,
+  67             then TLG program will work properly without the need to reset the Master
+  68          */
+  69          #if 1
+  70          #define DefaultTLG_addr        (UC)0xF4    /* default SLAVE address for TLG */
+  71          #else
+              #define DefaultTLG_addr        (UC)0x12
+              #endif
+  74          
+  75          #define PT8640_COMMAND_PREFIX  'T'    /* First letter of PT8640 command */
+  76                                                /* set */
+  77          
+  78            /* User text start address: 10 blocks of 11 byte ( 10 data + checksum) */
+  79          #define USER_TEXT              0x0B
+  80          
+  81          #define SWVERSION              10
+  82          #define HWVERSION               0
+  83          #define HWINFO                 11
+  84          
+  85          code char TypeTable[NoInASCII] =
+  86             {
+  87            /*   0 */  'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'D', 'R',
+  88            /*  12 */  'R', 'D', 'A', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+  89            /*  24 */  'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'D', 'Q', 'R',
+  90            /*  36 */  'D', 'R', 'R', 'R', 'R', 'R', 'R', 'N', 'S', 'N', 'N', 'R',
+  91            /*  48 */  'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'R', 'D',
+  92            /*  60 */  'R', 'R', 'R', 'D', 'R', 'A', 'A', 'A', 'A', 'A', 'A', 'A',
+  93            /*  72 */  'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A',
+  94            /*  84 */  'A', 'A', 'A', 'A', 'A', 'A', 'A', 'R', 'R', 'R', 'R', 'R',
+  95            /*  96 */  'R', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A',
+  96            /* 108 */  'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A',
+  97            /* 120 */  'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'
+  98            };
+  99          
+ 100          #define NOOFCOMMANDS 8
+ 101          
+ 102          code struct COMMAND_STRUCT CommandTable[NOOFCOMMANDS] =
+ 103            {
+ 104            'T', 'A', UnitAddressCommand,
+ 105            'T', 'W', WriteUserTextCommand,
+ 106            'T', 'R', ReadUserTextCommand,
+ 107            'T', 'I', ReadSWVersionCommand,
+ 108            'T', 'H', ReadHWVersionCommand,
+ 109            'T', 'T', ReadHWInformationCommand,
+ 110            'T', 'K', GeneratorDelayCommand, /* The last two are new and general */
+ 111            'T', 'L', GeneratorFormatCommand /* commands to tackle format and    */
+ 112            };                               /* delay for all generators         */
+ 113          
+ 114          
+ 115          
+ 116          UC RxState;
+ 117          UC RxChkSum;
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 3   
+
+ 118          
+ 119          UC RxOutput;
+ 120          UC RxInput;
+ 121          
+ 122          UC BufState;
+ 123          UC Char;
+ 124          UC CharType;
+ 125          
+ 126          char StrNdx;
+ 127          char ParamNdx;
+ 128          
+ 129          UC   MySlaveAddress;
+ 130          
+ 131          char Cmd[2];
+ 132          char CmdDelimiter;
+ 133          
+ 134          #define RXRLEN      20
+ 135          
+ 136          char idata RxBuffer[RXRLEN];
+ 137          char idata String[15];
+ 138          UL   Parameter[3];
+ 139          
+ 140          UC   Tx_ACK_Buffer;
+ 141          bit  Tx_ACK_Pending;
+ 142          bit  Tx_BUSY;
+ 143          bit  Tx_SBUF_Empty;
+ 144          
+ 145          bit  Broadcast;
+ 146          sbit LED = P2^4;
+ 147          
+ 148          /* extern CURR_PARAMS gen_params; */
+ 149          extern CURR_PARAMS tlgs[4];
+ 150          extern bit         changed;
+ 151          extern UC          current_generator;
+ 152          extern ul          tlg_samples;
+ 153          
+ 154          /***************************************************************************/
+ 155          /*  RS232Init                                                      RS232.C */
+ 156          /*                                                                         */
+ 157          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 158          /* Revised:    980601, KEn                                                 */
+ 159          /*                                                                         */
+ 160          /*  Function:  Initialize the RS232 communication.                         */
+ 161          /*  Remarks:    --                                                         */
+ 162          /*  Returns:    --                                                         */
+ 163          /*  Updates:    --                                                         */
+ 164          /***************************************************************************/
+ 165          void RS232Init()
+ 166            {
+ 167   1        MySlaveAddress   = DefaultTLG_addr; /* default SLAVE address for TLG */
+ 168   1        RxInput     = 0; 
+ 169   1        RxOutput    = 0;
+ 170   1        RxState     = IdleState;
+ 171   1        Char        = 0;
+ 172   1        CharType    = 0;
+ 173   1        BufState    = State_0;
+ 174   1        Broadcast   = FALSE;
+ 175   1        Tx_BUSY     = FALSE;
+ 176   1        Tx_ACK_Pending = FALSE;
+ 177   1        Tx_SBUF_Empty  = TRUE;
+ 178   1        }
+ 179          
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 4   
+
+ 180          
+ 181          /***************************************************************************/
+ 182          /*  CharHandler                                                    RS232.C */
+ 183          /*                                                                         */
+ 184          /* Author:     Kim Engedahl, DEV, 970217                                   */
+ 185          /* Revised:    980601, KEn                                                 */
+ 186          /*                                                                         */
+ 187          /*  Function:  RS232 command handler.                                      */
+ 188          /*  Remarks:   NOTE!  The broadcast messages are handled specially.        */
+ 189          /*  Returns:    --                                                         */
+ 190          /*  Updates:    --                                                         */
+ 191          /***************************************************************************/
+ 192          void CharHandler()
+ 193            {
+ 194   1      
+ 195   1        Char = RxBuffer[ RxOutput = ++RxOutput % RXRLEN];
+ 196   1                          
+ 197   1        CharType = TypeTable[Char];
+ 198   1      
+ 199   1        switch (BufState)
+ 200   1          {
+ 201   2          case State_0:
+ 202   2            if (CharType == 'A')
+ 203   2              {
+ 204   3              BufState++;
+ 205   3              Cmd[0] = Char;
+ 206   3              ParamNdx = 0;
+ 207   3              Parameter[0] = Parameter[1] = Parameter[2] = 0;
+ 208   3              return;
+ 209   3              }
+ 210   2            if (CharType != 'D')
+ 211   2              BufState = State_7;
+ 212   2            return;
+ 213   2          case State_1:
+ 214   2            switch (CharType)
+ 215   2              {
+ 216   3              case 'A':
+ 217   3                Cmd[1] = Char;
+ 218   3                return;
+ 219   3              case 'D':
+ 220   3                CmdDelimiter = Char;
+ 221   3                BufState = State_6;
+ 222   3                return;
+ 223   3              case 'Q':
+ 224   3                StrNdx = -1;
+ 225   3                BufState = State_3;
+ 226   3                return;
+ 227   3              case 'N':
+ 228   3                Parameter[ParamNdx = 0] = Char - '0';
+ 229   3                BufState = State_2;
+ 230   3                return;
+ 231   3              default:
+ 232   3                BufState = State_7;
+ 233   3              }
+ 234   2            break;
+ 235   2          case State_2:
+ 236   2            switch (CharType)
+ 237   2              {
+ 238   3              case 'N':
+ 239   3                Parameter[ParamNdx] = 10*Parameter[ParamNdx] + Char - '0';
+ 240   3                return;
+ 241   3              case 'S':
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 5   
+
+ 242   3                BufState = State_5;
+ 243   3                return;
+ 244   3              case 'D':
+ 245   3                CmdDelimiter = Char;
+ 246   3                BufState = State_6;
+ 247   3                return;
+ 248   3              default:
+ 249   3                BufState = State_7;
+ 250   3              }
+ 251   2            break;
+ 252   2          case State_3:
+ 253   2            if (CharType == 'Q')
+ 254   2              {
+ 255   3              String[++StrNdx] = '\0';
+ 256   3              BufState++;
+ 257   3              return;
+ 258   3              }
+ 259   2            String[++StrNdx] = Char;
+ 260   2            break;
+ 261   2          case State_4:
+ 262   2            switch (CharType)
+ 263   2              {
+ 264   3              case 'Q':
+ 265   3                String[StrNdx] = Char;
+ 266   3                BufState = State_3;
+ 267   3                break;
+ 268   3              case 'S':
+ 269   3                BufState++;
+ 270   3                break;
+ 271   3              case 'D':
+ 272   3                CmdDelimiter = Char;
+ 273   3                BufState = State_6;
+ 274   3                break;
+ 275   3              default:
+ 276   3                BufState = State_7;
+ 277   3                return;
+ 278   3              }
+ 279   2            break;
+ 280   2          case State_5:
+ 281   2            switch (CharType)
+ 282   2              {
+ 283   3              case 'Q':
+ 284   3                StrNdx = -1;
+ 285   3                BufState = State_3;
+ 286   3                break;
+ 287   3              case 'N':
+ 288   3                Parameter[++ParamNdx] = Char - '0';
+ 289   3                BufState = State_2;
+ 290   3                break;
+ 291   3              default:
+ 292   3                BufState = State_7;
+ 293   3                return;
+ 294   3              }
+ 295   2            break;
+ 296   2          case State_6:
+ 297   2            if (Char == 0x80) /* this means that there was no chksum error */
+ 298   2              {
+ 299   3              if (Cmd[0] == PT8640_COMMAND_PREFIX)  /* if (Cmd[0] == 'T') */
+ 300   3                CommandExecute();
+ 301   3              }
+ 302   2            BufState = State_0;
+ 303   2            return;
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 6   
+
+ 304   2          case State_7:
+ 305   2            if (CharType == 'D')
+ 306   2              BufState++;
+ 307   2            return;      
+ 308   2          case State_8:
+ 309   2            BufState = State_0;
+ 310   2            return;      
+ 311   2          }
+ 312   1        }
+ 313           
+ 314          /***************************************************************************/
+ 315          /*  CommandExecute                                                 RS232.C */
+ 316          /*                                                                         */
+ 317          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 318          /* Revised:    980601, KEn                                                 */
+ 319          /*                                                                         */
+ 320          /*  Function:  Decode and execute the received RS232 command.              */
+ 321          /*  Remarks:   NOTE! The broadcast messages are NOT decoded in this        */
+ 322          /*             function, UNLESS they are called as NORMAL commands.        */
+ 323          /*             Is is assumed the the first character HAS been tested AND   */
+ 324          /*             found valid BEFORE entering this function.                  */
+ 325          /*  Returns:    --                                                         */
+ 326          /*  Updates:    --                                                         */
+ 327          /***************************************************************************/
+ 328          void CommandExecute()
+ 329            {
+ 330   1        UI i;
+ 331   1      
+ 332   1        for (i = 0; i < NOOFCOMMANDS; i++)
+ 333   1          if (Cmd[1] == CommandTable[i].Cmd2)
+ 334   1            {
+ 335   2            CommandTable[i].Exec();
+ 336   2            return;
+ 337   2            }
+ 338   1        }
+ 339          
+ 340          /***************************************************************************/
+ 341          /*  WriteChar                                                      RS232.C */
+ 342          /*                                                                         */
+ 343          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 344          /* Revised:    980601, KEn                                                 */
+ 345          /*                                                                         */
+ 346          /*  Function:  Write one character to the RS232 output buffer.             */
+ 347          /*  Remarks:    --                                                         */
+ 348          /*  Returns:    --                                                         */
+ 349          /*  Updates:    --                                                         */
+ 350          /***************************************************************************/
+ 351          void WriteChar(char TxChar)
+ 352            {
+ 353   1        Tx_BUSY = TRUE;
+ 354   1        while (!Tx_SBUF_Empty)
+ 355   1          ;
+ 356   1        Tx_SBUF_Empty = FALSE;
+ 357   1        SBUF = TxChar;
+ 358   1        while (!Tx_SBUF_Empty)
+ 359   1          ;
+ 360   1        Tx_BUSY = FALSE;
+ 361   1        }
+ 362          
+ 363          #if 1
+ 364          /******************************************************************
+ 365           * NAME       void WriteString(UC idata *Str)
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 7   
+
+ 366           * PURPOSE    To transmit string to master
+ 367           * 
+ 368           * ARGUMENTS  UC idata *Str - NULL terminated string
+ 369           *
+ 370           * RETURNS    Nothing
+ 371           *
+ 372           * EXTERNS    None
+ 373           *
+ 374           * NOTES:     Text of the string is transmitted in quotes.
+ 375           *            Checksum includes these quotes.
+ 376           ******************************************************************/
+ 377          void WriteString(UC idata *Str)
+ 378            {
+ 379   1        UC checksum = 2*'\"';
+ 380   1      
+ 381   1        WriteChar('\"');
+ 382   1        
+ 383   1        while (*Str)
+ 384   1          {
+ 385   2          WriteChar(*Str);
+ 386   2          checksum += *Str++;
+ 387   2          }
+ 388   1        WriteChar('\"');
+ 389   1        WriteChar(';');
+ 390   1        WriteChar((checksum + ';') & 0x7F);
+ 391   1      
+ 392   1        }
+ 393          #endif
+ 394          /***************************************************************************/
+ 395          /*  WriteVal                                                       RS232.C */
+ 396          /*                                                                         */
+ 397          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 398          /* Revised:    980601, KEn                                                 */
+ 399          /*                                                                         */
+ 400          /*  Function:  Write a value to the RS232 output buffer.                   */
+ 401          /*  Remarks:    --                                                         */
+ 402          /*  Returns:    --                                                         */
+ 403          /*  Updates:    --                                                         */
+ 404          /***************************************************************************/
+ 405          void WriteVal(UL value)
+ 406            {
+ 407   1        UC checksum, i;
+ 408   1        UC tmp, ValOut;
+ 409   1        UL divider;
+ 410   1      
+ 411   1        ValOut = FALSE;
+ 412   1        checksum = 0;
+ 413   1      
+ 414   1        divider = 1000000000;
+ 415   1      
+ 416   1        for (i = 0; i < 10; i++)
+ 417   1           {
+ 418   2           if (tmp = (value / divider) % 10)
+ 419   2             ValOut = TRUE;
+ 420   2           if (ValOut || (i == 9))
+ 421   2             {
+ 422   3             tmp += '0';
+ 423   3             WriteChar(tmp);
+ 424   3             checksum += tmp;
+ 425   3             }  
+ 426   2          divider /= 10;
+ 427   2          }
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 8   
+
+ 428   1        WriteChar(';');
+ 429   1        WriteChar((checksum + ';') & 0x7F);
+ 430   1        }
+ 431          
+ 432          /***************************************************************************/
+ 433          /*  TestInputBuffer                                                RS232.C */
+ 434          /*                                                                         */
+ 435          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 436          /* Revised:    980601, KEn                                                 */
+ 437          /*  Function:  Test if any more date in the input buffer.                  */
+ 438          /*  Remarks:    --                                                         */
+ 439          /*  Returns:    TRUE: If any more data, otherwise FALSE.                   */
+ 440          /*  Updates:    --                                                         */
+ 441          /***************************************************************************/
+ 442          bit TestInputBuffer()
+ 443            {
+ 444   1        if (RxInput - RxOutput)
+ 445   1          return(TRUE);
+ 446   1        return(FALSE);
+ 447   1        }
+ 448          
+ 449          
+ 450          
+ 451          /*******************************************************************
+ 452           * NAME       void WriteUserTextCommand()
+ 453           * PURPOSE    To write text string sent by 5230 Master into eeprom.
+ 454           *            < TW > command
+ 455           * ARGUMENTS  None
+ 456           *
+ 457           * RETURNS    Nothing
+ 458           *
+ 459           * EXTERNS    None.
+ 460           *
+ 461           * NOTES:     10 characters are written, plus checksum.
+ 462           *            
+ 463           *******************************************************************/
+ 464          void WriteUserTextCommand()
+ 465            {
+ 466   1      
+ 467   1        if ( CmdDelimiter == ';')
+ 468   1          {
+ 469   2          if ((UC)Parameter[0] < 10)
+ 470   2            PageWriteE2prom(CONROL_BYTE, USER_TEXT + (11 * (UC)Parameter[0]), String, 10);
+ 471   2          }
+ 472   1        }
+ 473          
+ 474          /*******************************************************************
+ 475           * NAME       void ReadUserTextCommand()
+ 476           * PURPOSE    To read string from eeprom and transmit it to 5230 Master.
+ 477           *            < TR > command
+ 478           * ARGUMENTS  None
+ 479           *
+ 480           * RETURNS    Nothing
+ 481           *
+ 482           * EXTERNS    None.
+ 483           *
+ 484           * NOTES:     There is place for 10 strings, each containing 11
+ 485           *            characters (last one is checksum) in the eeprom.
+ 486           *            Parameter[0] contains nr of string to read.
+ 487           *******************************************************************/
+ 488          void ReadUserTextCommand()
+ 489            {
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 9   
+
+ 490   1        if (CmdDelimiter == '?')
+ 491   1          {
+ 492   2          if ((UC)Parameter[0] < 10)
+ 493   2            {
+ 494   3            SeqReadE2prom(CONROL_BYTE, USER_TEXT + (11 * (UC)Parameter[0]), String, 10);
+ 495   3            String[10] = '\0';
+ 496   3            WriteString(String); /* WriteString() adds quotes */
+ 497   3            }
+ 498   2          }
+ 499   1        }
+ 500          
+ 501          /***************************************************************************/
+ 502          /*  void ReadSWVersionCommand(void)                                        */
+ 503          /*                                                                         */
+ 504          /* Author:    JK                                                           */
+ 505          /* Revised:   17.07.2002                                                   */
+ 506          /*                                                                         */
+ 507          /*  Function: To return software version (TI command)                      */
+ 508          /*                                                                         */
+ 509          /*  Returns:  Nothing                                                      */
+ 510          /*  Notes:                                                                 */
+ 511          /*            8051F226 board                                               */
+ 512          /***************************************************************************/
+ 513          void ReadSWVersionCommand()
+ 514            {
+ 515   1      
+ 516   1        switch (CmdDelimiter)
+ 517   1          {
+ 518   2          case ';':
+ 519   2            break;
+ 520   2          case '?':
+ 521   2      #if 1
+ 522   2            WriteVal(SWVERSION);
+ 523   2      #endif
+ 524   2            break;
+ 525   2          default:
+ 526   2            break;
+ 527   2          }
+ 528   1        }
+ 529          
+ 530          /***************************************************************************/
+ 531          /*  ReadHWVersionCommand                                                   */
+ 532          /*                                                                         */
+ 533          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 534          /* Revised:    990304, KEn                                                 */
+ 535          /* Function: To return hardware version (TH command)                       */
+ 536          /***************************************************************************/
+ 537          void ReadHWVersionCommand()
+ 538            {
+ 539   1      
+ 540   1        if (CmdDelimiter == '?')
+ 541   1          {
+ 542   2      
+ 543   2          WriteVal(HWVERSION);
+ 544   2          }
+ 545   1        }
+ 546          
+ 547          /***************************************************************************/
+ 548          /*  ReadHWInformationCommand                                               */
+ 549          /*                                                                         */
+ 550          /* Author:    Kim Engedahl, DEV, 971120                                    */
+ 551          /* Revised:    990304, KEn                                                 */
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 10  
+
+ 552          /* Function: To return hardware information (TT command)                   */
+ 553          /***************************************************************************/
+ 554          void ReadHWInformationCommand()
+ 555            {
+ 556   1      
+ 557   1        if (CmdDelimiter == '?')
+ 558   1          {
+ 559   2      
+ 560   2          WriteVal(HWINFO);
+ 561   2          }
+ 562   1        }
+ 563          
+ 564          /* GeneratorDelayCommand(): sets delay for x generator.
+ 565             TK <uc>,<ul>
+ 566             In Master software, the delay is sent as follows:
+ 567          
+ 568             error = SndULUL(TLGUnit[gen].Address, cmdBuffer, (UL)gen, tmp);
+ 569          
+ 570             i.e. generator nr and delay are sent (no info about format)
+ 571          */
+ 572          void GeneratorDelayCommand(void)
+ 573            {
+ 574   1        switch (CmdDelimiter)
+ 575   1          {
+ 576   2          case ';':
+ 577   2            tlgs[(UC)Parameter[0]].delay.longval = Parameter[1];
+ 578   2            current_generator = (UC)Parameter[0];
+ 579   2            changed           = 1;
+ 580   2      #if 0              /* GeneratorDelayCommand() will signal change          */
+                    LED = ~LED;  
+              #endif
+ 583   2            break;
+ 584   2          default:
+ 585   2            break;
+ 586   2          }
+ 587   1        }
+ 588          /* GeneratorFormatCommand(): sets format for x generator.
+ 589             TL <uc>,<uc>
+ 590             In Master software, the delay is sent as follows:
+ 591          
+ 592             error = SndULUL(TLGUnit[subgen].Address, "TL", (UL)subgen, (UL)fmt);
+ 593          
+ 594             i.e. generator nr and format are sent (no info about delay)
+ 595          */
+ 596          void GeneratorFormatCommand(void)
+ 597            {
+ 598   1        switch (CmdDelimiter)
+ 599   1          {
+ 600   2          case ';':
+ 601   2            tlgs[(UC)Parameter[0]].format = (UC) Parameter[1];
+ 602   2      #if 0              /* GeneratorDelayCommand() will signal change          */
+                    LED = ~LED;  
+              #endif
+ 605   2            break;
+ 606   2          default:
+ 607   2            break;
+ 608   2          }
+ 609   1        }
+ 610          
+ 611          /***************************************************************************/
+ 612          /*  UnitAddressCommand                                                     */
+ 613          /*                                                                         */
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 11  
+
+ 614          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 615          /* Revised:   980601, KEn                                                  */
+ 616          /*                                                                         */
+ 617          /*  Function: Set/read the unit slave address (TA command)                 */
+ 618          /*  Remarks:                                                               */
+ 619          /*                                                                         */
+ 620          /***************************************************************************/
+ 621          void UnitAddressCommand(void)
+ 622            {
+ 623   1      
+ 624   1        switch (CmdDelimiter)
+ 625   1          {
+ 626   2          case ';':
+ 627   2            MySlaveAddress = (UC)Parameter[0];  /* Parameter[0] holds bbux_addr  */
+ 628   2      #if 0
+                    if (MySlaveAddress == 0x13)
+                      LED = ~LED; 
+              #endif
+ 632   2            WriteChar(MySlaveAddress);      /* echo MySlaveAddress to Master */
+ 633   2            WriteChar(MySlaveAddress);      /* echo MySlaveAddress to Master */
+ 634   2            break;
+ 635   2      
+ 636   2          case '?':
+ 637   2            WriteVal((UL) MySlaveAddress);
+ 638   2            break;
+ 639   2          }
+ 640   1        }
+ 641          /***************************************************************************/
+ 642          /*  RS232break                                                     RS232.C */
+ 643          /*                                                                         */
+ 644          /* Author:    Kim Engedahl, DEV, 970217                                    */
+ 645          /* Revised:   980601, KEn                                                  */
+ 646          /*                                                                         */
+ 647          /*  Function:  Transmitter/receiver interrupt handler.                     */
+ 648          /*  Remarks:   DO NOT CALL THIS FUNCTION!!! IT'S AN INTERRUPT ONLY         */
+ 649          /*  Returns:    --                                                         */
+ 650          /*  Updates:    --                                                         */
+ 651          /***************************************************************************/
+ 652          void RS232break(void) interrupt 4
+ 653            {
+ 654   1        static char RxChar, RxCharType;
+ 655   1      
+ 656   1        while (RI)
+ 657   1          {
+ 658   2          if (SM2)
+ 659   2            {
+ 660   3            if (SBUF == 0x90)
+ 661   3              {
+ 662   4              Broadcast = TRUE;
+ 663   4              SM2       = 0;
+ 664   4              RxState   = DataState;
+ 665   4              RxChkSum  = 0;
+ 666   4              }
+ 667   3            else
+ 668   3              if (SBUF == MySlaveAddress)
+ 669   3                {
+ 670   4                SM2      = 0;
+ 671   4                RxState  = DataState;
+ 672   4                RxChkSum = 0;
+ 673   4                }
+ 674   3            }
+ 675   2          else
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 12  
+
+ 676   2            {
+ 677   3            RxChar = SBUF;
+ 678   3            if (RxState == DelState)
+ 679   3              {
+ 680   4              SM2 = 1;
+ 681   4              if ((RxChkSum & 0x7F) - RxChar)
+ 682   4                {
+ 683   5                Tx_ACK_Buffer = 0x81;          /* checksum error */
+ 684   5                }
+ 685   4              else
+ 686   4                {
+ 687   5                Tx_ACK_Buffer = 0x80;          /* checksum OK    */
+ 688   5                }
+ 689   4              RxChar = Tx_ACK_Buffer;
+ 690   4              if (!Broadcast)
+ 691   4                {
+ 692   5                if (Tx_BUSY)
+ 693   5                  Tx_ACK_Pending = TRUE;
+ 694   5                else
+ 695   5                  {
+ 696   6                  Tx_SBUF_Empty = FALSE;
+ 697   6                  SBUF = Tx_ACK_Buffer;
+ 698   6                  }
+ 699   5                }
+ 700   4              else
+ 701   4                Broadcast = FALSE;
+ 702   4              }
+ 703   3            else
+ 704   3              { 
+ 705   4              RxCharType = TypeTable[RxChar];
+ 706   4              if (RxCharType == 'Q')
+ 707   4                RxState ^= XORValue;
+ 708   4              else
+ 709   4                {
+ 710   5                if (RxState != 0x02)
+ 711   5                  {
+ 712   6                  if (RxCharType == 'D')
+ 713   6                    RxState = DelState;
+ 714   6                  }
+ 715   5                }
+ 716   4              }
+ 717   3            RxBuffer[ RxInput = ++RxInput % RXRLEN] = RxChar;
+ 718   3            RxChkSum += RxChar;
+ 719   3            }
+ 720   2          RI = 0;
+ 721   2          }
+ 722   1      
+ 723   1        if (TI)
+ 724   1          {
+ 725   2          if (Tx_ACK_Pending)
+ 726   2            {
+ 727   3            Tx_ACK_Pending = FALSE;
+ 728   3            SBUF = Tx_ACK_Buffer;
+ 729   3            }
+ 730   2          else
+ 731   2            Tx_SBUF_Empty = TRUE;
+ 732   2          TI = 0;
+ 733   2          }
+ 734   1        }
+ 735          
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 13  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION Com007C (BEGIN)
+0000         L?0125:
+0000 75F005            MOV     B,#05H
+0003 E500        R     MOV     A,i+01H
+0005 120000      E     LCALL   ?C?OFFXADD
+0008 E500        R     MOV     A,i
+000A 75F005            MOV     B,#05H
+000D A4                MUL     AB
+000E 2583              ADD     A,DPH
+0010 F583              MOV     DPH,A
+0012 22                RET     
+0013         L?0126:
+0013 E500        R     MOV     A,ParamNdx
+0015         L?0127:
+0015 25E0              ADD     A,ACC
+0017 25E0              ADD     A,ACC
+0019 2400        R     ADD     A,#LOW Parameter
+001B F8                MOV     R0,A
+001C 22                RET     
+001D         L?0128:
+001D E500        R     MOV     A,Char
+001F 24D0              ADD     A,#0D0H
+0021 FF                MOV     R7,A
+0022 E4                CLR     A
+0023 34FF              ADDC    A,#0FFH
+0025 FE                MOV     R6,A
+0026 E4                CLR     A
+0027 FC                MOV     R4,A
+0028 FD                MOV     R5,A
+0029 22                RET     
+002A         L?0129:
+002A EF                MOV     A,R7
+002B 75F00B            MOV     B,#0BH
+002E A4                MUL     AB
+002F 240B              ADD     A,#0BH
+0031 FD                MOV     R5,A
+0032 7B00        R     MOV     R3,#LOW String
+0034 22                RET     
+0035         L?0130:
+0035         L?0131:
+0035 E4                CLR     A
+0036 7B0A              MOV     R3,#0AH
+0038 FA                MOV     R2,A
+0039 F9                MOV     R1,A
+003A F8                MOV     R0,A
+003B 22                RET     
+003C         L?0132:
+003C         L?0133:
+003C 7E00              MOV     R6,#00H
+003E 7D00              MOV     R5,#00H
+0040 7C00              MOV     R4,#00H
+0042 22                RET     
+             ; FUNCTION Com007C (END)
+
+             ; FUNCTION RS232Init (BEGIN)
+                                           ; SOURCE LINE # 165
+                                           ; SOURCE LINE # 166
+                                           ; SOURCE LINE # 167
+0000 7500F4      R     MOV     MySlaveAddress,#0F4H
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 14  
+
+                                           ; SOURCE LINE # 168
+0003 E4                CLR     A
+0004 F500        R     MOV     RxInput,A
+                                           ; SOURCE LINE # 169
+0006 F500        R     MOV     RxOutput,A
+                                           ; SOURCE LINE # 170
+0008 F500        R     MOV     RxState,A
+                                           ; SOURCE LINE # 171
+000A F500        R     MOV     Char,A
+                                           ; SOURCE LINE # 172
+000C F500        R     MOV     CharType,A
+                                           ; SOURCE LINE # 173
+000E F500        R     MOV     BufState,A
+                                           ; SOURCE LINE # 174
+0010 C200        R     CLR     Broadcast
+                                           ; SOURCE LINE # 175
+0012 C200        R     CLR     Tx_BUSY
+                                           ; SOURCE LINE # 176
+0014 C200        R     CLR     Tx_ACK_Pending
+                                           ; SOURCE LINE # 177
+0016 D200        R     SETB    Tx_SBUF_Empty
+                                           ; SOURCE LINE # 178
+0018 22                RET     
+             ; FUNCTION RS232Init (END)
+
+             ; FUNCTION CharHandler (BEGIN)
+                                           ; SOURCE LINE # 192
+                                           ; SOURCE LINE # 193
+                                           ; SOURCE LINE # 195
+0000 0500        R     INC     RxOutput
+0002 E500        R     MOV     A,RxOutput
+0004 75F014            MOV     B,#014H
+0007 84                DIV     AB
+0008 AFF0              MOV     R7,B
+000A 8F00        R     MOV     RxOutput,R7
+000C 7400        R     MOV     A,#LOW RxBuffer
+000E 2F                ADD     A,R7
+000F F8                MOV     R0,A
+0010 E6                MOV     A,@R0
+0011 F500        R     MOV     Char,A
+                                           ; SOURCE LINE # 197
+0013 900000      R     MOV     DPTR,#TypeTable
+0016 93                MOVC    A,@A+DPTR
+0017 F500        R     MOV     CharType,A
+                                           ; SOURCE LINE # 199
+0019 E500        R     MOV     A,BufState
+001B B40900            CJNE    A,#09H,?C0111
+001E         ?C0111:
+001E 4003              JC      $ + 5H
+0020 020000      R     LJMP    ?C0005
+0023 900000      R     MOV     DPTR,#?C0112
+0026 F8                MOV     R0,A
+0027 28                ADD     A,R0
+0028 28                ADD     A,R0
+0029 73                JMP     @A+DPTR
+002A         ?C0112:
+002A 020000      R     LJMP    ?C0003
+002D 020000      R     LJMP    ?C0007
+0030 020000      R     LJMP    ?C0014
+0033 020000      R     LJMP    ?C0020
+0036 020000      R     LJMP    ?C0022
+0039 020000      R     LJMP    ?C0028
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 15  
+
+003C 020000      R     LJMP    ?C0033
+003F 020000      R     LJMP    ?C0036
+0042 020000      R     LJMP    ?C0038
+                                           ; SOURCE LINE # 200
+                                           ; SOURCE LINE # 201
+0045         ?C0003:
+                                           ; SOURCE LINE # 202
+0045 E500        R     MOV     A,CharType
+0047 B44121            CJNE    A,#041H,?C0004
+                                           ; SOURCE LINE # 203
+                                           ; SOURCE LINE # 204
+004A 0500        R     INC     BufState
+                                           ; SOURCE LINE # 205
+004C 850000      R     MOV     Cmd,Char
+                                           ; SOURCE LINE # 206
+004F E4                CLR     A
+0050 F500        R     MOV     ParamNdx,A
+                                           ; SOURCE LINE # 207
+0052 F500        R     MOV     Parameter+0BH,A
+0054 F500        R     MOV     Parameter+0AH,A
+0056 F500        R     MOV     Parameter+09H,A
+0058 F500        R     MOV     Parameter+08H,A
+005A F500        R     MOV     Parameter+07H,A
+005C F500        R     MOV     Parameter+06H,A
+005E F500        R     MOV     Parameter+05H,A
+0060 F500        R     MOV     Parameter+04H,A
+0062 F500        R     MOV     Parameter+03H,A
+0064 F500        R     MOV     Parameter+02H,A
+0066 F500        R     MOV     Parameter+01H,A
+0068 F500        R     MOV     Parameter,A
+006A 22                RET     
+                                           ; SOURCE LINE # 209
+006B         ?C0004:
+                                           ; SOURCE LINE # 210
+006B E500        R     MOV     A,CharType
+006D 6444              XRL     A,#044H
+006F 7003              JNZ     $ + 5H
+0071 020000      R     LJMP    ?C0005
+                                           ; SOURCE LINE # 211
+0074 020000      R     LJMP    ?C0122
+                                           ; SOURCE LINE # 213
+0077         ?C0007:
+                                           ; SOURCE LINE # 214
+0077 E500        R     MOV     A,CharType
+0079 24BC              ADD     A,#0BCH
+007B 6010              JZ      ?C0010
+007D 24F6              ADD     A,#0F6H
+007F 6012              JZ      ?C0012
+0081 24FD              ADD     A,#0FDH
+0083 600B              JZ      ?C0011
+0085 2410              ADD     A,#010H
+0087 7012              JNZ     ?C0013
+                                           ; SOURCE LINE # 215
+                                           ; SOURCE LINE # 216
+0089         ?C0009:
+                                           ; SOURCE LINE # 217
+0089 850000      R     MOV     Cmd+01H,Char
+008C 22                RET     
+                                           ; SOURCE LINE # 219
+008D         ?C0010:
+                                           ; SOURCE LINE # 220
+                                           ; SOURCE LINE # 221
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 16  
+
+008D 020000      R     LJMP    ?C0119
+                                           ; SOURCE LINE # 223
+0090         ?C0011:
+                                           ; SOURCE LINE # 224
+                                           ; SOURCE LINE # 225
+0090 020000      R     LJMP    ?C0116
+                                           ; SOURCE LINE # 227
+0093         ?C0012:
+                                           ; SOURCE LINE # 228
+0093 120000      R     LCALL   L?0128
+0096 F500        R     MOV     ParamNdx,A
+                                           ; SOURCE LINE # 229
+0098 020000      R     LJMP    ?C0117
+                                           ; SOURCE LINE # 231
+009B         ?C0013:
+                                           ; SOURCE LINE # 232
+009B         ?C0114:
+                                           ; SOURCE LINE # 233
+                                           ; SOURCE LINE # 234
+009B 020000      R     LJMP    ?C0122
+                                           ; SOURCE LINE # 235
+009E         ?C0014:
+                                           ; SOURCE LINE # 236
+009E E500        R     MOV     A,CharType
+00A0 24BC              ADD     A,#0BCH
+00A2 6047              JZ      ?C0018
+00A4 24F1              ADD     A,#0F1H
+00A6 603F              JZ      ?C0017
+00A8 2405              ADD     A,#05H
+00AA 7041              JNZ     ?C0019
+                                           ; SOURCE LINE # 237
+                                           ; SOURCE LINE # 238
+00AC         ?C0016:
+                                           ; SOURCE LINE # 239
+00AC 120000      R     LCALL   L?0126
+00AF 120000      E     LCALL   ?C?LLDIDATA
+00B2 120000      R     LCALL   L?0130
+00B5 120000      E     LCALL   ?C?LMUL
+00B8 A804              MOV     R0,AR4
+00BA A905              MOV     R1,AR5
+00BC AA06              MOV     R2,AR6
+00BE AB07              MOV     R3,AR7
+00C0 E4                CLR     A
+00C1 FC                MOV     R4,A
+00C2 FD                MOV     R5,A
+00C3 FE                MOV     R6,A
+00C4 EB                MOV     A,R3
+00C5 2500        R     ADD     A,Char
+00C7 FF                MOV     R7,A
+00C8 EE                MOV     A,R6
+00C9 3A                ADDC    A,R2
+00CA FE                MOV     R6,A
+00CB ED                MOV     A,R5
+00CC 39                ADDC    A,R1
+00CD FD                MOV     R5,A
+00CE EC                MOV     A,R4
+00CF 38                ADDC    A,R0
+00D0 FC                MOV     R4,A
+00D1 EF                MOV     A,R7
+00D2 24D0              ADD     A,#0D0H
+00D4 FF                MOV     R7,A
+00D5 EE                MOV     A,R6
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 17  
+
+00D6 34FF              ADDC    A,#0FFH
+00D8 FE                MOV     R6,A
+00D9 ED                MOV     A,R5
+00DA 34FF              ADDC    A,#0FFH
+00DC FD                MOV     R5,A
+00DD EC                MOV     A,R4
+00DE 34FF              ADDC    A,#0FFH
+00E0 FC                MOV     R4,A
+00E1 120000      R     LCALL   L?0126
+00E4 020000      E     LJMP    ?C?LSTIDATA
+                                           ; SOURCE LINE # 241
+00E7         ?C0017:
+                                           ; SOURCE LINE # 242
+00E7 750005      R     MOV     BufState,#05H
+00EA 22                RET     
+                                           ; SOURCE LINE # 244
+00EB         ?C0018:
+                                           ; SOURCE LINE # 245
+00EB         ?C0115:
+                                           ; SOURCE LINE # 246
+00EB 8037              SJMP    ?C0119
+                                           ; SOURCE LINE # 248
+00ED         ?C0019:
+                                           ; SOURCE LINE # 249
+00ED         ?C0118:
+                                           ; SOURCE LINE # 250
+                                           ; SOURCE LINE # 251
+00ED 8060              SJMP    ?C0122
+                                           ; SOURCE LINE # 252
+00EF         ?C0020:
+                                           ; SOURCE LINE # 253
+00EF E500        R     MOV     A,CharType
+00F1 B4510C            CJNE    A,#051H,?C0021
+                                           ; SOURCE LINE # 254
+                                           ; SOURCE LINE # 255
+00F4 0500        R     INC     StrNdx
+00F6 7400        R     MOV     A,#LOW String
+00F8 2500        R     ADD     A,StrNdx
+00FA F8                MOV     R0,A
+00FB E4                CLR     A
+00FC F6                MOV     @R0,A
+                                           ; SOURCE LINE # 256
+00FD 0500        R     INC     BufState
+00FF 22                RET     
+                                           ; SOURCE LINE # 258
+0100         ?C0021:
+                                           ; SOURCE LINE # 259
+0100 0500        R     INC     StrNdx
+0102 7400        R     MOV     A,#LOW String
+0104 2500        R     ADD     A,StrNdx
+0106 F8                MOV     R0,A
+0107 A600        R     MOV     @R0,Char
+                                           ; SOURCE LINE # 260
+0109 22                RET     
+                                           ; SOURCE LINE # 261
+010A         ?C0022:
+                                           ; SOURCE LINE # 262
+010A E500        R     MOV     A,CharType
+010C 24BC              ADD     A,#0BCH
+010E 6014              JZ      ?C0026
+0110 24F1              ADD     A,#0F1H
+0112 600D              JZ      ?C0025
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 18  
+
+0114 2402              ADD     A,#02H
+0116 7013              JNZ     ?C0027
+                                           ; SOURCE LINE # 263
+                                           ; SOURCE LINE # 264
+0118         ?C0024:
+                                           ; SOURCE LINE # 265
+0118 7400        R     MOV     A,#LOW String
+011A 2500        R     ADD     A,StrNdx
+011C F8                MOV     R0,A
+011D A600        R     MOV     @R0,Char
+                                           ; SOURCE LINE # 266
+                                           ; SOURCE LINE # 267
+011F 8019              SJMP    ?C0121
+                                           ; SOURCE LINE # 268
+0121         ?C0025:
+                                           ; SOURCE LINE # 269
+0121 0500        R     INC     BufState
+                                           ; SOURCE LINE # 270
+0123 22                RET     
+                                           ; SOURCE LINE # 271
+0124         ?C0026:
+                                           ; SOURCE LINE # 272
+0124         ?C0119:
+0124 850000      R     MOV     CmdDelimiter,Char
+                                           ; SOURCE LINE # 273
+0127 750006      R     MOV     BufState,#06H
+                                           ; SOURCE LINE # 274
+012A 22                RET     
+                                           ; SOURCE LINE # 275
+012B         ?C0027:
+                                           ; SOURCE LINE # 276
+012B         ?C0120:
+012B 8022              SJMP    ?C0122
+                                           ; SOURCE LINE # 278
+                                           ; SOURCE LINE # 279
+                                           ; SOURCE LINE # 280
+012D         ?C0028:
+                                           ; SOURCE LINE # 281
+012D E500        R     MOV     A,CharType
+012F 24B2              ADD     A,#0B2H
+0131 600B              JZ      ?C0031
+0133 24FD              ADD     A,#0FDH
+0135 7018              JNZ     ?C0032
+                                           ; SOURCE LINE # 282
+                                           ; SOURCE LINE # 283
+0137         ?C0030:
+                                           ; SOURCE LINE # 284
+0137         ?C0116:
+0137 7500FF      R     MOV     StrNdx,#0FFH
+                                           ; SOURCE LINE # 285
+013A         ?C0121:
+013A 750003      R     MOV     BufState,#03H
+                                           ; SOURCE LINE # 286
+013D 22                RET     
+                                           ; SOURCE LINE # 287
+013E         ?C0031:
+                                           ; SOURCE LINE # 288
+013E 120000      R     LCALL   L?0128
+0141 0500        R     INC     ParamNdx
+0143 E500        R     MOV     A,ParamNdx
+0145         ?C0117:
+0145 120000      R     LCALL   L?0127
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 19  
+
+0148 120000      E     LCALL   ?C?LSTIDATA
+                                           ; SOURCE LINE # 289
+014B 750002      R     MOV     BufState,#02H
+                                           ; SOURCE LINE # 290
+014E 22                RET     
+                                           ; SOURCE LINE # 291
+014F         ?C0032:
+                                           ; SOURCE LINE # 292
+014F         ?C0122:
+014F 750007      R     MOV     BufState,#07H
+0152 22                RET     
+                                           ; SOURCE LINE # 294
+                                           ; SOURCE LINE # 295
+                                           ; SOURCE LINE # 296
+0153         ?C0033:
+                                           ; SOURCE LINE # 297
+0153 E500        R     MOV     A,Char
+0155 B48008            CJNE    A,#080H,?C0034
+                                           ; SOURCE LINE # 298
+                                           ; SOURCE LINE # 299
+0158 E500        R     MOV     A,Cmd
+015A B45403            CJNE    A,#054H,?C0034
+                                           ; SOURCE LINE # 300
+015D 120000      R     LCALL   CommandExecute
+                                           ; SOURCE LINE # 301
+0160         ?C0034:
+                                           ; SOURCE LINE # 302
+0160 8008              SJMP    ?C0123
+                                           ; SOURCE LINE # 304
+0162         ?C0036:
+                                           ; SOURCE LINE # 305
+0162 E500        R     MOV     A,CharType
+0164 B44406            CJNE    A,#044H,?C0005
+                                           ; SOURCE LINE # 306
+0167 0500        R     INC     BufState
+0169 22                RET     
+                                           ; SOURCE LINE # 308
+016A         ?C0038:
+                                           ; SOURCE LINE # 309
+016A         ?C0123:
+016A E4                CLR     A
+016B F500        R     MOV     BufState,A
+                                           ; SOURCE LINE # 311
+                                           ; SOURCE LINE # 312
+016D         ?C0005:
+016D 22                RET     
+             ; FUNCTION CharHandler (END)
+
+             ; FUNCTION CommandExecute (BEGIN)
+                                           ; SOURCE LINE # 328
+                                           ; SOURCE LINE # 329
+                                           ; SOURCE LINE # 332
+0000 E4                CLR     A
+0001 F500        R     MOV     i,A
+0003 F500        R     MOV     i+01H,A
+0005         ?C0039:
+                                           ; SOURCE LINE # 333
+0005 900000      R     MOV     DPTR,#CommandTable+01H
+0008 120000      R     LCALL   L?0125
+000B E4                CLR     A
+000C 93                MOVC    A,@A+DPTR
+000D B50011      R     CJNE    A,Cmd+01H,?C0041
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 20  
+
+                                           ; SOURCE LINE # 334
+                                           ; SOURCE LINE # 335
+0010 900000      R     MOV     DPTR,#CommandTable+02H
+0013 120000      R     LCALL   L?0125
+0016 7401              MOV     A,#01H
+0018 93                MOVC    A,@A+DPTR
+0019 FA                MOV     R2,A
+001A 7402              MOV     A,#02H
+001C 93                MOVC    A,@A+DPTR
+001D F9                MOV     R1,A
+001E 020000      E     LJMP    ?C?ICALL
+                                           ; SOURCE LINE # 337
+0021         ?C0041:
+0021 0500        R     INC     i+01H
+0023 E500        R     MOV     A,i+01H
+0025 7002              JNZ     ?C0113
+0027 0500        R     INC     i
+0029         ?C0113:
+0029 C3                CLR     C
+002A 9408              SUBB    A,#08H
+002C E500        R     MOV     A,i
+002E 9400              SUBB    A,#00H
+0030 40D3              JC      ?C0039
+                                           ; SOURCE LINE # 338
+0032         ?C0043:
+0032 22                RET     
+             ; FUNCTION CommandExecute (END)
+
+             ; FUNCTION _WriteChar (BEGIN)
+                                           ; SOURCE LINE # 351
+;---- Variable 'TxChar' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 352
+                                           ; SOURCE LINE # 353
+0000 D200        R     SETB    Tx_BUSY
+0002         ?C0044:
+                                           ; SOURCE LINE # 354
+0002 3000FD      R     JNB     Tx_SBUF_Empty,?C0044
+0005         ?C0045:
+                                           ; SOURCE LINE # 356
+0005 C200        R     CLR     Tx_SBUF_Empty
+                                           ; SOURCE LINE # 357
+0007 8F99              MOV     SBUF,R7
+0009         ?C0046:
+                                           ; SOURCE LINE # 358
+0009 3000FD      R     JNB     Tx_SBUF_Empty,?C0046
+000C         ?C0047:
+                                           ; SOURCE LINE # 360
+000C C200        R     CLR     Tx_BUSY
+                                           ; SOURCE LINE # 361
+000E 22                RET     
+             ; FUNCTION _WriteChar (END)
+
+             ; FUNCTION _WriteString (BEGIN)
+                                           ; SOURCE LINE # 377
+;---- Variable 'Str' assigned to Register 'R6' ----
+0000 AE07              MOV     R6,AR7
+                                           ; SOURCE LINE # 378
+                                           ; SOURCE LINE # 379
+;---- Variable 'checksum' assigned to Register 'R5' ----
+0002 7D44              MOV     R5,#044H
+                                           ; SOURCE LINE # 381
+0004 7F22              MOV     R7,#022H
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 21  
+
+0006 120000      R     LCALL   _WriteChar
+0009         ?C0049:
+                                           ; SOURCE LINE # 383
+0009 A806              MOV     R0,AR6
+000B E6                MOV     A,@R0
+000C FF                MOV     R7,A
+000D 6009              JZ      ?C0050
+                                           ; SOURCE LINE # 384
+                                           ; SOURCE LINE # 385
+000F 120000      R     LCALL   _WriteChar
+                                           ; SOURCE LINE # 386
+0012 0E                INC     R6
+0013 E6                MOV     A,@R0
+0014 2D                ADD     A,R5
+0015 FD                MOV     R5,A
+                                           ; SOURCE LINE # 387
+0016 80F1              SJMP    ?C0049
+0018         ?C0050:
+                                           ; SOURCE LINE # 388
+0018 7F22              MOV     R7,#022H
+001A 120000      R     LCALL   _WriteChar
+                                           ; SOURCE LINE # 389
+001D 7F3B              MOV     R7,#03BH
+001F 120000      R     LCALL   _WriteChar
+                                           ; SOURCE LINE # 390
+0022 ED                MOV     A,R5
+0023 243B              ADD     A,#03BH
+0025 547F              ANL     A,#07FH
+0027 FF                MOV     R7,A
+0028 020000      R     LJMP    _WriteChar
+             ; FUNCTION _WriteString (END)
+
+             ; FUNCTION _WriteVal (BEGIN)
+                                           ; SOURCE LINE # 405
+0000 8F00        R     MOV     value+03H,R7
+0002 8E00        R     MOV     value+02H,R6
+0004 8D00        R     MOV     value+01H,R5
+0006 8C00        R     MOV     value,R4
+                                           ; SOURCE LINE # 406
+                                           ; SOURCE LINE # 411
+0008 E4                CLR     A
+0009 F500        R     MOV     ValOut,A
+                                           ; SOURCE LINE # 412
+000B F500        R     MOV     checksum,A
+                                           ; SOURCE LINE # 414
+000D F500        R     MOV     divider+03H,A
+000F 7500CA      R     MOV     divider+02H,#0CAH
+0012 75009A      R     MOV     divider+01H,#09AH
+0015 75003B      R     MOV     divider,#03BH
+                                           ; SOURCE LINE # 416
+0018 F500        R     MOV     i,A
+001A         ?C0052:
+                                           ; SOURCE LINE # 417
+                                           ; SOURCE LINE # 418
+001A AB00        R     MOV     R3,divider+03H
+001C AA00        R     MOV     R2,divider+02H
+001E A900        R     MOV     R1,divider+01H
+0020 A800        R     MOV     R0,divider
+0022 AF00        R     MOV     R7,value+03H
+0024 AE00        R     MOV     R6,value+02H
+0026 AD00        R     MOV     R5,value+01H
+0028 AC00        R     MOV     R4,value
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 22  
+
+002A 120000      E     LCALL   ?C?ULDIV
+002D 120000      R     LCALL   L?0130
+0030 120000      E     LCALL   ?C?ULDIV
+0033 AF03              MOV     R7,AR3
+;---- Variable 'tmp' assigned to Register 'R6' ----
+0035 AE07              MOV     R6,AR7
+0037 EE                MOV     A,R6
+0038 6003              JZ      ?C0055
+                                           ; SOURCE LINE # 419
+003A 7500FF      R     MOV     ValOut,#0FFH
+003D         ?C0055:
+                                           ; SOURCE LINE # 420
+003D E500        R     MOV     A,ValOut
+003F 7005              JNZ     ?C0057
+0041 E500        R     MOV     A,i
+0043 B4090C            CJNE    A,#09H,?C0056
+0046         ?C0057:
+                                           ; SOURCE LINE # 421
+                                           ; SOURCE LINE # 422
+0046 7430              MOV     A,#030H
+0048 2E                ADD     A,R6
+0049 FE                MOV     R6,A
+                                           ; SOURCE LINE # 423
+004A FF                MOV     R7,A
+004B 120000      R     LCALL   _WriteChar
+                                           ; SOURCE LINE # 424
+004E 2500        R     ADD     A,checksum
+0050 F500        R     MOV     checksum,A
+                                           ; SOURCE LINE # 425
+0052         ?C0056:
+                                           ; SOURCE LINE # 426
+0052 AF00        R     MOV     R7,divider+03H
+0054 AE00        R     MOV     R6,divider+02H
+0056 AD00        R     MOV     R5,divider+01H
+0058 AC00        R     MOV     R4,divider
+005A 120000      R     LCALL   L?0131
+005D 120000      E     LCALL   ?C?ULDIV
+0060 8F00        R     MOV     divider+03H,R7
+0062 8E00        R     MOV     divider+02H,R6
+0064 8D00        R     MOV     divider+01H,R5
+0066 8C00        R     MOV     divider,R4
+                                           ; SOURCE LINE # 427
+0068 0500        R     INC     i
+006A E500        R     MOV     A,i
+006C C3                CLR     C
+006D 940A              SUBB    A,#0AH
+006F 40A9              JC      ?C0052
+0071         ?C0053:
+                                           ; SOURCE LINE # 428
+0071 7F3B              MOV     R7,#03BH
+0073 120000      R     LCALL   _WriteChar
+                                           ; SOURCE LINE # 429
+0076 E500        R     MOV     A,checksum
+0078 243B              ADD     A,#03BH
+007A 547F              ANL     A,#07FH
+007C FF                MOV     R7,A
+007D 020000      R     LJMP    _WriteChar
+             ; FUNCTION _WriteVal (END)
+
+             ; FUNCTION TestInputBuffer (BEGIN)
+                                           ; SOURCE LINE # 442
+                                           ; SOURCE LINE # 443
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 23  
+
+                                           ; SOURCE LINE # 444
+0000 C3                CLR     C
+0001 E500        R     MOV     A,RxInput
+0003 9500        R     SUBB    A,RxOutput
+0005 6002              JZ      ?C0059
+                                           ; SOURCE LINE # 445
+0007 D3                SETB    C
+0008 22                RET     
+0009         ?C0059:
+                                           ; SOURCE LINE # 446
+0009 C3                CLR     C
+                                           ; SOURCE LINE # 447
+000A         ?C0060:
+000A 22                RET     
+             ; FUNCTION TestInputBuffer (END)
+
+             ; FUNCTION WriteUserTextCommand (BEGIN)
+                                           ; SOURCE LINE # 464
+                                           ; SOURCE LINE # 465
+                                           ; SOURCE LINE # 467
+0000 E500        R     MOV     A,CmdDelimiter
+0002 B43B13            CJNE    A,#03BH,?C0063
+                                           ; SOURCE LINE # 468
+                                           ; SOURCE LINE # 469
+0005 AF00        R     MOV     R7,Parameter+03H
+0007 EF                MOV     A,R7
+0008 C3                CLR     C
+0009 940A              SUBB    A,#0AH
+000B 500B              JNC     ?C0063
+                                           ; SOURCE LINE # 470
+000D 120000      R     LCALL   L?0129
+0010 75000A      E     MOV     ?_PageWriteE2prom?BYTE+03H,#0AH
+0013 7FA0              MOV     R7,#0A0H
+0015 120000      E     LCALL   _PageWriteE2prom
+                                           ; SOURCE LINE # 471
+                                           ; SOURCE LINE # 472
+0018         ?C0063:
+0018 22                RET     
+             ; FUNCTION WriteUserTextCommand (END)
+
+             ; FUNCTION ReadUserTextCommand (BEGIN)
+                                           ; SOURCE LINE # 488
+                                           ; SOURCE LINE # 489
+                                           ; SOURCE LINE # 490
+0000 E500        R     MOV     A,CmdDelimiter
+0002 643F              XRL     A,#03FH
+0004 701C              JNZ     ?C0066
+                                           ; SOURCE LINE # 491
+                                           ; SOURCE LINE # 492
+0006 AF00        R     MOV     R7,Parameter+03H
+0008 EF                MOV     A,R7
+0009 C3                CLR     C
+000A 940A              SUBB    A,#0AH
+000C 5014              JNC     ?C0066
+                                           ; SOURCE LINE # 493
+                                           ; SOURCE LINE # 494
+000E 120000      R     LCALL   L?0129
+0011 75000A      E     MOV     ?_SeqReadE2prom?BYTE+03H,#0AH
+0014 7FA0              MOV     R7,#0A0H
+0016 120000      E     LCALL   _SeqReadE2prom
+                                           ; SOURCE LINE # 495
+0019 E4                CLR     A
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 24  
+
+001A 7800        R     MOV     R0,#LOW String+0AH
+001C F6                MOV     @R0,A
+                                           ; SOURCE LINE # 496
+001D 7F00        R     MOV     R7,#LOW String
+001F 120000      R     LCALL   _WriteString
+                                           ; SOURCE LINE # 497
+                                           ; SOURCE LINE # 498
+                                           ; SOURCE LINE # 499
+0022         ?C0066:
+0022 22                RET     
+             ; FUNCTION ReadUserTextCommand (END)
+
+             ; FUNCTION ReadSWVersionCommand (BEGIN)
+                                           ; SOURCE LINE # 513
+                                           ; SOURCE LINE # 514
+                                           ; SOURCE LINE # 516
+0000 E500        R     MOV     A,CmdDelimiter
+0002 24C1              ADD     A,#0C1H
+0004 7008              JNZ     ?C0071
+                                           ; SOURCE LINE # 517
+                                           ; SOURCE LINE # 518
+                                           ; SOURCE LINE # 519
+                                           ; SOURCE LINE # 520
+0006         ?C0069:
+                                           ; SOURCE LINE # 522
+0006 7F0A              MOV     R7,#0AH
+0008 120000      R     LCALL   L?0132
+000B 120000      R     LCALL   _WriteVal
+                                           ; SOURCE LINE # 524
+                                           ; SOURCE LINE # 525
+                                           ; SOURCE LINE # 526
+                                           ; SOURCE LINE # 527
+                                           ; SOURCE LINE # 528
+000E         ?C0071:
+000E 22                RET     
+             ; FUNCTION ReadSWVersionCommand (END)
+
+             ; FUNCTION ReadHWVersionCommand (BEGIN)
+                                           ; SOURCE LINE # 537
+                                           ; SOURCE LINE # 538
+                                           ; SOURCE LINE # 540
+0000 E500        R     MOV     A,CmdDelimiter
+0002 B43F08            CJNE    A,#03FH,?C0073
+                                           ; SOURCE LINE # 541
+                                           ; SOURCE LINE # 543
+0005 7F00              MOV     R7,#00H
+0007 120000      R     LCALL   L?0132
+000A 120000      R     LCALL   _WriteVal
+                                           ; SOURCE LINE # 544
+                                           ; SOURCE LINE # 545
+000D         ?C0073:
+000D 22                RET     
+             ; FUNCTION ReadHWVersionCommand (END)
+
+             ; FUNCTION ReadHWInformationCommand (BEGIN)
+                                           ; SOURCE LINE # 554
+                                           ; SOURCE LINE # 555
+                                           ; SOURCE LINE # 557
+0000 E500        R     MOV     A,CmdDelimiter
+0002 B43F08            CJNE    A,#03FH,?C0075
+                                           ; SOURCE LINE # 558
+                                           ; SOURCE LINE # 560
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 25  
+
+0005 7F0B              MOV     R7,#0BH
+0007 120000      R     LCALL   L?0133
+000A 120000      R     LCALL   _WriteVal
+                                           ; SOURCE LINE # 561
+                                           ; SOURCE LINE # 562
+000D         ?C0075:
+000D 22                RET     
+             ; FUNCTION ReadHWInformationCommand (END)
+
+             ; FUNCTION GeneratorDelayCommand (BEGIN)
+                                           ; SOURCE LINE # 572
+                                           ; SOURCE LINE # 573
+                                           ; SOURCE LINE # 574
+0000 E500        R     MOV     A,CmdDelimiter
+0002 24C5              ADD     A,#0C5H
+0004 7019              JNZ     ?C0079
+                                           ; SOURCE LINE # 575
+                                           ; SOURCE LINE # 576
+0006         ?C0077:
+                                           ; SOURCE LINE # 577
+0006 AF00        R     MOV     R7,Parameter+07H
+0008 AE00        R     MOV     R6,Parameter+06H
+000A AD00        R     MOV     R5,Parameter+05H
+000C AC00        R     MOV     R4,Parameter+04H
+000E AB00        R     MOV     R3,Parameter+03H
+0010 EB                MOV     A,R3
+0011 75F005            MOV     B,#05H
+0014 A4                MUL     AB
+0015 2400        E     ADD     A,#LOW tlgs+01H
+0017 F8                MOV     R0,A
+0018 120000      E     LCALL   ?C?LSTIDATA
+                                           ; SOURCE LINE # 578
+001B 8B00        E     MOV     current_generator,R3
+                                           ; SOURCE LINE # 579
+001D D200        E     SETB    changed
+                                           ; SOURCE LINE # 583
+                                           ; SOURCE LINE # 584
+                                           ; SOURCE LINE # 585
+                                           ; SOURCE LINE # 586
+                                           ; SOURCE LINE # 587
+001F         ?C0079:
+001F 22                RET     
+             ; FUNCTION GeneratorDelayCommand (END)
+
+             ; FUNCTION GeneratorFormatCommand (BEGIN)
+                                           ; SOURCE LINE # 596
+                                           ; SOURCE LINE # 597
+                                           ; SOURCE LINE # 598
+0000 E500        R     MOV     A,CmdDelimiter
+0002 24C5              ADD     A,#0C5H
+0004 700B              JNZ     ?C0083
+                                           ; SOURCE LINE # 599
+                                           ; SOURCE LINE # 600
+0006         ?C0081:
+                                           ; SOURCE LINE # 601
+0006 E500        R     MOV     A,Parameter+03H
+0008 75F005            MOV     B,#05H
+000B A4                MUL     AB
+000C 2400        E     ADD     A,#LOW tlgs
+000E F8                MOV     R0,A
+000F A600        R     MOV     @R0,Parameter+07H
+                                           ; SOURCE LINE # 605
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 26  
+
+                                           ; SOURCE LINE # 606
+                                           ; SOURCE LINE # 607
+                                           ; SOURCE LINE # 608
+                                           ; SOURCE LINE # 609
+0011         ?C0083:
+0011 22                RET     
+             ; FUNCTION GeneratorFormatCommand (END)
+
+             ; FUNCTION UnitAddressCommand (BEGIN)
+                                           ; SOURCE LINE # 621
+                                           ; SOURCE LINE # 622
+                                           ; SOURCE LINE # 624
+0000 E500        R     MOV     A,CmdDelimiter
+0002 24C1              ADD     A,#0C1H
+0004 6011              JZ      ?C0086
+0006 2404              ADD     A,#04H
+0008 7016              JNZ     ?C0087
+                                           ; SOURCE LINE # 625
+                                           ; SOURCE LINE # 626
+000A         ?C0085:
+                                           ; SOURCE LINE # 627
+000A 850000      R     MOV     MySlaveAddress,Parameter+03H
+                                           ; SOURCE LINE # 632
+000D AF00        R     MOV     R7,MySlaveAddress
+000F 120000      R     LCALL   _WriteChar
+                                           ; SOURCE LINE # 633
+0012 AF00        R     MOV     R7,MySlaveAddress
+0014 020000      R     LJMP    _WriteChar
+                                           ; SOURCE LINE # 634
+                                           ; SOURCE LINE # 636
+0017         ?C0086:
+                                           ; SOURCE LINE # 637
+0017 AF00        R     MOV     R7,MySlaveAddress
+0019 E4                CLR     A
+001A FC                MOV     R4,A
+001B FD                MOV     R5,A
+001C FE                MOV     R6,A
+001D 120000      R     LCALL   _WriteVal
+                                           ; SOURCE LINE # 638
+                                           ; SOURCE LINE # 639
+                                           ; SOURCE LINE # 640
+0020         ?C0087:
+0020 22                RET     
+             ; FUNCTION UnitAddressCommand (END)
+
+             ; FUNCTION RS232break (BEGIN)
+0000 C0E0              PUSH    ACC
+0002 C0F0              PUSH    B
+0004 C083              PUSH    DPH
+0006 C082              PUSH    DPL
+0008 C0D0              PUSH    PSW
+000A 75D000            MOV     PSW,#00H
+000D C000              PUSH    AR0
+000F C006              PUSH    AR6
+0011 C007              PUSH    AR7
+                                           ; SOURCE LINE # 652
+0013         ?C0088:
+                                           ; SOURCE LINE # 656
+0013 209803            JB      RI,$ + 6H
+0016 020000      R     LJMP    ?C0089
+                                           ; SOURCE LINE # 657
+                                           ; SOURCE LINE # 658
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 27  
+
+0019 309D24            JNB     SM2,?C0090
+                                           ; SOURCE LINE # 659
+                                           ; SOURCE LINE # 660
+001C E599              MOV     A,SBUF
+001E B4900D            CJNE    A,#090H,?C0091
+                                           ; SOURCE LINE # 661
+                                           ; SOURCE LINE # 662
+0021 D200        R     SETB    Broadcast
+                                           ; SOURCE LINE # 663
+0023 C29D              CLR     SM2
+                                           ; SOURCE LINE # 664
+0025 750001      R     MOV     RxState,#01H
+                                           ; SOURCE LINE # 665
+0028 750000      R     MOV     RxChkSum,#00H
+                                           ; SOURCE LINE # 666
+002B 020000      R     LJMP    ?C0094
+002E         ?C0091:
+                                           ; SOURCE LINE # 668
+002E E599              MOV     A,SBUF
+0030 6500        R     XRL     A,MySlaveAddress
+0032 6003              JZ      $ + 5H
+0034 020000      R     LJMP    ?C0094
+                                           ; SOURCE LINE # 669
+                                           ; SOURCE LINE # 670
+0037 C29D              CLR     SM2
+                                           ; SOURCE LINE # 671
+0039 750001      R     MOV     RxState,#01H
+                                           ; SOURCE LINE # 672
+003C F500        R     MOV     RxChkSum,A
+                                           ; SOURCE LINE # 673
+                                           ; SOURCE LINE # 674
+003E 8077              SJMP    ?C0094
+0040         ?C0090:
+                                           ; SOURCE LINE # 676
+                                           ; SOURCE LINE # 677
+0040 859900      R     MOV     RxChar,SBUF
+                                           ; SOURCE LINE # 678
+0043 E500        R     MOV     A,RxState
+0045 6403              XRL     A,#03H
+0047 702B              JNZ     ?C0095
+                                           ; SOURCE LINE # 679
+                                           ; SOURCE LINE # 680
+0049 D29D              SETB    SM2
+                                           ; SOURCE LINE # 681
+004B E500        R     MOV     A,RxChkSum
+004D 547F              ANL     A,#07FH
+004F C3                CLR     C
+0050 9500        R     SUBB    A,RxChar
+0052 6005              JZ      ?C0096
+                                           ; SOURCE LINE # 682
+                                           ; SOURCE LINE # 683
+0054 750081      R     MOV     Tx_ACK_Buffer,#081H
+                                           ; SOURCE LINE # 684
+0057 8003              SJMP    ?C0097
+0059         ?C0096:
+                                           ; SOURCE LINE # 686
+                                           ; SOURCE LINE # 687
+0059 750080      R     MOV     Tx_ACK_Buffer,#080H
+                                           ; SOURCE LINE # 688
+005C         ?C0097:
+                                           ; SOURCE LINE # 689
+005C 850000      R     MOV     RxChar,Tx_ACK_Buffer
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 28  
+
+                                           ; SOURCE LINE # 690
+005F 20000E      R     JB      Broadcast,?C0098
+                                           ; SOURCE LINE # 691
+                                           ; SOURCE LINE # 692
+0062 300004      R     JNB     Tx_BUSY,?C0099
+                                           ; SOURCE LINE # 693
+0065 D200        R     SETB    Tx_ACK_Pending
+0067 8036              SJMP    ?C0102
+0069         ?C0099:
+                                           ; SOURCE LINE # 695
+                                           ; SOURCE LINE # 696
+0069 C200        R     CLR     Tx_SBUF_Empty
+                                           ; SOURCE LINE # 697
+006B 850099      R     MOV     SBUF,Tx_ACK_Buffer
+                                           ; SOURCE LINE # 698
+                                           ; SOURCE LINE # 699
+006E 802F              SJMP    ?C0102
+0070         ?C0098:
+                                           ; SOURCE LINE # 701
+0070 C200        R     CLR     Broadcast
+                                           ; SOURCE LINE # 702
+0072 802B              SJMP    ?C0102
+0074         ?C0095:
+                                           ; SOURCE LINE # 704
+                                           ; SOURCE LINE # 705
+0074 AF00        R     MOV     R7,RxChar
+0076 EF                MOV     A,R7
+0077 33                RLC     A
+0078 95E0              SUBB    A,ACC
+007A FE                MOV     R6,A
+007B 7400        R     MOV     A,#LOW TypeTable
+007D 2F                ADD     A,R7
+007E F582              MOV     DPL,A
+0080 7400        R     MOV     A,#HIGH TypeTable
+0082 3E                ADDC    A,R6
+0083 F583              MOV     DPH,A
+0085 E4                CLR     A
+0086 93                MOVC    A,@A+DPTR
+0087 F500        R     MOV     RxCharType,A
+                                           ; SOURCE LINE # 706
+0089 B45105            CJNE    A,#051H,?C0103
+                                           ; SOURCE LINE # 707
+008C 630003      R     XRL     RxState,#03H
+008F 800E              SJMP    ?C0102
+0091         ?C0103:
+                                           ; SOURCE LINE # 709
+                                           ; SOURCE LINE # 710
+0091 E500        R     MOV     A,RxState
+0093 6402              XRL     A,#02H
+0095 6008              JZ      ?C0102
+                                           ; SOURCE LINE # 711
+                                           ; SOURCE LINE # 712
+0097 E500        R     MOV     A,RxCharType
+0099 B44403            CJNE    A,#044H,?C0102
+                                           ; SOURCE LINE # 713
+009C 750003      R     MOV     RxState,#03H
+                                           ; SOURCE LINE # 714
+                                           ; SOURCE LINE # 715
+                                           ; SOURCE LINE # 716
+009F         ?C0102:
+                                           ; SOURCE LINE # 717
+009F 0500        R     INC     RxInput
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 29  
+
+00A1 E500        R     MOV     A,RxInput
+00A3 75F014            MOV     B,#014H
+00A6 84                DIV     AB
+00A7 AFF0              MOV     R7,B
+00A9 8F00        R     MOV     RxInput,R7
+00AB 7400        R     MOV     A,#LOW RxBuffer
+00AD 2F                ADD     A,R7
+00AE F8                MOV     R0,A
+00AF A600        R     MOV     @R0,RxChar
+                                           ; SOURCE LINE # 718
+00B1 E500        R     MOV     A,RxChar
+00B3 2500        R     ADD     A,RxChkSum
+00B5 F500        R     MOV     RxChkSum,A
+                                           ; SOURCE LINE # 719
+00B7         ?C0094:
+                                           ; SOURCE LINE # 720
+00B7 C298              CLR     RI
+                                           ; SOURCE LINE # 721
+00B9 020000      R     LJMP    ?C0088
+00BC         ?C0089:
+                                           ; SOURCE LINE # 723
+00BC 30990E            JNB     TI,?C0110
+                                           ; SOURCE LINE # 724
+                                           ; SOURCE LINE # 725
+00BF 300007      R     JNB     Tx_ACK_Pending,?C0108
+                                           ; SOURCE LINE # 726
+                                           ; SOURCE LINE # 727
+00C2 C200        R     CLR     Tx_ACK_Pending
+                                           ; SOURCE LINE # 728
+00C4 850099      R     MOV     SBUF,Tx_ACK_Buffer
+                                           ; SOURCE LINE # 729
+00C7 8002              SJMP    ?C0109
+00C9         ?C0108:
+                                           ; SOURCE LINE # 731
+00C9 D200        R     SETB    Tx_SBUF_Empty
+00CB         ?C0109:
+                                           ; SOURCE LINE # 732
+00CB C299              CLR     TI
+                                           ; SOURCE LINE # 733
+                                           ; SOURCE LINE # 734
+00CD         ?C0110:
+00CD D007              POP     AR7
+00CF D006              POP     AR6
+00D1 D000              POP     AR0
+00D3 D0D0              POP     PSW
+00D5 D082              POP     DPL
+00D7 D083              POP     DPH
+00D9 D0F0              POP     B
+00DB D0E0              POP     ACC
+00DD 32                RETI    
+             ; FUNCTION RS232break (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1114    ----
+   CONSTANT SIZE    =    168    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     28      13
+   IDATA SIZE       =     35    ----
+   BIT SIZE         =      4    ----
+C51 COMPILER V7.05   RS232                                                                 06/14/2005 09:41:23 PAGE 30  
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

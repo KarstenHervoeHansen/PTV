@@ -1,0 +1,60 @@
+--altddio_in DEVICE_FAMILY="Cyclone II" POWER_UP_HIGH="OFF" WIDTH=22 datain dataout_h dataout_l inclock
+--VERSION_BEGIN 4.1 cbx_altddio_in 2004:06:17:14:29:54:SJ cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_stratixii 2004:05:18:11:28:28:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION cycloneii_io (areset, datain, differentialin, inclk, inclkena, oe, outclk, outclkena, padio, sreset)
+WITH ( 	bus_hold,	input_async_reset,	input_power_up,	input_register_mode,	input_sync_reset,	oe_async_reset,	oe_power_up,	oe_register_mode,	oe_sync_reset,	open_drain_output,	operation_mode,	output_async_reset,	output_power_up,	output_register_mode,	output_sync_reset,	tie_off_oe_clock_enable,	tie_off_output_clock_enable,	use_differential_input) 
+RETURNS ( combout, differentialout, regout);
+
+--synthesis_resources = cycloneii_io 22 lut 66 
+OPTIONS ALTERA_INTERNAL_OPTION = "ADV_NETLIST_OPT_ALLOWED=""NEVER_ALLOW"";{-to input_cell_h} DDIO_INPUT_REGISTER=HIGH;{-to input_cell_l} DDIO_INPUT_REGISTER=LOW";
+
+SUBDESIGN ddio_in_va9
+( 
+	datain[21..0]	:	input;
+	dataout_h[21..0]	:	output;
+	dataout_l[21..0]	:	output;
+	inclock	:	input;
+) 
+VARIABLE 
+	ddio_ina[21..0] : cycloneii_io
+		WITH (
+			operation_mode = "input"
+		);
+	input_cell_h[21..0] : dffe;
+	input_cell_l[21..0] : dffe;
+	input_latch_l[21..0] : dffe;
+
+BEGIN 
+	ddio_ina[].padio = datain[];
+	input_cell_h[].CLK = inclock;
+	input_cell_h[].D = ddio_ina[].combout;
+	input_cell_l[].CLK = (! inclock);
+	input_cell_l[].D = ddio_ina[].combout;
+	input_latch_l[].CLK = inclock;
+	input_latch_l[].D = input_cell_l[].Q;
+	dataout_h[] = input_cell_h[].Q;
+	dataout_l[] = input_latch_l[].Q;
+END;
+--VALID FILE

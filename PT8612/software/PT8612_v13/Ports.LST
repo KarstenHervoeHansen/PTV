@@ -1,0 +1,183 @@
+C51 COMPILER V7.10   PORTS                                                                 02/22/2013 13:25:14 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE PORTS
+OBJECT MODULE PLACED IN Ports.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe Ports.c DB OE LARGE
+
+line level    source
+
+   1          /*******************************************************/
+   2          /* file: ports.c                                       */
+   3          /* abstract:  This file contains the routines to       */
+   4          /*            output values on the JTAG ports, to read */
+   5          /*            the TDO bit, and to read a byte of data  */
+   6          /*            from the prom                            */
+   7          /*                                                     */
+   8          /*  #define WIN95PP                                    */
+   9          /*******************************************************/
+  10          
+  11          #include <C8051F320.h>
+  12          #include "define.h"
+  13          #include "ports.h"
+  14          #include "serial.h"
+  15          
+  16          typedef union outPortUnion
+  17            {
+  18            UC value;
+  19            struct opBitsStr
+  20              {
+  21              UC bit0: 1;
+  22              UC bit1: 1;
+  23              UC bit2: 1;
+  24              UC bit3: 1; 
+  25              UC tdi:  1; /* This is output bit: TDI  (P2.4) */
+  26              UC tck:  1; /* This is output bit: TCK  (P2.5) */
+  27              UC tms:  1; /* This is output bit: TMS  (P2.6) */
+  28              UC one:  1; /* This is input  bit: TDO  (P2.7) */
+  29              } bits;
+  30            } outPortType;
+  31            
+  32          typedef union inPortUnion
+  33            {
+  34            UC value;
+  35            struct ipBitsStr
+  36              {
+  37              UC bit0: 1;
+  38              UC bit1: 1;
+  39              UC bit2: 1;
+  40              UC bit3: 1;
+  41              UC bit4: 1;
+  42              UC bit5: 1;
+  43              UC bit6: 1;
+  44              UC tdo:  1; /* This is input  bit: TDO  (P2.7) */
+  45              } bits;
+  46            } inpPortType;
+  47          
+  48          static inpPortType in_word;
+  49          static outPortType out_word;
+  50          static int         once = 0;
+  51          
+  52          
+  53          #include "io.c"
+  54          
+  55          /* if in debugging mode, then just set the variables */
+C51 COMPILER V7.10   PORTS                                                                 02/22/2013 13:25:14 PAGE 2   
+
+  56          void setPort(UC p, UC val)
+  57            {
+  58   1        if (once == 0)
+  59   1          {
+  60   2          out_word.bits.one  = 1;
+  61   2          once = 1;
+  62   2          }
+  63   1        if (p == TMS)
+  64   1          out_word.bits.tms = val;
+  65   1      
+  66   1        if (p == TDI)
+  67   1          out_word.bits.tdi = val;
+  68   1      
+  69   1        if (p == TCK)
+  70   1          {
+  71   2          out_word.bits.tck = val;
+  72   2          P2 =  out_word.value;
+  73   2          }
+  74   1        }
+  75          
+  76          
+  77          /* toggle tck LH */
+  78          void pulseClock(void)
+  79            {
+  80   1        setPort(TCK, 0);  /* set the TCK port to low  */
+  81   1        setPort(TCK, 1);  /* set the TCK port to high */
+  82   1        }
+  83          
+  84          /* read in a byte of data from the Serial Interface */
+  85          /* _getkey() returns  0 - if no char was available  */
+  86          void readByte(UC *mydata)
+  87            {
+  88   1        UC stat;
+  89   1      
+  90   1        stat = getch(mydata);
+  91   1        }
+  92          
+  93          /* read the TDO bit from port */
+  94          UC readTDOBit()
+  95            {
+  96   1        in_word.value = P2;
+  97   1        if (in_word.bits.tdo == 0x1)
+  98   1          return(1);
+  99   1        else
+ 100   1          return(0);
+ 101   1        }
+ 102          
+ 103          
+ 104          /* Wait at least the specified number of microsec.                           */
+ 105          /* Use a timer if possible; otherwise estimate the number of instructions    */
+ 106          /* necessary to be run based on the microcontroller speed.  For this example */
+ 107          /* we pulse the TCK port a number of times based on the processor speed.     */
+ 108          void waitTime(long microsec)
+ 109            {
+ 110   1        long i;
+ 111   1      
+ 112   1        //putch(STOP);
+ 113   1      
+ 114   1        if (microsec == 140000000L)
+ 115   1          { 
+ 116   2          microsec = 1000000; //7000000L; //14000000L / 2;
+ 117   2          for ( i = 0; i < microsec; ++i )
+C51 COMPILER V7.10   PORTS                                                                 02/22/2013 13:25:14 PAGE 3   
+
+ 118   2            {
+ 119   3            pulseClock();
+ 120   3            }
+ 121   2          return;
+ 122   2          }
+ 123   1      
+ 124   1        if (microsec == 1000L)
+ 125   1          {
+ 126   2          return;
+ 127   2      #if 0
+                  microsec = 0; //14; //25; //50; //100; //150; //1000L / 5;
+                  for ( i = 0; i < microsec; ++i )
+                    {
+                    pulseClock();
+                    }
+              #endif
+ 134   2          return;
+ 135   2          }
+ 136   1      
+ 137   1      
+ 138   1        if (microsec == 15L)
+ 139   1          {
+ 140   2          return;
+ 141   2      #if 0
+                  microsec = 0; //5; //10;
+                  for ( i = 0; i < microsec; ++i )
+                    {
+                    pulseClock();
+                    }
+              #endif
+ 148   2          }
+ 149   1      
+ 150   1        /* For systems with TCK rates >= 1 MHz;  This implementation is fine. */
+ 151   1        for (i = 0; i < microsec; ++i)
+ 152   1          {
+ 153   2          pulseClock();
+ 154   2          }
+ 155   1          //putch(START);
+ 156   1        }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    402    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      4       9
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

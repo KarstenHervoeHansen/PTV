@@ -1,0 +1,1172 @@
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE CMD
+OBJECT MODULE PLACED IN cmd.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe cmd.c DB OE LARGE
+
+line level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2005                                           */
+   3          /*  Project:  PT8641 HDTPG (PT8612), using 8051F320 Cygnal                 */
+   4          /*            processor.                                                   */
+   5          /*  File  :   cmd.C                                                        */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     01.03.2005                                                   */
+   8          /*  Status:   Version 8.0                                                  */
+   9          /*  Purpose:  This module implements serial communication routines used to */
+  10          /*            communicate with PT5300 Master.  It also contains two        */
+  11          /*            software SPI functions for communication with the FPGA.      */
+  12          /*            The following command set is implemented:                    */
+  13          /*                                                                         */
+  14          /* Changes:                                                                */
+  15          /* 28.01.2010: Changed SW version to 11, to match new SW bundle with FPGA  */
+  16          /* 27.05.2008: Changed SW version to 10, to match new SW bundle with FPGA  */   
+  17          /* 27.06.2007: Mainframe sends correct Sysetm byte (Mainframe ver 4.9)     */
+  18          /*             Version of this software is now 90.                         */
+  19          /* 26.01.2007: Querrying FPGA in Manual Mode implemented. Addresses in     */
+  20          /*             FPGA param RAM: 128 - 133 may now be querried (Ver 80).     */
+  21          /*             see comments in ManualMode().                               */
+  22          /* 17.08.2006: Manual Mode implemented (direct R/W to FPGA settings RAM)   */
+  23          /*             (Version 70)                                                */
+  24          /* 29.06.2006: JTAGMode (programming FPGA via JTAG) implemented.           */
+  25          /* 14.06.2006: Uart Tx made open drain    (version 50)(there was no v.40)  */
+  26          /* 21.02.2006: Processor changed to F320  (version 30)                     */
+  27          /*                                                                         */
+  28          /*           To issue these commands from an external PC connected to      */
+  29          /*           Master, we use the following FACTORY commands:                */
+  30          /*           :FACT:V24C:ADDR BBU_x;COMM 'UE?';   to get HW version         */
+  31          /*           :FACT:V24C:ADDR BBU_x;COMM 'UB',1,'string'; to write u.s 1    */
+  32          /*           :FACT:V24C:ADDR BBU_x;COMM 'UC?',1; to get user string 1      */
+  33          /*           ... etc.                                                      */
+  34          /*           We use BBU_x because the HD after it is found to be           */
+  35          /*           installed, gets its address changed to bbux_addr              */
+  36          /*                                                                         */
+  37          /*      KU number is read by master as string as follows:                  */
+  38          /*      ascPtr = RecStr(address, "UR", ProductKUNo_addr/10, &error);       */
+  39          /*      where ProductKUNo_addr/10 = 2.                                     */
+  40          /*      KU number is stored as user string nr. 2.                          */
+  41          /*                                                                         */
+  42          /*      When 5300 Master changes generator Pattern, or System, or Delay,   */
+  43          /*      or Attributes, it is done in one go using TrxHDTPGSystem() function*/
+  44          /*      from unit_drv.c.  This function sends the mentioned params in the  */
+  45          /*      following sequence:                                                */
+  46          /*                                                                         */
+  47          /* SndInt2(HDTPGUnit[ndx].Address, "UL", (UI)ndx, (UI)system);             */
+  48          /* SndInt3(HDTPGUnit[ndx].Address, "UM", (UI)ndx, (UI)pattern, (UI)attrib);*/
+  49          /* SndULUL(HDTPGUnit[ndx].Address, "UK", (UL)ndx, (UL)tmp); // delay       */
+  50          /*                                                                         */
+  51          /***************************************************************************/
+  52          #pragma WARNINGLEVEL (1) /* Lists only those warnings which may generate */
+  53                                   /* incorrect code. Default is 2.                */
+  54          
+  55          #include <C8051F320.h>
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 2   
+
+  56          #include <stdio.h>
+  57          #include "define.h"
+  58          #include <string.h>
+  59          #include "cmd.h"
+  60          #include "ser_spi.h"
+  61          #include "eeprom.h"
+  62          #include "serial.h"
+  63          #include "micro.h"
+  64          
+  65          
+  66          #define PT8641_COMMAND_PREFIX  'U'    /* First letter of PT8641 command */
+  67                                                /* set */
+  68          
+  69          /* User text start address in onboard EEPROM: 10 blocks of 11 byte (10 data + checksum) */
+  70          #define USER_TEXT              0x0B
+  71          
+  72          #define SWVERSION              130
+  73          #define HWVERSION              00
+  74          #define HWINFO                 12 /* This generatoar is called PT8612 */
+  75          
+  76          /*                   HD-SDI PT8612                                  */
+  77          /* In the FPGA, each parameter has a location in RAM, at particular */
+  78          /* address.  Changing a setting (parameter) involves sending        */
+  79          /* genrator number, value and its address, using defins below       */
+  80          /*       Symbol          Value                Setting               */
+  81          /*   -------------------------------------------------------------- */
+  82          #define   SYS_ADDR           0         /* System                    */
+  83          #define   PAT_ADDR           1         /* Pattern, Attribs          */
+  84          #define   DEL_ADDR           3         /* Delay   MSB...LSB         */
+  85          #define   CLI_ADDR           7         /* Audio Click               */
+  86          #define   SIG_ADDR           9         /* Audio Signal              */
+  87          #define   LEV_ADDR          10         /* Audio Level               */
+  88          
+  89          #define   HOR_ADDR          11         /* Text Position  Horizontal */
+  90          
+  91          #define   VER_ADDR          13         /* Text Position  Vertical   */
+  92          
+  93          #define   SCA_ADDR          15         /* Text Scale                */
+  94          #define   COL_ADDR          16         /* Text Color                */
+  95          #define   SIZ_ADDR_H        17         /* Text Bitmap Horizontal    */
+  96          #define   SIZ_ADDR_V        18         /* Text Bitmap Horizontal    */
+  97          #define   MOV_ADDR          19         /* Text Movement             */
+  98          #define   TXTONOFF_ADDR     20         /* Text ON / OFF             */
+  99          
+ 100          /* Addresses below contain now some status in FPGA.  When querried  */
+ 101          /* on these addresses, the FPGA returns values @ these addresses.   */
+ 102          /* On all other RAM addresses the FPGA does not return any values.  */
+ 103          /* This means that you can not querry DEL_ADDR for example and      */
+ 104          /* expect to get current delay.                                     */
+ 105          
+ 106          #define   STAT_CHAN1        128
+ 107          #define   STAT_CHAN2        129
+ 108          #define   STAT_CHAN3        130
+ 109          #define   STAT_CHAN4        131
+ 110          #define   STAT_PLL          132
+ 111          #define   STAT_GENL         133
+ 112          /********************************************************************/
+ 113          #define   TXT_ADDR          0x1000     /* Text Bitmap  4096         */
+ 114          
+ 115          #define   TXT_ADDR_HI       0x10
+ 116          #define   TXT_ADDR_LO       0x00
+ 117          
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 3   
+
+ 118          #define NOOFCOMMANDS 21
+ 119          
+ 120          code struct COMMAND_STRUCT CommandTable[NOOFCOMMANDS] =
+ 121            {
+ 122            /* Housekeeping functions                     */
+ 123            'U', 'A', /* UnitAddressCommand()          0  */
+ 124            'U', 'B', /* WriteUserTextCommand()        1  */
+ 125            'U', 'C', /* ReadUserTextCommand()         2  */
+ 126            'U', 'D', /* ReadSWVersionCommand()        3  */
+ 127            'U', 'E', /* ReadHWVersionCommand()        4  */
+ 128            'U', 'F', /* ReadHWInformationCommand()    5  */
+ 129            /* Settings functions                         */
+ 130            'U', 'G', /* GenSystemCommand()            6  */
+ 131            'U', 'H', /* GenPatternCommand()           7  */
+ 132            'U', 'I', /* GenAttribCommand()            8  */
+ 133            'U', 'J', /* GenDelayCommand()             9  */
+ 134            'U', 'K', /* GenAudioClickTimeCommand()    10 */
+ 135            'U', 'L', /* GenAudioSignalCommand()       11 */
+ 136            'U', 'M', /* GenAudioLevelCommand()        12 */
+ 137          
+ 138            'U', 'P', /* GenTextPosCommand()           13 */
+ 139            'U', 'Q', /* GenTextScaleCommand()         14 */
+ 140            'U', 'R', /* GenTextColorCommand()         15 */
+ 141            'U', 'T', /* GenTextMovCommand()           16 */
+ 142            'U', 'U', /* GenTextOnOffCommand()         17 */
+ 143            'U', 'Z', /* GenTextCommand()              18 */
+ 144            'U', 'N', /* JTAGMode()                    19 */
+ 145            'U', 'O'  /* ManualMode()                  20 */
+ 146            };
+ 147          
+ 148          #include "io.c"
+ 149          
+ 150          
+ 151          #if 1
+ 152          #include "font.c"   /* text font, in separae file */
+ 153          #endif
+ 154          
+ 155          static UC TextBuffer[3][17];
+ 156          static UC text_line_no = 0;
+ 157          
+ 158          extern bit  transparent; /* indicates to serial interrupt routine */
+ 159                                   /* that transparent mode is set and data */
+ 160                                   /* for FPGA programming is comming       */
+ 161          void (*uploader)();      /* function pointer declaration          */
+ 162          
+ 163          /***************************************************************************/
+ 164          /*  CommandExecute                                                 RS232.C */
+ 165          /*                                                                         */
+ 166          /* Author:    Janusz Kuzminski                                             */
+ 167          /* Revised:   06.01.2006                                                   */
+ 168          /*                                                                         */
+ 169          /*  Function:  Decode and execute the received RS232 command.              */
+ 170          /*  Remarks:   The commands are no longer executed via function pointers   */
+ 171          /*             as this made it impossible to use overlaying under compila- */
+ 172          /*             tion.  This function checks if 2-nd command code is equal   */
+ 173          /*             to one of second commands codes in CommandTable[] and if it */
+ 174          /*             is, appropriate function is executed.                       */
+ 175          /*  Returns:    --                                                         */
+ 176          /*  Updates:    --                                                         */
+ 177          /***************************************************************************/
+ 178          void CommandExecute()
+ 179            {
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 4   
+
+ 180   1        UC i;
+ 181   1      
+ 182   1        for (i = 0; i < NOOFCOMMANDS; i++)
+ 183   1          if (Cmd[1] == CommandTable[i].Cmd2)
+ 184   1            break;
+ 185   1      
+ 186   1        switch (i)
+ 187   1          {
+ 188   2          case 0:
+ 189   2            UnitAddressCommand();
+ 190   2            break;
+ 191   2          case 1:
+ 192   2            WriteUserTextCommand();
+ 193   2            break;
+ 194   2          case 2:
+ 195   2            ReadUserTextCommand();
+ 196   2            break;
+ 197   2          case 3:
+ 198   2            ReadSWVersionCommand();
+ 199   2            break;
+ 200   2          case 4:
+ 201   2            ReadHWVersionCommand();
+ 202   2            break;
+ 203   2          case 5:
+ 204   2            ReadHWInformationCommand();
+ 205   2            break;
+ 206   2          case 6:
+ 207   2            GenSystemCommand(SYS_ADDR);
+ 208   2            break;
+ 209   2          case 7:
+ 210   2            GenPatternCommand(PAT_ADDR);
+ 211   2            break;
+ 212   2          case 8:
+ 213   2            GenAttribCommand(PAT_ADDR + 1);
+ 214   2            break;
+ 215   2          case 9:
+ 216   2            GenDelayCommand(DEL_ADDR);
+ 217   2            break;
+ 218   2          case 10:
+ 219   2            GenAudioClickTimeCommand(CLI_ADDR);
+ 220   2            break;
+ 221   2          case 11:
+ 222   2            GenAudioSignalCommand(SIG_ADDR);
+ 223   2            break;
+ 224   2          case 12:
+ 225   2            GenAudioLevelCommand(LEV_ADDR);
+ 226   2            break;
+ 227   2          case 13:
+ 228   2            GenTextPosCommand(HOR_ADDR);
+ 229   2            break;
+ 230   2          case 14:
+ 231   2            GenTextScaleCommand(SCA_ADDR);
+ 232   2            break;
+ 233   2          case 15:
+ 234   2            GenTextColorCommand(COL_ADDR);
+ 235   2            break;
+ 236   2          case 16:
+ 237   2            GenTextMovCommand(MOV_ADDR);
+ 238   2            break;
+ 239   2          case 17:
+ 240   2            GenTextOnOffCommand(TXTONOFF_ADDR);
+ 241   2            break;
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 5   
+
+ 242   2          case 18:
+ 243   2            GenTextCommand(TXT_ADDR);
+ 244   2            break;
+ 245   2          case 19:
+ 246   2            JTAGMode();
+ 247   2            break;
+ 248   2          case 20:
+ 249   2            ManualMode();
+ 250   2            break;
+ 251   2      
+ 252   2          default:
+ 253   2            break;
+ 254   2          }
+ 255   1        }    
+ 256          
+ 257          /******************************************************************
+ 258          * NAME       void ManualMode(void)
+ 259          * PURPOSE    To provide direct (manual) access to FPGA settings
+ 260          *            memory and make a querry (querry works only with addresses
+ 261          *            STAT_CHAN1 to STAT_GENL, because it is so implemented
+ 262          *            in FPGA.
+ 263          *            (UO command)
+ 264          * 
+ 265          * ARGUMENTS  None
+ 266          *
+ 267          * RETURNS    Nothing
+ 268          *
+ 269          * EXTERNS    None
+ 270          *
+ 271          * NOTES:     This function sends to the FPGA:
+ 272          *            - address, contained in Parameter[1]
+ 273          *            - data,    contained in Parameter[2]
+ 274          *            allowing to change any setting, without using normal
+ 275          *            commands defined in CommandTable[].  It is to be 
+ 276          *            used in development stage, using the :FACTORY SCPI
+ 277          *            functions of the form:
+ 278          *
+ 279          *            :FACT:V24C:ADDR BBU_1;
+ 280          *             - direct all further communication to 8641 (PT8612) 
+ 281          *               mounted at XA1,
+ 282          *            :FACT:V24C:COMM 'UO',1,0,0;
+ 283          *             - invokes this function with 1 in Parameter[0]:GENERATOR
+ 284          *                                          0 in Paramerer[1]:ADDRESS
+ 285          *                                          0 in Paramerer[2]:DATA
+ 286          *            i.e. after the send function returns, generator 1
+ 287          *            in FPGA will have 0 placed at address 0 in in its
+ 288          *            settings RAM, thus system will be st to OFF.
+ 289          *
+ 290          *            Generator may be 1, 2, 4 or 8.  First 4 bits define
+ 291          *            generator, by placing '1' at appropriate position.
+ 292          *            In that way the byte containing generator number can
+ 293          *            be used as simple selector in FPGA code.
+ 294          *
+ 295          *            If the address is STAT_CHAN1 to STAT_GENL, this function allows to 
+ 296          *            make querry.  Note that normally the querry of a 
+ 297          *            parameter is not possible, because querry may not
+ 298          *            contain parameters (querry with parameters gives 
+ 299          *            syntax error).  Only in this function, the querry
+ 300          *            is implemented as follows:
+ 301          *            If the address is in the above range, the FPGA is 
+ 302          *            querried and the answer (1 byte) is placed in a static
+ 303          *            dat variable.  Subsequent querry ('UO?') will send the 
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 6   
+
+ 304          *            result in dat to the user (as hex value).
+ 305          
+ 306          *           The syntax is:
+ 307          *           :FACT:V24C:COMM 'UO',Gen,Addr,0; (0 is dummy data)
+ 308          *           :FACT:V24C:COMM 'UO?';           (standard querry)
+ 309          *           This function's querry feature requires FPGA software
+ 310          *           capable of 2 way communication.
+ 311          *           Also note that when changin system via this function,
+ 312          *           you must use values from hd_sys_table[], because
+ 313          *           mainframe does it in that manner.
+ 314          *           hd_sys_table[] is defined in unit_drv.c.
+ 315          *           This function does not perform validation of arguments
+ 316          *           arguments are used as suppllied by the user.
+ 317          *           Note that when changing settings using this function
+ 318          *           does not change settings in PT5300 Master.  This is 
+ 319          *           also true when using the :FACT:V24C:COMM system.
+ 320          ******************************************************************/
+ 321          void ManualMode(void)
+ 322            {
+ 323   1        UI addr;
+ 324   1        UC tmpb[10];
+ 325   1        static UC dat;
+ 326   1      
+ 327   1        switch (CmdDelimiter)
+ 328   1          {
+ 329   2          case ';': /* set */
+ 330   2            addr = (UI)Parameter[1];
+ 331   2            dat  = (UC)Parameter[2];
+ 332   2            receive_byte((UC)Parameter[0], addr, &dat);
+ 333   2      
+ 334   2          case '?': /* querry */
+ 335   2            /* send data in static variable dat */
+ 336   2            sprintf(tmpb, "0x%bX", (UC)dat);
+ 337   2            WriteString(tmpb);
+ 338   2            LED = ~LED;
+ 339   2            break;
+ 340   2      
+ 341   2          default:
+ 342   2            break;
+ 343   2          }
+ 344   1        }
+ 345          
+ 346          
+ 347          /******************************************************************
+ 348          * NAME       void JTAGMode(void)
+ 349          * PURPOSE    To program FPGA with data sent from PT5300 Master
+ 350          *            via serial interface. (UN command)
+ 351          * 
+ 352          * ARGUMENTS  None
+ 353          *
+ 354          * RETURNS    Nothing
+ 355          *
+ 356          * EXTERNS    transparent (flag indicating to normal serial interrupt
+ 357          *                         routine that another routine is to be 
+ 358          *                         used)
+ 359          *
+ 360          * NOTES:     This command does:
+ 361          *            Reprograms UART to 115200 Baud and P2 for FPGA JTAG
+ 362          *            functions:
+ 363          *                       P2.7: TDO : input
+ 364          *                       P2.6: TMS : output
+ 365          *                       P2.5: TCK : output
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 7   
+
+ 366          *                       P2.4: TDI : output
+ 367          *
+ 368          *            Sets transparent flag to TRUE.  This means that 
+ 369          *            serial interrupt routine calls serint0, which is 
+ 370          *            separate JTAG programmer serial interrupt routine.
+ 371          *
+ 372          *            Runs xsvfExecute() function, which is JTAG programmer
+ 373          *            routine and uses separate functions to fetch and send
+ 374          *            characters (in module serial.c).
+ 375          *
+ 376          *            Data for xsvfExecute() are sent by the   DKPLAY.EXE
+ 377          *            (running on a PC) to PT5300 Master, which operates in
+ 378          *            transparent mode, i.e. each incoming character is sent
+ 379          *            to PT8612 and each character sent by PT8612 is sent to
+ 380          *            the PC.
+ 381          *
+ 382          ******************************************************************/
+ 383          void JTAGMode(void)
+ 384            {
+ 385   1        UC i;
+ 386   1        UC cnt;
+ 387   1        UC buff[60];
+ 388   1      
+ 389   1        ES0 = 0;
+ 390   1      
+ 391   1        delay();
+ 392   1        delay();
+ 393   1        delay();
+ 394   1        RI0 = 0;
+ 395   1        TI0 = 0;
+ 396   1      
+ 397   1        transparent = TRUE;
+ 398   1      
+ 399   1        /*----------------------------------------------------------------*/
+ 400   1        /*       Timers Configuration 115200 BR @ 11.059200 MHz           */
+ 401   1        /*----------------------------------------------------------------*/
+ 402   1      
+ 403   1        CKCON = 0x08;     /* Clock Control Register: Timer1 uses SYSCLK   */
+ 404   1        TL0   = 0x00;     /* Timer 0 Low Byte                             */
+ 405   1        TH0   = 0xFF;     /* Timer 0 High Byte                            */
+ 406   1        TL1   = 0x00;     /* Timer 1 Low Byte                             */
+ 407   1        TH1   = 0xD0;     /* BaudRate = 115200                            */
+ 408   1        TMOD  = 0x20;     /* Timer Mode Register                          */
+ 409   1        TCON  = 0x00;     /* Timer Control Register                       */
+ 410   1        /*----------------------------------------------------------------*/
+ 411   1        /*                UART0 Configuration                             */
+ 412   1        /*----------------------------------------------------------------*/
+ 413   1        SCON0 = 0x10;     /* Serial Port Control Register                 */
+ 414   1        PCON  = 0x00;     /* Power Control Register                       */
+ 415   1      
+ 416   1        TR1 = 1;          /* start timer1                                 */
+ 417   1      
+ 418   1        serinit();     /* zeroes pointers for new serial routine */
+ 419   1      
+ 420   1        /*config();*/
+ 421   1        XBR0 = 0x01;  // Crossbar Register 1
+ 422   1        XBR1 = 0x40;  // Crossbar Register 2 (weak pull-ups globally enabled)
+ 423   1      
+ 424   1      /* New values for JTAG signals from P2 */
+ 425   1        P2MDOUT = 0xFC;   /* Output configuration for P2 (0x7C)           */
+ 426   1        P2MDIN  = 0xFC;   /* Input configuration for P2                   */
+ 427   1        P2SKIP  = 0x00;   /* Port 2 Crossbar Skip Register                */
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 8   
+
+ 428   1      
+ 429   1        serinit();/* zeroes both pointers for new serial routine          */
+ 430   1      
+ 431   1        LED = 0;
+ 432   1        flush();  /* zeroes both pointers to serial buffer and fills the  */
+ 433   1                  /* buffer with 0 */
+ 434   1      
+ 435   1        RI0 = 0;
+ 436   1        TI0 = 0;
+ 437   1        ES0 = 1;       /* Enable serial interrupt    */
+ 438   1        EA  = 1;
+ 439   1        cnt = 0;
+ 440   1      
+ 441   1      #if 1
+ 442   1        while (1)
+ 443   1          {
+ 444   2          cnt++;
+ 445   2          flush();  /* zeroes both pointers to serial buffer and fills the  */
+ 446   2                    /* buffer with 0 */
+ 447   2          while (1)
+ 448   2            {
+ 449   3            if (getch(&i))       /* wait for START from SERVER (transmits START) */
+ 450   3              {                  /* removes  START sent by master */
+ 451   4              /* The flush() below is not in order to flush, but to zero rx_outptr */
+ 452   4              flush(); 
+ 453   4              break;
+ 454   4              }
+ 455   3            else
+ 456   3              continue;
+ 457   3            }
+ 458   2        
+ 459   2          LED = 0;
+ 460   2          i = xsvfExecute();
+ 461   2          LED = 0;
+ 462   2        
+ 463   2          if (i != 0)
+ 464   2            {
+ 465   3            putch(ERR);
+ 466   3            LED = 0;
+ 467   3            }
+ 468   2          else
+ 469   2            {
+ 470   3            putch(SUCCESS);
+ 471   3            LED = 0;
+ 472   3            }
+ 473   2          break;
+ 474   2          }
+ 475   1      #endif
+ 476   1      
+ 477   1        delay();
+ 478   1        delay();
+ 479   1        RI0 = 0;
+ 480   1        TI0 = 0;
+ 481   1        ES0 = 0;       /* Disable serial interrupt   */
+ 482   1        EA  = 0;
+ 483   1        uploader = (void code *) 0x3C00;
+ 484   1        uploader();
+ 485   1        }
+ 486          
+ 487          /******************************************************************
+ 488          * NAME       void GenSystemCommand(void)
+ 489          * PURPOSE    To set format for given generator (UG command)
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 9   
+
+ 490          * 
+ 491          * ARGUMENTS  UI addr
+ 492          *
+ 493          * RETURNS    Nothing
+ 494          *
+ 495          * EXTERNS    None
+ 496          *
+ 497          * NOTES: 
+ 498          *         In Master software, the format is sent as follows:
+ 499          *          'UL'<ul>,<ul>
+ 500          *          
+ 501          *  error = SndULUL(HDTPGUnit[subgen].Address, "UL", (UL)gen, (UL)fmt);
+ 502          *          
+ 503          *          i.e. generator nr and format are sent (no info about delay)
+ 504          *          but delay is ALWAYS sent after format and attributes.
+ 505          *          There is no check of validity of both parameters.
+ 506          *          Potentialy dangerous!!
+ 507          
+ 508          ******************************************************************/
+ 509          void GenSystemCommand(UI addr)
+ 510            {
+ 511   1        UC sys;
+ 512   1      
+ 513   1        switch (CmdDelimiter)
+ 514   1          {
+ 515   2          case ';': /* set system */
+ 516   2            /* sys = hd_sys_table[(int)Parameter[1]]; */
+ 517   2            /* Mainframe sends the correct value now instead of index */
+ 518   2            sys = (UC)Parameter[1];
+ 519   2            send((UC)Parameter[0], addr, &sys, 1);
+ 520   2            break;
+ 521   2          case '?': /* querry */
+ 522   2          default:
+ 523   2            break;
+ 524   2          }
+ 525   1        }
+ 526          
+ 527          
+ 528          /******************************************************************
+ 529          * NAME       void GenPatternCommand(void)
+ 530          * PURPOSE    To set pattern for given generator (UH command)
+ 531          * 
+ 532          * ARGUMENTS  None
+ 533          *
+ 534          * RETURNS    Nothing
+ 535          *
+ 536          * EXTERNS    None
+ 537          *
+ 538          * NOTES: 
+ 539          *            In Master software, the pattern is sent as follows:
+ 540          *             'UH'<UI>,<UI>
+ 541          *          
+ 542          *      error = SndInt2(HDTPGUnit[ndx].Address, "UH", (UI)gen, (UI)pattern);
+ 543          *          
+ 544          *          i.e. generator nr, pattern and attributes are sent (no info about delay)
+ 545          *          but delay is ALWAYS sent after format.
+ 546          *          There is no check of validity of both parameters.
+ 547          *          Potentialy dangerous!! 
+ 548          *
+ 549          *          void send(UC gen, UI addr, UC* dat, int cnt)
+ 550          ******************************************************************/
+ 551          void GenPatternCommand(UI addr)
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 10  
+
+ 552            {
+ 553   1        UC pat;
+ 554   1      
+ 555   1        switch (CmdDelimiter)
+ 556   1          {
+ 557   2          case ';':
+ 558   2            pat = (UC) Parameter[1];
+ 559   2            send((UC)Parameter[0], addr, &pat, 1);
+ 560   2            break;
+ 561   2          default:
+ 562   2            break;
+ 563   2          }
+ 564   1        }
+ 565          
+ 566          /*   (UI command)                  */
+ 567          void GenAttribCommand(UI addr)
+ 568            {
+ 569   1        UC at;
+ 570   1      
+ 571   1        switch (CmdDelimiter)
+ 572   1          {
+ 573   2          case ';':
+ 574   2            at = (UC)Parameter[1]; /* get text attributes */
+ 575   2            send((UC)Parameter[0], addr, &at, 1);
+ 576   2            break;
+ 577   2          default:
+ 578   2            break;
+ 579   2          }
+ 580   1        }
+ 581          
+ 582          
+ 583          /******************************************************************
+ 584          * NAME       void GenDelayCommand(void)
+ 585          * PURPOSE    To set delay for given generator (UJ command)
+ 586          * 
+ 587          * ARGUMENTS  None
+ 588          *
+ 589          * RETURNS    Nothing
+ 590          *
+ 591          * EXTERNS    None
+ 592          *
+ 593          * NOTES: 
+ 594          *            In Master software, the delay is sent as follows:
+ 595          *             'UK' <ul>,<ul>
+ 596          *          
+ 597          *  error = SndULUL(HDTPGUnit[ndx].Address, "UK", (UL)ndx, (UL)tmp); /* delay
+ 598          *          
+ 599          *          i.e. generator nr and delay are sent (no info about format)
+ 600          *          There is no check of validity of both parameters.
+ 601          *          Potentialy dangerous!! 
+ 602          *
+ 603          * Problem: On the FGA side the protocol was changed so that only 3
+ 604          *          bytes per delay are used and therefore received.  Because
+ 605          *          our protocol transmits MSB first, the LSB byte of delay
+ 606          *          parameter was lost.  So this function must send the 
+ 607          *          following bytes of Delay parameter:
+ 608          *          BYTE2 then BYTE1 and then BYTE0.  BYTE3 must not be sent!
+ 609          *          Discovered on 20.04.2006.
+ 610          *          We will use the following union to tackle this problem,
+ 611          *          which is defined in define.h:
+ 612                      unions for unsigned long and unsigned int
+ 613                      to access these data types bytewise
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 11  
+
+ 614                      Note that for Kiel C compiler, charval[0]
+ 615                      carries MSB and charval[3] carries LSB.
+ 616                      This is the opposite of how TC does it.
+ 617          
+ 618                        typedef union xx
+ 619                            {
+ 620                            long longval;
+ 621                            int  intgval[2];
+ 622                            UC   charval[4];
+ 623                            }  ul;
+ 624                        
+ 625                    charval[0] = BYTE3 = MSB
+ 626                    charval[1] = BYTE2 =  .
+ 627                    charval[2] = BYTE1 =  .
+ 628                    charval[3] = BYTE0 = LSB   0x5AA30C
+ 629          
+ 630          ******************************************************************/
+ 631          void GenDelayCommand(UI addr)
+ 632            {
+ 633   1        ul del;
+ 634   1      
+ 635   1        switch (CmdDelimiter)
+ 636   1          {
+ 637   2          case ';':
+ 638   2            del.longval = (UL)Parameter[1];
+ 639   2            send((UC)Parameter[0], addr, (UC*)&del.charval[1], 3);
+ 640   2      
+ 641   2            LED = ~LED;
+ 642   2      
+ 643   2            break;
+ 644   2          default:
+ 645   2            break;
+ 646   2          }
+ 647   1        }
+ 648          
+ 649          /* (UK command)                               */
+ 650          void GenAudioClickTimeCommand(UI addr)
+ 651            {
+ 652   1        UI click;
+ 653   1      
+ 654   1        switch (CmdDelimiter)
+ 655   1          {
+ 656   2          case ';':
+ 657   2            click = (UI)Parameter[1]; /* get click *was UC: WRONG!!!!*/
+ 658   2            send((UC)Parameter[0], addr, (UC*)&click, 2);
+ 659   2            break;
+ 660   2          default:
+ 661   2            break;
+ 662   2          }
+ 663   1        }
+ 664          
+ 665          /* (UL command)                               */
+ 666          void GenAudioSignalCommand(UI addr)
+ 667            {
+ 668   1        UC sig;
+ 669   1      
+ 670   1        switch (CmdDelimiter)
+ 671   1          {
+ 672   2          case ';':
+ 673   2            sig = (UC)Parameter[1]; /* get sig */
+ 674   2            send((UC)Parameter[0], addr, (UC*)&sig, 1);
+ 675   2            break;
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 12  
+
+ 676   2          default:
+ 677   2            break;
+ 678   2          }
+ 679   1        }
+ 680          
+ 681          /* (UM command)                             */
+ 682          void GenAudioLevelCommand(UI addr)
+ 683            {
+ 684   1        UC lev;
+ 685   1      
+ 686   1        switch (CmdDelimiter)
+ 687   1          {
+ 688   2          case ';':
+ 689   2            lev = (UC)Parameter[1]; /* get sig */
+ 690   2            send((UC)Parameter[0], addr, (UC*)&lev, 1);
+ 691   2            break;
+ 692   2          default:
+ 693   2            break;
+ 694   2          }
+ 695   1        }
+ 696          
+ 697          
+ 698          /******************************************************************
+ 699          * NAME       void GenTextCommand(UI addr)
+ 700          * PURPOSE    The purpose of this function is to receive 3 lines 
+ 701          *            of text from the PT5300, to compose text bitmap and 
+ 702          *            transfer it to the FPGA. (UZ command)
+ 703          *
+ 704          * ARGUMENTS  UI addr - address of FPGA chunk RAM where the bitmap
+ 705          *                      is to be stored.
+ 706          * RETURNS    Nothing
+ 707          * EXTERNS    None
+ 708          *
+ 709          * NOTES: 
+ 710          *            In Master software, the text is sent as follows:
+ 711          *             'UZ'<uc>,<string>
+ 712          *            i.e. command, gen_number and text.
+ 713          *              <uc> carries generator number.
+ 714          *              The <uc> is available here as
+ 715          *              Parameter[0].  The <string> is available in global
+ 716          *              buffer String.  
+ 717          *            The master software sends all 3 lines of equal length,
+ 718          *            lines shorter than the longest one are padded with 
+ 719          *            spaces.
+ 720          *            No info about line number is sent, but lines are always
+ 721          *            sent in sequence, 1, 2 and 3.  We use global variable 
+ 722          *            text_line_no to hold control over actual line number.
+ 723          *
+ 724              while(*Str)
+ 725                {
+ 726                UC StrValue = *Str++;
+ 727                UC Font     = Font57[line_nr + (7 * (StrValue - ' '))];
+ 728                if (line_nr == 7)
+ 729                  Font = 0;    
+ 730          
+ 731          ******************************************************************/
+ 732          void GenTextCommand(UI addr)
+ 733            {
+ 734   1        UC gen;
+ 735   1        UI i;
+ 736   1        UC *Str;
+ 737   1        UC Font;
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 13  
+
+ 738   1        UC line_nr;
+ 739   1        UC width;
+ 740   1        UC heigth;
+ 741   1      
+ 742   1        UC weigth;
+ 743   1        UC first;
+ 744   1        UC last;
+ 745   1      
+ 746   1        weigth = 0;
+ 747   1      
+ 748   1      #if 0
+                if (gen == 1)
+                  LED = ~LED;  
+              #endif
+ 752   1      
+ 753   1        gen    = (UC)Parameter[0];
+ 754   1        
+ 755   1      
+ 756   1        strcpy(TextBuffer[text_line_no], String);
+ 757   1        text_line_no++;
+ 758   1        if (text_line_no != 3)
+ 759   1          return;
+ 760   1      
+ 761   1        text_line_no = 0;
+ 762   1      
+ 763   1        /* calculate and send text size hor: in pixels, ver: in pixels */
+ 764   1        width  = strlen(TextBuffer[0]) * 8;
+ 765   1      
+ 766   1      #if 1
+ 767   1        /* Lines with spaces only shall not be displayed */
+ 768   1      
+ 769   1        if (is_text(TextBuffer[0]))
+ 770   1          weigth |= 1;
+ 771   1        if (is_text(TextBuffer[1]))
+ 772   1          weigth |= 2;
+ 773   1        if (is_text(TextBuffer[2]))
+ 774   1          weigth |= 4;
+ 775   1      
+ 776   1        switch (weigth)
+ 777   1          {
+ 778   2          case 0:      /* spaces on all lines, send heigth = 0 and return */
+ 779   2            i = 0;
+ 780   2            send(gen, TXTONOFF_ADDR, &i, 1);    /* send TEXT OFF  */
+ 781   2            return;
+ 782   2            break;
+ 783   2          case 1:      /* only line 0 has text... */
+ 784   2            heigth = 9;
+ 785   2            first  = 0;
+ 786   2            last   = 1;
+ 787   2            break;
+ 788   2          case 2:      /* only line 1 has text... */
+ 789   2            heigth = 9;
+ 790   2            first  = 1;
+ 791   2            last   = 2;
+ 792   2            break;
+ 793   2          case 3:      /* line 0 and 1 have text... */
+ 794   2            heigth = 17;
+ 795   2            first  =  0;
+ 796   2            last   =  2;
+ 797   2            break;
+ 798   2          case 4:      /* only line 2 has text... */
+ 799   2            heigth = 9;
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 14  
+
+ 800   2            first  = 2;
+ 801   2            last   = 3;
+ 802   2            break;
+ 803   2          case 5:      /* line 0 and 2 have text... line in between shal be removed...*/
+ 804   2            strcpy(TextBuffer[1], TextBuffer[2]);
+ 805   2            heigth = 17;
+ 806   2            first  =  0;
+ 807   2            last   =  2;
+ 808   2            break;
+ 809   2          case 6:      /* line 1 and 2 have text... */
+ 810   2            heigth = 17;
+ 811   2            first  =  1;
+ 812   2            last   =  3;
+ 813   2            break;
+ 814   2          case 7:      /* all lines have text... */
+ 815   2            heigth = 25;
+ 816   2            first  =  0;
+ 817   2            last   =  3;
+ 818   2            break;
+ 819   2          }
+ 820   1      #else
+                    first  = 0;
+                    last   = 3;
+                    heigth = 25;
+              #endif
+ 825   1      
+ 826   1        send(gen, SIZ_ADDR_H, &width,  1);  /* send TEXT SIZE */
+ 827   1        send(gen, SIZ_ADDR_V, &heigth, 1);  /* send TEXT SIZE */
+ 828   1      
+ 829   1        /* Proto: void send(UC gen, UI addr, UC* dat, int cnt) */
+ 830   1      
+ 831   1        CS = 0;
+ 832   1        spi_transfer(gen, 8);
+ 833   1        spi_transfer(TXT_ADDR_HI, 8);       /* send TEXT ADDRESS MSB */
+ 834   1        spi_transfer(TXT_ADDR_LO, 8);       /* send TEXT ADDRESS LSB */
+ 835   1      
+ 836   1        /* compose the bitmap       */
+ 837   1        /* send one scan line blank */
+ 838   1        for (i = 0; i < strlen(TextBuffer[0]); i++)
+ 839   1          spi_transfer(0, 8);
+ 840   1      
+ 841   1        for (i = first; i < last; i++)              /* for 3 lines of text... */
+ 842   1          for (line_nr = 0; line_nr < 8; line_nr++) /* and 8 scan lines...    */
+ 843   1            {
+ 844   2            Str = &TextBuffer[i];
+ 845   2            while (*Str) /* compose the string itself */
+ 846   2              {
+ 847   3              Font = Font57[line_nr + (7 * (*Str++ - ' '))];
+ 848   3              Font = Font << 1;
+ 849   3              if (line_nr == 7)
+ 850   3                Font = 0;    
+ 851   3              spi_transfer(Font, 8);
+ 852   3              }
+ 853   2            }
+ 854   1        CS = 1;
+ 855   1        }
+ 856          
+ 857          #if 1
+ 858          /******************************************************************
+ 859          * NAME       UC is_text(UC *buff)
+ 860          * PURPOSE    To test if supplied string contains only spaces
+ 861          * 
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 15  
+
+ 862          * ARGUMENTS  UC *buff: buffer with text
+ 863          *
+ 864          * RETURNS    1 - if text contains text
+ 865          *            0 - if text contains only spaces
+ 866          *
+ 867          * EXTERNS    None
+ 868          *
+ 869          * NOTES: 
+ 870          ******************************************************************/
+ 871          UC is_text(UC *buff)
+ 872            {
+ 873   1        
+ 874   1        while (*buff)
+ 875   1          {
+ 876   2          if (*buff != ' ')
+ 877   2            return (1);
+ 878   2          buff++;
+ 879   2          }
+ 880   1        return (0);
+ 881   1        }
+ 882          #endif
+ 883          
+ 884          
+ 885          
+ 886          /* (UQ command)                          */
+ 887          void GenTextScaleCommand(UI addr)
+ 888            {
+ 889   1        UC scal;
+ 890   1      
+ 891   1        switch (CmdDelimiter)
+ 892   1          {
+ 893   2          case ';':
+ 894   2            scal = (UC)Parameter[1]; /* get scale */
+ 895   2            send((UC)Parameter[0], addr, (UC*)&scal, 1);
+ 896   2            break;
+ 897   2          default:
+ 898   2            break;
+ 899   2          }
+ 900   1        }
+ 901          
+ 902          /* (UP command)                           */
+ 903          void GenTextPosCommand(UI addr)
+ 904            {
+ 905   1        UI pos[2];
+ 906   1      
+ 907   1        switch (CmdDelimiter)
+ 908   1          {
+ 909   2          case ';':
+ 910   2            pos[0] = (UI)Parameter[1]; /* get X */
+ 911   2            pos[1] = (UI)Parameter[2]; /* get Y */
+ 912   2            send((UC)Parameter[0], addr, (UC*)&pos, 4);
+ 913   2            break;
+ 914   2          default:
+ 915   2            break;
+ 916   2          }
+ 917   1        }
+ 918          
+ 919          /* (UR command)                            */
+ 920          void GenTextColorCommand(UI addr)
+ 921            {
+ 922   1        UC col;
+ 923   1      
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 16  
+
+ 924   1        switch (CmdDelimiter)
+ 925   1          {
+ 926   2          case ';':
+ 927   2            col = (UC)Parameter[1]; /* get color */
+ 928   2            send((UC)Parameter[0], addr, (UC*)&col, 1);
+ 929   2            break;
+ 930   2          default:
+ 931   2            break;
+ 932   2          }
+ 933   1        }
+ 934          
+ 935          
+ 936          /* (UT command)                             */
+ 937          void GenTextMovCommand(UI addr)
+ 938            {
+ 939   1        UC tm;
+ 940   1      
+ 941   1        switch (CmdDelimiter)
+ 942   1          {
+ 943   2          case ';':
+ 944   2            tm = (UC)Parameter[1]; /* get text movement */
+ 945   2            send((UC)Parameter[0], addr, (UC*)&tm, 1);
+ 946   2            break;
+ 947   2          default:
+ 948   2            break;
+ 949   2          }
+ 950   1        }
+ 951          
+ 952          /* (UU command)                            */
+ 953          void GenTextOnOffCommand(UI addr)
+ 954            {
+ 955   1        UC tm;
+ 956   1      
+ 957   1        switch (CmdDelimiter)
+ 958   1          {
+ 959   2          case ';':
+ 960   2            tm = (UC)Parameter[1]; /* get text onoff */
+ 961   2            send((UC)Parameter[0], addr, (UC*)&tm, 1);
+ 962   2            break;
+ 963   2          default:
+ 964   2            break;
+ 965   2          }
+ 966   1        }
+ 967          /*******************************************************************
+ 968           * NAME       void WriteUserTextCommand()
+ 969           * PURPOSE    To write text string sent by 5300 Master into eeprom.
+ 970           *            (UB command)
+ 971           * ARGUMENTS  None
+ 972           *
+ 973           * RETURNS    Nothing
+ 974           *
+ 975           * EXTERNS    None.
+ 976           *
+ 977           * NOTES:     10 characters are written, plus checksum.
+ 978           *            
+ 979           *             :FACT:V24C:ADDR BBU_1;COMM 'UB',2,'000000';
+ 980           *******************************************************************/
+ 981          void WriteUserTextCommand()
+ 982            {
+ 983   1      
+ 984   1        if ( CmdDelimiter == ';')
+ 985   1          {
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 17  
+
+ 986   2          if ((UC)Parameter[0] < 10)
+ 987   2            PageWriteE2prom(CONROL_BYTE, USER_TEXT + (11 * (UC)Parameter[0]), String, 10);
+ 988   2          }
+ 989   1        }
+ 990          
+ 991          /*******************************************************************
+ 992           * NAME       void ReadUserTextCommand()
+ 993           * PURPOSE    To read string from eeprom and transmit it to 5300 Master.
+ 994           *            (UC command)
+ 995           * ARGUMENTS  None
+ 996           *
+ 997           * RETURNS    Nothing
+ 998           *
+ 999           * EXTERNS    None.
+1000           *
+1001           * NOTES:     There is place for 10 strings, each containing 11
+1002           *            characters (last one is checksum) in the eeprom.
+1003           *            Parameter[0] contains nr of string to read.
+1004           *               :FACT:V24C:ADDR BBU_1;COMM 'UC?',2;
+1005           *******************************************************************/
+1006          void ReadUserTextCommand()
+1007            {
+1008   1        if (CmdDelimiter == '?')
+1009   1          {
+1010   2          if ((UC)Parameter[0] < 10)
+1011   2            {
+1012   3            SeqReadE2prom(CONROL_BYTE, USER_TEXT + (11 * (UC)Parameter[0]), String, 10);
+1013   3            String[10] = '\0';
+1014   3            WriteString(String); /* WriteString() adds quotes */
+1015   3            }
+1016   2          }
+1017   1        }
+1018          
+1019          /***************************************************************************/
+1020          /*  void ReadSWVersionCommand(void)                                        */
+1021          /*                                                                         */
+1022          /* Author:    JK                                                           */
+1023          /* Revised:   17.07.2002                                                   */
+1024          /*                                                                         */
+1025          /*  Function: To return software version (UD command)                      */
+1026          /*                                                                         */
+1027          /*  Returns:  Nothing                                                      */
+1028          /*  Notes:                                                                 */
+1029          /*            8051F226 board                                               */
+1030          /***************************************************************************/
+1031          void ReadSWVersionCommand()
+1032            {
+1033   1      
+1034   1        switch (CmdDelimiter)
+1035   1          {
+1036   2          case ';':
+1037   2            break;
+1038   2          case '?':
+1039   2            WriteVal(SWVERSION);
+1040   2            break;
+1041   2          default:
+1042   2            break;
+1043   2          }
+1044   1        }
+1045          
+1046          /***************************************************************************/
+1047          /*  ReadHWVersionCommand                                                   */
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 18  
+
+1048          /*                                                                         */
+1049          /* Author:    Kim Engedahl, DEV, 970217                                    */
+1050          /* Revised:    990304, KEn                                                 */
+1051          /* Function: To return hardware version (UE command)                       */
+1052          /***************************************************************************/
+1053          void ReadHWVersionCommand()
+1054            {
+1055   1      
+1056   1        if (CmdDelimiter == '?')
+1057   1          {
+1058   2      
+1059   2          WriteVal(HWVERSION);
+1060   2          }
+1061   1        }
+1062          
+1063          /***************************************************************************/
+1064          /*  ReadHWInformationCommand                                               */
+1065          /*                                                                         */
+1066          /* Author:    Kim Engedahl, DEV, 971120                                    */
+1067          /* Revised:    990304, KEn                                                 */
+1068          /* Function: To return hardware information (UF command)                   */
+1069          /***************************************************************************/
+1070          void ReadHWInformationCommand()
+1071            {
+1072   1      
+1073   1        if (CmdDelimiter == '?')
+1074   1          {
+1075   2      
+1076   2          WriteVal(HWINFO);
+1077   2          }
+1078   1        }
+1079          
+1080          /***************************************************************************/
+1081          /*  UnitAddressCommand                                                     */
+1082          /*                                                                         */
+1083          /* Author:    Kim Engedahl, DEV, 970217                                    */
+1084          /* Revised:   980601, KEn                                                  */
+1085          /*                                                                         */
+1086          /*  Function: Set/read the unit slave address (UA command)                 */
+1087          /*                                                                         */
+1088          /*  Remarks:  This function is invoked during FindDynamicOptions procedure */
+1089          /*            in Master startup sequence, where master sends UA command    */
+1090          /*            with apropriate conn_addr parameter.  This function changes  */
+1091          /*            MySlaveAddress from DefaultHDTPG_addr to con_addr and echoes */
+1092          /*            the conn_addr back, so the master knows that board is mounted*/
+1093          /*                                                                         */
+1094          /*               Send 'set unit address to con_addr' command               */
+1095          /*            SndChar(DefaultHDTPG_addr, "UA", conn_addr);                 */
+1096          /*                                                                         */
+1097          /***************************************************************************/
+1098          void UnitAddressCommand(void)
+1099            {
+1100   1      
+1101   1        switch (CmdDelimiter)
+1102   1          {
+1103   2          case ';':
+1104   2            MySlaveAddress = (UC)Parameter[0];  /* Parameter[0] holds bbux_addr  */
+1105   2            WriteChar(MySlaveAddress);          /* echo MySlaveAddress to Master */
+1106   2            break;
+1107   2      
+1108   2          case '?':
+1109   2            WriteVal((UL) MySlaveAddress);
+C51 COMPILER V7.10   CMD                                                                   02/22/2013 13:25:16 PAGE 19  
+
+1110   2            break;
+1111   2          }
+1112   1        }
+1113          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1907    ----
+   CONSTANT SIZE    =    720    ----
+   XDATA SIZE       =     56     105
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

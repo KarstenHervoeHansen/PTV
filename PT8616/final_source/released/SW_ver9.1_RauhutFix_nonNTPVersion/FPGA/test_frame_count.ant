@@ -1,0 +1,223 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 1995-2007 Xilinx, Inc.
+// All Right Reserved.
+////////////////////////////////////////////////////////////////////////////////
+//   ____  ____ 
+//  /   /\/   / 
+// /___/  \  /    Vendor: Xilinx 
+// \   \   \/     Version : 9.2.03i
+//  \   \         Application : ISE
+//  /   /         Filename : test_frame_count.ant
+// /___/   /\     Timestamp : Mon Nov 12 09:51:03 2007
+// \   \  /  \ 
+//  \___\/\___\ 
+//
+//Command: 
+//Design Name: test_frame_count
+//Device: Xilinx
+//
+`timescale 1ns/1ps
+
+module test_frame_count;
+    reg clk_i = 1'b0;
+    reg ltc_frame_tick_i = 1'b0;
+    reg sync_i = 1'b0;
+    reg dropframe_i = 1'b0;
+    reg [1:0] format_i = 2'b00;
+    reg [7:0] hours_i = 8'b00000000;
+    reg [7:0] mins_i = 8'b00000000;
+    reg [7:0] secs_i = 8'b00000000;
+    reg [7:0] frames_i = 8'b00000000;
+    wire [1:0] hour_tens_o;
+    wire [3:0] hour_units_o;
+    wire [2:0] min_tens_o;
+    wire [3:0] min_units_o;
+    wire [2:0] sec_tens_o;
+    wire [3:0] sec_units_o;
+    wire [1:0] frame_tens_o;
+    wire [3:0] frame_units_o;
+    wire update_frame_o;
+
+    parameter PERIOD_clk_i = 20;
+    parameter real DUTY_CYCLE_clk_i = 0.5;
+    parameter OFFSET_clk_i = 100;
+    parameter PERIOD_ltc_frame_tick_i = 120;
+    parameter real DUTY_CYCLE_ltc_frame_tick_i = 0.1666666667;
+    parameter OFFSET_ltc_frame_tick_i = 100;
+
+    initial    // Clock process for clk_i
+    begin
+        #OFFSET_clk_i;
+        forever
+        begin
+            clk_i = 1'b0;
+            #(PERIOD_clk_i-(PERIOD_clk_i*DUTY_CYCLE_clk_i)) clk_i = 1'b1;
+            #(PERIOD_clk_i*DUTY_CYCLE_clk_i);
+        end
+    end
+
+    initial    // Clock process for ltc_frame_tick_i
+    begin
+        #OFFSET_ltc_frame_tick_i;
+        forever
+        begin
+            ltc_frame_tick_i = 1'b0;
+            #(PERIOD_ltc_frame_tick_i-(PERIOD_ltc_frame_tick_i*DUTY_CYCLE_ltc_frame_tick_i)) ltc_frame_tick_i = 1'b1;
+            #(PERIOD_ltc_frame_tick_i*DUTY_CYCLE_ltc_frame_tick_i);
+        end
+    end
+
+    LTC_frame_counter UUT (
+        .clk_i(clk_i),
+        .ltc_frame_tick_i(ltc_frame_tick_i),
+        .sync_i(sync_i),
+        .dropframe_i(dropframe_i),
+        .format_i(format_i),
+        .hours_i(hours_i),
+        .mins_i(mins_i),
+        .secs_i(secs_i),
+        .frames_i(frames_i),
+        .hour_tens_o(hour_tens_o),
+        .hour_units_o(hour_units_o),
+        .min_tens_o(min_tens_o),
+        .min_units_o(min_units_o),
+        .sec_tens_o(sec_tens_o),
+        .sec_units_o(sec_units_o),
+        .frame_tens_o(frame_tens_o),
+        .frame_units_o(frame_units_o),
+        .update_frame_o(update_frame_o));
+
+    integer TX_FILE = 0;
+    integer TX_ERROR = 0;
+    
+    initial begin    // Annotation process for clock clk_i
+        #0;
+        ANNOTATE_frame_tens_o;
+        ANNOTATE_frame_units_o;
+        ANNOTATE_hour_tens_o;
+        ANNOTATE_hour_units_o;
+        ANNOTATE_min_tens_o;
+        ANNOTATE_min_units_o;
+        ANNOTATE_sec_tens_o;
+        ANNOTATE_sec_units_o;
+        ANNOTATE_update_frame_o;
+        #OFFSET_clk_i;
+        forever begin
+            #15;
+            ANNOTATE_frame_tens_o;
+            ANNOTATE_frame_units_o;
+            ANNOTATE_hour_tens_o;
+            ANNOTATE_hour_units_o;
+            ANNOTATE_min_tens_o;
+            ANNOTATE_min_units_o;
+            ANNOTATE_sec_tens_o;
+            ANNOTATE_sec_units_o;
+            ANNOTATE_update_frame_o;
+            #5;
+        end
+    end
+
+    initial begin  // Open the annotations file...
+        TX_FILE = $fopen("\\\\wts\\data1\\PT8616\\final_source\\FPGA\\test_frame_count.ano");
+        #1120 // Final time:  1120 ns
+        $display("Success! Annotation Simulation Complete.");
+        $fdisplay(TX_FILE, "Total[%d]", TX_ERROR);
+        $fclose(TX_FILE);
+        $finish;
+    end
+
+    initial begin // Process for clk_i
+        // -------------  Current Time:  100ns
+        #100;
+        frames_i = 8'b00100111;
+        secs_i = 8'b01011001;
+        format_i = 2'b10;
+        // -------------------------------------
+        // -------------  Current Time:  105ns
+        #5;
+        dropframe_i = 1'b1;
+        sync_i = 1'b1;
+        // -------------------------------------
+        // -------------  Current Time:  125ns
+        #20;
+        sync_i = 1'b0;
+        // -------------------------------------
+    end
+
+    initial begin // Process for ltc_frame_tick_i
+    end
+
+    task ANNOTATE_hour_tens_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,hour_tens_o,%b]", $time, hour_tens_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_hour_units_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,hour_units_o,%b]", $time, hour_units_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_min_tens_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,min_tens_o,%b]", $time, min_tens_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_min_units_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,min_units_o,%b]", $time, min_units_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_sec_tens_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,sec_tens_o,%b]", $time, sec_tens_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_sec_units_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,sec_units_o,%b]", $time, sec_units_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_frame_tens_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,frame_tens_o,%b]", $time, frame_tens_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_frame_units_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,frame_units_o,%b]", $time, frame_units_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+    task ANNOTATE_update_frame_o;
+        #0 begin
+            $fdisplay(TX_FILE, "Annotate[%d,update_frame_o,%b]", $time, update_frame_o);
+            $fflush(TX_FILE);
+            TX_ERROR = TX_ERROR + 1;
+        end
+    endtask
+
+endmodule
+

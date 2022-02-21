@@ -1,0 +1,1 @@
+C:\Cygnal\IDEfiles\c51\Bin\a51 startup.a51

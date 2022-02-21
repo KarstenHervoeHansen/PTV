@@ -1,0 +1,14 @@
+@rem diagram path :	F:\PT-Trilevel\dia\ver1\tlg_rev1.c
+@rem pcb path :		F:\PT-Trilevel\pcb\ver1\tlg_rev1.pcb
+
+@rem %1 : Drive
+@rem %2 : common path
+@rem %3 : input file name
+@rem %4 : output file name (.net)
+
+call e:\dk-utili\orc_net f: \Pt8611 \dia\pt8611\rev4\tsg_rev4.c  \pcb\pt8611\rev4\tsg
+f:\dka_util\net_cnv\net_cnv  f:\Pt8611\pcb\pt8611\rev4\tsg
+del f:\Pt8611\pcb\pt8611\rev4\tsg.net
+copy f:\Pt8611\pcb\pt8611\rev4\tsg.cnv f:\Pt8611\pcb\pt8611\rev4\tsg.net
+del f:\Pt8611\pcb\pt8611\rev4\tsg.cnv
+pause

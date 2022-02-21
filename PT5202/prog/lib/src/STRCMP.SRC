@@ -1,0 +1,71 @@
+; @(#)strcmp.src	1.2.1.1 4/1/98
+;*****************************************************************************
+;*
+;* MODULE	: strcmp.src
+;*
+;* APPLICATION	: C library
+;*
+;* DESCRIPTION	: Source file for strcmp() routine
+;*		  Compares two strings.
+;*
+;* INPUT	: s1 = R0	(tiny/small/medium)
+;*		  s1 = R1:R0	(large)
+;*		  s2 = R1	(tiny/small/medium)
+;*		  s2 = R3:R2	(large)
+;*
+;* OUTPUT	: R0	< 0  -- s1<s2
+;*			= 0  -- s1=s2
+;*			> 0  -- s1>s2
+;*
+;* USES		: R0-R3
+;*
+;* COPYRIGHT	: 1997 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+
+INCLUDE 'HEAD'
+
+	NAME	STRCMP
+
+DEFINE S1	"R0"
+IF    MODEL_LARGE
+DEFINE S2	"R2"
+ELSE
+DEFINE S2	"R1"
+ENDIF
+
+IF    MODEL_MEDIUM || MODEL_LARGE
+LIBC_PR	SEGMENT	HCODE
+ELSE
+LIBC_PR	SEGMENT	CODE
+ENDIF
+
+	RSEG	LIBC_PR
+
+	PUBLIC	_strcmp
+
+;*****************************************************************************
+;* strcmp
+;*****************************************************************************
+_strcmp:
+IF    MODEL_LARGE
+	PUSH.B	DS		; save default segment
+	MOV.B	ES,R3L		; s2 addressed via ES
+	CLR	SSEL.0		; s1 addressed via DS
+	MOV.B	DS,R1L		;
+ENDIF
+cont:	MOV.B	R3H,[S1+]	; *s1++
+	MOV.B	R3L,R3H		; c = *s1++
+	SUB.B	R3L,[S2+]	; result = *s1++ - *s2++
+	BNE	stop		; if ( result != 0 ) stop compare
+	OR.B	R3H,R3H		; 
+	BNE	cont		; if ( c != 0 ) continue compare
+stop:	MOV.B	R0L,R3L		;
+	SEXT.B	R0H		; return (int)result;
+IF    MODEL_LARGE
+	SETB	SSEL.0		; set back for default addressing
+	POP.B	DS		; restore default segment
+ENDIF
+	RET
+
+	END

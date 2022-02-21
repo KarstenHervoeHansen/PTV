@@ -1,0 +1,329 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTL\cc71474b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    UITOA
+                          6 ; uitoa.c     1 /* uitoa.c */
+                          7 ; uitoa.c     2 
+                          8 ; uitoa.c     3 /*
+                          9 ; uitoa.c     4  *   RTXCio    
+                         10 ; uitoa.c     5  *   Copyright (c) 
+                         11 ; uitoa.c     6  *   Embedded System Products, Inc.
+                         12 ; uitoa.c     7  *   ALL RIGHTS RESERVED
+                         13 ; uitoa.c     8 */
+                         14 ; uitoa.c     9 
+                         15 ; uitoa.c    10 /*
+                         16 ; uitoa.c    11  * itoa and uitoa are used by format()
+                         17 ; uitoa.c    12 */
+                         18 ; uitoa.c    13 
+                         19 ; uitoa.c    14 extern int strlen(const char *);
+                         20 ; uitoa.c    15 
+                         21 ; uitoa.c    16 #define NEED_ITOA
+                         22 ; uitoa.c    17 #define NEED_UITOA
+                         23 ; uitoa.c    18 #define NEED_REVERSE
+                         24 ; uitoa.c    19 
+                         25 ; uitoa.c    20 /* CONFIG */
+                         26 ; uitoa.c    21 #define RADIX  /* indicates non-decimal radix support */
+                         27 ; uitoa.c    22                /* some versions don't support non-decimal radix */
+                         28 ; uitoa.c    23 
+                         29 ; uitoa.c    24 #ifdef NEED_REVERSE
+                         30 ; uitoa.c    25 void reverse(char *);
+                         31 ; uitoa.c    26 #else
+                         32 ; uitoa.c    27 extern void reverse(char *);
+                         33 ; uitoa.c    28 #endif
+                         34 ; uitoa.c    29 
+                         35 ; uitoa.c    30 #ifdef RADIX
+                         36 ; uitoa.c    31 static const char lookup[] =
+000000                   37 UITOA_INI_FA    SEGMENT HDATA INSEGMENT INIT
+000000                   38         RSEG    UITOA_INI_FA
+000000                   39 _lookup:
+000000 30313233343536    40         DB      030H,031H,032H,033H,034H,035H,036H,037H,038H,039H,041H,042H
+       3738394142           
+                         41 ; uitoa.c    32 {
+                         42 ; uitoa.c    33    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                         43 ; uitoa.c    34    'A', 'B', 'C', 'D', 'E', 'F'
+                         44 ; uitoa.c    35 };
+                         45 ; uitoa.c    36 #endif
+                         46 ; uitoa.c    37 
+                         47 ; uitoa.c    38 
+                         48 ; uitoa.c    39 #ifdef NEED_UITOA
+                         49 ; uitoa.c    40 /* unsigned integer to ascii */
+                         50 ; uitoa.c    41 void uitoa(
+                         51 ; uitoa.c    42 unsigned int n,    /* unsigned integer to be converted */
+                         52 ; uitoa.c    43 char s[],          /* storage area to save ascii */
+                         53 ; uitoa.c    44 int radix)         /* optional radix, decimal assumed */
+                         54 ; uitoa.c    45 {
+                         55         PUBLIC  _uitoa
+00000C 43444546          56         DB      043H,044H,045H,046H
+000000                   57 UITOA_PR        SEGMENT HCODE
+000000                   58         RSEG    UITOA_PR
+000000                   58         RSEG    UITOA_PR
+000000                   59 _uitoa:
+000000 0F70              60         PUSH.W  R4, R5, R6
+000002 A97A              61         ADDS.W  R7,#0AH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+000004 8C3F04            62         MOV.W   [R7+4],R3
+000007 8C2F02            63         MOV.W   [R7+2],R2
+                         64 ; uitoa.c    46     int i = 0;
+00000A B960              65         MOV.W   R6,#00H
+00000A B960              65         MOV.W   R6,#00H
+                         66 ; uitoa.c    47 
+                         67 ; uitoa.c    48     do
+00000C                   68 _3:
+                         69 ; uitoa.c    49         { /* generate digits in reverse order */
+                         70 ; uitoa.c    50 #ifdef RADIX
+                         71 ; uitoa.c    51             s[i++] = lookup[n % radix]; /* get next digit */
+00000C 8920              72         MOV.W   R2,R0
+00000E 7933              73         XOR.W   R3,R3
+000010 ED21              74         DIVU.D  R2,R1
+000012 8923              75         MOV.W   R2,R3
+000014 B930              76         MOVS.W  R3,#00H
+000016 964842rr          77         MOV.B   ES,#SEG( _lookup )
+00001A 8542rrrr          78         MOV.B   R2L,[R2+SOF( _lookup )]
+00001E 824F              79         MOV.B   [R7],R2L
+000020 8946              80         MOV.W   R4,R6
+000022 9859              81         SEXT.W  R5
+000024 8C3704            82         MOV.W   R3,[R7+4]
+000027 8C2702            83         MOV.W   R2,[R7+2]
+00002A 0924              84         ADD.W   R2,R4
+00002C 8287              85         MOV.B   R4L,[R7]
+00002E 866C42            86         MOV.B   ES,R3L
+000031 828A              87         MOV.B   [R2],R4L
+000033 A961              88         ADDS.W  R6,#01H
+                         89 ; uitoa.c    52 #else
+                         90 ; uitoa.c    53             s[i++] = n % 10 + '0'; /* get next digit */
+                         91 ; uitoa.c    54 #endif
+                         92 ; uitoa.c    55         }
+                         93 ; uitoa.c    56 #ifdef RADIX
+                         94 ; uitoa.c    57     while ((n /= radix) > 0); /* delete it */
+000035 8920              95         MOV.W   R2,R0
+000037 7933              96         XOR.W   R3,R3
+000039 ED21              97         DIVU.D  R2,R1
+00003B 8902              98         MOV.W   R0,R2
+00003D 99040000          99         CMP.W   R0,#00H
+000041 F8E5             100         BG      _3
+                        101 ; uitoa.c    58 #else
+                        102 ; uitoa.c    59     while ((n /= 10) > 0); /* delete it */
+                        103 ; uitoa.c    60 #endif
+                        104 ; uitoa.c    61     s[i] = '\0';
+000043 8946             105         MOV.W   R4,R6
+000045 9859             106         SEXT.W  R5
+000047 8C3704           107         MOV.W   R3,[R7+4]
+00004A 8C2702           108         MOV.W   R2,[R7+2]
+00004D 0924             109         ADD.W   R2,R4
+00004F 866C42           110         MOV.B   ES,R3L
+000052 B220             111         MOV.B   [R2],#00H
+                        112 ; uitoa.c    62 
+                        113 ; uitoa.c    63     reverse(s);
+000054 8C1704           114         MOV.W   R1,[R7+4]
+000057 8C0702           115         MOV.W   R0,[R7+2]
+00005A C5004F           116         CALL    _reverse
+                        117 ; uitoa.c    64 }
+00005D A976             118         ADDS.W  R7,#06H
+00005F 2F70             119         POP.W   R4, R5, R6
+000061 D680             120         RET
+000061 D68000           120         RET
+                        121 ; uitoa.c    65 #endif
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        122 ; uitoa.c    66 
+                        123 ; uitoa.c    67 
+                        124 ; uitoa.c    68 #ifdef NEED_ITOA
+                        125 ; uitoa.c    69 /* integer to ascii */
+                        126 ; uitoa.c    70 void itoa(
+                        127 ; uitoa.c    71 int n,       /* integer to be converted */
+                        128 ; uitoa.c    72 char s[],    /* storage area to save ascii */
+                        129 ; uitoa.c    73 int radix)   /* optional radix, decimal assumed */
+                        130 ; uitoa.c    74 {
+                        131         PUBLIC  _itoa
+000064                  132 _itoa:
+000064 0F70             133         PUSH.W  R4, R5, R6
+000066 A978             134         ADDS.W  R7,#08H
+000068 8A1F             135         MOV.W   [R7],R1
+00006A 8C3F04           136         MOV.W   [R7+4],R3
+00006D 8C2F02           137         MOV.W   [R7+2],R2
+                        138 ; uitoa.c    75     int i = 0;
+000070 B940             139         MOV.W   R4,#00H
+                        140 ; uitoa.c    76     int sign;
+                        141 ; uitoa.c    77 
+                        142 ; uitoa.c    78     if ((sign = n) < 0) /* record sign */
+000072 8910             143         MOV.W   R1,R0
+000074 8950             144         MOV.W   R5,R0
+000076 99140000         145         CMP.W   R1,#00H
+00007A FA04             146         BGE     _5
+                        147 ; uitoa.c    79         n = -n;         /* make n positive */
+00007C 8960             148         MOV.W   R6,R0
+00007E 986B             149         NEG.W   R6
+000080 8950             150         MOV.W   R5,R0
+000082 8906             151         MOV.W   R0,R6
+000082 8906             151         MOV.W   R0,R6
+                        152 ; uitoa.c    80 
+                        153 ; uitoa.c    81     do
+000084                  154 _5:
+000084                  154 _5:
+000084                  155 _6:
+                        156 ; uitoa.c    82         { /* generate digits in reverse order */
+                        157 ; uitoa.c    83 #ifdef RADIX
+                        158 ; uitoa.c    84             s[i++] = lookup[n % radix]; /* get next digit */
+000084 8C0F06           159         MOV.W   [R7+6],R0
+000087 8A27             160         MOV.W   R2,[R7]
+000089 7911             161         XOR.W   R1,R1
+00008B ED02             162         DIVU.D  R0,R2
+00008D 8901             163         MOV.W   R0,R1
+00008F B910             164         MOVS.W  R1,#00H
+000091 964842rr         165         MOV.B   ES,#SEG( _lookup )
+000095 85C0rrrr         166         MOV.B   R6L,[R0+SOF( _lookup )]
+000099 8904             167         MOV.W   R0,R4
+00009B 9819             168         SEXT.W  R1
+00009D 8C3704           169         MOV.W   R3,[R7+4]
+0000A0 8C2702           170         MOV.W   R2,[R7+2]
+0000A3 0920             171         ADD.W   R2,R0
+0000A5 866C42           172         MOV.B   ES,R3L
+0000A8 82CA             173         MOV.B   [R2],R6L
+0000AA A941             174         ADDS.W  R4,#01H
+                        175 ; uitoa.c    85 #else
+                        176 ; uitoa.c    86             s[i++] = n % 10 + '0'; /* get next digit */
+                        177 ; uitoa.c    87 #endif
+                        178 ; uitoa.c    88         }
+                        179 ; uitoa.c    89 #ifdef RADIX
+                        180 ; uitoa.c    90     while ((n /= radix) > 0); /* delete it */
+0000AC 8C0706           181         MOV.W   R0,[R7+6]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+0000AF 8A27             182         MOV.W   R2,[R7]
+0000B1 8910             183         MOV.W   R1,R0
+0000B3 9819             184         SEXT.W  R1
+0000B5 EF02             185         DIV.D   R0,R2
+0000B7 99040000         186         CMP.W   R0,#00H
+0000BB FCE4             187         BGT     _6
+                        188 ; uitoa.c    91 #else
+                        189 ; uitoa.c    92     while ((n /= 10) > 0); /* delete it */
+                        190 ; uitoa.c    93 #endif
+                        191 ; uitoa.c    94     if (sign < 0)
+0000BD 99540000         192         CMP.W   R5,#00H
+0000C1 FA0B             193         BGE     _7
+                        194 ; uitoa.c    95         s[i++] = '-';
+0000C3 8924             195         MOV.W   R2,R4
+0000C5 9839             196         SEXT.W  R3
+0000C7 8C1704           197         MOV.W   R1,[R7+4]
+0000CA 8C0702           198         MOV.W   R0,[R7+2]
+0000CD 0902             199         ADD.W   R0,R2
+0000CF 862C42           200         MOV.B   ES,R1L
+0000D2 92082D           201         MOV.B   [R0],#02DH
+0000D5 A941             202         ADDS.W  R4,#01H
+0000D5 A94100           202         ADDS.W  R4,#01H
+0000D8                  203 _7:
+                        204 ; uitoa.c    96     s[i] = '\0';
+0000D8 8944             205         MOV.W   R4,R4
+0000DA 9859             206         SEXT.W  R5
+0000DC 8C3704           207         MOV.W   R3,[R7+4]
+0000DF 8C2702           208         MOV.W   R2,[R7+2]
+0000E2 0924             209         ADD.W   R2,R4
+0000E4 866C42           210         MOV.B   ES,R3L
+0000E7 B220             211         MOV.B   [R2],#00H
+                        212 ; uitoa.c    97 
+                        213 ; uitoa.c    98     reverse(s);
+0000E9 8C1704           214         MOV.W   R1,[R7+4]
+0000EC 8C0702           215         MOV.W   R0,[R7+2]
+0000EF C50004           216         CALL    _reverse
+                        217 ; uitoa.c    99 }
+0000F2 99700008         218         ADD.W   R7,#08H
+0000F6 2F70             219         POP.W   R4, R5, R6
+0000F8 D680             220         RET
+0000F8 D680             220         RET
+                        221 ; uitoa.c   100 #endif
+                        222 ; uitoa.c   101 
+                        223 ; uitoa.c   102 
+                        224 ; uitoa.c   103 #ifdef NEED_REVERSE
+                        225 ; uitoa.c   104 void reverse(s)  /* reverse string s in place */
+                        226 ; uitoa.c   105 char s[];
+                        227         PUBLIC  _reverse
+0000FA                  228 _reverse:
+0000FA 0F70             229         PUSH.W  R4, R5, R6
+0000FC 9972000C         230         SUB.W   R7,#0CH
+                        231 ; uitoa.c   106 {
+                        232 ; uitoa.c   107     char c;
+                        233 ; uitoa.c   108     int i, j;
+                        234 ; uitoa.c   109 
+                        235 ; uitoa.c   110     for (i = 0, j = strlen(s) - 1; i < j; i++, j--)
+000100 B940             236         MOV.W   R4,#00H
+000102 8C1F0A           237         MOV.W   [R7+10],R1
+000105 8C0F08           238         MOV.W   [R7+8],R0
+                        239         CALL    _strlen
+000108 C4rrrrrr        +239 ;       FCALL   _strlen
+00010C 8960             240         MOV.W   R6,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+00010E A96F             241         ADDS.W  R6,#0FH
+000110 8956             242         MOV.W   R5,R6
+000112 8906             243         MOV.W   R0,R6
+000114 9819             244         SEXT.W  R1
+000116 8C370A           245         MOV.W   R3,[R7+10]
+000119 8C2708           246         MOV.W   R2,[R7+8]
+00011C 0920             247         ADD.W   R2,R0
+00011E 8C3F06           248         MOV.W   [R7+6],R3
+000121 8C2F04           249         MOV.W   [R7+4],R2
+000124 99640000         250         CMP.W   R6,#00H
+000128 FD27             251         BLE     _12
+000128 FD27             251         BLE     _12
+00012A                  252 _11:
+                        253 ; uitoa.c   111     {
+                        254 ; uitoa.c   112         c = s[i];
+00012A 8904             255         MOV.W   R0,R4
+00012C 9819             256         SEXT.W  R1
+00012E 8C370A           257         MOV.W   R3,[R7+10]
+000131 8C2708           258         MOV.W   R2,[R7+8]
+000134 0920             259         ADD.W   R2,R0
+000136 8C3F02           260         MOV.W   [R7+2],R3
+000139 8A2F             261         MOV.W   [R7],R2
+00013B 866C42           262         MOV.B   ES,R3L
+00013E 8202             263         MOV.B   R0L,[R2]
+                        264 ; uitoa.c   113         s[i] = s[j];
+000140 8C3706           265         MOV.W   R3,[R7+6]
+000143 8C2704           266         MOV.W   R2,[R7+4]
+000146 866C42           267         MOV.B   ES,R3L
+000149 8212             268         MOV.B   R0H,[R2]
+00014B 8C3702           269         MOV.W   R3,[R7+2]
+00014E 8A27             270         MOV.W   R2,[R7]
+000150 866C42           271         MOV.B   ES,R3L
+000153 821A             272         MOV.B   [R2],R0H
+                        273 ; uitoa.c   114         s[j] = c;
+000155 8C3706           274         MOV.W   R3,[R7+6]
+000158 8C2704           275         MOV.W   R2,[R7+4]
+00015B 866C42           276         MOV.B   ES,R3L
+00015E 820A             277         MOV.B   [R2],R0L
+000160 A941             278         ADDS.W  R4,#01H
+000162 99220001         279         SUB.W   R2,#01H
+000166 8C3F06           280         MOV.W   [R7+6],R3
+000169 8C2F04           281         MOV.W   [R7+4],R2
+00016C 8C3706           282         MOV.W   R3,[R7+6]
+00016F 8C2704           283         MOV.W   R2,[R7+4]
+000172 A95F             284         ADDS.W  R5,#0FH
+000174 4945             285         CMP.W   R4,R5
+000176 FBD9             286         BLT     _11
+000176 FBD9             286         BLT     _11
+                        287 ; uitoa.c   115     }
+000178                  288 _12:
+                        289 ; uitoa.c   116 }
+000178 9970000C         290         ADD.W   R7,#0CH
+00017C 2F70             291         POP.W   R4, R5, R6
+00017E D680             292         RET
+                        293 ; uitoa.c   117 #endif
+                        294 ; uitoa.c   118 
+                        295 ; uitoa.c   119 /* end of uitoa.c */
+                        297         EXTRN   HCODE(_strlen)
+                        298         CALLS   'uitoa', 'reverse'
+                        299         CALLS   'itoa', 'reverse'
+                        300         CALLS   'reverse', 'strlen'

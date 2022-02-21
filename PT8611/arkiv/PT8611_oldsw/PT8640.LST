@@ -1,0 +1,388 @@
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE PT8640
+OBJECT MODULE PLACED IN PT8640.OBJ
+COMPILER INVOKED BY: C:\CYGNAL\IDEfiles\C51\BIN\C51.exe PT8640.c DB OE CD OPTIMIZE(9,SPEED) SMALL
+
+stmt level    source
+
+   1          /***************************************************************************/
+   2          /*  Copyright DK-Audio A/S, 2003                                           */
+   3          /*  Project:  PT8640 TriLevel HDTV generator, using 8051F231 Cygnal        */
+   4          /*            processor.                                                   */
+   5          /*  Module:   PT8640.C                                                     */
+   6          /*  Author:   Jnausz Kuzminski                                             */
+   7          /*  Date:     15.10.2003                                                   */
+   8          /*  Status:   Version 1.0                                                  */
+   9          /*  Purpose:  Main program for PT8640 unit.                                */
+  10          /*  Note:     F231 has 8K Flash and 255 bytes of RAM and no  XRAM          */
+  11          /*                                                                         */
+  12          /*            Linker args: RS(256) NOOL                                    */
+  13          /***************************************************************************/
+  14          
+  15          
+  16          #include "f200.h"
+  17          #include "define.h"
+  18          #include <string.h>
+  19          #include "rs232.h"
+  20          #include "spi_mod1.h"
+  21          #include "eeprom.h"
+  22          
+  23          /**************************************************************************/
+  24          /* Baud Rate calculation: Figure 17.13.                                   */
+  25          /* UART operates in Mode 3, with Timer 2 used for Baud Rate generation    */
+  26          /*                                                                        */
+  27          /*   Baud Rate = Timer 2 overflow rate / 16                               */
+  28          /*                                                                        */
+  29          /*  Timer 2 overflow rate = tclk / (TIMER2_RANGE - RELOAD2)               */
+  30          /*  tclk = CRYSTAL / 2                                                    */
+  31          /*                                                                        */
+  32          /*  Baud Rate = CRYSTAL / 32 * (TIMER2_RANGE - RELOAD2)                   */
+  33          /**************************************************************************/
+  34          
+  35          #define CRYSTAL                  16.666E6        /* 29.4912E6 */
+  36          
+  37          #define TIMER2_RANGE (unsigned long)65536
+  38          
+  39          #define BAUDRATE     (unsigned long) (76800)    /* select 57600 baud */
+  40                                                      
+  41          #define RELOAD2 (unsigned short)(TIMER2_RANGE - (CRYSTAL/(BAUDRATE*(unsigned long)32)))
+  42          
+  43          #define THI2_RESET  (RELOAD2 >> 8) & 0xFF
+  44          #define TLO2_RESET  (RELOAD2 & 0xFF)
+  45          
+  46          
+  47          /* ==================== */
+  48          /* SCON - bit settings  */
+  49          /* -------------------- */
+  50          /* UART                 */
+  51          /* -------------------- */
+  52          #define U_SM0   (1 << 7)   /* allow for 8-bit UART  Mode 3: 9-bit UART, Variable BR */
+  53          #define U_SM1   (1 << 6)   /* allow for 8-bit UART  Mode 3: 9-bit UART, Variable BR */
+  54          #define U_SM2   (1 << 5)   /* clear to disable multiprocessor communication */
+  55          #define U_REN   (1 << 4)   /* enable serial reception */
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 2   
+
+  56               
+  57          #define U_TB8   (0 << 3)   /* the 9th databit transmitted in mode 2 or 3 */
+  58          #define U_RB8   (0 << 2)   /* the 9th databit received in mode 2 or 3 */
+  59          
+  60          #define U_TI    (0 << 1)   /* set the transmit interrupt flag */
+  61          #define U_RI    (0 << 0)   /* set the receive interrupt flag */ 
+  62          
+  63          #define xSCON (U_SM0 | U_SM1 | U_SM2 | U_REN | U_TB8 | U_RB8 | U_TI | U_RI )
+  64          
+  65          /* =================== */
+  66          /* TCON - bit settings */
+  67          /* ------------------- */
+  68          /* TIMER 2             */
+  69          /* ------------------- */
+  70          #define T2_TF2    (0 << 7)   /* overflow flag - NOT cleared by hardware */
+  71          #define T2_EXF2   (0 << 6)   /* not applicable - OR in a zero (0) */
+  72          #define T2_RCLK   (1 << 5)   /* set to use timer 2 as clock source for UART,(AND select autoreload) */
+  73          #define T2_TCLK   (1 << 4)   /* set to use timer 2 as clock source for UART,(AND select autoreload) */
+  74          #define T2_EXEN2  (0 << 3)   /* not applicable - OR in a zero (0) */
+  75          #define T2_TR2    (0 << 2)   /* not applicable - OR in a zero (0) */
+  76          #define T2_CT2    (0 << 1)   /* not applicable - OR in a zero (0) */
+  77          #define T2_CPRL2  (0 << 0)   /* not applicable - OR in a zero (0) */
+  78          
+  79          #define T2_CON    (T2_TF2 | T2_EXF2 | T2_RCLK| T2_TCLK | T2_EXEN2 | T2_TR2 | T2_CT2 | T2_CPRL2)
+  80          
+  81          #define xTCON     T2_CON
+  82          /* =================== 
+  83          
+  84          /*
+  85          //-------------------
+  86          // Global CONSTANTS
+  87          //-------------------
+  88          */
+  89          sbit  LED = P2^4;          /* green LED */
+  90          
+  91          sbit  TP = P3^2;          /* P3^2: test point */
+  92          
+  93          sbit OE = P1^0;
+  94          
+  95          /* CURR_PARAMS gen_params; */
+  96          
+  97          CURR_PARAMS tlgs[4];
+  98          bit         changed;
+  99          UC          current_generator;
+ 100          ul          tlg_samples;
+ 101          
+ 102          /*************************/
+ 103          /*  Function PROTOTYPES  */
+ 104          /*************************/
+ 105          void init_all(void);
+ 106          
+ 107          
+ 108          void main (void)
+ 109            {
+ 110   1        UC error;
+ 111   1      
+ 112   1        changed  = 0;
+ 113   1        init_all();
+ 114   1      
+ 115   1        error = 0;
+ 116   1      
+ 117   1      #if 0
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 3   
+
+              c = 0xbb;
+              d = 0xaa;
+              PageWriteE2prom(CONROL_BYTE, 10, &c, 1);
+              
+              SeqReadE2prom(CONROL_BYTE, 10, &d, 1);
+              #endif
+ 124   1      
+ 125   1        while (1)
+ 126   1          {
+ 127   2          if (TestInputBuffer())
+ 128   2            CharHandler();
+ 129   2          if (changed)
+ 130   2            {
+ 131   3            write_plds(tlgs[current_generator].format);
+ 132   3            changed = 0;
+ 133   3            }
+ 134   2          }
+ 135   1        }
+ 136          
+ 137          /***************************************************************************/
+ 138          /*  void init_all(void)                                                    */
+ 139          /*                                                                         */
+ 140          /* Author:    JK                                                           */
+ 141          /* Revised:   17.07.2002                                                   */
+ 142          /*                                                                         */
+ 143          /*  Function: Initialize 8051-226 Uart to 57600,n,9,1 and set Timer 2 to   */
+ 144          /*            operate as BR generator                                      */
+ 145          /*            Initialize processor to external clock                       */
+ 146          /*                                                                         */
+ 147          /*  Returns:  Nothing                                                      */
+ 148          /*  Notes:    Baud rate generator mode is selected by setting RCLK and     */
+ 149          /*            TCLK to logic one.  With this done, Timer 2 operates in      */
+ 150          /*            auto reload mode regardless of the state of the CP/RL2 bit   */
+ 151          /***************************************************************************/
+ 152          void init_all(void)
+ 153            {
+ 154   1        UC c;
+ 155   1        UI n;
+ 156   1      
+ 157   1        /* disable watchdog timer */
+ 158   1        WDTCN = 0xde;
+ 159   1        WDTCN = 0xad;
+ 160   1        
+ 161   1        OSCXCN  = 0x67; /* XFCN = 111, f > 6.74 MHz, page 90  */
+ 162   1      
+ 163   1        n = 1000;
+ 164   1        while ( n > 0)
+ 165   1          n--;
+ 166   1      
+ 167   1        PRT2CF |= 0x10;  /* enable P2.4 (LED) as push-pull output */
+ 168   1        PRT2CF |= 0x3F; /* page 98, SPI, NSS_1, NSS_2, NSS_M as push-pulls */
+ 169   1      
+ 170   1        PRT2MX |= 0x00; /* page 95, SPI NOT routed to pins, we have software SPI */
+ 171   1      
+ 172   1        PRT1CF |= 0xFF; /* page 97, P1 as push-pull */
+ 173   1      
+ 174   1        while(1)        /* wait until ext. osc. is stable, page 91 */
+ 175   1         {
+ 176   2         c = OSCXCN;
+ 177   2         c &= 0x80;
+ 178   2         if (c)         /* if XTLVLD = 1, oscillator is stable */
+ 179   2           break;
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 4   
+
+ 180   2         }
+ 181   1      
+ 182   1        OSCICN |= 0x08; /* Uses extern osc as sysclk, page 89 */
+ 183   1      
+ 184   1        PRT0MX  = 1;    /* UART TX and RX routed to P0.0 and P0.1, page 94 */
+ 185   1        PRT0CF  = 0x00; /* enable P0.0 (TX) as open drain output,   page 96 0x01 */
+ 186   1      
+ 187   1        P2 = 0xFF;
+ 188   1      
+ 189   1      #if 0
+                PRT3CF  = 0xFF;          /* P3.0 and p3.1 as push-pull            */
+                P3MODE  = 0xFF;          /* digital inputs enabled                */
+                P3      = 0xFF;
+              #endif
+ 194   1      
+ 195   1        SCON   =  xSCON; /*   Init uart  */
+ 196   1        
+ 197   1        T2CON  = xTCON;  /*   Init Timer 2 as BR generator */
+ 198   1      /*
+ 199   1      //
+ 200   1      // Note: the baud rate for communication between master and units in 5230
+ 201   1      //       is not 57600 but one which corresponds to reload values below.
+ 202   1      //       The value of this baud rate is unknown.
+ 203   1      //       Values below were established experimentally.
+ 204   1      //       Probably, the baud rate is 76800
+ 205   1      //
+ 206   1      */
+ 207   1        RCAP2H = THI2_RESET;
+ 208   1        RCAP2L = TLO2_RESET;
+ 209   1      
+ 210   1        TR2 = 1;             /* Start Timer 2 */
+ 211   1      
+ 212   1        RS232Init();
+ 213   1      
+ 214   1        TI = 0;              /* Clear possible transmit interrupt  */
+ 215   1        RI = 0;              /* Clear possible receive interrupt   */
+ 216   1        
+ 217   1        c = I2cInit(); /* program will hang here if no eeprom! */
+ 218   1      
+ 219   1        OE   = 1;  /* /OE for buffers, disable buffers */
+ 220   1      
+ 221   1        LED  = 0;
+ 222   1      
+ 223   1        ES   = 1;  /* Enable serial interrupt   */
+ 224   1        EA   = 1;
+ 225   1        }
+ 226          
+ 227           
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 5   
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION main (BEGIN)
+                                           ; SOURCE LINE # 108
+                                           ; SOURCE LINE # 109
+                                           ; SOURCE LINE # 112
+0000 C200        R     CLR     changed
+                                           ; SOURCE LINE # 113
+0002 120000      R     LCALL   init_all
+                                           ; SOURCE LINE # 115
+0005 E4                CLR     A
+0006 F500        R     MOV     error,A
+0008         ?C0001:
+                                           ; SOURCE LINE # 125
+                                           ; SOURCE LINE # 126
+                                           ; SOURCE LINE # 127
+0008 120000      E     LCALL   TestInputBuffer
+000B 5003              JNC     ?C0003
+                                           ; SOURCE LINE # 128
+000D 120000      E     LCALL   CharHandler
+0010         ?C0003:
+                                           ; SOURCE LINE # 129
+0010 3000F5      R     JNB     changed,?C0001
+                                           ; SOURCE LINE # 130
+                                           ; SOURCE LINE # 131
+0013 E500        R     MOV     A,current_generator
+0015 75F005            MOV     B,#05H
+0018 A4                MUL     AB
+0019 2400        R     ADD     A,#LOW tlgs
+001B F8                MOV     R0,A
+001C E6                MOV     A,@R0
+001D FF                MOV     R7,A
+001E 120000      E     LCALL   _write_plds
+                                           ; SOURCE LINE # 132
+0021 C200        R     CLR     changed
+                                           ; SOURCE LINE # 133
+                                           ; SOURCE LINE # 134
+0023 80E3              SJMP    ?C0001
+             ; FUNCTION main (END)
+
+             ; FUNCTION init_all (BEGIN)
+                                           ; SOURCE LINE # 152
+                                           ; SOURCE LINE # 153
+                                           ; SOURCE LINE # 158
+0000 75FFDE            MOV     WDTCN,#0DEH
+                                           ; SOURCE LINE # 159
+0003 75FFAD            MOV     WDTCN,#0ADH
+                                           ; SOURCE LINE # 161
+0006 75B167            MOV     OSCXCN,#067H
+                                           ; SOURCE LINE # 163
+;---- Variable 'n' assigned to Register 'R6/R7' ----
+0009 7FE8              MOV     R7,#0E8H
+000B 7E03              MOV     R6,#03H
+000D         ?C0006:
+                                           ; SOURCE LINE # 164
+                                           ; SOURCE LINE # 165
+000D EF                MOV     A,R7
+000E 1F                DEC     R7
+000F 7001              JNZ     ?C0012
+0011 1E                DEC     R6
+0012         ?C0012:
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 6   
+
+0012 EF                MOV     A,R7
+0013 4E                ORL     A,R6
+0014 70F7              JNZ     ?C0006
+0016         ?C0007:
+                                           ; SOURCE LINE # 167
+0016 43A610            ORL     PRT2CF,#010H
+                                           ; SOURCE LINE # 168
+0019 43A63F            ORL     PRT2CF,#03FH
+                                           ; SOURCE LINE # 170
+                                           ; SOURCE LINE # 172
+001C 75A5FF            MOV     PRT1CF,#0FFH
+001F         ?C0008:
+                                           ; SOURCE LINE # 174
+                                           ; SOURCE LINE # 175
+                                           ; SOURCE LINE # 176
+;---- Variable 'c' assigned to Register 'R7' ----
+001F AFB1              MOV     R7,OSCXCN
+                                           ; SOURCE LINE # 177
+0021 530780            ANL     AR7,#080H
+                                           ; SOURCE LINE # 178
+0024 EF                MOV     A,R7
+0025 60F8              JZ      ?C0008
+                                           ; SOURCE LINE # 179
+                                           ; SOURCE LINE # 180
+0027         ?C0009:
+                                           ; SOURCE LINE # 182
+0027 43B208            ORL     OSCICN,#08H
+                                           ; SOURCE LINE # 184
+002A 75E101            MOV     PRT0MX,#01H
+                                           ; SOURCE LINE # 185
+002D E4                CLR     A
+002E F5A4              MOV     PRT0CF,A
+                                           ; SOURCE LINE # 187
+0030 75A0FF            MOV     P2,#0FFH
+                                           ; SOURCE LINE # 195
+0033 7598F0            MOV     SCON,#0F0H
+                                           ; SOURCE LINE # 197
+0036 75C830            MOV     T2CON,#030H
+                                           ; SOURCE LINE # 207
+0039 75CBFF            MOV     RCAP2H,#0FFH
+                                           ; SOURCE LINE # 208
+003C 75CAF9            MOV     RCAP2L,#0F9H
+                                           ; SOURCE LINE # 210
+003F D2CA              SETB    TR2
+                                           ; SOURCE LINE # 212
+0041 120000      E     LCALL   RS232Init
+                                           ; SOURCE LINE # 214
+0044 C299              CLR     TI
+                                           ; SOURCE LINE # 215
+0046 C298              CLR     RI
+                                           ; SOURCE LINE # 217
+0048 120000      E     LCALL   I2cInit
+                                           ; SOURCE LINE # 219
+004B D290              SETB    OE
+                                           ; SOURCE LINE # 221
+004D C2A4              CLR     LED
+                                           ; SOURCE LINE # 223
+004F D2AC              SETB    ES
+                                           ; SOURCE LINE # 224
+0051 D2AF              SETB    EA
+                                           ; SOURCE LINE # 225
+0053 22                RET     
+C51 COMPILER V7.05   PT8640                                                                06/14/2005 09:41:23 PAGE 7   
+
+             ; FUNCTION init_all (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    121    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     25       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

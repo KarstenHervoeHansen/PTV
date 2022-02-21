@@ -1,0 +1,122 @@
+C51 COMPILER V7.05   SW_UART                                                               11/17/2008 14:46:15 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE SW_UART
+OBJECT MODULE PLACED IN SW_uart.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.EXE SW_uart.c DB OE BR
+
+stmt level    source
+
+   1          #include <C8051F320.h>
+   2          #include <string.h>
+   3          
+   4          //transmit pin
+   5          sbit TX = P2^6;
+   6          sbit LED2 = P2^1;
+   7          
+   8          //char for outbuffer
+   9          bit CLK;
+  10          unsigned char SWBUF;
+  11          unsigned char BITCOUNT;
+  12          
+  13          unsigned char xdata outbuffer[128];
+  14          unsigned char outptr, outindex;
+  15          
+  16          //timer1 interrupt (38400x2 Hz)
+  17          void TX_gen() interrupt 3
+  18          {
+  19   1              //clock devider
+  20   1              if(CLK)
+  21   1              {
+  22   2                      //hvis flere bytes i outbuffer
+  23   2                      if(outptr!=outindex)
+  24   2                      {
+  25   3                              //idle mode
+  26   3                              if(BITCOUNT==0)
+  27   3                              {
+  28   4                                      LED2=0;
+  29   4                                      //send start bit, load buffer
+  30   4                                      TX=0;
+  31   4                                      SWBUF=outbuffer[outptr];
+  32   4                                      BITCOUNT++;
+  33   4                              }
+  34   3                      
+  35   3                              //send stop bit
+  36   3                              else if(BITCOUNT==9)
+  37   3                              {
+  38   4                                      TX=1;
+  39   4                                      BITCOUNT++;
+  40   4                              }
+  41   3                              //hel byte sendt, gå til idle mode
+  42   3                              else if(BITCOUNT==10)
+  43   3                              {
+  44   4                                      LED2 = 1;
+  45   4                                      //send stop bit
+  46   4                                      TX=1;
+  47   4                                      outptr=(++outptr)&127;
+  48   4                                      BITCOUNT=0;
+  49   4                              }
+  50   3                              //ellers transmiter enkelte bits
+  51   3                              else
+  52   3                              {
+  53   4                                      if(SWBUF&1)
+  54   4                                              TX=1;
+  55   4                                      else
+C51 COMPILER V7.05   SW_UART                                                               11/17/2008 14:46:15 PAGE 2   
+
+  56   4                                              TX=0;
+  57   4                      
+  58   4                                      SWBUF=SWBUF>>1;
+  59   4                                      BITCOUNT++;
+  60   4                              }
+  61   3                      }
+  62   2              }
+  63   1              CLK=~CLK;
+  64   1      }
+  65          
+  66          //Setup af SW UART
+  67          void setup_SW_uart()
+  68          {
+  69   1              outptr=0;
+  70   1              outindex=0;
+  71   1              memset(outbuffer, 0, sizeof(outbuffer));
+  72   1      
+  73   1              SWBUF=0;
+  74   1      
+  75   1              //enabler timer 0 interrupt, til generering af RS232 data
+  76   1              ET1=1;
+  77   1      }
+  78          
+  79          //send enkelt karakter
+  80          void SW_putch(unsigned char out)
+  81          {
+  82   1              //vent på at der ikke sende længere
+  83   1              while(outptr!=outindex)
+  84   1                      ;
+  85   1      
+  86   1              outbuffer[outindex++]=out;
+  87   1              outindex&=127;
+  88   1      }
+  89          
+  90          //send en streng
+  91          void SW_sendstr(unsigned char *str, unsigned char length)
+  92          {
+  93   1              unsigned char bytecount=0;
+  94   1      
+  95   1              for(bytecount; bytecount<length; bytecount++)
+  96   1                      SW_putch(str[bytecount]);
+  97   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    186    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    128    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4       3
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

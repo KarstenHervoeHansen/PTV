@@ -1,0 +1,115 @@
+file: specs03.txt
+date: 10.11.2004
+re:   Specifications for new version of 8603 with 3 lines of movable test.
+
+This file contains specifications for PT8603 modification consisting of
+3 lines of moving text feature.  This is a further development of PT8603/910
+project, which introduced text movement of one line of text in 8603.
+
+Like 8632, the 8603 shall have 3 lines of text, each line of 32 characters
+long.
+- Text may be either stationary or moving.
+- Either all 3 lines of text will be visible, or no text will be visible.
+- Position of these 3 lines of text will be changeable.
+
+In PT5210 Master software, the above conditions define the following items 
+of the SDI-SIGNAL/TEXT menu:
+
+ <EDIT>  <ON/OFF> <MOVEMENT> <POS> <ESC>
+
+The <EDIT> menu shall be analogous to that of 8632, however, the line ON/OFF
+feature will not be implemented.
+
+ LINE1: <textstring>   <SAVE>  <ESC>
+ LINE2: <textstring>   <SAVE>  <ESC>
+ LINE3: <textstring>   <SAVE>  <ESC>
+
+The <ON/OFF> menu, shall have single feature:
+
+TEXT: <ON/OFF>   <SAVE>  <ESC>
+
+The <MOVEMENT> menu shall have single feature:
+
+MOVEMENT: <ON/OFF>  <SAVE>  <ESC>
+
+The <POSITION> menu shall have single feature:
+
+X:<+1>  Y:<+1>  <SAVE>  <ESC>
+
+Implementatiion of above features in 8603 software:
+
+Edited text will go to appropriate row of OSDText[3][33];
+On startup, the 3 lines of text are transmitted from master using
+the TEXT Command (SN).  The Text_Command() function will be modified to 
+behave like one in 8632, i.e. it will require 2 params: line number and 
+string.
+
+Text ON/OFF will be controlled by single variable Text1Enable.  The 
+Text_ON_Command() function will behave like in 8603 with one moving
+text line, i.e. it will require only one parameter.  However, to 
+make this compatible with 8632/33, two parameres are used, line_nr
+and text ON/OFF.  The line_nr is a dummy parameter.
+
+Text movement will be controlled by a single variable TextMovement.
+This variable will be set by 5210 master via a new function:
+Text_Movement() (SH Command).
+
+All PLDs on 8603 will have to be programmed with code for 8632.
+The SDI-SIGNAL menu will have TEXT menu with a tree shown below:
+
+               <ANALOG-BLACK>  <SDI-SIGNAL> ...  [Base_Show()]
+                             |
+                        Base_down()
+                             |
+               <PATTERN>  <TEXT>  <SYSTEM>       [SDIMenuShow()]
+                             |
+                       SDITextDown()
+                             |
+              <EDIT> <ON/OFF> <MOVEMENT> <POS>   [SDITextMenuShow()]
+                             |
+                    SDITextMenuSelect()
+                             |
+        ----------------------------------------------------------------
+        |                    |                      |                   |
+SDITextEditSelect() SDITextOnOffSelect() SDITextMovementSelect() SDITextPosSelect()
+
+
+SCPI functions for TEXT:
+
+- :OUTP:SDIS:TEXT:STRING1 'XYZ';  (for line 1) or
+  :OUTP:SDIS:TEXT:STR1 'XYZ';      and
+  :OUTP:SDIS:TEXT:STRING1?;        for querry
+
+- :OUTP:SDIS:TEXT:ONOFF ON;        to set text on and
+  :OUTP:SDIS:TEXT:ONOFF OFF;       to set text off
+  :OUTP:SDIS:TEXT:ONOFF?;          to querry text on/off
+
+- :OUTP:SDIS:TEXT:MOTION ON;       to set text motion on or
+  :OUTP:SDIS:TEXT:MOT ON;          and 
+  :OUTP:SDIS:TEXT:MOTION OFF;      to set text motion off
+  :OUTP:SDIS:TEXT:MOTION?;         to querry text motion
+
+- :OUTP:SDIS:TEXT:POS 3,3;         to set text position or
+  :OUTP:SDIS:TEXT:POSOSITION 3,3;
+  :OUTP:SDIS:TEXT:POS?;            to querry text position
+
+
+- Command for :OUTP:SDIS?; (querry) does not output any text params.
+
+IC to be mounted on PT8603:
+
+V75: 4008 002 06592 Csum 8980 (PLD)
+V63: 4008 002 06563 Csum B003 (PLD)
+V54: 4008 002 06552 Csum 9F4C (PLD)
+V53: PT8603.bin     Csum 5E9D (software ver.39)
+
+
+New master software for 5210:
+
+V403: PT5210.bin Csum A35F (software ver.37)
+
+***
+
+
+
+

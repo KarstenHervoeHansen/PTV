@@ -1,0 +1,407 @@
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE UBLOX_PROT
+OBJECT MODULE PLACED IN ublox_prot.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe ublox_prot.c DB OE
+
+stmt level    source
+
+   1          #include <string.h>
+   2          #include <c8051f320.h>
+   3          #include "globals.h"
+   4          #include "serial.h"
+   5          #include "ublox_prot.h"
+   6          #include "LTC_handler.h"
+   7          
+   8          sbit LED2 = P2^1;
+   9          
+  10          //GPS data variable
+  11          //kvantiseringsfejl
+  12          signed long xdata quant_error;
+  13          
+  14          //time mode
+  15          unsigned char xdata GPS_timemode;
+  16          
+  17          //GPS tids info
+  18          union {
+  19                  unsigned long GPS_tow_long;
+  20                  unsigned char GPS_tow_bytes[4];
+  21          }  xdata GPS_tow;
+  22          
+  23          unsigned int xdata GPS_week=0;
+  24          unsigned char xdata GPS_time_valid=0;
+  25          char xdata leap_seconds=0;
+  26          sbit timepulse_status = P1^0;
+  27          
+  28          //UTC tids info
+  29          struct time xdata UTC_time_buffer;
+  30          unsigned char xdata UTC_time_valid=0;
+  31          
+  32          //Konfiguration af timemode
+  33          //0x06, 0x1D => Config, tmode
+  34          //0x1C, 0x00 => Payload length
+  35          //unsigned long => timemode (1= survey in)
+  36          //long Fixed Pos X
+  37          //long Fixed Pos Y
+  38          //long Fixed Pos Z
+  39          //unsigned long => standard deviation
+  40          //unsigned long => minimum survey in duration (3600*2 sekunder = 2 timer)
+  41          //unsigned long => minumum survey in standard deviation
+  42          
+  43          PACKET code timemode =
+  44          {0x06, 0x1D, 0x1C, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  45           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  46           0x10, 0x27, 0x00, 0x00, 0x20, 0x1C, 0x00, 0x00, 0x90, 0xD0,
+  47           0x03, 0x00, 0x00, 0x00};  
+  48          
+  49          //Konfiguration af port
+  50          //0x06, 0x00 => Config, port
+  51          //0x14, 0x00 => Payload length
+  52          //0x01 => port 1, UART
+  53          //0x00, 0x00, 0x00 => Reserverede bytes
+  54          //0xD0, 0x08, 0x08, 0x00 => UART mode (8 bit, no parity, 1 stopbit)
+  55          //0x00, 0x96, 0x00, 0x00 => BAUD rate = 38400
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 2   
+
+  56          //0x07, 0x00 => Inputprotokoller til modul  (alle)
+  57          //0x01, 0x00 => Outputprotokoller fra modul (UBX kun)
+  58          //0x00, 0x00 => Autobauding fra
+  59          //0x00, 0x00 => Reserverede bytes
+  60          PACKET code cfg_prt=
+  61          {0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0xD0, 0x08,
+  62           0x08, 0x00, 0x00, 0x96, 0x00, 0x00, 0x07, 0x00, 0x01, 0x00, 
+  63           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  64           0x00, 0x00, 0x00, 0x00};
+  65          
+  66          //states for inlæsning af UBX protokol
+  67          enum states {idle, read_id, read_msg, read_ckc} state;
+  68          
+  69          //header for ub_protokol
+  70          static unsigned char ub_header[2]= {0xb5, 0x62};
+  71          
+  72          //indlæsnings buffer
+  73          unsigned char xdata msg_buf[32];//var 90
+  74          unsigned char ck_a, ck_b;
+  75          unsigned char buf_index=0, str_ptr=0;
+  76          unsigned int length;
+  77          
+  78          bit msg_update_flag;
+  79          bit acknowledge;
+  80          
+  81          //Rutine der processesere UBLOX beskeder, byte for byte
+  82          void packet_process()
+  83          {               
+  84   1              if(getch(&msg_buf[buf_index]))
+  85   1              {
+  86   2                      //der ventes på ny besked (ub-sync karaktere)
+  87   2                      if (state==idle)
+  88   2                      {
+  89   3                              if(msg_buf[buf_index] == ub_header[str_ptr])
+  90   3                                      str_ptr++;
+  91   3                              else
+  92   3                                      str_ptr=0;
+  93   3      
+  94   3                              buf_index++;
+  95   3      
+  96   3                              //hvis begge synk karaktere er læst i rigtig rækkefølge, gå til næste state
+  97   3                              if (str_ptr==2)
+  98   3                              {
+  99   4                                      str_ptr=0;
+ 100   4                                      buf_index=0;
+ 101   4                                      state=read_id;
+ 102   4                                      ck_a=0;
+ 103   4                                      ck_b=0;
+ 104   4                                      length=0;
+ 105   4                              }
+ 106   3                      }
+ 107   2                      
+ 108   2                      //der læses besked ID
+ 109   2                      else if (state==read_id)
+ 110   2                      {
+ 111   3                              str_ptr++;
+ 112   3      
+ 113   3                              //beregn checksum
+ 114   3                              ck_a+=msg_buf[buf_index];
+ 115   3                              ck_b+=ck_a;
+ 116   3      
+ 117   3                              //når fire karaktere læst (ID-MSG-Length (16 bit)), gå til næste state
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 3   
+
+ 118   3                              if (str_ptr==4)
+ 119   3                              {
+ 120   4                                      length = msg_buf[2]+(msg_buf[3]<<8);
+ 121   4                                      state=read_msg;
+ 122   4                                      str_ptr=0;
+ 123   4                              }
+ 124   3      
+ 125   3                              buf_index++;
+ 126   3                      }
+ 127   2      
+ 128   2                      //indlæs payload
+ 129   2                      else if (state==read_msg)
+ 130   2                      {
+ 131   3                              str_ptr++;
+ 132   3      
+ 133   3                              //beregn checksum
+ 134   3                              ck_a+=msg_buf[buf_index];
+ 135   3                              ck_b+=ck_a;
+ 136   3      
+ 137   3                              //når alle er læst, gå til næste state
+ 138   3                              if(str_ptr==length)
+ 139   3                                      state=read_ckc;
+ 140   3                      
+ 141   3                              buf_index++;
+ 142   3                      }
+ 143   2      
+ 144   2                      //indlæs checksum
+ 145   2                      else if (state==read_ckc)
+ 146   2                      {
+ 147   3                              str_ptr++;
+ 148   3      
+ 149   3                              //når to ckc er læst
+ 150   3                              if(str_ptr==length+2)
+ 151   3                              {
+ 152   4                                      str_ptr=0;
+ 153   4                                      buf_index=0;
+ 154   4                                      state=idle;
+ 155   4      
+ 156   4                                      //hvis checksummen er korrekt, sæt beskedopdateringsflag højt
+ 157   4                                      if((ck_a==msg_buf[length+4]) && (ck_b==msg_buf[length+5]))
+ 158   4                                              msg_update_flag=1;
+ 159   4                              }
+ 160   3      
+ 161   3                              buf_index++;
+ 162   3                      }
+ 163   2              }
+ 164   1      }
+ 165          
+ 166          void interpret_message()
+ 167          {
+ 168   1              PACKET in_packet;
+ 169   1      
+ 170   1              get_packet(&in_packet);
+ 171   1      
+ 172   1              //fortolk klasse
+ 173   1              switch(in_packet.class_num)
+ 174   1              {
+ 175   2                      //navigations klasse
+ 176   2                      case 0x01:
+ 177   2                              //case med mulige id's for nav
+ 178   2                              switch(in_packet.id_num)
+ 179   2                              {
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 4   
+
+ 180   3                                      //GPS tidshåndtering
+ 181   3                                      case 0x20:
+ 182   3                                              //hent skudsekunder
+ 183   3                                              leap_seconds = in_packet.payload[10];
+ 184   3      
+ 185   3                                              //hent TOW
+ 186   3                                              GPS_tow.GPS_tow_bytes[3]=in_packet.payload[0];
+ 187   3                                              GPS_tow.GPS_tow_bytes[2]=in_packet.payload[1];
+ 188   3                                              GPS_tow.GPS_tow_bytes[1]=in_packet.payload[2];
+ 189   3                                              GPS_tow.GPS_tow_bytes[0]=in_packet.payload[3];
+ 190   3                                              GPS_tow.GPS_tow_long=(GPS_tow.GPS_tow_long+500)/1000;
+ 191   3      
+ 192   3                                              //juster GPS til UTC tid
+ 193   3                                              GPS_tow.GPS_tow_long-=leap_seconds;
+ 194   3      
+ 195   3                                              //hent week
+ 196   3                                              GPS_week=in_packet.payload[8];
+ 197   3                                              GPS_week+=(unsigned int)in_packet.payload[9]<<8;
+ 198   3      
+ 199   3                                              //hent GPS validitet
+ 200   3                                              GPS_time_valid=in_packet.payload[11];
+ 201   3                                      break;
+ 202   3      
+ 203   3                                      //UTC tidshåndtering
+ 204   3                                      case 0x21:
+ 205   3                                              //hent år,      måned, dag, minut, sekund og validitet 
+ 206   3                                              UTC_time_buffer.year=in_packet.payload[12]+(in_packet.payload[13]<<8);
+ 207   3                                              UTC_time_buffer.month=in_packet.payload[14];
+ 208   3                                              UTC_time_buffer.day=in_packet.payload[15];
+ 209   3                                              UTC_time_buffer.hour=in_packet.payload[16];
+ 210   3                                              UTC_time_buffer.min=in_packet.payload[17];
+ 211   3                                              UTC_time_buffer.sec=in_packet.payload[18];
+ 212   3                                              UTC_time_valid=in_packet.payload[19];
+ 213   3                                      break;
+ 214   3                              }
+ 215   2                      break;
+ 216   2      
+ 217   2                      //acknowledge
+ 218   2                      case 0x05:
+ 219   2                              switch(in_packet.id_num)
+ 220   2                              {
+ 221   3                                      //acknowledged
+ 222   3                                      case 0x01:
+ 223   3                                              acknowledge=1;
+ 224   3                                      break;
+ 225   3                                      //NOT acknowdledged
+ 226   3                                      case 0x00:
+ 227   3                                              acknowledge=0;
+ 228   3                                      break;
+ 229   3                                      default:
+ 230   3                                              acknowledge=0;
+ 231   3                              }
+ 232   2                      break;
+ 233   2      
+ 234   2                      //timing info
+ 235   2                      case 0x0D:
+ 236   2                              switch(in_packet.id_num)
+ 237   2                              {
+ 238   3                                      //tidspuls info
+ 239   3                                      case 0x01:
+ 240   3                                              quant_error=in_packet.payload[8];
+ 241   3                                              quant_error+=in_packet.payload[9]<<8;
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 5   
+
+ 242   3                                              quant_error+=in_packet.payload[10]<<16;
+ 243   3                                              quant_error+=in_packet.payload[11]<<24;
+ 244   3                                      break;
+ 245   3      
+ 246   3                                      //survey in status
+ 247   3                                      case 0x04:
+ 248   3                                              GPS_timemode = in_packet.payload[24];
+ 249   3                                      break;
+ 250   3                              }
+ 251   2                      break;
+ 252   2              }
+ 253   1      
+ 254   1      }
+ 255          
+ 256          /*void poll_packet(unsigned char class_num, unsigned char id_num)
+ 257          {
+ 258                  PACKET poll_packet;
+ 259          
+ 260                  poll_packet.class_num=class_num;
+ 261                  poll_packet.id_num=id_num;
+ 262                  poll_packet.l_lo=0;
+ 263                  poll_packet.l_hi=0;
+ 264          
+ 265                  send_packet(&poll_packet);
+ 266          }*/
+ 267          
+ 268          void send_packet(PACKET *out_packet)
+ 269          {
+ 270   1              ck_a=0; ck_b=0;
+ 271   1      
+ 272   1              length=out_packet->l_lo;
+ 273   1      
+ 274   1              //transmit sync chars
+ 275   1              putch(0xB5);
+ 276   1              putch(0x62);
+ 277   1      
+ 278   1              //transmit class and id
+ 279   1              putch(out_packet->class_num);
+ 280   1              ck_a=out_packet->class_num; ck_b=ck_a;
+ 281   1      
+ 282   1              putch(out_packet->id_num);
+ 283   1              ck_a=ck_a+out_packet->id_num; ck_b=ck_b+ck_a;
+ 284   1      
+ 285   1              //transmit length
+ 286   1              putch(out_packet->l_lo);
+ 287   1              ck_a=ck_a+out_packet->l_lo; ck_b=ck_b+ck_a;
+ 288   1      
+ 289   1              putch(out_packet->l_hi);
+ 290   1              ck_a=ck_a+out_packet->l_hi; ck_b=ck_b+ck_a;
+ 291   1      
+ 292   1              //transmit payload
+ 293   1              for(buf_index=0; buf_index<length; buf_index++)
+ 294   1              {
+ 295   2                              putch(out_packet->payload[buf_index]);
+ 296   2                              ck_a=ck_a+out_packet->payload[buf_index]; ck_b=ck_b+ck_a;
+ 297   2              }
+ 298   1      
+ 299   1              //transmit checksum
+ 300   1              putch(ck_a);
+ 301   1              putch(ck_b);
+ 302   1      }
+ 303          
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 6   
+
+ 304          void get_packet(void *in_packet)
+ 305          {
+ 306   1              //kopier hele beskeden + 4 bytes (ID+Class+2 bytes length)
+ 307   1              memcpy(in_packet, msg_buf, length+4);
+ 308   1      }
+ 309          
+ 310          void setup_ublox()
+ 311          {
+ 312   1              unsigned int timer;
+ 313   1              unsigned char retry=0;
+ 314   1              
+ 315   1              while(!acknowledge && retry<5)
+ 316   1              {
+ 317   2                      timer=0;
+ 318   2                      //set default BAUD rate
+ 319   2                      set_UART9600();
+ 320   2      
+ 321   2                      //send opsætning for ønsket protokol og baudrate
+ 322   2                      send_packet(&cfg_prt);
+ 323   2      
+ 324   2                      //sæt til ny baudrate
+ 325   2                      set_UART38400();
+ 326   2              
+ 327   2                      //vent på at der er modtaget en hel pakke, eller på time out
+ 328   2                      while(!msg_update_flag && timer!=1000)
+ 329   2                      {
+ 330   3                              timer++;
+ 331   3                              packet_process();
+ 332   3                      }
+ 333   2      
+ 334   2                      retry++;
+ 335   2                      
+ 336   2                      interpret_message();
+ 337   2                      msg_update_flag=0;
+ 338   2              }
+ 339   1              
+ 340   1              //nulstil ack
+ 341   1              acknowledge=0;
+ 342   1      
+ 343   1              //send opsætning for timemode
+ 344   1              send_packet(&timemode);
+ 345   1      
+ 346   1      }
+ 347          
+ 348          //sætter beskedmodtagelsesrate i sekunder
+ 349          void set_message_rate(char class_num, char id_num, char rate)
+ 350          {
+ 351   1              PACKET temp_packet;
+ 352   1      
+ 353   1              temp_packet.class_num=0x06;
+ 354   1              temp_packet.id_num=0x01;
+ 355   1              temp_packet.l_lo=0x06;
+ 356   1              temp_packet.l_hi=0x00;
+ 357   1      
+ 358   1              temp_packet.payload[0]=class_num;
+ 359   1              temp_packet.payload[1]=id_num;
+ 360   1              temp_packet.payload[2]=0;
+ 361   1              temp_packet.payload[3]=rate;
+ 362   1              temp_packet.payload[4]=0;
+ 363   1              temp_packet.payload[5]=0;
+ 364   1      
+ 365   1              send_packet(&temp_packet);
+C51 COMPILER V7.05   UBLOX_PROT                                                            02/14/2008 11:13:44 PAGE 7   
+
+ 366   1      }
+ 367          
+ 368          
+ 369          void get_UTC_time(struct time *out_time)
+ 370          {
+ 371   1              memcpy(out_time, &UTC_time_buffer, 7);
+ 372   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1117    ----
+   CONSTANT SIZE    =     68    ----
+   XDATA SIZE       =     53    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      9      80
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

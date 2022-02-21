@@ -1,0 +1,215 @@
+C51 COMPILER V7.10   LENVAL                                                                01/28/2010 09:18:56 PAGE 1   
+
+
+C51 COMPILER V7.10, COMPILATION OF MODULE LENVAL
+OBJECT MODULE PLACED IN Lenval.OBJ
+COMPILER INVOKED BY: c:\SiLabs\MCU\IDEfiles\C51\BIN\C51.exe Lenval.c DB OE LARGE
+
+line level    source
+
+   1          /*******************************************************/
+   2          /* file: lenval.c                                      */
+   3          /* abstract:  This file contains routines for using    */
+   4          /*            the lenVal data structure.               */
+   5          /*******************************************************/
+   6          #include "define.h"
+   7          #include "lenval.h"
+   8          #include "ports.h"
+   9          
+  10          /*****************************************************************************
+  11          * Function:     value
+  12          * Description:  Extract the long value from the lenval array.
+  13          * Parameters:   plvValue    - ptr to lenval.
+  14          * Returns:      long        - the extracted value.
+  15          *****************************************************************************/
+  16          long value(lenVal* plvValue)
+  17            {
+  18   1        long    lValue;         /* result to hold the accumulated result */
+  19   1        short   sIndex;
+  20   1        
+  21   1        lValue  = 0;
+  22   1        for (sIndex = 0; sIndex < plvValue->len ; ++sIndex)
+  23   1          {
+  24   2          lValue <<= 8;                       /* shift the accumulated result */
+  25   2          lValue  |= plvValue->val[sIndex];   /* get the last byte first */
+  26   2          }
+  27   1        
+  28   1        return(lValue);
+  29   1        }
+  30          /*****************************************************************************
+  31          * Function:     readVal
+  32          * Description:  read from XSVF numBytes bytes of data into x.
+  33          * Parameters:   plv         - ptr to lenval in which to put the bytes read.
+  34          *               sNumBytes   - the number of bytes to read.
+  35          * Returns:      void.
+  36          *****************************************************************************/
+  37          void readVal(lenVal* plv, short sNumBytes)
+  38            {
+  39   1        unsigned char*  pucVal;
+  40   1        
+  41   1        plv->len    = sNumBytes;        /* set the length of the lenVal        */
+  42   1        for (pucVal = plv->val; sNumBytes; --sNumBytes, ++pucVal)
+  43   1          {
+  44   2              /* read a byte of data into the lenVal */
+  45   2          readByte(pucVal);
+  46   2          }
+  47   1        }
+  48          
+  49          /*****************************************************************************
+  50          * Function:     EqualLenVal
+  51          * Description:  Compare two lenval arrays with an optional mask.
+  52          * Parameters:   plvTdoExpected  - ptr to lenval #1.
+  53          *               plvTdoCaptured  - ptr to lenval #2.
+  54          *               plvTdoMask      - optional ptr to mask (=0 if no mask).
+  55          * Returns:      short   - 0 = mismatch; 1 = equal.
+C51 COMPILER V7.10   LENVAL                                                                01/28/2010 09:18:56 PAGE 2   
+
+  56          *****************************************************************************/
+  57          short EqualLenVal(lenVal* plvTdoExpected, lenVal* plvTdoCaptured, lenVal*  plvTdoMask)
+  58            {
+  59   1        short           sEqual;
+  60   1        short           sIndex;
+  61   1        unsigned char   ucByteVal1;
+  62   1        unsigned char   ucByteVal2;
+  63   1        unsigned char   ucByteMask;
+  64   1        
+  65   1        sEqual  = 1;
+  66   1        sIndex  = plvTdoExpected->len;
+  67   1      
+  68   1          while (sEqual && sIndex--)
+  69   1            {
+  70   2            ucByteVal1  = plvTdoExpected->val[sIndex];
+  71   2            ucByteVal2  = plvTdoCaptured->val[sIndex];
+  72   2            if (plvTdoMask)
+  73   2              {
+  74   3              ucByteMask   = plvTdoMask->val[sIndex];
+  75   3              ucByteVal1  &= ucByteMask;
+  76   3              ucByteVal2  &= ucByteMask;
+  77   3              }
+  78   2            if (ucByteVal1 != ucByteVal2)
+  79   2              {
+  80   3              sEqual  = 0;
+  81   3              }
+  82   2            }
+  83   1        return(sEqual);
+  84   1        }
+  85          
+  86          
+  87          
+  88          #if 0
+              /*****************************************************************************
+              * Function:     initLenVal
+              * Description:  Initialize the lenval array with the given value.
+              *               Assumes lValue is less than 256.
+              * Parameters:   plv         - ptr to lenval.
+              *               lValue      - the value to set.
+              * Returns:      void.
+              *****************************************************************************/
+              void initLenVal(lenVal*    plv,
+                               long       lValue)
+              {
+                plv->len    = 1;
+                plv->val[0] = (unsigned char)lValue;
+              }
+              
+              /*****************************************************************************
+              * Function:     SetBit
+              * Description:  set the (byte, bit) of lv equal to val
+              * Example:      SetBit("00000000",byte, 1) equals "01000000".
+              * Parameters:   plv     - ptr to lenval.
+              *               iByte   - the byte to get the bit from.
+              *               iBit    - the bit number (0=msb).
+              *               sVal    - the bit value to set.
+              * Returns:      void.
+              *****************************************************************************/
+              void SetBit(lenVal*    plv,
+                           int        iByte,
+                           int        iBit,
+                           short      sVal)
+C51 COMPILER V7.10   LENVAL                                                                01/28/2010 09:18:56 PAGE 3   
+
+              {
+                  unsigned char   ucByteVal;
+                  unsigned char   ucBitMask;
+              
+                  ucBitMask   = (unsigned char)(1 << (7 - iBit));
+                  ucByteVal   = (unsigned char)(plv->val[iByte] & (~ucBitMask));
+              
+                  if (sVal)
+                  {
+                      ucByteVal   |= ucBitMask;
+                  }
+                  plv->val[iByte]   = ucByteVal;
+              }
+              
+              /*****************************************************************************
+              * Function:     RetBit
+              * Description:  return the (byte, bit) of lv (reading from left to right).
+              * Parameters:   plv     - ptr to lenval.
+              *               iByte   - the byte to get the bit from.
+              *               iBit    - the bit number (0=msb)
+              * Returns:      short   - the bit value.
+              *****************************************************************************/
+              short RetBit(lenVal*   plv,
+                            int       iByte,
+                            int       iBit)
+              {
+                  /* assert((iByte >= 0) && (iByte < plv->len)); */
+                  /* assert((iBit >= 0) && (iBit < 8)); */
+                  return((short)((plv->val[iByte] >> (7 - iBit)) & 0x1));
+              }
+              
+              /*****************************************************************************
+              * Function:     AddVal
+              * Description:  add val1 to val2 and store in resVal;
+              *               assumes val1 and val2  are of equal length.
+              * Parameters:   plvResVal   - ptr to result.
+              *               plvVal1     - ptr of addendum.
+              *               plvVal2     - ptr of addendum.
+              * Returns:      void.
+              *****************************************************************************/
+              void addVal(lenVal* plvResVal, lenVal* plvVal1, lenVal* plvVal2)
+                {
+                unsigned char   ucCarry;
+                unsigned short  usSum;
+                unsigned short  usVal1;
+                unsigned short  usVal2;
+                short           sIndex;
+                
+                plvResVal->len  = plvVal1->len;         /* set up length of result */
+                
+                /* start at least significant bit and add bytes    */
+                ucCarry = 0;
+                sIndex  = plvVal1->len;
+                while (sIndex--)
+                  {
+                  usVal1  = plvVal1->val[sIndex];   /* i'th byte of val1 */
+                  usVal2  = plvVal2->val[sIndex];   /* i'th byte of val2 */
+                  
+                  /* add the two bytes plus carry from previous addition */
+                  usSum   = (unsigned short)(usVal1 + usVal2 + ucCarry);
+                  
+                  /* set up carry for next byte */
+C51 COMPILER V7.10   LENVAL                                                                01/28/2010 09:18:56 PAGE 4   
+
+                  ucCarry = (unsigned char)((usSum > 255) ? 1 : 0);
+                  
+                      /* set the i'th byte of the result */
+                  plvResVal->val[sIndex] = (unsigned char)usSum;
+                  }
+                }
+              #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    468    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      27
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,247 @@
+/**************************************************************************
+**
+**      FILE        :  @(#)xa.cpu	1.13
+**
+**      VERSION     :  97/09/04
+**
+**      DESCRIPTION :  Cpu description for XA
+**
+**      COPYRIGHT   :  1997 TASKING, Inc.
+**
+**************************************************************************/
+ 
+//	Please note that you should NOT change anything in this file!
+//	The following macros are used (set by EDE or user include file):
+//
+//	_REGSFR		name: select the correct SFR definition file
+//	_ICODE		amount (in bytes) of on-chip EPROM/ROM program memory
+//	_IRAM		amount (in bytes) of on-chip data RAM
+//	_ZPAGE		0/1: 0 means Large Memory mode, 1 means Page Zero mode
+//	_XMEM		0/1: 0 means single chip, 1 means external memory
+
+#if _ZPAGE
+//	When XA page 0 mode is chosen, only 16 address bits are maintained by
+//	the XA core.
+#define	_ARANGE		0x10000
+#define _DAMODE		space=XA_data
+#define _CAMODE		space=XA_code
+#else
+//	When the default XA operation is chosen via the, all addresses are
+//	maintained by the core
+#define	_ARANGE		0x1000000
+#define _DAMODE		amode=hdata
+#define _CAMODE		amode=hcode
+#endif
+
+cpu {
+
+////////////////////////////////////////////////////////////////////////
+//
+//       A D R E S S I N G   M O D E S
+//
+//
+#if _ZPAGE==0
+        /////////////////////////////////////////////////////////
+ 	//
+	// huge indirect addressable data memory
+	// - Section SEGMENT HDATA (object format id-nbr Y2)
+	// - 8 bit addressable
+	// - 0-16M address range mapped to 0-16M of XA_data
+	//
+	amode hdata {
+		attribute Y2;
+		mau 8;
+		map src=0 size=_ARANGE dst=0 space=XA_data; 
+	}
+#endif
+        /////////////////////////////////////////////////////////
+	//
+	// indirect addressable data memory
+	// - Section SEGMENT IDATA (object format id-nbr Y7)
+	// - 8 bits addressable
+	// - 256 x 0-64K (8 bits segment + 16 bits address)
+	//   mapped to 0-16M address space XA_data (via hdata)
+	//
+	amode idata {
+		attribute Y7;
+		mau 8;
+		map src=0 page=64k size=_ARANGE dst=0 _DAMODE;
+	}
+
+        /////////////////////////////////////////////////////////
+	//
+	// direct addressable data memory
+	// - Section SEGMENT DATA (object format id-nbr Y8)
+	// - 8 bits addressable
+	// - 0-1k (10 bits address) mapped to 0-1k address space 
+	//   (via idata)
+	//
+	amode data {
+		attribute Y8;
+		mau 8;
+		map src=0 size=1k dst=0	amode=idata;
+		map src=1k size=1k dst=1k space=XA_sfr;
+	}
+
+        /////////////////////////////////////////////////////////
+	//
+	// bitaddressable data memory
+	// - Section SEGMENT BITADDR (object format id-nbr Y4)
+	// - 8 bit addressable
+	// - 0x20-0x40 mapped to 0x20-0x40 address space
+	//   (via data)
+	//
+	amode bitaddr {
+		attribute Y4;
+		mau 8;
+		map src=0x20 size=0x20 dst=0x20 amode = data;
+		map src=0x400 size=0x40 dst=0x400 amode = data;
+	}
+
+        /////////////////////////////////////////////////////////
+	//
+	// bitaddressable data memory
+	// - Section SEGMENT BIT (object format id-nbr Y6)
+	// - 1 bit addressable
+	// - 0x100-0x200 (bits) mapped to 0x20-0x40 address space
+	//   (via bitaddr)
+	// -0x200-0x400 (bits) mapped to 0x400-0x440 address space
+	//   (via bitaddr)
+	//
+	amode bit {
+		attribute Y6;
+		mau 1;
+		map src=0x100 size=0x100 dst=0x20 amode = bitaddr;
+		map src=0x200 size=0x200 dst=0x400 amode = bitaddr;
+	}
+#if _XMEM
+        /////////////////////////////////////////////////////////
+	//
+	// external data memory
+	// - Section SEGMENT XDATA (object format id-nbr Y9)
+	// - 8 bits addressable
+	// - 256 x 64K (8 bits segment + 16 bits address)
+	//   mapped to 0-16M address space XA_data
+	// NOTE: segment 0 starts at address 0x200
+	//
+	amode xdata {
+		attribute Y9;
+		mau 8;
+		map src=_IRAM page=64k size=_ARANGE dst=_IRAM _DAMODE;
+	}
+
+        /////////////////////////////////////////////////////////
+	//
+	// first 64K of external data memory
+	// - Section SEGMENT XDATA SHORT (object format id-nbr Y3)
+	// - 8 bits addressable
+	// - 0-64k
+	// 
+	//
+	amode xshort {
+		attribute Y3;
+		mau 8;
+		map src=0 size=64k dst=0 space=XA_short;
+	}
+#endif
+#if _ZPAGE==0
+        /////////////////////////////////////////////////////////
+	//
+	// huge program memory
+	// - Section SEGMENT HCODE (object format id-nbr Y1)
+	// - 8 bits addressable
+	// - 0-16M
+	//
+	amode hcode {
+		attribute Y1;
+		mau 8;
+		map src=0 size=_ARANGE dst=0 space = XA_code;
+	}
+#endif
+        /////////////////////////////////////////////////////////
+	//
+	// program memory
+	// - Section SEGMENT CODE (object format id-nbr Y10)
+	// - 8 bits addressable
+	// - 0-64k
+	//
+	amode code {
+		attribute Y10;
+		mau 8;
+		map src=0 size=64k dst=0 _CAMODE;
+	}
+
+////////////////////////////////////////////////////////////////
+//
+//      S P A C E 
+//
+//
+	space XA_code {
+		mau 8;
+		map src=0 size=_ARANGE dst=0 bus=code_bus label=program;
+	}
+
+	space XA_data {
+		mau 8;
+		map src=0 size=_ARANGE dst=0 bus=data_bus label=data;
+	}
+#if _XMEM
+	space XA_short {
+		mau 8;
+		map src=0 size=64k dst=0 bus=external_data_bus label=xshort;
+	}
+#endif
+	space XA_sfr {
+		mau 8;
+		map src=0x400 size=1k dst=0x400 bus=IO label=sfr;
+	}
+
+////////////////////////////////////////////////////////////////
+//
+//      B U S
+//
+//
+	bus data_bus {
+		mau 8;
+		map src=0 size=_IRAM dst=0 bus=internal_data_bus;
+#if _XMEM
+		map src=_IRAM size=_ARANGE-_IRAM dst=_IRAM bus=external_data_bus;
+#endif
+	}
+
+	bus internal_data_bus {
+		mau 8;
+		mem addr=0 chips=i_ram_data;
+	}
+
+	bus code_bus {
+		mau 8;
+		map src=0 size=_ICODE dst=0 bus=internal_code_bus;
+#if _XMEM
+		map src=_ICODE size=_ARANGE-_ICODE dst=_ICODE bus=external_code_bus;
+#endif
+	}
+
+	bus internal_code_bus {
+		mau 8;
+		mem addr=0 chips=i_code;
+	}
+
+	bus IO {
+		mau 8;
+		mem addr=0x400 chips=sfr;
+	}
+
+////////////////////////////////////////////////////////////////
+//
+//      I N T E R N A L  M E M O R Y 
+//
+//
+	chips i_ram_data attr=w mau=8 size=_IRAM;
+	chips i_code     attr=r mau=8 size=_ICODE;
+	chips sfr        attr=s mau=8 size=0x400;
+
+#ifdef _REGSFR
+	regsfr _REGSFR    // Use file generated by 'rmxa' for CrossView Pro
+#endif
+}

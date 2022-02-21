@@ -1,0 +1,418 @@
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 1   
+
+
+C51 COMPILER V7.05, COMPILATION OF MODULE GPS_MAIN
+OBJECT MODULE PLACED IN GPS_main.OBJ
+COMPILER INVOKED BY: C:\SiLabs\MCU\IDEfiles\C51\Bin\C51.exe GPS_main.c DB OE
+
+stmt level    source
+
+   1          #include <C8051F320.h>
+   2          #include <string.h>
+   3          #include "ini.h"
+   4          #include "globals.h"
+   5          #include "i2c_bus.h"
+   6          #include "i2c_slave.h"
+   7          #include "serial.h"
+   8          #include "ublox_prot.h"
+   9          #include "LTC_handler.h"
+  10          #include "pt5300_handler.h"
+  11          #include "EEPROM_drv.h"
+  12          
+  13          //den nuværende softwareversion i FPGA (!! SKAL stemme overens med MCU)
+  14          unsigned char current_FPGA_sw_version=0x10;
+  15          //den nuværende MCU software version (bliver vist i PT5300) 10'ere = version, 1'ere = revision
+  16          unsigned char current_MCU_sw_version=10;
+  17          //software version i FPGA
+  18          unsigned char FPGA_software_version=0;
+  19          
+  20          bit ext1_rise_flag, ext1_fall_flag;
+  21          
+  22          //FPGA status inputs
+  23          sbit timepulse_status = P1^0;
+  24          
+  25          //LED out
+  26          sbit LED1 = P2^0;
+  27          sbit LED2 = P2^1;
+  28          
+  29          //Jumper in
+  30          sbit MCU_jumper = P2^6;
+  31          
+  32          //reset out til FPGA
+  33          sbit FPGA_reset = P2^2;
+  34          
+  35          //tæller til diverse formål
+  36          unsigned char counter=0;
+  37          
+  38          #define pps_i                                   0
+  39          #define int_pps                                 1
+  40          #define int_clk                                 2
+  41          #define kvant_pps                               3
+  42          #define pps_148_tick                    4
+  43          #define ms_tick                                 5
+  44          #define SPG_sync_signal                 6
+  45          #define PAL_sync                                7
+  46          #define NTSC_sync                               8
+  47          #define int_pps_tick_100mhz             9
+  48          #define longer_tick                             10
+  49          #define I2C_start                               11
+  50          #define I2C_update                              12
+  51          #define I2C_stop                                13
+  52          #define I2C_debug                               14
+  53          #define LTC_a_debug                             15
+  54          #define LTC_b_debug                             16
+  55          #define ref_clk                                 17
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 2   
+
+  56          #define none                                    18
+  57          
+  58          // !! OBS !! Alting på  TP3 er forlænget til 1 ms ekstra
+  59          char tp_select[3] = {int_pps, int_pps_tick_100mhz, pps_148_tick};
+  60          
+  61          /********* Master status byte *************
+  62          Bit 0: Timepulse status
+  63          Bit 1: GPS PLL låst status
+  64          Bit 2: 
+  65          Bit 3: 
+  66          Bit 4: 
+  67          Bit 5: 
+  68          Bit 6: 
+  69          Bit 7: 
+  70          
+  71          *******************************************/
+  72          unsigned char master_status_byte;
+  73          
+  74          
+  75          /********* FPGA system control *************
+  76          Bit 0: 0 = PAL, 1 = NTSC
+  77          Bit 1: 1 = 4 sekunder PAL sync, 0 = ingen sync (høj for hver 4. sekund, tilpasset GPS tid)
+  78          Bit 2: 1 = reset OCXO, 0 = aktiv OCXO
+  79          Bit 3: 1 = hurtigt OCXO filter, 0 = langsomt OCXO filter
+  80          Bit 4: 1 = OCXO fixed, 0 = OCXO tracking
+  81          Bit 5: 
+  82          Bit 6: 
+  83          Bit 7: 
+  84          
+  85          *******************************************/
+  86          unsigned char FPGA_system_control;
+  87          
+  88          // KU streng, indeholder KU nummer for GPS board. Er gemt i EEPROM bank 0, byte 200-210
+  89          unsigned char KU_str[11];
+  90          
+  91          // Læst værdi for OCXO styrespæning, gemmes til næste reboot
+  92          unsigned char OCXO_value_hi, OCXO_value_lo;
+  93          int OCXO_phase_diff;
+  94          
+  95          union {
+  96                  unsigned int OCXO_dac_value_int;
+  97                  unsigned char OCXO_dac_value_bytes[2];
+  98          } OCXO_dac_value;
+  99          
+ 100          union {
+ 101                  unsigned int OCXO_avg_dac_value_int;
+ 102                  unsigned char OCXO_avg_dac_bytes[2];
+ 103          } OCXO_avg_dac_value;
+ 104          
+ 105          bit OCXO_locked_status;
+ 106          unsigned char OCXO_counter=0;
+ 107          
+ 108          //tolerance for OCXO faseforskel, for switch mellem hurtigt/langsomt loop
+ 109          #define OCXO_tolerance          32
+ 110          
+ 111          //tolerance for tidsrum, der skal være låst i/ude af lås, før skift af loophastighed
+ 112          #define OCXO_time                       100
+ 113          
+ 114          //rising edge på syntesiseret 1 PPS
+ 115          void int_rise() interrupt 0
+ 116          {
+ 117   1              ext1_rise_flag=1;
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 3   
+
+ 118   1      }
+ 119          
+ 120          //falling edge på syntesiseret 1 PPS (500 ms efter GPS PPS)
+ 121          void int_fall() interrupt 2
+ 122          {
+ 123   1              ext1_fall_flag=1;
+ 124   1      }
+ 125          
+ 126          
+ 127          
+ 128          /****************************************************************************
+ 129          *                                                                                                                                                       *
+ 130          *                                               GPS Genlock main rutine                                                         *
+ 131          *                                                                                                                                                       *
+ 132          *               Hovedprogram for GPS                                    Udgivet 05/02/08                        *
+ 133          *               Udvikler: Jens K Hansen                                                                                         *
+ 134          *                                                                                                                                                       *
+ 135          *               Revision 0: Oprettet                                                                                            *
+ 136          *               Revision 1: 5/2/2008: Udgivet som version 1.0                                           *
+ 137          *                                                                                                                                                       *
+ 138          ****************************************************************************/
+ 139          
+ 140          void main()
+ 141          {
+ 142   1              config();
+ 143   1      
+ 144   1              //Setup sekvens
+ 145   1              setup_I2C();
+ 146   1      
+ 147   1              //enable interrupts. Må ikke flyttes, da SMBUS skal være enabled, for at kunne registrere modul i mainfra
+             -me
+ 148   1              EA=1;
+ 149   1      
+ 150   1              //reset FPGA så længe FPGA ikke er boot'et og der ingen tidspuls er
+ 151   1              FPGA_reset=1;
+ 152   1              LED1 = 0;
+ 153   1              LED2 = 0;
+ 154   1      
+ 155   1              //Indlæs KU nummer
+ 156   1              for(counter=0;counter<11;counter++)
+ 157   1                      KU_str[counter]=EEPROM_read_byte(0, 200+counter);
+ 158   1      
+ 159   1              setup_UART();
+ 160   1              set_UART38400();
+ 161   1              init_LTC();
+ 162   1      
+ 163   1              //indlæs genlock system setup  fra EEPROM, og skriv denne til FPGA (masker OCXO kontrol væk)
+ 164   1              FPGA_system_control=EEPROM_read_byte(0, 0)&0x01;
+ 165   1              
+ 166   1              //delay, mens FPGA skal nå at loade PROM kode (SW version kan læses)
+ 167   1              while(FPGA_software_version != current_FPGA_sw_version)
+ 168   1                      FPGA_software_version=FPGA_read_byte(32);
+ 169   1      
+ 170   1              /////////////////////// SETUP TESTPOINTS ///////////////////////
+ 171   1              FPGA_write_array(23, &tp_select, 3);
+ 172   1      
+ 173   1              /////////////////////// SETUP OCXO /////////////////////////////
+ 174   1              //læs gemt OCXO styrespænding
+ 175   1              OCXO_dac_value.OCXO_dac_value_bytes[0] = EEPROM_read_byte(0, 1);
+ 176   1              OCXO_dac_value.OCXO_dac_value_bytes[1] = EEPROM_read_byte(0, 2);
+ 177   1      
+ 178   1              //hvis første gangs boot, sæt default værdi
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 4   
+
+ 179   1              if (OCXO_dac_value.OCXO_dac_value_int == 0)
+ 180   1                      OCXO_dac_value.OCXO_dac_value_int = 23000;
+ 181   1      
+ 182   1              //OCXO = reset + hurtigt loop filter
+ 183   1              set_bit(&FPGA_system_control, 2);
+ 184   1              set_bit(&FPGA_system_control, 3);
+ 185   1              FPGA_write_byte(20, FPGA_system_control);
+ 186   1              
+ 187   1              //send startop styrespænding til FPGA
+ 188   1              FPGA_write_byte(21, OCXO_dac_value.OCXO_dac_value_bytes[1]);
+ 189   1              FPGA_write_byte(22, OCXO_dac_value.OCXO_dac_value_bytes[0]);
+ 190   1      
+ 191   1              //////////////////// SETUP UBLOX OUTPUT ////////////////////////
+ 192   1              //setup UBlox LEA 4T modul
+ 193   1              setup_ublox();
+ 194   1      
+ 195   1              //send kvantiseringsfejl 1 gang pr. sekund
+ 196   1              set_message_rate(0x0D, 0x01, 1);
+ 197   1      
+ 198   1              //set GPS tid ud 1 gang pr. sekund
+ 199   1              set_message_rate(0x01, 0x20, 1);
+ 200   1      
+ 201   1              //set UTC tid ud 1 gang pr. sekund
+ 202   1              set_message_rate(0x01, 0x21, 1);
+ 203   1              
+ 204   1              //set survey in progress ud 1 gang pr. 10 sekunder
+ 205   1              set_message_rate(0x0D, 0x04, 10);
+ 206   1      
+ 207   1              //færdig med initialisering
+ 208   1              FPGA_reset=0;
+ 209   1              
+ 210   1              counter=0;
+ 211   1              LED1= 1;
+ 212   1      
+ 213   1              //main løkke
+ 214   1              while(1)
+ 215   1              {       
+ 216   2                      //pak master status streng
+ 217   2                      if(timepulse_status)
+ 218   2                              set_bit(&master_status_byte, 0);
+ 219   2                      else
+ 220   2                              clear_bit(&master_status_byte, 0);
+ 221   2      
+ 222   2                      if(OCXO_locked_status)
+ 223   2                              set_bit(&master_status_byte, 1);
+ 224   2                      else
+ 225   2                              clear_bit(&master_status_byte, 1);
+ 226   2      
+ 227   2      
+ 228   2      
+ 229   2      //////////////////////////////////////////////////////
+ 230   2      //                      kontinuerlige processer                                 //
+ 231   2      //////////////////////////////////////////////////////
+ 232   2      
+ 233   2                      //processér indkommende uBlox data
+ 234   2                      packet_process();
+ 235   2      
+ 236   2                      //Check for bekræftelse af skift til sommer/vintertid
+ 237   2                      confirm_daylight_switch();
+ 238   2      
+ 239   2                      //hvis modtaget data fra PT5300
+ 240   2                      if(i2c_msgupdate==1)
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 5   
+
+ 241   2                      {       
+ 242   3                              LED1=0;
+ 243   3                              pt5300_in_handle();
+ 244   3                              i2c_msgupdate=0;
+ 245   3                      }
+ 246   2      
+ 247   2                      //hvis hel besked modtaget
+ 248   2                      if(msg_update_flag==1)
+ 249   2                      {       
+ 250   3                              LED1=0;
+ 251   3                              interpret_message();
+ 252   3                              msg_update_flag=0;
+ 253   3                      }
+ 254   2      
+ 255   2      
+ 256   2      //////////////////////////////////////////////////////
+ 257   2      //                      synkrone processer                                      //
+ 258   2      //////////////////////////////////////////////////////
+ 259   2      
+ 260   2                      //hvis stigende puls (synkron med GPS PPS)
+ 261   2                      if(ext1_rise_flag==1)
+ 262   2                      {
+ 263   3                              LED1=0;
+ 264   3      
+ 265   3                              ////////////////////// OCXO styring ///////////////////////////
+ 266   3                              //læs OCXO faseforskel
+ 267   3                              OCXO_phase_diff = (FPGA_read_byte(36)*256) + FPGA_read_byte(35);
+ 268   3      
+ 269   3                              //hvis indenfor låsetolerance, men ikke låst endnu
+ 270   3                              if((!OCXO_locked_status) && timepulse_status && (OCXO_phase_diff<OCXO_tolerance) && (OCXO_phase_diff>(-
+             -OCXO_tolerance)))
+ 271   3                              {
+ 272   4                                      
+ 273   4                                      //hvis låst i lang tid nok
+ 274   4                                      if(OCXO_counter>OCXO_time)
+ 275   4                                      {
+ 276   5                                              OCXO_counter=0;
+ 277   5                                              OCXO_locked_status=1;                           //angiv som låst!
+ 278   5                                              clear_bit(&FPGA_system_control, 3);     //sæt til langsomt loop-filter
+ 279   5                                      }
+ 280   4                                      //ellers tæl på låsetiden
+ 281   4                                      else                    
+ 282   4                                              OCXO_counter++;
+ 283   4                              }
+ 284   3                              //ellers hvis låst, men ikke indenfor tolerance eller ingen GPS kontakt
+ 285   3                              else if (OCXO_locked_status && ((!timepulse_status) || (OCXO_phase_diff>OCXO_tolerance) || (OCXO_phase_
+             -diff<(-OCXO_tolerance))))
+ 286   3                              {
+ 287   4                                      //hvis ude af lås i for lang tid
+ 288   4                                      if(OCXO_counter>OCXO_time)
+ 289   4                                      {
+ 290   5                                              OCXO_counter=0;
+ 291   5                                              OCXO_locked_status=0;                           //angiv som ikke låst!
+ 292   5                                              set_bit(&FPGA_system_control, 3);       //sæt til hurtigt loop-filter
+ 293   5                                      }
+ 294   4                                      //ellers tæl på låsetiden
+ 295   4                                      else                    
+ 296   4                                              OCXO_counter++;
+ 297   4                              }
+ 298   3      
+ 299   3                              update_LTC_strings();
+ 300   3                              check_daylight_switch();
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 6   
+
+ 301   3      
+ 302   3                              if(timepulse_status)
+ 303   3                                      counter++;
+ 304   3                              else
+ 305   3                                      counter=0;
+ 306   3      
+ 307   3                              //hvis ingen tidspuls
+ 308   3                              if(!timepulse_status)
+ 309   3                              {
+ 310   4                                      //send gennemsnits styrespænding til DAC
+ 311   4                                      FPGA_write_byte(21, OCXO_dac_value.OCXO_dac_value_bytes[1]);
+ 312   4                                      FPGA_write_byte(22, OCXO_dac_value.OCXO_dac_value_bytes[0]);
+ 313   4      
+ 314   4                                      //sæt OCXO til fixed mode
+ 315   4                                      set_bit(&FPGA_system_control, 4);
+ 316   4                              }
+ 317   3                              else
+ 318   3                              {
+ 319   4                                      //hvis GPS signal tilgængeligt, slå fixed mode fra
+ 320   4                                      clear_bit(&FPGA_system_control, 4);
+ 321   4                              }
+ 322   3      
+ 323   3                              //hvis PLL'en er låst, log styrespænding i EEPROM + udregn gennemsnits styrespænding
+ 324   3                              if(OCXO_locked_status && timepulse_status)
+ 325   3                              {
+ 326   4                                      OCXO_dac_value.OCXO_dac_value_bytes[1]=FPGA_read_byte(33);
+ 327   4                                      OCXO_dac_value.OCXO_dac_value_bytes[0]=FPGA_read_byte(34);
+ 328   4      
+ 329   4                                      //beregn gennemsnits DAC værdi
+ 330   4                                      OCXO_avg_dac_value.OCXO_avg_dac_value_int-=OCXO_avg_dac_value.OCXO_avg_dac_value_int/16;
+ 331   4                                      OCXO_avg_dac_value.OCXO_avg_dac_value_int+=OCXO_dac_value.OCXO_dac_value_int/16;
+ 332   4      
+ 333   4                                      //gem OCXO styrespænding over to(!!) sekunder, for ikke at forsinke MCU
+ 334   4                                      if(counter==1)
+ 335   4                                              EEPROM_write_byte(0, 2, OCXO_dac_value.OCXO_dac_value_bytes[1]);
+ 336   4      
+ 337   4                                      if(counter==2)
+ 338   4                                              EEPROM_write_byte(0, 1, OCXO_dac_value.OCXO_dac_value_bytes[0]);
+ 339   4                              }
+ 340   3      
+ 341   3                              //OCXO PLL har nu modtaget start op værdi, så aktiver (der ventes 15 sek)
+ 342   3                              if ((counter == 15) && (UTC_time_valid==0x07) && timepulse_status)
+ 343   3                              {
+ 344   4                                      clear_bit(&FPGA_system_control, 2);
+ 345   4                                      LED2=1;
+ 346   4                              }
+ 347   3      
+ 348   3                              ext1_rise_flag=0;
+ 349   3                      }
+ 350   2      
+ 351   2      
+ 352   2                      
+ 353   2                      //hvis faldende puls (500 ms efter stignede puls) (!! Ikke flere kommandoer her, tidsmangel ??)
+ 354   2                      if(ext1_fall_flag==1)
+ 355   2                      {
+ 356   3                              LED1=0;
+ 357   3      
+ 358   3                              //håndter tid
+ 359   3                              LTC_manager();
+ 360   3                              transmit_LTC_data();
+ 361   3                              ext1_fall_flag=0;
+ 362   3                      }
+C51 COMPILER V7.05   GPS_MAIN                                                              02/14/2008 11:13:43 PAGE 7   
+
+ 363   2      
+ 364   2                      //hvis ingen aktivitet, sluk LED1
+ 365   2                      LED1=1;
+ 366   2              }
+ 367   1      }
+ 368          
+ 369          
+ 370          //Sætter en bit høj i *byte
+ 371          void set_bit(unsigned char *byte, unsigned char bit_number)
+ 372          {
+ 373   1              *byte=*byte|(1<<bit_number);
+ 374   1      }
+ 375          
+ 376          //Sætter en bit lav i *byte
+ 377          void clear_bit(unsigned char *byte, unsigned char bit_number)
+ 378          {
+ 379   1              *byte=*byte&~(1<<bit_number);
+ 380   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    672    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     29    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

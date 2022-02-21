@@ -1,0 +1,4597 @@
+
+//	@(#)cxa.dol	1.32.1.15
+//
+//	COPYRIGHT 1996-1997 Tasking Inc.
+
+
+
+
+
+
+
+
+
+
+TOOLCHAIN
+{
+  DOILVERSION  = 1.0
+  TITLE        = "TASKING C for XA 2.0 r2"
+  ABBREV       = "XA"
+
+  BINDIR       = "\\bin"		// do not use Capitals for DIR's
+  INCDIR       = "\\include"
+  LIBDIR       = "\\lib\\xa"
+  OBJSUFFIX    = .obj
+  ERRORPARSER1 = "/^%e[EWSFR][ \\t]+[0-9]+:[ \\t]*%m.*/%backward %save/^%f[^ \\t][^:][^ \\t]+:/%restore %save/^[ \\t]+%l[0-9]+:/%restore"
+  ERRORPARSER2 = "/asxa %e[EWSF][0-9]+: %f[^ ]+ line %l[0-9]+.*: %m.*/"
+  ERRORPARSER3 = "/^\\*\\*\\*\\* %e[EW][^\\(]+\\(%f[^, ]+, line #%l[0-9]+\\) %m.*/"
+}
+
+MANUAL
+{
+  NAME       = "&EDE Manual"
+  MANUALID   = EM
+  MANUALPATH = "\\etc\\m_edewin.hlp"
+  MANUALICON = "EDE_MAN_ICON"
+  MENUHELP   = "Launch Embedded Development Environment Manual"
+  ICONHELP   = "EDE Manual"
+}
+
+
+MANUAL
+{
+  NAME       = "Editor &Getting Started Manual"
+  MANUALID   = CWGS
+  MANUALPATH = "\\etc\\cwgstart.hlp"
+  MANUALICON = "GET_STARTED_ICON"
+  MENUHELP   = "Launch Getting Started with Editor Manual"
+  ICONHELP   = "Editor Getting Started"
+}
+MANUAL
+{
+  NAME       = "Editor &Reference Manual"
+  MANUALID   = CWED
+  MANUALPATH = "\\etc\\cwguide.hlp"
+  MANUALICON = "EDITOR_MAN_ICON"
+  MENUHELP   = "Launch Editor Reference Manual"
+  ICONHELP   = "Editor Manual"
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+MANUAL
+{
+  NAME       = "XA &C Compiler Manual"
+  MANUALID   = CM
+  MANUALPATH = "\\etc\\m_cxa.hlp"
+  MANUALICON = "C_MAN_ICON"
+  MENUHELP   = "Launch XA C Compiler Manual"
+  ICONHELP   = "XA C Compiler Manual"
+}
+MANUAL
+{
+  NAME       = "XA &Assembler Manual"
+  MANUALID   = AM
+  MANUALPATH = "\\etc\\m_asxa.hlp"
+  MANUALICON = "AS_MAN_ICON"
+  MENUHELP   = "Launch XA Assembler Manual"
+  ICONHELP   = "XA Assembler Manual"
+}
+MANUAL
+{
+  NAME       = "XA Cross&View Pro Manual"
+  MANUALID   = XM
+  MANUALPATH = "\\etc\\m_xvwxa.hlp"
+  MANUALICON = "XVW_MAN_ICON"
+  MENUHELP   = "Launch CrossView Pro XA Debugger Manual"
+  ICONHELP   = "CrossView Pro XA Manual"
+}
+
+
+TOOL
+{
+  TOOLID        = CPP
+  MANUALID      = CPM  
+  SUFFIXPAIR    = .cc.ic
+  ACTION        = "%exe(ccxa.exe) -cc %file -f <<EOF 
+  ${separate \"\\n\" %opt }
+  EOF"
+  DEPENDMETHOD  = 1
+  ERRORPARSER1
+}
+
+TOOL
+{ 
+  TOOLID        = CPP
+  MANUALID      = CPM
+  SUFFIXPAIR    = .cxx.ic
+  ACTION        = "%exe(ccxa.exe) -cc %file -f <<EOF
+  ${separate \"\\n\" %opt }
+  EOF"       
+  DEPENDMETHOD  = 1
+  ERRORPARSER1 
+} 
+
+TOOL
+{ 
+  TOOLID        = CPP
+  MANUALID      = CPM
+  SUFFIXPAIR    = .cpp.ic
+  ACTION        = "%exe(ccxa.exe) -cc %file -f <<EOF
+  ${separate \"\\n\" %opt }
+  EOF"       
+  DEPENDMETHOD  = 1
+  ERRORPARSER1 
+} 
+
+TOOL
+{
+  TOOLID        = CC
+  MANUALID      = CM
+  SUFFIXPAIR    = .ic.src
+  ACTION        = "%exe(cxa.exe) %file -f <<EOF
+  ${separate \"\\n\" %opt }
+  EOF"
+  DEPENDMETHOD  = 1
+  ERRORPARSER1 
+}
+
+TOOL
+{
+  TOOLID = CC
+  MANUALID = CM  
+  SUFFIXPAIR = .c.src
+  ACTION = "%exe(cxa.exe) %file -f<<EOF
+  $(EMPTY) %opt
+  EOF"
+  DEPENDMETHOD = 1
+  ERRORPARSER1
+}
+
+TOOL
+{
+  TOOLID = MPP 
+  MANUALID = AM
+  SUFFIXPAIR = .asm.src
+  ACTION = "%exe(mppxa.exe) %file %opt"
+  DEPENDMETHOD = 2
+  ERRORPARSER3
+}
+
+TOOL
+{
+  TOOLID = AS
+  MANUALID = AM
+  SUFFIXPAIR = .src.obj
+  ACTION = "%exe(asxa.exe) %file -f<<EOF
+  $(EMPTY) %opt
+  EOF"
+  DEPENDMETHOD = 3
+  ERRORPARSER2
+}
+TOOL
+{
+  TOOLID = LK
+  MANUALID = AM
+  SUFFIXPAIR = .obj.out
+  ACTION = "%exe(ccxa.exe) -Wlk -emEDE=\\\"$(PROJ).i\\\" -o $@ -f<<EOF
+  $(separate \"\\n\" $(match .obj $!))
+  $(separate \"\\n\" $(match .a $!)) -cl %opt
+  EOF"
+}
+TOOL
+{
+  TOOLID = LK
+  MANUALID = AM
+  SUFFIXPAIR = .a.out
+  ACTION = ""		// see .obj.out action
+}
+
+TOOL
+{
+  TOOLID = AR
+  MANUALID = AM
+  SUFFIXPAIR = .obj.a
+  ACTION = "%exe(arxa.exe) -crv $@ -f<<EOF
+  $(separate \"\\n\" $(match .obj $!))
+  EOF"
+}
+
+TOOL
+{
+  TOOLID = LC
+  MANUALID = AM
+  SUFFIXPAIR = .out.abs
+  ACTION = "%exe(lcxa.exe) -o $@ $(match .out $!) -emEDE=\\\"$(PROJ).i\\\" -f<<EOF
+  $(EMPTY) %opt
+  EOF"
+}
+TOOL
+{
+  TOOLID = LC
+  MANUALID = AM
+  SUFFIXPAIR = .out.sre
+  ACTION = "%exe(lcxa.exe) -o $@ $(match .out $!) -emEDE=\\\"$(PROJ).i\\\" -f<<EOF
+  $(EMPTY) %opt
+  EOF"
+}
+TOOL
+{
+  TOOLID = LC
+  MANUALID = AM
+  SUFFIXPAIR = .out.hex
+  ACTION = "%exe(lcxa.exe) -o $@ $(match .out $!) -emEDE=\\\"$(PROJ).i\\\" -f<<EOF
+  $(EMPTY) %opt
+  EOF"
+}
+TOOL
+{
+  TOOLID = XVW
+  MANUALID = XM
+  ACTION = "%exe(xfwxa.exe) %file -em EDE=\\\"%y.i\\\" -G %x %opt"
+}
+TOOL
+{
+  TOOLID        = MODELXA
+  ACTION        = ""
+}
+
+MENU
+{
+  MENUID   = L
+  NAME	   = "Lan&guage Options"
+  TITLE    = "Language Options"
+  MENUHELP = "Select Language"
+  NOPREVIEW                             // This menu has FLAGTEXT only
+ 
+  TAB
+  {
+    TOOLID = MODELXA
+    NAME = "Language"
+
+    BLOCK      
+    {
+      NAME      = "Language Selection"
+
+
+      OPTION
+      {
+        NAME  = "The C++ compiler is available as a separate package."
+        ID    = CppLanguageText1
+        TYPE  = TEXT
+      }
+
+      EMPTYLINE
+
+
+      OPTION
+      {
+        NAME  = "Specify whether your project uses:"
+        ID    = CppLanguageText2
+        TYPE  = TEXT
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME   = "C&++ (optionally mixed with C modules)"
+        ID     = CppCompGlobal
+        GLOBAL
+        PARENT = !Demo
+        TYPE   = RADIOBUTTON
+        STATE  = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "-c++"
+        }
+      }
+      
+      OPTION  
+      { 
+        NAME  = "&C only (no C++ modules)"
+        ID    = CCompGlobal
+        GLOBAL
+        TYPE  = RADIOBUTTON
+        STATE = SELECTED
+      }
+    }  
+  }     
+}       
+
+MENU
+{
+  MENUID   = M
+  NAME	   = "&Processor Options"
+  TITLE    = "Processor Options" 
+  MENUHELP = "Select CPU and set properties"
+  NOPREVIEW				// This menu has FLAGTEXT only
+
+  TAB
+  {
+    TOOLID = MODELXA
+    NAME = "Processor"
+
+    BLOCK
+    {
+      NAME = "CPU derivative for SFRs"
+
+      OPTION
+      {
+        NAME = "&CPU (Special Function Registers):"
+        ID = Cpu
+        TYPE = POPUPLIST
+        STATE = CpuXaG3
+        ITEM
+        {
+          NAME = "Philips XA-G1"
+          ID = CpuXaG1
+          FLAGTEXT = "xag1"
+        }
+        ITEM
+        {
+          NAME = "Philips XA-G2"
+          ID = CpuXaG2
+          FLAGTEXT = "xag2"
+        }
+        ITEM
+        {
+          NAME = "Philips XA-G3"
+          ID = CpuXaG3
+          FLAGTEXT = "xag3"
+        }
+
+
+
+
+
+
+
+
+
+        ITEM
+        {
+          NAME = "Philips XA-S3"
+          ID = CpuXaS3
+          FLAGTEXT = "xas3"
+        }
+        ITEM
+        {
+          NAME = "Philips XA-SCC"
+          ID = CpuXaSCC
+          FLAGTEXT = "xascc"
+        }
+        ITEM
+        {
+          NAME = "Philips Artistic"
+          ID = CpuXaArt
+          FLAGTEXT = "xaart"
+        }
+        ITEM
+        {
+          NAME = "User Specified"
+          ID = CpuUser
+        }
+        ITEM
+        {
+          NAME = "None"
+          ID = CpuNone
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "You can specify your own CPU name and create SFR files using the"
+        ID = CpuUserText1
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = "REG<name>.<EXT> naming convention: .SFR (C compiler),"
+        ID = CpuUserText2
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = ".SFR( Assembler), .DEF (Register Manager), .DAT (CrossView Pro)"
+        ID = CpuUserText3
+	TYPE = TEXT
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&User specified CPU name:"
+        ID = CpuUserName
+        PARENT = CpuUser
+        TYPE = EDITBOX
+        SELECTED
+        {
+          FLAGTEXT = "%s"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = MODELXA
+    NAME = "Memory"
+
+    BLOCK
+    {
+      NAME = "CPU memory specification"
+
+      OPTION
+      {
+        NAME = "On-chip EPROM/ROM program memory size:"
+        ID = IRomSize
+        TYPE = POPUPLIST
+        STATE = IRom32k
+        ITEM
+        {
+          NAME = "8 Kbytes"
+          ID = IRom8k
+	  PARENT = CpuXaG1 | CpuUser | CpuNone
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ICODE 0x2000\n"
+        }
+        ITEM
+        {
+          NAME = "16 Kbytes"
+          ID = IRom16k
+	  PARENT = CpuXaG2 | CpuUser | CpuNone
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ICODE 0x4000\n"
+        }
+        ITEM
+        {
+          NAME = "32 Kbytes"
+          ID = IRom32k
+	  PARENT = CpuXaG3 | CpuXaS3 | CpuXaArt | CpuUser | CpuNone
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ICODE 0x8000\n"
+        }
+        ITEM
+        {
+          NAME = "No on-chip program memory"
+          ID = IRom0
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ICODE 0x0\n"
+        }
+        ITEM
+        {
+          NAME = "User Specified"
+          ID = IRomUser
+	  PARENT = CpuUser | CpuNone
+        }
+      }
+
+      OPTION
+      {
+        NAME = "On-chip data R&AM size:"
+        ID = IRamSize
+        TYPE = POPUPLIST
+        STATE = IRam1k
+        ITEM
+        {
+          NAME = "256 bytes"
+          ID = IRam256
+  	  PARENT = CpuXaSCC | CpuUser | CpuNone 
+  	  DEFMACRO = "FILE=%p.i;LK,LC;#define _IRAM 0x100\n"
+        }
+        ITEM
+        {
+          NAME = "512 bytes"
+          ID = IRam512
+	  PARENT = CpuXaG1 | CpuXaG2 | CpuXaG3 | CpuXaArt | CpuUser | CpuNone
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _IRAM 0x200\n"
+        }
+        ITEM
+        {
+          NAME = "1 Kbytes"
+          ID = IRam1k
+	  PARENT = CpuXaS3 | CpuUser | CpuNone
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _IRAM 0x400\n"
+        }
+        ITEM
+        {
+          NAME = "User Specified"
+          ID = IRamUser
+	  PARENT = CpuUser
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&User specified on-chip EPROM/ROM program memory size (0-0FFFFH):"
+        ID = IRomUserSize
+        PARENT = IRomUser
+        TYPE = EDITBOX WIDE
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ICODE %s\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "U&ser specified on-chip data RAM size (0-0FFFFH):"
+        ID = IRamUserSize
+        PARENT = IRamUser
+        TYPE = EDITBOX WIDE
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _IRAM %s\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Single chip solution (no external memory)"
+        ID = CpuSingleChip
+        PARENT = !CpuXaSCC
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+      }
+
+      OPTION
+      {
+        NAME = "&External memory (specify ROM/RAM areas in Linker Options...)"
+        ID = CpuExtMem
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Separate external code and data bus (Harvard architecture)"
+        ID = Harvard
+        PARENT = !CpuXaSCC
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+      }
+
+      OPTION
+      {
+        NAME = "&Unified external code and data bus"
+        ID = Unified
+        PARENT = CpuExtMem
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _UNIFIED_BUS 1\n"
+        }
+      }
+
+//
+// EDE include invisible options
+//
+      OPTION
+      {
+        ID = EdeIncludeSfr1
+	PARENT = !CpuUser & !CpuNone
+        TYPE = INVISIBLE
+        STATE = SELECTED
+	SELECTED
+	{
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _REGSFR reg$(Cpu).dat\n"
+	}
+      }
+      OPTION
+      {
+        ID = EdeIncludeSfr2
+	PARENT = CpuUser & !CpuNone
+        TYPE = INVISIBLE
+        STATE = SELECTED
+	SELECTED
+	{
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _REGSFR reg$(CpuUserName).dat\n"
+	}
+      }
+      OPTION
+      {
+        ID = EdeIncludeExtMem
+	PARENT = LcExtCode | LcExtCodeLin | LcExtRam | LcExtRamLin | LcExtRom
+        TYPE = INVISIBLE
+        STATE = SELECTED
+        SELECTED
+        {
+          DEFMACRO = "FILE=%p.i;LK,LC;#define _XMEM 1\n"
+        }
+      }
+      OPTION
+      {  
+        ID = EdeIncludeNoExtMem
+        PARENT = !(LcExtCode | LcExtCodeLin | LcExtRam | LcExtRamLin | LcExtRom)
+        TYPE = INVISIBLE
+        STATE = SELECTED
+        SELECTED
+        { 
+          DEFMACRO = "FILE=%p.i;LK,LC;#define _XMEM 0\n"
+        }
+      }
+    }  
+  }
+}       
+
+MENU
+{
+  MENUID        = C
+  NAME          = "C&++ Compiler Options"
+  TITLE         = "XA C++ Compiler Options" 
+  MENUHELP      = "Set options for the XA C++ Compiler"
+  LOCALOPT      = .cpp .cc .cxx
+ 
+  TAB
+  {
+    TOOLID = CPP
+    NAME   = "EC++"
+ 
+    BLOCK
+    {
+      NAME = "Embedded C++ Settings"
+ 
+      OPTION
+      {
+        NAME = "Enable &TASKING CXA embedded language extensions (e.g. '_near')"
+        ID    = CompEmbeddedTasking
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--embedded"
+        }
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_embedded"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Check compliance with the \"EC++\" standard"
+        ID    = CompEmbeddedCpp
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--embedded_c++"
+        }
+      }
+
+      EMPTYLINE
+ 
+      OPTION
+      {
+        NAME  = "Comply with the \"EC++\" standard except for:"
+        ID    = ECppLanguageText
+        TYPE  = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "Allow &templates"
+	ID    = ECppTemplates
+        PARENT= CompEmbeddedCpp
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress templates_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow &exception handling"
+	ID    = ECppExceptions
+        PARENT= CompEmbeddedCpp & CompExceptions
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress exceptions_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow &name spaces"
+	ID    = ECppNameSpaces
+        PARENT= CompEmbeddedCpp & CompNamespaces
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress namespaces_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow &run-time type identification (RTTI)"
+	ID    = ECppRTTI
+        PARENT= CompEmbeddedCpp & CompRtti
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress rtti_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow ne&w style cast"
+	ID    = ECppNewCast
+        PARENT= CompEmbeddedCpp
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress new_cast_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow the u&sing keyword"
+	ID    = ECppUsingDecl
+        PARENT= CompEmbeddedCpp
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress using_decl_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow the &mutable keyword"
+	ID    = ECppMutable
+        PARENT= CompEmbeddedCpp
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress mutable_in_embedded_cplusplus"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Allow m&ultiple inheritance"
+	ID    = ECppMultipleInheritance
+        PARENT= CompEmbeddedCpp
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--diag_suppress multiple_inheritance_in_embedded_cplusplus"
+        }
+      }
+    }
+  }
+ 
+  TAB
+  {
+    TOOLID = CPP
+    NAME = "Language"
+ 
+    BLOCK
+    {
+      NAME = "C++ Language Options"
+ 
+      OPTION
+      {
+        NAME = "Enable &anachronisms"
+        ID    = CompAnachronisms
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--anachronisms"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable &support for array new and delete"
+        ID    = CompArrayNewAndDelete
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_array_new_and_delete"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable recognition of alternative &tokens"
+        ID    = CompAlternativeTokens
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--alternative_tokens"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable recognition of '&bool' as a keyword"
+        ID    = CompBoolKeyword
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_bool"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable support for &exception handling"
+        ID    = CompExceptions
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--exceptions"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable support for &namespaces"
+        ID    = CompNamespaces
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_namespaces"
+        }
+      }
+        
+      OPTION
+      {
+        NAME = "Enable support for &RTTI (run-time type identification)"
+        ID    = CompRtti
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_rtti"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable recognition of 't&ypename' as a keyword"
+        ID    = CompTypename
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_typename"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable recognition of '&wchar_t' as a keyword"
+        ID    = CompWcharT
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_wchar_t_keyword"
+        }
+      }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      EMPTYLINE
+ 
+      OPTION
+      {
+        NAME = "Enable compatibility with cfront version &2.1"
+        ID    = CompCfront21
+        PARENT= CppCompGlobal
+        TYPE  = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--cfront_2.1"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable compatibility with cfront version &3.0"
+        ID    = CompCfront30
+        PARENT= CppCompGlobal
+        TYPE  = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--cfront_3.0"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable default &compatibility mode"
+        ID    = CompDefaultCompatible
+        PARENT= CppCompGlobal
+        TYPE  = RADIOBUTTON
+        STATE = SELECTED
+      }
+    }
+  }
+ 
+  TAB
+  {
+    TOOLID = CPP
+    NAME   = "Diagnostics"
+ 
+    BLOCK
+    {
+      NAME = "Error Handling"
+
+      OPTION
+      {
+        NAME = "Issue &errors on non-ANSI features"
+        ID    = CompStrictAnsiErrors
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--strict"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Issue &warnings on non-ANSI features"
+        ID    = CompStrictAnsiWarnings
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--strict_warnings"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Issue &remarks (diagnostic messages even milder than warnings)"
+        ID    = CompRemarks
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--remarks"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "&Suppress all C++ warning messages"
+        ID    = CompSupressCppWarnings
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--no_warnings"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "S&uppress warnings when automatics are used before they are set"
+        ID    = CompSupressUseBeforeSetWarnings
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--no_use_before_set_warnings"
+        }
+      }
+    }
+  }
+ 
+  TAB
+  {
+    TOOLID = CPP
+    NAME = "Precompiled Headers"
+
+    BLOCK
+    {
+      NAME = "Precompiled Headers"
+ 
+      OPTION
+      {
+        NAME = "Automatically use and/or create a &precompiled header file"
+        ID    = CompPch
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--pch"
+        }
+      }
+ 
+      EMPTYLINE
+ 
+      OPTION
+      {
+        NAME  = "Create the specified precompiled &header file:"
+        ID    = CompCreatePch
+        PARENT= CppCompGlobal
+        TYPE  = EDITBOX WIDE
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "--create_pch %s"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME  = "&Use the specified precompiled header file in current compilation:"
+        ID    = CompUsePch
+        PARENT= CppCompGlobal
+        TYPE  = EDITBOX WIDE
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "--use_pch %s"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME  = "D&irectory in which to search for and/or create a precompiled header file:"
+        ID    = CompPchDir
+        PARENT= CppCompGlobal
+        TYPE  = EDITBOX WIDE
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "--pch_dir %s"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CPP
+    NAME = "Miscellaneous"
+ 
+    BLOCK
+    {
+      NAME = "C++ Miscellaneous Options"
+ 
+      OPTION
+      {
+        NAME = "Enable &implicit inclusion of source files for finding templates"
+        ID    = CompImplicitInclusion
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_implicit_include"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "&Force definition of virtual function tables"
+        ID    = CompForceVtbl
+        PARENT= !CompSuppressVtbl & CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--force_vtbl"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "&Suppress definition of virtual function tables"
+        ID    = CompSuppressVtbl
+        PARENT= !CompForceVtbl & CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "--suppress_vtbl"
+        }
+      }
+ 
+      OPTION
+      {
+        NAME = "Enable minimal inlining of function &calls"
+        ID    = CompInlining
+        PARENT= CppCompGlobal
+        TYPE  = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "--no_inlining"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "&Define user macros, e.g. VALUE=100,SERIAL"
+	ID = CompDefine
+	TYPE = EDITBOX WIDE
+	STATE = ""
+	SELECTED
+	{
+	  OPTIONTEXT = "%list(,, ,-D%s)"
+	}
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME  = "&Additional options:"
+        ID    = CppAdditional
+        PARENT= CppCompGlobal
+        TYPE  = EDITBOX WIDE
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "%s"
+        }
+      }
+//
+// C++ invisible options
+//
+      OPTION
+      {
+        ID    = CppMemoryModel
+        TYPE  = INVISIBLE
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-M$(MemoryModel)"
+        }
+      }
+    }
+  }
+}
+ 
+MENU
+{
+  MENUID   = C
+  NAME	   = "&C Compiler Options"
+  TITLE    = "XA C Compiler Options" 
+  MENUHELP = "Set options for the XA C Compiler"
+  LOCALOPT = .c
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Memory Model"
+
+    BLOCK
+    {
+      NAME = "Memory Model"
+
+      OPTION
+      {
+	ID = Demo
+	TYPE = INVISIBLE
+
+
+
+	STATE = NOTSELECTED	// Full product version
+
+      }
+
+       OPTION
+       {
+        ID      = CompIncDir
+        TYPE    = INVISIBLE
+        STATE   = SELECTED
+        SELECTED
+        {
+         OPTIONTEXT    = "%list(;, ,-I%incdir)"
+        }
+       }
+ 
+ 
+       OPTION
+       {
+        NAME = "Memory &Model:"
+        ID = MemoryModel
+	GLOBAL
+        TYPE = POPUPLIST
+        STATE = 0
+        ITEM
+        { 
+          NAME = "Tiny"
+          ID = MemoryModelTiny
+          OPTIONTEXT = "-Mt"
+          FLAGTEXT = "t"
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _MODEL_TINY\n"
+        }
+        ITEM
+        {
+          NAME = "Small"
+          ID = MemoryModelSmall
+          OPTIONTEXT = "-Ms"
+          FLAGTEXT = "s"
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _MODEL_SMALL\n"
+        }
+        ITEM
+        {
+          NAME = "Medium"
+          ID = MemoryModelMedium
+          OPTIONTEXT = "-Mm"
+          FLAGTEXT = "m"
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _MODEL_MEDIUM\n"
+	}
+        ITEM
+        {
+          NAME = "Large"
+          ID = MemoryModelLarge
+          OPTIONTEXT = "-Ml"
+          FLAGTEXT = "l"
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _MODEL_LARGE\n"
+        }
+      }
+
+      EMPTYLINE
+
+
+
+
+
+
+
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Model Default Behavior:"
+	ID = MemoryExpl_0
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = "Tiny: 64K code 1K data, page 0"
+	ID = MemoryExpl_2
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = "Small: 64K code 64K data, page 0"
+	ID = MemoryExpl_3
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = "Medium: 16M code 64K data, large memory"
+	ID = MemoryExpl_4
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = "Large: 16M code 16M data, large memory"
+	ID = MemoryExpl_6
+	TYPE = TEXT
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Memory space qualifiers overrule the default behavior"
+	ID = MemoryExpl_7
+	TYPE = TEXT
+      }
+      OPTION
+      {
+	NAME = "Refer to the XA compiler manual for details"
+	ID = MemoryExpl_8
+	TYPE = TEXT
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Allocation"
+
+    BLOCK
+    {
+      NAME = "Interrupt vectors"
+
+      OPTION
+      {
+        NAME = "&Generate code for interrupt vector"
+        ID = IntVectors
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "-v"
+        }
+      }
+
+      OPTION
+      {
+        ID = CompCpu1
+	PARENT = !CpuUser & !CpuNone
+        TYPE = INVISIBLE
+        STATE = SELECTED
+	SELECTED
+	{
+	  OPTIONTEXT= "-C$(Cpu)"
+        }
+      }
+      OPTION
+      {
+        ID = CompCpu2
+	PARENT = CpuUser & CpuUserName & !CpuNone
+        TYPE = INVISIBLE
+        STATE = SELECTED
+	SELECTED
+	{
+	  OPTIONTEXT= "-C$(CpuUserName)"
+        }
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "String and const allocation"
+
+      OPTION
+      {
+        NAME = "in ROM and C&opy to RAM"
+        ID = CompRomStringsCopy
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-So"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "in ROM &Data space only"
+        ID = CompRomStringsData
+	PARENT = CpuExtMem
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-Sd"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "strings in ROM &Code space only, const in ROM and copy to RAM"
+        ID = CompRomStringsCode
+        PARENT = !CpuXaSCC
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-Sc"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Output"
+
+    BLOCK
+    {
+      NAME = "Output"
+
+      OPTION
+      {
+        NAME = "Merge &C source code with assembly output"
+        ID = MixedAsm
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Display lines per minute"
+        ID = ModuleSummary
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-t"
+        }
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "Diagnostics"
+
+      OPTION
+      {
+	NAME = "&Report all warnings"
+	ID = CompWarn
+	TYPE = RADIOBUTTON
+	STATE = SELECTED
+      }
+
+      OPTION
+      {
+	NAME = "&Suppress all warnings"
+	ID = CompNoWarn
+	TYPE = RADIOBUTTON
+	STATE = NOTSELECTED
+	SELECTED
+	{
+	  OPTIONTEXT = "-w"
+	}
+      }
+
+      OPTION
+      {
+	NAME = "Suppress specific &warnings:"
+	ID = CompSpecWarn
+	TYPE = RADIOBUTTON
+	STATE = NOTSELECTED
+      }
+
+      OPTION
+      {
+	NAME = "     e.g.  126,135,144"
+	ID = CompWarnList
+	PARENT = CompSpecWarn
+	TYPE = EDITBOX
+	STATE = ""  
+	SELECTED
+	{
+	  OPTIONTEXT = "%list(,, ,-w%s)"
+	}  
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Language"
+
+    BLOCK
+    {
+      NAME = "Language Extensions"
+
+      OPTION
+      {
+        NAME = "&Disable language extensions (strict ANSI mode)"
+        ID = CompA0
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-A0"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Enable all language extensions"
+        ID = CompA1
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-A1"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Advanced language extensions"
+        ID = CompA2
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-A$(CompAChar)$(CompAIden500)$(CompACpp)$(CompAHex)$(CompAProm)$(CompALval)$(CompACst)"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Perform &character arithmetic"
+        ID = CompAChar
+        PARENT = CompA2
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "c"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "C"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Allow 500-character &identifiers"
+        ID = CompAIden500
+        PARENT = CompA2
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "l"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "L"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Allow C++ &style comments in C source code"
+        ID = CompACpp
+        PARENT = CompA2
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "p"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "P"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Default argument &promotions on old-style function parameters"
+        ID = CompAProm
+        PARENT = CompA2
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "t"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "T"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Allow &type cast of void lvalue object"
+        ID = CompALval
+        PARENT = CompA2
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "v"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "V"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Check assignment c&onstant string to non constant string pointer"
+        ID = CompACst
+        PARENT = CompA2
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "X"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "x"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Treat 'char' variables as &unsigned"
+        ID = UnsignedChars
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-u"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Type of unsuffixed &hex constant:"
+        ID = CompAHex
+        PARENT = CompA2
+        TYPE = POPUPLIST
+        STATE = 0
+        ITEM
+        {
+          NAME = "char, uchar, int, uint, long, ulong"
+          ID = CompACharHex
+	  PARENT = CompAChar
+	  FLAGTEXT = ""
+        }
+        ITEM
+        {
+          NAME = "char, int, uint, long, ulong"
+          ID = CompAUCharHex
+	  PARENT = CompAChar
+          FLAGTEXT = "U"
+        }
+        ITEM
+        {
+          NAME = "int, uint, long, ulong"
+          ID = CompAIntHex
+	  PARENT = !CompAChar
+          FLAGTEXT = "U"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Optimization"
+
+    BLOCK
+    {
+      NAME = "Optimization"
+
+      OPTION
+      {
+        NAME = "&Optimization Level:"
+        ID = CompOptim
+        TYPE = POPUPLIST
+        STATE = 1
+        ITEM
+        {
+          NAME = "No optimization"
+          ID = CompO0
+          OPTIONTEXT = "-O0"
+        }
+        ITEM
+        {
+          NAME = "Optimize for size"
+          ID = CompO1
+          OPTIONTEXT = "-O1"
+        }
+        ITEM
+        {
+          NAME = "Optimize for speed"
+          ID = CompO2
+          OPTIONTEXT = "-O2"
+        }
+        ITEM
+        {
+          NAME = "Advanced optimization"
+          ID = CompOAdv
+          OPTIONTEXT = "-O$(CompOa)$(CompOb)$(CompOc)$(CompOd)$(CompOe)$(CompOf)$(CompOh)$(CompOi)$(CompOl)$(CompOs)$(CompOt)$(CompOu)$(CompOv)$(CompOw)"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Advanced optimization:"
+	ID = CompOtext1
+	TYPE = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "Relax &alias checking"
+        ID = CompOa
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "a"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "A"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable &common subexpression elimination (CSE)"
+        ID = CompOc
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "c"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "C"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable constant and copy propagation (&data flow)"
+        ID = CompOd
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "d"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "D"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Produce &small code (favor code size above execution speed)"
+        ID = CompOs
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "s"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "S"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable peep&hole optimizer (remove redundant code)"
+        ID = CompOh
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "h"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "H"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Move &invariant code outside loop"
+        ID = CompOi
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "i"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "I"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable fast &loops (smallest code size)"
+        ID = CompOl
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "l"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "L"
+        }
+      }
+
+      EMPTYLINE  
+
+      OPTION
+      {
+	NAME = "Advanced optimization continues in 'Adv. Optim' tab"
+	ID = CompOtext2
+	TYPE = TEXT
+      }
+
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Adv. Optim."
+
+    BLOCK
+    {
+      NAME = "Advanced optimization ...continued"
+
+      OPTION
+      {
+        NAME = "No &clearing of non-initialized static and public variables"
+        ID = CompOb
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "b"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "B"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Expression propagation"
+        ID = CompOe
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "e"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "E"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable code order rearranging in &flow optimization"
+        ID = CompOf
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "f"
+        }
+         NOTSELECTED
+        {
+          FLAGTEXT = "F"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Force jump &table for switch statements"
+        ID = CompOt
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "t"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "T"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Loop &unrolling"
+        ID = CompOu
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "u"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "U"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Subscript strength reduction"
+        ID = CompOv
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "v"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "V"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Smart s&witch code selection (table or chain)"
+        ID = CompOw
+        PARENT = CompOAdv
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "w"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "W"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Preprocessing"
+
+    BLOCK
+    {
+      NAME = "Preprocessing"
+
+      OPTION
+      {
+        NAME = "&Preprocess only and capture output"
+	ID = CompPrep
+	TYPE = CHECKBOX
+	STATE = NOTSELECTED
+	SELECTED
+	{
+	  OPTIONTEXT = "-E"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "&Define user macros, e.g. VALUE=100,SERIAL"
+	ID = CompDefine
+	TYPE = EDITBOX WIDE
+	STATE = ""
+	SELECTED
+	{
+	  OPTIONTEXT = "%list(,, ,-D%s)"
+	}
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Predefine the macro _MODEL to compiler data &model selected"
+        ID = CompUModel
+	TYPE = CHECKBOX
+	STATE = SELECTED
+	NOTSELECTED
+	{
+	  OPTIONTEXT = "-U_MODEL"
+	}
+      }
+      OPTION
+      {
+	NAME = "Predefine the macro _CXA to &compiler version number"
+        ID = CompUCXA
+	TYPE = CHECKBOX
+	STATE = SELECTED
+	NOTSELECTED
+	{
+	  OPTIONTEXT = "-U_CXA"
+	}
+      }
+      OPTION
+      {
+	NAME = "Let the macro _SINGLE_FP reflect d&ouble precision support"
+        ID = CompUSingleFp
+	TYPE = CHECKBOX
+	STATE = SELECTED
+	NOTSELECTED
+	{
+	  OPTIONTEXT = "-U_SINGLE_FP"
+	}
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "First #&include this file:"
+	ID = CompSpecInc
+	TYPE = EDITBOX
+	STATE = ""
+	SELECTED
+	{
+	  OPTIONTEXT = "-H%s"
+	}
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Debug"
+
+    BLOCK
+    {
+      NAME = "Symbolic Debug"
+
+      OPTION
+      {
+        NAME = "&Generate symbolic debug information"
+        ID = CompDebug
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-g$(DebugAllTypes)$(DebugNop)$(DebugLifeTime)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Include debug information for non referenced types"
+        ID = DebugAllTypes
+        PARENT = CompDebug
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "f"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Disable &lifetime info for all types"
+        ID = DebugLifeTime
+        PARENT = CompDebug
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "l"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = CC
+    NAME = "Misc"
+
+    BLOCK
+    {
+      NAME = "Floating point"
+
+      OPTION
+      {
+        NAME = "Using single precision only speeds up execution (non-ANSI):"
+        ID = CompFloatText1
+        TYPE = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "Use &single precision floating point only"
+        ID = CompFloatSingle
+	GLOBAL
+	PARENT = !Demo
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-F"
+          FLAGTEXT = "-F"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Treat floating point &constants as 'float'"
+        ID = CompFloatConstants
+        PARENT = !CompFloatSingle & !Demo
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-Fc"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Enable floating point &trap/exception handling"
+        ID = FpTrapLib
+	GLOBAL
+	PARENT = !Demo
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "-fptrap"
+        }
+      }
+
+
+
+
+
+
+
+
+
+    }
+
+    BLOCK
+    {
+      NAME = "Miscellaneous"
+
+      OPTION
+      {
+        NAME = "&Additional options:"
+        ID = CompAdditional
+        TYPE = EDITBOX WIDE
+        STATE = ""
+	SELECTED
+	{
+	  OPTIONTEXT = "%s"
+	}
+      }
+    }
+  }
+}
+
+MENU
+{
+  MENUID   = A
+  NAME     = "&Assembler Options"
+  TITLE    = "XA Assembler Options" 
+  MENUHELP = "Set options for the XA Assembler"
+  LOCALOPT = .c .asm .src
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "Code Generation"
+
+    BLOCK
+    {
+      NAME = "Processor execution mode"
+
+      OPTION
+      {
+        NAME = "XA &Zero-Page mode"
+        ID = ZeroPageMode
+	GLOBAL
+	PARENT= MemoryModelTiny | MemoryModelSmall
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "ZP"
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ZPAGE 1\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "XA &Large-Memory mode"
+        ID = LargeMemoryMode
+	GLOBAL
+	PARENT= MemoryModelMedium | MemoryModelLarge
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "NOZP"
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _ZPAGE 0\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Execution mode is coupled with compiler memory model"
+	ID = ExecutionModeExpl_0
+	TYPE = TEXT
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "Debug info"
+
+      OPTION
+      {
+        NAME = "Emit &ASM level additional to C level debug information"
+        ID = HllAndAsmDebug
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-gs"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Emit &C level symbolic debug information only"
+        ID = HllDebug
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = ""			// Is the default
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Emit ASM level symbolic debug information &only"
+        ID = AsmDebug
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-gaH$(AsmDebugNoLocals)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Disable the generation of &local symbols debugging information"
+        ID = AsmDebugNoLocals
+	GLOBAL
+	PARENT = AsmDebug
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "L"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "l"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "Output"
+
+    BLOCK
+    {
+      NAME = "Output"
+
+      OPTION
+      {
+        NAME = "Generate &section summary"
+        ID = AsmOutputSectionSum
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-t"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Generate list file"
+        ID = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "NOPR"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "List file settings in 'List File' and 'Adv. List File' tab"
+        ID = AsmOutputText1
+	PARENT = O1004
+        TYPE = TEXT
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "Diagnostics"
+
+      OPTION
+      {
+	NAME = "&Report all warnings"
+	ID = AsmWarn
+	TYPE = RADIOBUTTON
+	STATE = SELECTED
+      }
+
+      OPTION
+      {
+	NAME = "&Suppress all warnings"
+	ID = AsmNoWarn
+	TYPE = RADIOBUTTON
+	STATE = NOTSELECTED
+	SELECTED
+	{
+	  OPTIONTEXT = "-w"
+	}
+      }
+
+      OPTION
+      {
+	NAME = "Suppress specific &warnings:"
+	ID = AsmSpecWarn
+	TYPE = RADIOBUTTON
+	STATE = NOTSELECTED
+      }
+
+      OPTION
+      {
+	NAME = "     e.g.  104,118,121"
+	ID = AsmWarnList
+	PARENT = AsmSpecWarn
+	TYPE = EDITBOX
+	STATE = ""  
+	SELECTED
+	{
+	  OPTIONTEXT = "%list(,, ,-w%s)"
+	}  
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "List File"
+
+    BLOCK
+    {
+      NAME = "List file configuration"
+
+      OPTION
+      {
+        NAME = "Title of &list file:"
+        ID = O1005
+	PARENT = O1004
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "TT(%s)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Date in header of list file:"
+        ID = O1006
+	PARENT = O1004
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "DA(%s)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Lines per page:"
+        ID = O1007
+	PARENT = O1004
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "PL(%d)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Characters per line:"
+        ID = O1008
+	PARENT = O1004
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "PW(%d)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Format list file into pages"
+        ID = O1009
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "NOPI"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Advanced list file settings continues in 'Adv. List File' tab"
+	ID = AsmListFileText1
+	TYPE = TEXT
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Enable or disable list file generation in 'Output' tab"
+	ID = AsmListFileText2
+	TYPE = TEXT
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "Adv. List File"
+
+    BLOCK
+    {
+      NAME = "Advanced list file configuration"
+
+      OPTION
+      {
+        NAME = "&Assembler controls               (END)"
+        ID = AsmListAssCntrl
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-L$(AsmListAssCntrl)$(AsmListSectDir)$(AsmListSymbolDir)$(AsmListCppInfo)$(AsmListMacroDup)$(AsmListEmptyLines)$(AsmListCondAss)$(AsmListAssEquates)$(AsmListHLL)$(AsmListWrappedSource)$(AsmListMacroDupExp)$(AsmListCycleCounts)"
+	  FLAGTEXT = "C"
+        }
+	NOTSELECTED
+        {
+          OPTIONTEXT = "-L$(AsmListAssCntrl)$(AsmListSectDir)$(AsmListSymbolDir)$(AsmListCppInfo)$(AsmListMacroDup)$(AsmListEmptyLines)$(AsmListCondAss)$(AsmListAssEquates)$(AsmListHLL)$(AsmListWrappedSource)$(AsmListMacroDupExp)$(AsmListCycleCounts)"
+	  FLAGTEXT = "c"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Section directives                (SEGMENT, xSEG)"
+        ID = AsmListSectDir
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "D"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "d"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "S&ymbol definition directives  (EXTRN,PUBLIC,LOCAL,CALLS)"
+        ID = AsmListSymbolDir
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "E"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "e"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Cpp line information              (#line)"
+        ID = AsmListCppInfo
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "L"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "l"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Macro/dup definitions          (MACRO, DUP)"
+        ID = AsmListMacroDup
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "M"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "m"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Empty source lines               (newline)"
+        ID = AsmListEmptyLines
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "N"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "C&onditional assembly            (IF,ELSE,ENDIF)"
+        ID = AsmListCondAss
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "P"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "p"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Assembler e&quates               (EQU, =)"
+        ID = AsmListAssEquates
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "Q"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "q"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&HLL symbolic debug             (SYMB)"
+        ID = AsmListHLL
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "S"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Wrapped source lines"
+        ID = AsmListWrappedSource
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "W"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "w"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Macro/d&up expansions"
+        ID = AsmListMacroDupExp
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "X"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "x"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "H&ide/show cycle counts"
+        ID = AsmListCycleCounts
+	PARENT = O1004
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+	  FLAGTEXT = "Y"
+        }
+	NOTSELECTED
+        {
+	  FLAGTEXT = "y"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+	NAME = "Enable or disable list file generation in the 'Output' tab"
+	ID = AsmListFileText3
+	TYPE = TEXT
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "Optimization"
+
+    BLOCK
+    {
+      NAME = "Control optimization"
+
+      OPTION
+      {
+        NAME = "&Hardware instructions only"
+        ID = AsmOptHardwareOnly
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-O$(AsmOptHardwareOnly)$(AsmOptJumpBranch)$(AsmOptShort)"
+	  FLAGTEXT = "h"
+        }
+        NOTSELECTED
+        {
+          OPTIONTEXT = "-O$(AsmOptHardwareOnly)$(AsmOptJumpBranch)$(AsmOptShort)"
+	  FLAGTEXT = "H"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Jump and branch range optimization"
+        ID = AsmOptJumpBranch
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "j"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "J"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Short instruction optimization"
+        ID = AsmOptShort
+        TYPE = CHECKBOX
+        STATE = SELECTED
+	SELECTED
+        {
+          FLAGTEXT = "s"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "S"
+        }
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "Generic optimization level"
+
+      OPTION
+      {
+        NAME = "Level &0: JMP and CALL with backward reference"
+        ID = O1011
+	PARENT = !AsmOptHardwareOnly
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "GL(0)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Level &1: Level 0 and JMP and CALL with forward reference"
+        ID = O1012
+	PARENT = !AsmOptHardwareOnly
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "GL(1)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Level &2: Level 1 and relative JMP instructions"
+        ID = O1013
+	PARENT = !AsmOptHardwareOnly
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+      }
+
+      OPTION
+      {
+        NAME = "Level &3: Level 2 and generic instructions"
+        ID = O1014
+	PARENT = !AsmOptHardwareOnly
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "GL(3)"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "Preproccesing"
+
+    BLOCK
+    {
+      NAME = "Preprocessing"
+
+      OPTION
+      {
+	NAME = "&Define user macros, e.g. VALUE=100,SERIAL"
+	ID = AsmDefine
+	TYPE = EDITBOX WIDE
+	STATE = ""
+	SELECTED
+	{
+	  OPTIONTEXT = "%list(,, ,-D%s)"
+	}
+      }
+
+      OPTION
+      {
+        ID      = AsModelTiny
+        PARENT  = MemoryModelTiny
+        TYPE    = INVISIBLE
+        STATE   = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT    = "-DMODEL_TINY"
+        }
+      }
+      OPTION
+      {
+        ID      = AsModelSmall
+        PARENT  = MemoryModelSmall
+        TYPE    = INVISIBLE
+        STATE   = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT    = "-DMODEL_SMALL"
+        }
+      }
+      OPTION
+      {
+        ID      = AsModelMedium
+        PARENT  = MemoryModelMedium
+        TYPE    = INVISIBLE
+        STATE   = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT    = "-DMODEL_MEDIUM"
+        }
+      }
+      OPTION
+      {
+        ID      = AsModelLarge
+        PARENT  = MemoryModelLarge
+        TYPE    = INVISIBLE
+        STATE   = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT    = "-DMODEL_LARGE"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = AS
+    NAME = "Miscellaneous"
+
+    BLOCK
+    {
+      NAME = "Miscellaneous"
+
+      OPTION
+      {
+        NAME = "&Assembler works case sensitive"
+        ID = O1015
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "CA"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Use predefined register names"
+        ID = O1016
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "NOMO"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Labels are &local by default"
+        ID = AsmMiscLabLocal
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+      }
+
+      OPTION
+      {
+        NAME = "Labels are &global by default"
+        ID = AsmMiscLabGlobal
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+	SELECTED
+	{
+	  OPTIONTEXT= "-ig"
+        }
+      }
+
+      OPTION
+      {
+        ID = AsmCpu1
+	PARENT = !CpuUser & !CpuNone
+        TYPE = INVISIBLE
+        STATE = SELECTED
+	SELECTED
+	{
+	  OPTIONTEXT= "-C$(Cpu)"
+        }
+      }
+      OPTION
+      {
+        ID = AsmCpu2
+	PARENT = CpuUser & CpuUserName & !CpuNone
+        TYPE = INVISIBLE
+        STATE = SELECTED
+	SELECTED
+	{
+	  OPTIONTEXT= "-C$(CpuUserName)"
+        }
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "User options:"
+
+      OPTION
+      {
+        NAME = "User &options:"
+        ID = O1017
+        TYPE = EDITBOX
+        STATE = ""
+	SELECTED
+	{
+	  OPTIONTEXT = "%s"
+	}
+      }
+    }
+  }
+}
+
+MENU
+{
+  MENUID   = L
+  NAME     = "&Linker Options"
+  TITLE    = "XA Linker/Locator Options" 
+  MENUHELP = "Set options for the XA Linker/Locator"
+
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Format"
+
+    BLOCK
+    {
+      NAME = "Output Format"
+
+      OPTION
+      {
+        NAME = "&TIOF for TASKING internal (.ABS)"
+        ID = LcTiof
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-f0"
+          DEFMACRO = "TARGET=abs"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&IEEE 695 for TASKING CrossView Pro Debugger (.ABS)"
+        ID = LcIeee
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-f1"
+          DEFMACRO = "TARGET=abs"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Motorola &S records for EPROM programmers (.SRE)"
+        ID = LcSrec
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-f2$(LcRecordLength)$(LcS1Records)$(LcS2Records)$(LcS3Records)$(LcSortAddr)"
+          DEFMACRO = "TARGET=sre"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Intel &HEX records for EPROM programmers (.HEX)"
+        ID = LcIhex
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-f3$(LcRecordLength)$(LcHexMultiple)$(LcIhexStart)"
+          DEFMACRO = "TARGET=hex"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Library for TASKING XA Linker (.A)"
+        ID = LcLib
+	PARENT = !Demo
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          DEFMACRO = "TARGET=a"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Record length for Intel HEX and S records:"
+        ID = LcRecordLength
+        PARENT = (LcSrec | LcIhex )
+        TYPE = EDITBOX SMALL
+        STATE = "32"
+        SELECTED
+        {
+          FLAGTEXT = "b%d"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Create HEX file for each memory &chip"
+        ID = LcHexMultiple
+        PARENT = LcIhex
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "c"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Emit Intel HEX start address record"
+        ID = LcIhexStart
+        PARENT = LcIhex
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Sort addresses in &ascending order"
+        ID = LcSortAddr
+        PARENT = LcSrec
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "a"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = "u"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Force Motorola S&1 records"
+        ID = LcS1Records
+        PARENT = LcSrec
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "S1"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Force Motorola S&2 records"
+        ID = LcS2Records
+        PARENT = LcSrec
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          FLAGTEXT = "S2"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Force Motorola S&3 records"
+        ID = LcS3Records
+        PARENT = LcSrec
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          FLAGTEXT = "S3"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LK
+    NAME = "Linker"
+
+    BLOCK
+    {
+      NAME = "Linker Miscellaneous"
+
+      OPTION
+      {
+        NAME = "&Generate a linker listing file (.LNL)"
+        ID = LkMap
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-Wlk-M"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Make a separate function call graph file (.CAL)"
+        ID = LkGraph
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-Wlk-c"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Print the name of each file as it is processed"
+        ID = LkVerbose
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-Wlk-v"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Link &case sensitive (required for C language)"
+        ID = LkCase
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "-Wlk-C"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Link &default C libraries"
+        ID = LkCLibraries
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = SELECTED
+
+
+
+
+
+
+
+
+
+
+
+	SELECTED
+	{
+	  OPTIONTEXT = "$(CompFloatSingle) $(FpTrapLib)"
+	}
+
+	NOTSELECTED
+        {
+          OPTIONTEXT = "-nolib"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Suppress warning messages above:"
+        ID = LkWarnings
+        PARENT = !LcLib
+        TYPE = POPUPLIST SMALL
+        STATE = 8
+        ITEM
+        {
+          NAME = "Level 0"
+          ID = LkWarn0
+          OPTIONTEXT = "-Wlk-w0"
+        }
+        ITEM
+        {
+          NAME = "Level 1"
+          ID = LkWarn1
+          OPTIONTEXT = "-Wlk-w1"
+        }
+        ITEM
+        {
+          NAME = "Level 2"
+          ID = LkWarn2
+          OPTIONTEXT = "-Wlk-w2"
+        }
+        ITEM
+        {
+          NAME = "Level 3"
+          ID = LkWarn3
+          OPTIONTEXT = "-Wlk-w3"
+        }
+        ITEM
+        {
+          NAME = "Level 4"
+          ID = LkWarn4
+          OPTIONTEXT = "-Wlk-w4"
+        }
+        ITEM
+        {
+          NAME = "Level 5"
+          ID = LkWarn5
+          OPTIONTEXT = "-Wlk-w5"
+        }
+        ITEM
+        {
+          NAME = "Level 6"
+          ID = LkWarn6
+          OPTIONTEXT = "-Wlk-w6"
+        }
+        ITEM
+        {
+          NAME = "Level 7"
+          ID = LkWarn7
+          OPTIONTEXT = "-Wlk-w7"
+        }
+        ITEM
+        {
+          NAME = "Level 8"
+          ID = LkWarn8
+          OPTIONTEXT = "-Wlk-w8"
+        }
+        ITEM
+        {
+          NAME = "Level 9"
+          ID = LkWarn9
+          OPTIONTEXT = "-Wlk-w9"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Additional options:"
+        ID = LkAdditional
+        PARENT = !LcLib
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "%list(,, ,-Wlk %s)"
+        }
+      }
+
+      OPTION
+      {
+        ID = LkCpp
+        TYPE = INVISIBLE
+	STATE = SELECTED
+	SELECTED
+        {
+          OPTIONTEXT = "$(CppCompGlobal)"
+        }
+      }
+
+      OPTION
+      {
+        ID = LkMemoryModel
+        TYPE = INVISIBLE
+	STATE = SELECTED
+	SELECTED
+        {
+          OPTIONTEXT = "-M$(MemoryModel)"
+        }
+      }
+
+      OPTION
+      {
+        ID      = LkLibDir
+        TYPE    = INVISIBLE
+        STATE   = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "%list(;, ,-L%libdir)"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Locator"
+
+    BLOCK
+    {
+      NAME = "Locator Miscellaneous"
+
+      OPTION
+      {
+        NAME = "Produce a memory &map file (.MAP)"
+        ID = LcMap
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-M"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Include symbolic debug information"
+        ID = LcIncludeDebug
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        NOTSELECTED
+        {
+          OPTIONTEXT = "-s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&CrossView Pro buffer size (strings in target memory):"
+        ID = LcXvwBuf
+	PARENT = CompDebug & LcIncludeDebug
+        TYPE = EDITBOX SMALL
+	STATE = "0"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _XVWBUF %s\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Print the &name of each file as it is processed"
+        ID = LcVerbose
+        PARENT = !LcLib
+        TYPE = CHECKBOX
+        STATE = NOTSELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-v"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Suppress warning messages above:"
+        ID = LcWarnings
+        PARENT = !LcLib
+        TYPE = POPUPLIST SMALL
+        STATE = 8
+        ITEM
+        {
+          NAME = "Level 0"
+          ID = LcWarn0
+          OPTIONTEXT = "-w0"
+        }
+        ITEM
+        {
+          NAME = "Level 1"
+          ID = LcWarn1
+          OPTIONTEXT = "-w1"
+        }
+        ITEM
+        {
+          NAME = "Level 2"
+          ID = LcWarn2
+          OPTIONTEXT = "-w2"
+        }
+        ITEM
+        {
+          NAME = "Level 3"
+          ID = LcWarn3
+          OPTIONTEXT = "-w3"
+        }
+        ITEM
+        {
+          NAME = "Level 4"
+          ID = LcWarn4
+          OPTIONTEXT = "-w4"
+        }
+        ITEM
+        {
+          NAME = "Level 5"
+          ID = LcWarn5
+          OPTIONTEXT = "-w5"
+        }
+        ITEM
+        {
+          NAME = "Level 6"
+          ID = LcWarn6
+          OPTIONTEXT = "-w6"
+        }
+        ITEM
+        {
+          NAME = "Level 7"
+          ID = LcWarn7
+          OPTIONTEXT = "-w7"
+        }
+        ITEM
+        {
+          NAME = "Level 8"
+          ID = LcWarn8
+          OPTIONTEXT = "-w8"
+        }
+        ITEM
+        {
+          NAME = "Level 9"
+          ID = LcWarn9
+          OPTIONTEXT = "-w9"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Use a s&tandard locator control file (.DSC)"
+        ID = LcStandardDsc
+        PARENT = !LcLib
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+	SELECTED
+        {
+          OPTIONTEXT = "-dxa.dsc"
+	  FLAGTEXT = "xa.dsc"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Use p&roject specific locator control file (.DSC)"
+        ID = LcMyDsc
+        PARENT = !LcLib
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED
+      }
+
+      OPTION
+      {
+        NAME = "&Project specific control file:"
+	ID = LcMyDscField
+        PARENT = LcMyDsc & !LcLib
+        TYPE = EDITBOX
+        STATE = "xa"
+        SELECTED
+        {
+          OPTIONTEXT = "-d%s.dsc"
+	  FLAGTEXT = "%s"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Generate code for space:"
+        ID = LcCodeSpace
+        PARENT = !LcLib
+        TYPE = POPUPLIST SMALL
+        STATE = 0
+        ITEM
+        {
+          NAME = "All spaces"
+          ID = LcXaAll
+	  PARENT = LcTiof | LcIeee
+          OPTIONTEXT = ""
+        }
+        ITEM
+        {
+          NAME = "XA_code"
+          ID = LcXaCode
+          OPTIONTEXT = "-S XA_code"
+        }
+        ITEM
+        {
+          NAME = "XA_data"
+          ID = LcXaData
+          OPTIONTEXT = "-S XA_data"
+        }
+        ITEM
+        {
+          NAME = "XA_short"
+          ID = LcXaShort
+          OPTIONTEXT = "-S XA_short"
+        }
+      }
+
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Additional options:"
+        ID = LcAdditional
+        PARENT = !LcLib
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "%s"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Memory Harvard"
+
+    BLOCK
+    {
+      NAME = "External memory specification Harvard architecture"
+
+      OPTION
+      {
+        NAME = "External &Code ROM area(s): start-address,end-address;..."
+        ID = LcExtCode
+	PARENT = CpuExtMem & Harvard
+        TYPE = EDITBOX WIDE
+	STATE = "_ICODE,0FFFFH"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#ifdef _X_CODE_ROM\n%list(;,\n,_X_CODE_ROM\\(x_code%n,%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Reserve Code ROM area(s): start-address,end-address;..."
+        ID = LcReserveCode
+	PARENT = Harvard
+        TYPE = EDITBOX WIDE
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _CRESERVES\n#ifdef _CRESERVED\n%list(;,\n,_CRESERVED\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "External &Data RAM area(s): start-address,end-address;..."
+        ID = LcExtRam
+	PARENT = CpuExtMem & Harvard
+        TYPE = EDITBOX WIDE
+	STATE = "0,0FFFFH"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#ifdef _X_DATA_RAM\n%list(;,\n,_X_DATA_RAM\\(x_ram_data%n,%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Reserve Data R&AM area(s): start-address,end-address;..."
+        ID = LcReserveData
+	PARENT = Harvard
+        TYPE = EDITBOX WIDE
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _DRESERVES\n#ifdef _DRESERVED\n%list(;,\n,_DRESERVED\\(%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Put strings and const in ROM Data space only"
+	ID = CompRomStringsDataText
+        TYPE = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "External Data R&OM area(s): start-address,end-address;..."
+        ID = LcExtRom
+	PARENT = CpuExtMem & CompRomStringsData & Harvard
+        TYPE = EDITBOX WIDE
+	STATE = "0FFFFH,0FFFFH"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#ifdef _X_DATA_ROM\n%list(;,\n,_X_DATA_ROM\\(x_rom_data%n,%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "Note: See Compiler Options Allocation Tab"
+	ID = CompRomStringsDataText
+        TYPE = TEXT
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Stack"
+
+    BLOCK
+    {
+      NAME = "System stack specification single chip"
+
+      OPTION
+      {
+        NAME = "&System stack size:"
+        ID = LcStackSizeSingle
+	PARENT = !(CpuExtMem)
+        TYPE = EDITBOX SMALL
+	STATE = "128"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _STACK_SZ %s\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "S&ystem stack address:"
+        ID = LcStackAddrSingle
+	PARENT = LcStackSizeSingle & !(CpuExtMem)
+        TYPE = EDITBOX SMALL
+	STATE = "080H"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _STACK_LC %s\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "XA Reset sequence sets SP to 0100H"
+        ID = LcStackText1
+	TYPE = TEXT
+      }
+      OPTION
+      {
+        NAME = "Stack Overflow Interrupt triggers when SP from 80H to 7EH"
+        ID = LcStackText2
+	TYPE = TEXT
+      }
+
+    }
+
+    BLOCK
+    {
+      NAME = "System stack specification external memory"
+
+      OPTION
+      {
+        NAME = "&System stack size:"
+        ID = LcStackSizeExt
+	PARENT = CpuExtMem
+        TYPE = EDITBOX SMALL
+	STATE = "1k"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _STACK_SZ %s\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "S&ystem stack address:"
+        ID = LcStackAddrExt
+	PARENT = LcStackSizeExt & CpuExtMem
+        TYPE = EDITBOX SMALL
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _STACK_LC %s\n"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Heap"
+
+    BLOCK
+    {
+      NAME = "Heap specification for malloc() and free()"
+
+      OPTION
+      {
+        NAME = "&Heap size:"
+        ID = LcHeapSize
+        TYPE = EDITBOX SMALL
+	STATE = "2k"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _HEAP_SZ %s\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "H&eap address:"
+        ID = LcHeapAddr
+	PARENT = LcHeapSize
+        TYPE = EDITBOX SMALL
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _HEAP_LC %s\n"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Data"
+
+    BLOCK
+    {
+      NAME = "Specify order (and optional address) of sections"
+
+      OPTION
+      {
+        NAME = "Syntax: <section-name>[ addr=<address>][,...]"
+        ID = LcOrderTextData
+	TYPE = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "DATA section(s):"
+        ID = LcDataSeg
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _DORDER\n#ifdef _DATA\n%list(,,\n,_DATA\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "IDATA section(s):"
+        ID = LcIdataSeg
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _IORDER\n#ifdef _IDATA\n%list(,,\n,_IDATA\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "HDATA section(s):"
+        ID = LcHdataSeg
+	PARENT = LargeMemoryMode
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _HORDER\n#ifdef _HDATA\n%list(,,\n,_HDATA\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "BIT section(s):"
+        ID = LcBitSeg
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _BORDER\n#ifdef _BIT\n%list(,,\n,_BIT\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "BITADDR section(s):"
+        ID = LcBitaddrSeg
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _BAORDER\n#ifdef _BITADDR\n%list(,,\n,_BITADDR\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "RDATA section(s):"
+        ID = LcRdataSeg
+	PARENT = CompRomStringsData
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _RDORDER\n#ifdef _RDATA\n%list(,,\n,_RDATA\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "RIDATA section(s):"
+        ID = LcRidataSeg
+	PARENT = CompRomStringsData
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _RIORDER\n#ifdef _RIDATA\n%list(,,\n,_RIDATA\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "RHDATA section(s):"
+        ID = LcRhdataSeg
+	PARENT = LargeMemoryMode & CompRomStringsData
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _RHORDER\n#ifdef _RHDATA\n%list(,,\n,_RHDATA\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "XSHORT section(s):"
+        ID = LcXshorttSeg
+	PARENT = EdeIncludeExtMem
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _XSORDER\n#ifdef _XSHORT\n%list(,,\n,_XSHORT\\(%s\\))\n#endif\n"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Code"
+
+    BLOCK
+    {
+      NAME = "Specify order (and optional address) of sections"
+
+      OPTION
+      {
+        NAME = "Syntax: <section-name>[ addr=<address>][,...]"
+        ID = LcOrderTextCode
+	TYPE = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "CODE section(s):"
+        ID = LcCodeSeg
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _CORDER\n#ifdef _CODE\n%list(,,\n,_CODE\\(%s\\))\n#endif\n"
+        }
+      }
+      OPTION
+      {
+        NAME = "HCODE section(s):"
+        ID = LcHcodeSeg
+	PARENT = LargeMemoryMode
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _HCORDER\n#ifdef _HCODE\n%list(,,\n,_HCODE\\(%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "CODE copy section(s):"
+        ID = LcCodeSegCopy
+	PARENT = !LargeMemoryMode
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _CORDER\n#ifdef _CCOPY\n%list(,,\n,_CCOPY\\(%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "HCODE copy section(s):"
+        ID = LcHcodeSegCopy
+	PARENT = LargeMemoryMode
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _HCORDER\n#ifdef _HCOPY\n%list(,,\n,_HCOPY\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Specify address of copy table, Syntax: <address>"
+        ID = LcOrderTextCopyTable
+	TYPE = TEXT
+      }
+
+      OPTION
+      {
+        NAME = "CODE copy table section:"
+        ID = LcCodeSegTable
+	PARENT = !LargeMemoryMode
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _CORDER\n#ifdef _CTABLE\n%list(,,\n,_CTABLE\\(%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "HCODE copy table section:"
+        ID = LcHcodeSegTable
+	PARENT = LargeMemoryMode
+        TYPE = EDITBOX
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _HCORDER\n#ifdef _HTABLE\n%list(,,\n,_HTABLE\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Interrupt vector offset (0-0xFFFFFF):"
+        ID = LcResetVector
+	PARENT = CpuExtMem
+        TYPE = EDITBOX SMALL
+	STATE = "0"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _RESET_VECTOR %s\n"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = LC
+    NAME = "Memory Unified"
+
+    BLOCK
+    {
+      NAME = "External memory specification Unified code and data bus"
+
+      OPTION
+      {
+        NAME = "External R&OM area(s): start-address,end-address;..."
+        ID = LcExtCodeLin
+	PARENT = CpuExtMem & !Harvard
+        TYPE = EDITBOX WIDE
+	STATE = "_ICODE,07FFFH"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#ifdef _X_CODE_ROM\n%list(;,\n,_X_CODE_ROM\\(x_code%n,%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Reserve ROM area(s): start-address,end-address;..."
+        ID = LcReserveRom
+	PARENT = !Harvard
+        TYPE = EDITBOX WIDE
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _CRESERVES\n#ifdef _CRESERVED\n%list(;,\n,_CRESERVED\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "External R&AM area(s): start-address,end-address;..."
+        ID = LcExtRamLin
+	PARENT = CpuExtMem & !Harvard
+        TYPE = EDITBOX WIDE
+	STATE = "08000H,0FFFFH"
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#ifdef _X_DATA_RAM\n%list(;,\n,_X_DATA_RAM\\(x_ram_data%n,%s\\))\n#endif\n"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Reserve RAM area(s): start-address,end-address;..."
+        ID = LcReserveRam
+	PARENT = !Harvard
+        TYPE = EDITBOX WIDE
+	STATE = ""
+        SELECTED
+        {
+	  DEFMACRO = "FILE=%p.i;LK,LC;#define _DRESERVES\n#ifdef _DRESERVED\n%list(;,\n,_DRESERVED\\(%s\\))\n#endif\n"
+        }
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "Note: See Processor Memory Tab Unified Bus"
+	ID = ProcessMemoryUnifiedBus
+        TYPE = TEXT
+      }
+    }
+  }
+}
+
+MENU
+{
+  MENUID   = D
+  NAME     = "Cross&View Pro Options"
+  TITLE    = "XA CrossView Pro Debugger Options" 
+  MENUHELP = "Set options for the XA CrossView Pro Debugger"
+
+  TAB
+  {
+    TOOLID = XVW
+    NAME = "Settings"
+
+    BLOCK
+    {
+      NAME = "Execution environment"
+
+      OPTION
+      {
+        NAME  = "The ROM monitor debugger is available as a separate package."
+        ID    = XvwLanguageText1
+        TYPE  = TEXT
+      }
+
+      EMPTYLINE
+
+      OPTION
+      {
+        NAME = "&Simulator"
+        ID = XvwSim
+        TYPE = RADIOBUTTON
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-tcfg sim.cfg"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "ROM monitor"
+        ID = XvwRom
+        TYPE = RADIOBUTTON
+        STATE = NOTSELECTED 
+        SELECTED
+        {
+          OPTIONTEXT = "-tcfg rism.cfg -D $(XvwDeviceType)$(XvwSerialPort)$(XvwBaud)$(XvwHost)$(XvwPort)"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Board type:"
+        ID = XvwBoardType
+        PARENT = XvwRom
+        TYPE = POPUPLIST
+        STATE = 0
+        ITEM
+        {
+          NAME = "FDI XTEND G3"
+          ID = XvwXTENDG3
+        }
+        ITEM
+        {
+          NAME = "FDI XTEND S3"
+          ID = XvwXTENDS3
+        }
+      }
+    }
+
+    BLOCK
+    {
+      NAME = "Communications setup"
+
+      OPTION
+      {
+        NAME = "&Device type:"
+        ID = XvwDeviceType
+        PARENT = XvwRom
+        TYPE = POPUPLIST
+        STATE = 0
+        ITEM
+        {
+          NAME = "RS232"
+          ID = XvwRs232
+          FLAGTEXT = "rs232"
+        }
+        ITEM
+        {
+          NAME = "TCP/IP"
+          ID = XvwTcpip
+          FLAGTEXT = "tcp"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Serial port:"
+        ID = XvwSerialPort
+        PARENT = XvwRs232
+        TYPE = POPUPLIST
+        STATE = 0
+        ITEM
+        {
+          NAME = "COM1"
+          ID = XvwCom1
+          FLAGTEXT = ",com1"
+        }
+        ITEM
+        {
+          NAME = "COM2"
+          ID = XvwCom2
+          FLAGTEXT = ",com2"
+        }
+        ITEM
+        {
+          NAME = "COM3"
+          ID = XvwCom3
+          FLAGTEXT = ",com3"
+        }
+        ITEM
+        {
+          NAME = "COM4"
+          ID = XvwCom4
+          FLAGTEXT = ",com4"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Baud rate:"
+        ID = XvwBaud
+        PARENT = XvwRs232
+        TYPE = EDITBOX
+        STATE = "38400"
+        SELECTED
+        {
+          FLAGTEXT = ",%s"
+        }
+        NOTSELECTED
+        {
+          FLAGTEXT = ",38400"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "TCP/IP &Host name:"
+        ID = XvwHost
+        PARENT = XvwTcpip
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          FLAGTEXT = ",%s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "TCP/IP &Port number:"
+        ID = XvwPort
+        PARENT = XvwTcpip
+        TYPE = EDITBOX
+        STATE = ""
+        SELECTED
+        {
+          FLAGTEXT = ",%d"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = XVW
+    NAME = "Logging"
+
+    BLOCK
+    {
+      NAME = "Record and Playback"
+
+      OPTION
+      {
+        NAME = "&Log CrossView Pro target communication in file:"
+        ID = XvwLog
+	PARENT = XvwRom
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-L %s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Record CrossView Pro commands in file:"
+        ID = XvwRecord
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-r %s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Record &Command Window output in file:"
+        ID = XvwOutput
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-R %s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "&Play back commands from file (continuously):"
+        ID = XvwPlayback
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-p %s"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Play back commands from file (&step by step):"
+        ID = XvwPlaybackStep
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-P %s"
+        }
+      }
+    }
+  }
+
+  TAB
+  {
+    TOOLID = XVW
+    NAME = "Misc"
+
+    BLOCK
+    {
+      NAME = "Miscellaneous"
+
+      OPTION
+      {
+        NAME = "&Initial download of program"
+        ID = XvwInitialDownload
+        TYPE = CHECKBOX
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-i"
+        }
+      }
+
+      EMPTYLINE
+
+//      OPTION
+//      {
+//        NAME = "Start XVW in transparency mode"
+//        ID = XvwTrans
+//        TYPE = CHECKBOX
+//        STATE = NOTSELECTED
+//        SELECTED
+//        {
+//          OPTIONTEXT = "-T $(O3019)"
+//        }
+//      }
+
+//      OPTION
+//      {
+//        NAME = "Execute file in transparency mode"
+//        ID = O3019
+//        PARENT = XvwTrans
+//        TYPE = EDITBOX
+//        STATE = ""
+//        SELECTED
+//        {
+//          FLAGTEXT = "%s"
+//        }
+//      }
+
+//      OPTION
+//      {
+//        NAME = "Program loaded into memory at address"
+//        ID = O3020
+//        TYPE = EDITBOX
+//        STATE = ""
+//        SELECTED
+//        {
+//          OPTIONTEXT = "-n %d"
+//        }
+//      }
+
+      OPTION
+      {
+        NAME = "Maximum number of &breakpoints:"
+        ID = XvwMaxBreakpoints
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-b %d"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Maximum number of &assertions:"
+        ID = XvwMaxAssert
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-a %d"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Maximum number of &trace instructions:"
+        ID = XvwMaxTrace
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-c %d"
+        }
+      }
+
+      OPTION
+      {
+        NAME = "Maximum number debugger &special variables:"
+        ID = XvwSpecial
+        TYPE = EDITBOX SMALL
+        STATE = ""
+        SELECTED
+        {
+          OPTIONTEXT = "-s %d"
+        }
+      }
+
+      OPTION
+      {
+	ID = XvwMyDsc
+        PARENT = LcMyDsc
+        TYPE = INVISIBLE
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-dsc $(LcMyDscField)"
+        }
+      }
+
+      OPTION
+      {
+	ID = XvwStandardDsc
+        PARENT = LcStandardDsc
+        TYPE = INVISIBLE
+        STATE = SELECTED
+        SELECTED
+        {
+          OPTIONTEXT = "-dsc $(LcStandardDsc)"
+        }
+      }
+    }
+  }
+}
+
+

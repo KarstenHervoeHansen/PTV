@@ -1,0 +1,120 @@
+--lpm_counter CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEVICE_FAMILY="Cyclone" lpm_direction="UP" lpm_modulus=3 lpm_width=2 clk_en clock q
+--VERSION_BEGIN 4.1 cbx_cycloneii 2004:05:18:11:27:16:SJ cbx_lpm_add_sub 2004:06:23:12:24:04:SJ cbx_lpm_compare 2004:04:12:17:30:12:SJ cbx_lpm_counter 2004:07:12:18:53:30:SJ cbx_lpm_decode 2004:03:10:10:44:06:SJ cbx_mgl 2004:06:17:17:30:06:SJ cbx_stratix 2004:04:28:15:20:14:SJ cbx_stratixii 2004:05:18:11:28:28:SJ  VERSION_END
+
+
+--  Copyright (C) 1988-2002 Altera Corporation
+--  Any  megafunction  design,  and related netlist (encrypted  or  decrypted),
+--  support information,  device programming or simulation file,  and any other
+--  associated  documentation or information  provided by  Altera  or a partner
+--  under  Altera's   Megafunction   Partnership   Program  may  be  used  only
+--  to program  PLD  devices (but not masked  PLD  devices) from  Altera.   Any
+--  other  use  of such  megafunction  design,  netlist,  support  information,
+--  device programming or simulation file,  or any other  related documentation
+--  or information  is prohibited  for  any  other purpose,  including, but not
+--  limited to  modification,  reverse engineering,  de-compiling, or use  with
+--  any other  silicon devices,  unless such use is  explicitly  licensed under
+--  a separate agreement with  Altera  or a megafunction partner.  Title to the
+--  intellectual property,  including patents,  copyrights,  trademarks,  trade
+--  secrets,  or maskworks,  embodied in any such megafunction design, netlist,
+--  support  information,  device programming or simulation file,  or any other
+--  related documentation or information provided by  Altera  or a megafunction
+--  partner, remains with Altera, the megafunction partner, or their respective
+--  licensors. No other licenses, including any licenses needed under any third
+--  party's intellectual property, are provided herein.
+
+
+FUNCTION cyclone_lcell (aclr, aload, cin, clk, dataa, datab, datac, datad, ena, inverta, regcascin, sclr, sload)
+WITH ( 	cin_used,	lut_mask,	operation_mode,	output_mode,	register_cascade_mode,	sum_lutc_input,	synch_mode) 
+RETURNS ( combout, cout, regout);
+
+--synthesis_resources = lut 4 
+SUBDESIGN cntr_0fc
+( 
+	clk_en	:	input;
+	clock	:	input;
+	q[1..0]	:	output;
+) 
+VARIABLE
+	cmpr6_aeb_int	:	WIRE;
+	cmpr6_aeb	:	WIRE;
+	cmpr6_dataa[1..0]	:	WIRE;
+	cmpr6_datab[1..0]	:	WIRE;
+	counter_cella0 : cyclone_lcell
+		WITH (
+			cin_used = "false",
+			lut_mask = "11AA",
+			operation_mode = "arithmetic",
+			synch_mode = "on"
+		);
+	counter_cella1 : cyclone_lcell
+		WITH (
+			cin_used = "true",
+			lut_mask = "12A0",
+			operation_mode = "arithmetic",
+			sum_lutc_input = "cin",
+			synch_mode = "on"
+		);
+	cout_bit : cyclone_lcell
+		WITH (
+			cin_used = "true",
+			lut_mask = "F8F8",
+			operation_mode = "normal",
+			sum_lutc_input = "cin",
+			synch_mode = "off"
+		);
+	a_val[1..0]	: WIRE;
+	aclr	: NODE;
+	aclr_actual	: WIRE;
+	aset_node	: WIRE;
+	compare_result	: WIRE;
+	data[1..0]	: NODE;
+	modulus_bus[1..0]	: WIRE;
+	modulus_trigger	: WIRE;
+	s_val[1..0]	: WIRE;
+	safe_q[1..0]	: WIRE;
+	sclr	: NODE;
+	sload	: NODE;
+	sset_node	: WIRE;
+	time_to_clear	: WIRE;
+	updownDir	: WIRE;
+
+BEGIN 
+	IF (cmpr6_dataa[] == cmpr6_datab[]) THEN
+		cmpr6_aeb_int = VCC;
+	ELSE
+		cmpr6_aeb_int = GND;
+	END IF;
+	cmpr6_aeb = cmpr6_aeb_int;
+	cmpr6_dataa[] = safe_q[];
+	cmpr6_datab[] = modulus_bus[];
+	counter_cella[1..0].aclr = aclr_actual;
+	counter_cella[1..0].aload = B"00";
+	counter_cella[1].cin = counter_cella[0].cout;
+	counter_cella[1..0].clk = clock;
+	counter_cella[1..0].dataa = safe_q[];
+	counter_cella[1..0].datab = B"00";
+	counter_cella[1..0].datac = ((sload & data[]) # (((! sload) & modulus_bus[]) & (! updownDir)));
+	counter_cella[1..0].ena = clk_en;
+	counter_cella[1..0].sclr = sclr;
+	counter_cella[1..0].sload = (sload # modulus_trigger);
+	cout_bit.cin = counter_cella[1].cout;
+	cout_bit.dataa = updownDir;
+	cout_bit.datab = time_to_clear;
+	a_val[] = B"11";
+	aclr = GND;
+	aclr_actual = aclr;
+	aset_node = B"0";
+	compare_result = cmpr6_aeb;
+	data[] = GND;
+	modulus_bus[] = B"10";
+	modulus_trigger = cout_bit.combout;
+	q[] = safe_q[];
+	s_val[] = B"11";
+	safe_q[] = counter_cella[1..0].regout;
+	sclr = GND;
+	sload = GND;
+	sset_node = B"0";
+	time_to_clear = compare_result;
+	updownDir = B"1";
+END;
+--VALID FILE

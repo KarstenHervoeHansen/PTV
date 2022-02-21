@@ -1,0 +1,453 @@
+; @(#)init.src	1.6 7/22/97
+;*****************************************************************************
+;*
+;* MODULE	: init.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;*	
+;* DESCRIPTION	: 
+;*
+;*	Initialize or clear data segements as specified by the copy-table
+;*
+;*	copy-table entry:
+;*
+;*		+10 length
+;*		 +9 length
+;*		 +8 length
+;*		 +7 source-address
+;*		 +6 source-address
+;*		 +5 source-address
+;*		 +4 destination-address
+;*		 +3 destination-address
+;*		 +2 destination-address
+;*		 +1 action (0 if last entry)
+;*  cpt_entry -> +0 amode  (0 if last entry)
+;*
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+		NAME _INITSEG
+
+; copy table addressing modes, these numbers are defined in the
+; xa.cpu description file. <number> equals Y<number> amode definitions
+CP_LAST		EQU	 0
+CP_HCODE	EQU	 1	; not used for initialization
+CP_HDATA	EQU	 2
+CP_XSHORT	EQU	 3
+CP_BITADDR	EQU	 4
+CP_SFR		EQU	 5	; not used for initialization
+CP_BIT		EQU	 6
+CP_IDATA	EQU	 7
+CP_DATA		EQU	 8
+CP_XDATA	EQU	 9 
+CP_CODE		EQU	10	; not used for initialization
+
+; copy table action 
+CP_COPY		EQU	1
+CP_BSS		EQU	2
+
+; source address registers
+DEFINE	DestL		"R0"
+DEFINE	DestH		"R1"
+DEFINE	DestLL		"R0L"
+DEFINE	DestLH		"R0H"
+DEFINE	DestHL		"R1L"
+DEFINE	DestHH		"R1H"
+DestHSSEL	EQU	SSEL.0
+
+; destination address registers
+DEFINE	SrcL		"R2"
+DEFINE	SrcH		"R3"
+DEFINE	SrcLL		"R2L"
+DEFINE	SrcLH		"R2H"
+DEFINE	SrcHL		"R3L"
+DEFINE	SrcHH		"R3H"
+SrcHSSEL	EQU	SSEL.2 
+
+; copy count registers
+DEFINE	LengthL		"R4"
+DEFINE	LengthH		"R5"
+DEFINE	LengthLL	"R4L"
+DEFINE	LengthLH	"R4H"
+DEFINE	LengthHL	"R5L"
+DEFINE	LengthHH	"R5H"
+
+; code table address registers
+DEFINE	InitL		"R6"
+DEFINE	InitLL		"R6L"
+DEFINE	InitLH		"R6H"
+InitHSSEL	EQU	SSEL.6
+
+;**************************************************************************************
+;*
+;*	MOV byte from code space pointed by 'SOURCE' to a destination register 'DEST'
+;*	and increment CS when needed.
+;*
+;**************************************************************************************
+MOVC_INC_CS	MACRO	DEST, SOURCE
+		MOVC.B	DEST,[SOURCE+]
+IF	MODEL_LARGE || MODEL_MEDIUM
+		CJNE.W	SOURCE, #00H, ^LAB
+		ADD.B	CS, #01H
+^LAB:
+ENDIF
+		ENDM
+
+;**************************************************************************************
+
+IF	MODEL_LARGE || MODEL_MEDIUM
+	EXTRN HCODE(__lc_cp)
+ELSE
+	EXTRN CODE(__lc_cp)
+ENDIF
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+;
+		PUBLIC	__INITSEG
+
+;**************************************************************************************
+;*
+;*	Start Initialisation
+;*
+;**************************************************************************************
+__INITSEG:
+IF	MODEL_LARGE || MODEL_MEDIUM
+	MOV.B	CS,#SEG(__lc_cp)		; set initial code segement of copy-table
+	MOV.W	InitL,#SOF(__lc_cp)		; now InitL points to first entry in the copytable
+IF	MODEL_MEDIUM
+	SETB	InitHSSEL			; access code space via InitL
+ENDIF
+ELSE
+	MOV.W	InitL,#__lc_cp			; now InitL points to first entry in the copytable
+ENDIF
+_cpt_next_entry:
+	MOVC.B	DestHH,[InitL+]			; +00 amode  (0 if last entry)
+	BEQ	_cpt_ready			; Ready
+IF	MODEL_LARGE || MODEL_MEDIUM
+	CJNE.W	InitL,#00H,_cpt_lab		; segement override ?
+	ADD.B	CS,#01H				; increment code segment pointer
+_cpt_lab:
+ENDIF
+	MOVC_INC_CS	SrcHH, InitL		; +01 action (0 if last entry)
+	MOVC_INC_CS	DestLL, InitL		; +02 destination-address
+	MOVC_INC_CS	DestLH, InitL		; +03 destination-address
+	MOVC_INC_CS	DestHL, InitL		; +04 destination-address
+;	MOV.B	DestHH,#00H			; delayed until clear/copy
+	MOVC_INC_CS	SrcLL, InitL		; +05 source-address
+	MOVC_INC_CS	SrcLH, InitL		; +06 source-address
+	MOVC_INC_CS	SrcHL, InitL		; +07 source-address
+;	MOV.B	SrcHH,#00H			; delayed until clear/copy
+	MOVC_INC_CS	LengthLL, InitL		; +08 length
+	MOVC_INC_CS	LengthLH, InitL		; +09 length
+	MOVC_INC_CS	LengthHL, InitL		; +10 length
+	MOV.B	LengthHH,#00H			; clear high byte of MSW-length
+	CJNE.B	SrcHH,#CP_COPY,_cpt_clear	; test if area must be initialised or cleared
+_cpt_init:					; Initialise data segment
+	MOV.B	SrcHH,#00H			; clear high byte of MSW-source-address
+	CMP.B	DestHH,#CP_DATA			;
+	BEQ	_cpt_initdata			; Initialise segment DATA
+        CMP.B   DestHH,#CP_BITADDR              ;
+        BEQ     _cpt_initdata                   ; Initialise segment BITADDR
+	CMP.B	DestHH,#CP_IDATA		;
+	BEQ	_cpt_initidata			; Initialise segment IDATA
+	CMP.B	DestHH,#CP_XDATA		;
+	BEQ	_cpt_initidata			; Initialise segment XDATA
+	CMP.B	DestHH,#CP_XSHORT		;
+	BEQ	_cpt_initxshort			; Initialise segment XDATA SHORT
+IF	MODEL_LARGE || MODEL_MEDIUM
+	CMP.B	DestHH,#CP_HDATA		;
+	BEQ	_cpt_inithdata			; Initialise segment HDATA
+ENDIF
+	CMP.B	DestHH,#CP_BIT			;
+	BEQ	_cpt_initbit			; Initialise segment BIT
+	GJMP	_cpt_ready			; Ready
+_cpt_clear:					; Clear data segment
+	MOV.B	SrcHH,#00H			; clear high byte of MSW-source-address
+	CMP.B	DestHH,#CP_DATA			;
+	BEQ	_cpt_bssdata			; Clear segment DATA
+	CMP.B	DestHH,#CP_IDATA		;
+	BEQ	_cpt_bssidata			; Clear segment IDATA
+	CMP.B	DestHH,#CP_XDATA		;
+	BEQ	_cpt_bssidata			; Clear segment XDATA
+	CMP.B	DestHH,#CP_XSHORT		;
+	BEQ	_cpt_bssxshort			; Clear segment IDATA SHORT
+IF	MODEL_LARGE || MODEL_MEDIUM
+	CMP.B	DestHH,#CP_HDATA		;
+	BEQ	_cpt_bsshdata			; Clear segment HDATA
+ENDIF
+	GJMP	_cpt_ready			; Ready
+
+;**************************************************************************************
+;*
+;*	Initialisation completed
+;*
+;**************************************************************************************
+_cpt_ready:
+IF	MODEL_MEDIUM
+	CLR	InitHSSEL			; restore to default data segement
+ENDIF
+	RET
+
+;**************************************************************************************
+;*
+;*	Clear segment DATA
+;*
+;**************************************************************************************
+_cpt_bssdata:
+IF	MODEL_LARGE
+	MOV.B	ES,DS
+ENDIF
+_cpt_bssdata_next:
+	MOV.B	[DestL+],#00H
+	DJNZ.W	LengthL,_cpt_bssdata_next
+	GJMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Clear segment IDATA
+;*
+;**************************************************************************************
+_cpt_bssidata:
+IF	MODEL_LARGE
+	MOV.B	ES,DestHL
+ENDIF
+_cpt_bssidata_next:
+	MOV.B	[DestL+],#00H
+	DJNZ.W	LengthL,_cpt_bssidata_next
+	GJMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Clear segment XSHORT
+;*
+;**************************************************************************************
+_cpt_bssxshort:
+_cpt_bssxshort_next:
+	MOVX.B	[DestL],LengthHH
+	ADD.W	DestL,#01H
+	DJNZ.W	LengthL,_cpt_bssxshort_next
+	GJMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Clear segment HDATA
+;*
+;**************************************************************************************
+IF	MODEL_LARGE || MODEL_MEDIUM
+_cpt_bsshdata:
+	MOV.B	DestHH,#00H
+IF	MODEL_MEDIUM
+	SETB	DestHSSEL
+ENDIF
+_cpt_bsshdata_next:
+	MOV.B	ES,DestHL
+	MOV.B	[DestL],#00H
+	ADD.W	DestL,#01H
+	ADDC.W	DestH,#00H
+	SUB.W	LengthL,#01H
+	SUBB.W	LengthH,#00H
+	OR.W	LengthL,LengthL
+	BNE	_cpt_bsshdata_next	
+	OR.W	LengthH,LengthH
+	BNE	_cpt_bsshdata_next
+IF	MODEL_MEDIUM
+	CLR	DestHSSEL
+ENDIF
+	GJMP	_cpt_next_entry
+ENDIF
+
+;**************************************************************************************
+;*
+;*	Initialise segment DATA
+;*
+;**************************************************************************************
+_cpt_initdata:
+	PUSH.B	InitLL
+IF	MODEL_LARGE || MODEL_MEDIUM
+	PUSH.B	CS
+ENDIF
+IF	MODEL_MEDIUM
+	SETB	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE
+	MOV.B	ES,DS
+ENDIF
+_cpt_initdata_next:
+IF	MODEL_LARGE || MODEL_MEDIUM
+	MOV.B	CS,SrcHL
+ENDIF
+	MOVC.B	InitLL,[SrcL+]
+	MOV.B	[DestL+],InitLL
+IF	MODEL_LARGE || MODEL_MEDIUM
+	SUB.W	SrcL,#01H
+	ADD.W	SrcL,#01H
+	ADDC.W	SrcH,#00H
+ENDIF
+	DJNZ.W	LengthL,_cpt_initdata_next
+IF	MODEL_MEDIUM
+	CLR	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE || MODEL_MEDIUM
+	POP.B	CS
+ENDIF
+	POP.B	InitLL
+	GJMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise segment IDATA
+;*
+;**************************************************************************************
+_cpt_initidata:
+	PUSH.B	InitLL
+IF	MODEL_LARGE || MODEL_MEDIUM
+	PUSH.B	CS
+ENDIF
+IF	MODEL_MEDIUM
+	SETB	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE
+	MOV.B	ES,DestHL
+ENDIF
+_cpt_initidata_next:
+IF	MODEL_LARGE || MODEL_MEDIUM
+	MOV.B	CS,SrcHL
+ENDIF
+	MOVC.B	InitLL,[SrcL+]
+	MOV.B	[DestL+],InitLL
+IF	MODEL_LARGE || MODEL_MEDIUM
+	SUB.W	SrcL,#01H
+	ADD.W	SrcL,#01H
+	ADDC.W	SrcH,#00H
+ENDIF
+	DJNZ.W	LengthL,_cpt_initidata_next
+IF	MODEL_MEDIUM
+	CLR	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE || MODEL_MEDIUM
+	POP.B	CS
+ENDIF
+	POP.B	InitLL
+	GJMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise segment XSHORT
+;*
+;**************************************************************************************
+_cpt_initxshort:
+	PUSH.B	InitLL
+IF	MODEL_LARGE || MODEL_MEDIUM
+	PUSH.B	CS
+ENDIF
+IF	MODEL_MEDIUM
+	SETB	SrcHSSEL
+ENDIF
+_cpt_initxshort_next:
+IF	MODEL_LARGE || MODEL_MEDIUM
+	MOV.B	CS,SrcHL
+ENDIF
+	MOVC.B	InitLL,[SrcL+]
+	MOVX.B	[DestL],InitLL
+	ADD.W	DestL,#01H
+IF	MODEL_LARGE || MODEL_MEDIUM
+	SUB.W	SrcL,#01H
+	ADD.W	SrcL,#01H
+	ADDC.W	SrcH,#00H
+ENDIF
+	DJNZ.W	LengthL,_cpt_initxshort_next
+IF	MODEL_MEDIUM
+	CLR	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE || MODEL_MEDIUM
+	POP.B	CS
+ENDIF
+	POP.B	InitLL
+	GJMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise segment HDATA
+;*
+;**************************************************************************************
+IF	MODEL_LARGE || MODEL_MEDIUM
+_cpt_inithdata:
+	PUSH.B	InitLL
+	PUSH.B	CS
+	MOV.B	DestHH,#00H
+IF	MODEL_MEDIUM
+	SETB	SrcHSSEL
+	SETB	DestHSSEL
+ENDIF
+_cpt_inithdata_next:
+	MOV.B	CS,SrcHL
+	MOV.B	ES,DestHL
+	MOVC.B	InitLL,[SrcL+]
+	MOV.B	[DestL],InitLL
+	ADD.W	DestL,#01H
+	ADDC.W	DestH,#00H
+	SUB.W	SrcL,#01H
+	ADD.W	SrcL,#01H
+	ADDC.W	SrcH,#00H
+	SUB.W	LengthL,#01H
+	SUBB.W	LengthH,#00H
+	OR.W	LengthL,LengthL	
+	BNE	_cpt_inithdata_next	
+	OR.W	LengthH,LengthH
+	BNE	_cpt_inithdata_next
+IF	MODEL_MEDIUM
+	CLR	SrcHSSEL
+	CLR	DestHSSEL
+ENDIF
+	POP.B	CS
+	POP.B	InitLL
+	GJMP	_cpt_next_entry
+ENDIF
+
+;**************************************************************************************
+;*
+;*	Initialise BIT segment
+;*
+;**************************************************************************************
+_cpt_initbit:
+	PUSH.W	InitL
+IF	MODEL_LARGE || MODEL_MEDIUM
+	PUSH.B	CS
+ENDIF
+IF	MODEL_MEDIUM
+	SETB	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE
+	MOV.B	ES,DS
+ENDIF
+_cpt_initbit_next:
+IF	MODEL_LARGE || MODEL_MEDIUM
+	MOV.B	CS,SrcHL
+ENDIF
+	MOVC.B	InitLL,[SrcL+]
+	MOV.W	DestH,DestL
+	MOV.B	InitLH,DestHL
+	LSR.W	DestH,#3
+	AND.B	InitLH,#07h
+	ASL.B	InitLL,InitLH
+	OR.B	[DestH],InitLL
+	ADD.W	DestL,#01H
+IF	MODEL_LARGE || MODEL_MEDIUM
+	SUB.W	SrcL,#01H
+	ADD.W	SrcL,#01H
+	ADDC.W	SrcH,#00H
+ENDIF
+	DJNZ.W	LengthL,_cpt_initbit_next
+IF	MODEL_MEDIUM
+	CLR	SrcHSSEL
+ENDIF
+IF	MODEL_LARGE || MODEL_MEDIUM
+	POP.B	CS
+ENDIF
+	POP.W	InitL
+	GJMP	_cpt_next_entry
+
+	END
