@@ -1,0 +1,104 @@
+@echo off
+cls
+rem   bat-fil til generering af PM39_25.EXE og kopiering af
+rem   moduler i C, Pascal og Basic.
+rem
+rem   Opr. PF, P-DPE
+rem   Rev. af: KEn, P-DPE, 931130
+rem   Rev. af: KEN, VDE, 970822: SW-version 3.25.
+cls
+echo ***********  PM5639/25 Miniature CRT Color Sensor Software   **********
+echo .
+echo   Placer  3«" HD 1.44Mb disk i drev A        (8709 001 14471)
+echo .
+echo   Tast F        Forts‘tte
+echo   Tast 9        Afbryd
+\norton\ask "  Tast D        Disk formattering  ",fFdD9
+if errorlevel 5 goto end
+if errorlevel 4 call diskfor
+if errorlevel 3 call diskfor
+
+rem     Indtast KU-nummer, generer pixel data file med KU-nummer samt
+rem     filen SERIAL.INC
+:kupix
+\data\5639_20\kupixel
+if errorlevel 1 goto error
+
+copy pm39_25.org pm39_25.exe
+
+rem   Kopierer pixel data file ind i EXE-file
+\data\5639_20\ent3920 pm39_25.exe
+if errorlevel 0 goto setfiletime
+goto error
+
+:setfiletime
+rem  S‘tter EXE-filen's tid = SW version
+FILETIME PM39_25.EXE 3.20
+
+cls
+echo .
+echo  Kopiering af filer til 3«" disken  
+echo .
+echo    Tast F      Forts‘t
+ask "   Tast 9      Afbryd   ",fF9
+if errorlevel 3 goto end
+
+:kopiering
+cls
+echo .
+echo   Kopiering af 16 filer til drev A ... vent
+md A:\borlandc
+md A:\pascal
+md A:\basic
+md A:\chgbaud
+
+COPY PM39_25.EXE  A: /V
+COPY \data\5639_20\PM5639.HLP   A: /V
+COPY \data\5639_20\PM5639.NDX   A: /V
+COPY FILELIST.DOC A: /V
+
+COPY \data\5639_20\borlandc\DEMO.EXE  A:\borlandc /V
+COPY \data\5639_20\borlandc\DEMO.C    A:\borlandc /V
+COPY \data\5639_20\borlandc\PM39IO.C  A:\borlandc /V
+COPY \data\5639_20\borlandc\PM39IO.H  A:\borlandc /V
+COPY \data\5639_20\borlandc\DEMO.PRJ  A:\borlandc /V
+
+COPY \data\5639_20\pascal\DEMO.EXE    A:\pascal /V
+COPY \data\5639_20\pascal\DEMO.PAS    A:\pascal /V
+COPY \data\5639_20\pascal\PM39IO.PAS  A:\pascal /V
+
+COPY \data\5639_20\basic\DEMO.EXE A:\basic /V
+COPY \data\5639_20\basic\DEMO.BAS A:\basic /V
+
+COPY \data\5639_20\chgbaud\README A:\chgbaud /V
+COPY \data\5639_20\chgbaud\CHGBAUD.EXE A:\chgbaud /V
+
+cls
+echo   Fil oversigt for drev A
+dir A:
+echo .
+echo   Tryk ENTER for at forts‘tte
+getkey
+
+goto ok
+
+:error
+echo .
+echo FEJL ved generering af EXE file 
+echo .
+goto end
+
+:ok
+echo .
+echo .
+echo    Husk at afpr›ve programmerne p† 3«" disken
+echo    Part Number: 4008 002 95101  3«"
+echo .
+echo    Tast A:         tryk ENTER
+echo    Tast PM39_25    tryk ENTER
+echo .
+:end
+echo .
+echo     Programmet genstartes ved at taste    MAKE3925  ENTER
+echo .
+echo     HUSK:  Inden PC'en slukkes tast S  ENTER

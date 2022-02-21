@@ -1,0 +1,1084 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTXCIO\cc71789b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    TOUT_API
+                          6 ; tout_api.c    1       /************************************************************************
+                            ****/
+                          7 ; tout_api.c    2       /* MODULE:                                                               
+                               */
+                          8 ; tout_api.c    3       /*   tout_api.c - Timeout input/output application interrface.           
+                               */
+                          9 ; tout_api.c    4       /************************************************************************
+                            ****/
+                         10 ; tout_api.c    5       /* FUNCTIONS:                                                            
+                               */
+                         11 ; tout_api.c    6       
+                         12 ; tout_api.c    7       #ifdef TIMEOUT_IO   /* { */
+                         13 ; tout_api.c    8       /*   IORC IO_readt( CHNLID, BLKNO, BUFFADD, BYTECNT, TICKS )             
+                               */
+                         14 ; tout_api.c    9       /*   IORC IO_writet( CHNLID, BLKNO, BUFFADD, BYTECNT, TICKS )            
+                               */
+                         15 ; tout_api.c   10       /*   IORC IO_dev_opent( DEVID, void *, TICKS )                           
+                               */
+                         16 ; tout_api.c   11       /*   IORC IO_dev_closet( DEVID, void *, TICKS )                          
+                               */
+                         17 ; tout_api.c   12       /*   IORC IO_controlt( CHNLID, SPFNCID, void *, TICKS )                  
+                               */
+                         18 ; tout_api.c   13       #ifdef ASYNCH_IO  /* { */
+                         19 ; tout_api.c   14       /*   IORC IO_dev_waitt( CHNLID, TICKS )                                  
+                               */
+                         20 ; tout_api.c   15       /*   IORC IO_chnl_reset( CHNLID )                                        
+                               */
+                         21 ; tout_api.c   16       #endif /* } ASYNCH_IO */
+                         22 ; tout_api.c   17       #endif  /* } TIMEOUT_IO */
+                         23 ; tout_api.c   18       
+                         24 ; tout_api.c   19       /************************************************************************
+                            ****/
+                         25 ; tout_api.c   20       /*
+                         26 ; tout_api.c   21        *   RTXCio    
+                         27 ; tout_api.c   22        *   Copyright (c) 
+                         28 ; tout_api.c   23        *   Embedded System Products, Inc.
+                         29 ; tout_api.c   24        *   ALL RIGHTS RESERVED
+                         30 ; tout_api.c   25       */
+                         31 ; tout_api.c   26       /************************************************************************
+                            ****/
+                         32 ; tout_api.c   27       #include "rtxcapi.h"      /* RTXC - kernel types, declarations & prototyp
+                            es */
+                         33 ; tout_api.c   28       
+                         34 ; tout_api.c   29       #include "rtio_inc.h"                  /* RTXCio - Header file include fi
+                            le */
+                         35 ; tout_api.c   30       
+                         36 ; tout_api.c   31       extern const CHNLID  nchnls;         /* RTXCio - number of channels decla
+                            red */
+                         37 ; tout_api.c   32       extern const DEVID  nldevs;           /* RTXCio - number of devices decla
+                            red */
+                         38 ; tout_api.c   33       extern CCB_ENTRY   channel_table[];          /* channel control block tab
+                            le */
+                         39 ; tout_api.c   34       extern PDU_HEADER * logical_dev_tbl[];  /* logical to physical device tab
+                            le */
+                         40 ; tout_api.c   35       
+                         41 ; tout_api.c   36       extern IORC  process_io( IOPACK * );
+                         42 ; tout_api.c   37       
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         43 ; tout_api.c   38       /*=======================================================================
+                            ===*/
+                         44 ; tout_api.c   39       /*                      RTXCio API FUNCTIONS                             
+                               */
+                         45 ; tout_api.c   40       /*=======================================================================
+                            ===*/
+                         46 ; tout_api.c   41       #ifdef  TIMEOUT_IO  /* { */
+                         47 ; tout_api.c   42       
+                         48 ; tout_api.c   43       #ifdef  T_READ_IO  /* { */
+                         49 ; tout_api.c   44       
+                         50 ; tout_api.c   45       IORC   IO_readt( CHNLID     chnlid,
+                         51 ; tout_api.c   46                            BLKNO      startblk,
+                         52 ; tout_api.c   47                            BUFFADD    transfer_buff,
+                         53 ; tout_api.c   48                            BYTECNT    numbytes,
+                         54 ; tout_api.c   49                            TICKS      waitime )
+                         55 ; tout_api.c   50       {
+                         56         PUBLIC  _IO_readt
+000000                   57 TOUT_API_PR     SEGMENT HCODE
+000000                   58         RSEG    TOUT_API_PR
+000000                   58         RSEG    TOUT_API_PR
+000000                   59 _IO_readt:
+000000 0F30              60         PUSH.W  R4, R5
+000002 9972001E          61         SUB.W   R7,#01EH
+000006 8C3F02            62         MOV.W   [R7+2],R3
+000009 8A2F              63         MOV.W   [R7],R2
+                         64 ; tout_api.c   51               /*---------------------------------------------------------------
+                            ---*/
+                         65 ; tout_api.c   52               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                         66 ; tout_api.c   53               /*---------------------------------------------------------------
+                            ---*/
+                         67 ; tout_api.c   54               struct io_package iopack;
+                         68 ; tout_api.c   55       
+                         69 ; tout_api.c   56               /*---------------------------------------------------------------
+                            ---*/
+                         70 ; tout_api.c   57               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                         71 ; tout_api.c   58               /* return an invalid channel error                               
+                               */
+                         72 ; tout_api.c   59               /*---------------------------------------------------------------
+                            ---*/
+                         73 ; tout_api.c   60               if( (chnlid == 0) || (chnlid > nchnls) ||
+                         74 ; tout_api.c   61                   (channel_table[chnlid].blink == NULLCCBE) )
+00000B 6900              75         OR.W    R0,R0
+00000D F315              76         BEQ     _4
+00000F 964842rr          77         MOV.B   ES,#SEG( _nchnls )
+000013 9948rrrr          78         MOV.W   R4,#SOF( _nchnls )
+000017 8A44              79         MOV.W   R4,[R4]
+000019 4904              80         CMP.W   R0,R4
+00001B F80E              81         BG      _4
+00001D 99480016          82         MOV.W   R4,#016H
+000021 E440              83         MULU.W  R4,R0
+000023 8924              84         MOV.W   R2,R4
+000025 B930              85         MOVS.W  R3,#00H
+000027 964842rr          86         MOV.B   ES,#SEG( _channel_table+4 )
+00002B 8D32rrrr          87         MOV.W   R3,[R2+SOF( _channel_table+6 )]
+00002F 8D22rrrr          88         MOV.W   R2,[R2+SOF( _channel_table+4 )]
+000033 6932              89         OR.W    R3,R2
+000035 F204              90         BNE     _5
+000035 F20400            90         BNE     _5
+000038                   91 _4:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                         92 ; tout_api.c   62                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) );
+                            
+000038 9908F801          93         MOV.W   R0,#0F801H
+00003C FE2D              94         BR      _8
+00003C FE2D              94         BR      _8
+00003E                   95 _5:
+                         96 ; tout_api.c   63       
+                         97 ; tout_api.c   64               /*---------------------------------------------------------------
+                            ---*/
+                         98 ; tout_api.c   65               /* Verify the requested device is setup for reading.             
+                               */
+                         99 ; tout_api.c   66               /*---------------------------------------------------------------
+                            ---*/
+                        100 ; tout_api.c   67               if( channel_table[chnlid].io_command == WRITE_IO )
+00003E B950             101         MOVS.W  R5,#00H
+000040 964842rr         102         MOV.B   ES,#SEG( _channel_table+12 )
+000044 8D24rrrr         103         MOV.W   R2,[R4+SOF( _channel_table+12 )]
+000048 99240009         104         CMP.W   R2,#09H
+00004C F203             105         BNE     _6
+                        106 ; tout_api.c   68                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+                            
+00004E 9908F802         107         MOV.W   R0,#0F802H
+000052 FE22             108         BR      _8
+000052 FE22             108         BR      _8
+000054                  109 _6:
+                        110 ; tout_api.c   69       
+                        111 ; tout_api.c   70               /*---------------------------------------------------------------
+                            ---*/
+                        112 ; tout_api.c   71               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        113 ; tout_api.c   72               /*---------------------------------------------------------------
+                            ---*/
+                        114 ; tout_api.c   73               iopack.iofncid = IO_READ;
+000054 BC7008           115         MOV.W   [R7+8],#00H
+                        116 ; tout_api.c   74               iopack.chnlid = chnlid;
+000057 8C0F06           117         MOV.W   [R7+6],R0
+                        118 ; tout_api.c   75               iopack.deviceno = channel_table[chnlid].io_deviceno;
+00005A 964842rr         119         MOV.B   ES,#SEG( _channel_table+10 )
+00005E 8D04rrrr         120         MOV.W   R0,[R4+SOF( _channel_table+10 )]
+000062 8C0F04           121         MOV.W   [R7+4],R0
+                        122 ; tout_api.c   76               iopack.io_duration = IO_TIMED;
+000065 BC710C           123         MOV.W   [R7+12],#01H
+                        124 ; tout_api.c   77               iopack.waitime = waitime;
+000068 8C6F1C           125         MOV.W   [R7+28],R6
+                        126 ; tout_api.c   78               iopack.startblk = startblk;
+00006B 8C3702           127         MOV.W   R3,[R7+2]
+00006E 8A27             128         MOV.W   R2,[R7]
+000070 8C3F10           129         MOV.W   [R7+16],R3
+000073 8C2F0E           130         MOV.W   [R7+14],R2
+                        131 ; tout_api.c   79               iopack.transfer_buff = transfer_buff;
+000076 8C3728           132         MOV.W   R3,[R7+40]
+000079 8C2726           133         MOV.W   R2,[R7+38]
+00007C 8C3F14           134         MOV.W   [R7+20],R3
+00007F 8C2F12           135         MOV.W   [R7+18],R2
+                        136 ; tout_api.c   80               iopack.numbytes = numbytes;
+000082 8C1F16           137         MOV.W   [R7+22],R1
+                        138 ; tout_api.c   81               iopack.otherinfo = NULLIOINFO;
+000085 BC701A           139         MOV.W   [R7+26],#00H
+000088 BC7018           140         MOV.W   [R7+24],#00H
+                        141 ; tout_api.c   82       
+                        142 ; tout_api.c   83               /*---------------------------------------------------------------
+                            ---*/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        143 ; tout_api.c   84               /* Process the i/o request.                                      
+                               */
+                        144 ; tout_api.c   85               /*---------------------------------------------------------------
+                            ---*/
+                        145 ; tout_api.c   86               return( process_io( &iopack ) );
+00008B 9128rr           146         MOV.B   R1L,#SEG( __lc_bs )
+00008E 7133             147         XOR.B   R1H,R1H
+000090 400704           148         LEA     R0,R7+4
+                        149         CALL    _process_io
+000093 C4rrrrrr        +149 ;       FCALL   _process_io
+000093 C4rrrrrr00      +149 ;       FCALL   _process_io
+                        150 ; tout_api.c   87       }
+000098                  151 _8:
+000098 9970001E         152         ADD.W   R7,#01EH
+00009C 2F30             153         POP.W   R4, R5
+00009E D680             154         RET
+00009E D680             154         RET
+                        155 ; tout_api.c   88       #endif   /* } T_READ_IO */
+                        156 ; tout_api.c   89       
+                        157 ; tout_api.c   90       /*=======================================================================
+                            ===*/
+                        158 ; tout_api.c   91       #ifdef T_WRITE_IO  /* { */
+                        159 ; tout_api.c   92       
+                        160 ; tout_api.c   93       IORC   IO_writet( CHNLID     chnlid,
+                        161 ; tout_api.c   94                             BLKNO      startblk,
+                        162 ; tout_api.c   95                             BUFFADD    transfer_buff,
+                        163 ; tout_api.c   96                             BYTECNT    numbytes,
+                        164 ; tout_api.c   97                             TICKS      waitime )
+                        165 ; tout_api.c   98       {
+                        166         PUBLIC  _IO_writet
+0000A0                  167 _IO_writet:
+0000A0 0F30             168         PUSH.W  R4, R5
+0000A2 9972001E         169         SUB.W   R7,#01EH
+0000A6 8C3F02           170         MOV.W   [R7+2],R3
+0000A9 8A2F             171         MOV.W   [R7],R2
+                        172 ; tout_api.c   99               /*---------------------------------------------------------------
+                            ---*/
+                        173 ; tout_api.c  100               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        174 ; tout_api.c  101               /*---------------------------------------------------------------
+                            ---*/
+                        175 ; tout_api.c  102               struct io_package iopack;
+                        176 ; tout_api.c  103       
+                        177 ; tout_api.c  104               /*---------------------------------------------------------------
+                            ---*/
+                        178 ; tout_api.c  105               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        179 ; tout_api.c  106               /* return an invalid channel error                               
+                               */
+                        180 ; tout_api.c  107               /*---------------------------------------------------------------
+                            ---*/
+                        181 ; tout_api.c  108               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        182 ; tout_api.c  109                   (channel_table[chnlid].blink == NULLCCBE) )
+0000AB 6900             183         OR.W    R0,R0
+0000AD F315             184         BEQ     _12
+0000AF 964842rr         185         MOV.B   ES,#SEG( _nchnls )
+0000B3 9948rrrr         186         MOV.W   R4,#SOF( _nchnls )
+0000B7 8A44             187         MOV.W   R4,[R4]
+0000B9 4904             188         CMP.W   R0,R4
+0000BB F80E             189         BG      _12
+0000BD 99480016         190         MOV.W   R4,#016H
+0000C1 E440             191         MULU.W  R4,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000C3 8924             192         MOV.W   R2,R4
+0000C5 B930             193         MOVS.W  R3,#00H
+0000C7 964842rr         194         MOV.B   ES,#SEG( _channel_table+4 )
+0000CB 8D32rrrr         195         MOV.W   R3,[R2+SOF( _channel_table+6 )]
+0000CF 8D22rrrr         196         MOV.W   R2,[R2+SOF( _channel_table+4 )]
+0000D3 6932             197         OR.W    R3,R2
+0000D5 F204             198         BNE     _13
+0000D5 F20400           198         BNE     _13
+0000D8                  199 _12:
+                        200 ; tout_api.c  110                         return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) 
+                            );
+0000D8 9908F801         201         MOV.W   R0,#0F801H
+0000DC FE2D             202         BR      _16
+0000DC FE2D             202         BR      _16
+0000DE                  203 _13:
+                        204 ; tout_api.c  111       
+                        205 ; tout_api.c  112               /*---------------------------------------------------------------
+                            ---*/
+                        206 ; tout_api.c  113               /* Verify the requested device is setup for writing.             
+                               */
+                        207 ; tout_api.c  114               /*---------------------------------------------------------------
+                            ---*/
+                        208 ; tout_api.c  115               if( channel_table[chnlid].io_command == READ_IO )
+0000DE B950             209         MOVS.W  R5,#00H
+0000E0 964842rr         210         MOV.B   ES,#SEG( _channel_table+12 )
+0000E4 8D24rrrr         211         MOV.W   R2,[R4+SOF( _channel_table+12 )]
+0000E8 99240008         212         CMP.W   R2,#08H
+0000EC F203             213         BNE     _14
+                        214 ; tout_api.c  116                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+                            
+0000EE 9908F802         215         MOV.W   R0,#0F802H
+0000F2 FE22             216         BR      _16
+0000F2 FE22             216         BR      _16
+0000F4                  217 _14:
+                        218 ; tout_api.c  117       
+                        219 ; tout_api.c  118               /*---------------------------------------------------------------
+                            ---*/
+                        220 ; tout_api.c  119               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        221 ; tout_api.c  120               /*---------------------------------------------------------------
+                            ---*/
+                        222 ; tout_api.c  121               iopack.iofncid = IO_WRITE;
+0000F4 BC7108           223         MOV.W   [R7+8],#01H
+                        224 ; tout_api.c  122               iopack.chnlid = chnlid;
+0000F7 8C0F06           225         MOV.W   [R7+6],R0
+                        226 ; tout_api.c  123               iopack.deviceno = channel_table[chnlid].io_deviceno;
+0000FA 964842rr         227         MOV.B   ES,#SEG( _channel_table+10 )
+0000FE 8D04rrrr         228         MOV.W   R0,[R4+SOF( _channel_table+10 )]
+000102 8C0F04           229         MOV.W   [R7+4],R0
+                        230 ; tout_api.c  124               iopack.io_duration = IO_TIMED;
+000105 BC710C           231         MOV.W   [R7+12],#01H
+                        232 ; tout_api.c  125               iopack.waitime = waitime;
+000108 8C6F1C           233         MOV.W   [R7+28],R6
+                        234 ; tout_api.c  126               iopack.startblk = startblk;
+00010B 8C3702           235         MOV.W   R3,[R7+2]
+00010E 8A27             236         MOV.W   R2,[R7]
+000110 8C3F10           237         MOV.W   [R7+16],R3
+000113 8C2F0E           238         MOV.W   [R7+14],R2
+                        239 ; tout_api.c  127               iopack.transfer_buff = transfer_buff;
+000116 8C3728           240         MOV.W   R3,[R7+40]
+000119 8C2726           241         MOV.W   R2,[R7+38]
+00011C 8C3F14           242         MOV.W   [R7+20],R3
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+00011F 8C2F12           243         MOV.W   [R7+18],R2
+                        244 ; tout_api.c  128               iopack.numbytes = numbytes;
+000122 8C1F16           245         MOV.W   [R7+22],R1
+                        246 ; tout_api.c  129               iopack.otherinfo = NULLIOINFO;
+000125 BC701A           247         MOV.W   [R7+26],#00H
+000128 BC7018           248         MOV.W   [R7+24],#00H
+                        249 ; tout_api.c  130       
+                        250 ; tout_api.c  131               /*---------------------------------------------------------------
+                            ---*/
+                        251 ; tout_api.c  132               /* Process the i/o request.                                      
+                               */
+                        252 ; tout_api.c  133               /*---------------------------------------------------------------
+                            ---*/
+                        253 ; tout_api.c  134               return( process_io( &iopack ) );
+00012B 9128rr           254         MOV.B   R1L,#SEG( __lc_bs )
+00012E 7133             255         XOR.B   R1H,R1H
+000130 400704           256         LEA     R0,R7+4
+                        257         CALL    _process_io
+000133 C4rrrrrr        +257 ;       FCALL   _process_io
+000133 C4rrrrrr00      +257 ;       FCALL   _process_io
+                        258 ; tout_api.c  135       }
+000138                  259 _16:
+000138 9970001E         260         ADD.W   R7,#01EH
+00013C 2F30             261         POP.W   R4, R5
+00013E D680             262         RET
+00013E D680             262         RET
+                        263 ; tout_api.c  136       
+                        264 ; tout_api.c  137       #endif   /* } T_WRITE_IO */
+                        265 ; tout_api.c  138       
+                        266 ; tout_api.c  139       /*=======================================================================
+                            ===*/
+                        267 ; tout_api.c  140       #ifdef  T_DEV_OPEN_IO   /* { */
+                        268 ; tout_api.c  141       
+                        269 ; tout_api.c  142       IORC   IO_dev_opent( DEVID   deviceno,
+                        270 ; tout_api.c  143                                void *  otherinfo,
+                        271 ; tout_api.c  144                                TICKS   waitime )
+                        272 ; tout_api.c  145       {
+                        273         PUBLIC  _IO_dev_opent
+000140                  274 _IO_dev_opent:
+000140 0F10             275         PUSH.W  R4
+000142 9972001A         276         SUB.W   R7,#01AH
+                        277 ; tout_api.c  146               /*---------------------------------------------------------------
+                            ---*/
+                        278 ; tout_api.c  147               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        279 ; tout_api.c  148               /*---------------------------------------------------------------
+                            ---*/
+                        280 ; tout_api.c  149               struct io_package iopack;
+                        281 ; tout_api.c  150       
+                        282 ; tout_api.c  151               /*---------------------------------------------------------------
+                            ---*/
+                        283 ; tout_api.c  152               /* If the device is not valid then return in error.              
+                               */
+                        284 ; tout_api.c  153               /*---------------------------------------------------------------
+                            ---*/
+                        285 ; tout_api.c  154               if( ( deviceno <= 0 ) || ( deviceno > nldevs ) )
+000146 99040000         286         CMP.W   R0,#00H
+00014A FD07             287         BLE     _19
+00014C 964842rr         288         MOV.B   ES,#SEG( _nldevs )
+000150 9948rrrr         289         MOV.W   R4,#SOF( _nldevs )
+000154 8A44             290         MOV.W   R4,[R4]
+000156 4904             291         CMP.W   R0,R4
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+000158 FD03             292         BLE     _20
+000158 FD03             292         BLE     _20
+00015A                  293 _19:
+                        294 ; tout_api.c  155                     return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+00015A 9908F802         295         MOV.W   R0,#0F802H
+00015E FE0E             296         BR      _21
+00015E FE0E             296         BR      _21
+000160                  297 _20:
+                        298 ; tout_api.c  156       
+                        299 ; tout_api.c  157               /*---------------------------------------------------------------
+                            ---*/
+                        300 ; tout_api.c  158               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        301 ; tout_api.c  159               /*---------------------------------------------------------------
+                            ---*/
+                        302 ; tout_api.c  160               iopack.iofncid = IO_DEV_OPEN;
+000160 BC7204           303         MOV.W   [R7+4],#02H
+                        304 ; tout_api.c  161               iopack.deviceno = deviceno;
+000163 8A0F             305         MOV.W   [R7],R0
+                        306 ; tout_api.c  162               iopack.io_duration = IO_TIMED;
+000165 BC7108           307         MOV.W   [R7+8],#01H
+                        308 ; tout_api.c  163               iopack.waitime = waitime;
+000168 8C1F18           309         MOV.W   [R7+24],R1
+                        310 ; tout_api.c  164               iopack.otherinfo = otherinfo;
+00016B 8C3F16           311         MOV.W   [R7+22],R3
+00016E 8C2F14           312         MOV.W   [R7+20],R2
+                        313 ; tout_api.c  165       
+                        314 ; tout_api.c  166               /*---------------------------------------------------------------
+                            ---*/
+                        315 ; tout_api.c  167               /* Process the i/o request.                                      
+                               */
+                        316 ; tout_api.c  168               /*---------------------------------------------------------------
+                            ---*/
+                        317 ; tout_api.c  169               return( process_io( &iopack ) );
+000171 9128rr           318         MOV.B   R1L,#SEG( __lc_bs )
+000174 7133             319         XOR.B   R1H,R1H
+000176 8907             320         MOV.W   R0,R7
+                        321         CALL    _process_io
+000178 C4rrrrrr        +321 ;       FCALL   _process_io
+000178 C4rrrrrr        +321 ;       FCALL   _process_io
+                        322 ; tout_api.c  170       }
+00017C                  323 _21:
+00017C 9970001A         324         ADD.W   R7,#01AH
+000180 2F10             325         POP.W   R4
+000182 D680             326         RET
+000182 D680             326         RET
+                        327 ; tout_api.c  171       
+                        328 ; tout_api.c  172       #endif   /* } T_DEV_OPEN_IO */
+                        329 ; tout_api.c  173       
+                        330 ; tout_api.c  174       /*=======================================================================
+                            ===*/
+                        331 ; tout_api.c  175       #ifdef  T_DEV_CLOSE_IO  /* { */
+                        332 ; tout_api.c  176       
+                        333 ; tout_api.c  177       IORC   IO_dev_closet( DEVID   deviceno,
+                        334 ; tout_api.c  178                                 void *  otherinfo,
+                        335 ; tout_api.c  179                                 TICKS   waitime )
+                        336 ; tout_api.c  180       {
+                        337         PUBLIC  _IO_dev_closet
+000184                  338 _IO_dev_closet:
+000184 0F10             339         PUSH.W  R4
+000186 9972001A         340         SUB.W   R7,#01AH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        341 ; tout_api.c  181               /*---------------------------------------------------------------
+                            ---*/
+                        342 ; tout_api.c  182               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        343 ; tout_api.c  183               /*---------------------------------------------------------------
+                            ---*/
+                        344 ; tout_api.c  184               struct io_package iopack;
+                        345 ; tout_api.c  185       
+                        346 ; tout_api.c  186               /*---------------------------------------------------------------
+                            ---*/
+                        347 ; tout_api.c  187               /* If the device is not valid then return in error.              
+                               */
+                        348 ; tout_api.c  188               /*---------------------------------------------------------------
+                            ---*/
+                        349 ; tout_api.c  189               if( ( deviceno <= 0 ) || ( deviceno > nldevs ) )
+00018A 99040000         350         CMP.W   R0,#00H
+00018E FD07             351         BLE     _24
+000190 964842rr         352         MOV.B   ES,#SEG( _nldevs )
+000194 9948rrrr         353         MOV.W   R4,#SOF( _nldevs )
+000198 8A44             354         MOV.W   R4,[R4]
+00019A 4904             355         CMP.W   R0,R4
+00019C FD03             356         BLE     _25
+00019C FD03             356         BLE     _25
+00019E                  357 _24:
+                        358 ; tout_api.c  190                   return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVALID) );
+00019E 9908F802         359         MOV.W   R0,#0F802H
+0001A2 FE0E             360         BR      _26
+0001A2 FE0E             360         BR      _26
+0001A4                  361 _25:
+                        362 ; tout_api.c  191       
+                        363 ; tout_api.c  192               /*---------------------------------------------------------------
+                            ---*/
+                        364 ; tout_api.c  193               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        365 ; tout_api.c  194               /*---------------------------------------------------------------
+                            ---*/
+                        366 ; tout_api.c  195               iopack.iofncid = IO_DEV_CLOSE;
+0001A4 BC7304           367         MOV.W   [R7+4],#03H
+                        368 ; tout_api.c  196               iopack.deviceno = deviceno;
+0001A7 8A0F             369         MOV.W   [R7],R0
+                        370 ; tout_api.c  197               iopack.io_duration = IO_TIMED;
+0001A9 BC7108           371         MOV.W   [R7+8],#01H
+                        372 ; tout_api.c  198               iopack.waitime = waitime;
+0001AC 8C1F18           373         MOV.W   [R7+24],R1
+                        374 ; tout_api.c  199               iopack.otherinfo = otherinfo;
+0001AF 8C3F16           375         MOV.W   [R7+22],R3
+0001B2 8C2F14           376         MOV.W   [R7+20],R2
+                        377 ; tout_api.c  200       
+                        378 ; tout_api.c  201               /*---------------------------------------------------------------
+                            ---*/
+                        379 ; tout_api.c  202               /* Process the i/o request.                                      
+                               */
+                        380 ; tout_api.c  203               /*---------------------------------------------------------------
+                            ---*/
+                        381 ; tout_api.c  204               return( process_io( &iopack ) );
+0001B5 9128rr           382         MOV.B   R1L,#SEG( __lc_bs )
+0001B8 7133             383         XOR.B   R1H,R1H
+0001BA 8907             384         MOV.W   R0,R7
+                        385         CALL    _process_io
+0001BC C4rrrrrr        +385 ;       FCALL   _process_io
+0001BC C4rrrrrr        +385 ;       FCALL   _process_io
+                        386 ; tout_api.c  205       }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+0001C0                  387 _26:
+0001C0 9970001A         388         ADD.W   R7,#01AH
+0001C4 2F10             389         POP.W   R4
+0001C6 D680             390         RET
+0001C6 D680             390         RET
+                        391 ; tout_api.c  206       
+                        392 ; tout_api.c  207       #endif   /* } T_DEV_CLOSE_IO */
+                        393 ; tout_api.c  208       
+                        394 ; tout_api.c  209       /*=======================================================================
+                            ===*/
+                        395 ; tout_api.c  210       #ifdef T_CONTROL_IO  /* { */
+                        396 ; tout_api.c  211       
+                        397 ; tout_api.c  212       IORC  IO_controlt( CHNLID      chnlid,
+                        398 ; tout_api.c  213                              SPFNCID     spfncid,
+                        399 ; tout_api.c  214                              void *      otherinfo,
+                        400 ; tout_api.c  215                              TICKS       waitime )
+                        401 ; tout_api.c  216       {
+                        402         PUBLIC  _IO_controlt
+0001C8                  403 _IO_controlt:
+0001C8 0F30             404         PUSH.W  R4, R5
+0001CA 9972001E         405         SUB.W   R7,#01EH
+0001CE 8C3F02           406         MOV.W   [R7+2],R3
+0001D1 8A2F             407         MOV.W   [R7],R2
+                        408 ; tout_api.c  217               /*---------------------------------------------------------------
+                            ---*/
+                        409 ; tout_api.c  218               /* Declare on the task's stack a structure to send I/O request in
+                            .  */
+                        410 ; tout_api.c  219               /*---------------------------------------------------------------
+                            ---*/
+                        411 ; tout_api.c  220               struct io_package iopack;
+                        412 ; tout_api.c  221       
+                        413 ; tout_api.c  222               /*---------------------------------------------------------------
+                            ---*/
+                        414 ; tout_api.c  223               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        415 ; tout_api.c  224               /* return an invalid channel error                               
+                               */
+                        416 ; tout_api.c  225               /*---------------------------------------------------------------
+                            ---*/
+                        417 ; tout_api.c  226               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        418 ; tout_api.c  227                   (channel_table[chnlid].blink == NULLCCBE) )
+0001D3 6900             419         OR.W    R0,R0
+0001D5 F315             420         BEQ     _30
+0001D7 964842rr         421         MOV.B   ES,#SEG( _nchnls )
+0001DB 9948rrrr         422         MOV.W   R4,#SOF( _nchnls )
+0001DF 8A44             423         MOV.W   R4,[R4]
+0001E1 4904             424         CMP.W   R0,R4
+0001E3 F80E             425         BG      _30
+0001E5 99480016         426         MOV.W   R4,#016H
+0001E9 E440             427         MULU.W  R4,R0
+0001EB 8924             428         MOV.W   R2,R4
+0001ED B930             429         MOVS.W  R3,#00H
+0001EF 964842rr         430         MOV.B   ES,#SEG( _channel_table+4 )
+0001F3 8D32rrrr         431         MOV.W   R3,[R2+SOF( _channel_table+6 )]
+0001F7 8D22rrrr         432         MOV.W   R2,[R2+SOF( _channel_table+4 )]
+0001FB 6932             433         OR.W    R3,R2
+0001FD F204             434         BNE     _31
+0001FD F20400           434         BNE     _31
+000200                  435 _30:
+                        436 ; tout_api.c  228                         return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) 
+                            );
+000200 9908F801         437         MOV.W   R0,#0F801H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+000204 FE1A             438         BR      _32
+000204 FE1A             438         BR      _32
+000206                  439 _31:
+                        440 ; tout_api.c  229       
+                        441 ; tout_api.c  230               /*---------------------------------------------------------------
+                            ---*/
+                        442 ; tout_api.c  231               /* Package the I/O argument to send to the physical controller.  
+                               */
+                        443 ; tout_api.c  232               /*---------------------------------------------------------------
+                            ---*/
+                        444 ; tout_api.c  233               iopack.iofncid = IO_CONTROL;
+000206 BC7408           445         MOV.W   [R7+8],#04H
+                        446 ; tout_api.c  234               iopack.chnlid = chnlid;
+000209 8C0F06           447         MOV.W   [R7+6],R0
+                        448 ; tout_api.c  235               iopack.deviceno = channel_table[chnlid].io_deviceno;
+00020C B950             449         MOVS.W  R5,#00H
+00020E 964842rr         450         MOV.B   ES,#SEG( _channel_table+10 )
+000212 8D04rrrr         451         MOV.W   R0,[R4+SOF( _channel_table+10 )]
+000216 8C0F04           452         MOV.W   [R7+4],R0
+                        453 ; tout_api.c  236               iopack.io_duration = IO_TIMED;
+000219 BC710C           454         MOV.W   [R7+12],#01H
+                        455 ; tout_api.c  237               iopack.waitime = waitime;
+00021C 8C6F1C           456         MOV.W   [R7+28],R6
+                        457 ; tout_api.c  238               iopack.spfncid = spfncid;
+00021F 8C1F0A           458         MOV.W   [R7+10],R1
+                        459 ; tout_api.c  239               iopack.otherinfo = otherinfo;
+000222 8C1702           460         MOV.W   R1,[R7+2]
+000225 8A07             461         MOV.W   R0,[R7]
+000227 8C1F1A           462         MOV.W   [R7+26],R1
+00022A 8C0F18           463         MOV.W   [R7+24],R0
+                        464 ; tout_api.c  240       
+                        465 ; tout_api.c  241               /*---------------------------------------------------------------
+                            ---*/
+                        466 ; tout_api.c  242               /* Process the i/o request.                                      
+                               */
+                        467 ; tout_api.c  243               /*---------------------------------------------------------------
+                            ---*/
+                        468 ; tout_api.c  244               return( process_io( &iopack ) );
+00022D 9128rr           469         MOV.B   R1L,#SEG( __lc_bs )
+000230 7133             470         XOR.B   R1H,R1H
+000232 400704           471         LEA     R0,R7+4
+                        472         CALL    _process_io
+000235 C4rrrrrr        +472 ;       FCALL   _process_io
+000235 C4rrrrrr00      +472 ;       FCALL   _process_io
+                        473 ; tout_api.c  245       }
+00023A                  474 _32:
+00023A 9970001E         475         ADD.W   R7,#01EH
+00023E 2F30             476         POP.W   R4, R5
+000240 D680             477         RET
+000240 D680             477         RET
+                        478 ; tout_api.c  246       
+                        479 ; tout_api.c  247       #endif   /* } T_CONTROL_IO */
+                        480 ; tout_api.c  248       
+                        481 ; tout_api.c  249       #ifdef ASYNCH_IO     /* { */
+                        482 ; tout_api.c  250       #ifdef T_DEV_WAITT   /* { */
+                        483 ; tout_api.c  251       /*=======================================================================
+                            ===*/
+                        484 ; tout_api.c  252       IORC  IO_dev_waitt( CHNLID chnlid,
+                        485 ; tout_api.c  253                               TICKS wait_time  )
+                        486 ; tout_api.c  254       {
+                        487         PUBLIC  _IO_dev_waitt
+000242                  488 _IO_dev_waitt:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+000242 0F70             489         PUSH.W  R4, R5, R6
+000244 A97E             490         ADDS.W  R7,#0EH
+000246 8A1F             491         MOV.W   [R7],R1
+                        492 ; tout_api.c  255               DEVID   deviceno;
+                        493 ; tout_api.c  256                KSRC   ret_val;
+                        494 ; tout_api.c  257       
+                        495 ; tout_api.c  258               /*---------------------------------------------------------------
+                            ---*/
+                        496 ; tout_api.c  259               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        497 ; tout_api.c  260               /* return an invalid channel error                               
+                               */
+                        498 ; tout_api.c  261               /*---------------------------------------------------------------
+                            ---*/
+                        499 ; tout_api.c  262               IORC ret_code;
+                        500 ; tout_api.c  263       
+                        501 ; tout_api.c  264               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        502 ; tout_api.c  265                   (channel_table[chnlid].blink == NULLCCBE) )
+000248 8920             503         MOV.W   R2,R0
+00024A 6900             504         OR.W    R0,R0
+00024C F313             505         BEQ     _35
+00024E 964842rr         506         MOV.B   ES,#SEG( _nchnls )
+000252 9918rrrr         507         MOV.W   R1,#SOF( _nchnls )
+000256 8A11             508         MOV.W   R1,[R1]
+000258 4921             509         CMP.W   R2,R1
+00025A F80C             510         BG      _35
+00025C E9200016         511         MULU.W  R2,#016H
+000260 8902             512         MOV.W   R0,R2
+000262 B910             513         MOVS.W  R1,#00H
+000264 964842rr         514         MOV.B   ES,#SEG( _channel_table+4 )
+000268 8D10rrrr         515         MOV.W   R1,[R0+SOF( _channel_table+6 )]
+00026C 8D00rrrr         516         MOV.W   R0,[R0+SOF( _channel_table+4 )]
+000270 6910             517         OR.W    R1,R0
+000272 F204             518         BNE     _36
+000272 F204             518         BNE     _36
+000274                  519 _35:
+                        520 ; tout_api.c  266                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) );
+                            
+000274 9908F801         521         MOV.W   R0,#0F801H
+                        522         BR      _50
+000278 D50085          +522         JMP.L   _50
+000278 D5008500        +522         JMP.L   _50
+00027C                  523 _36:
+                        524 ; tout_api.c  267       
+                        525 ; tout_api.c  268               deviceno = channel_table[chnlid].io_deviceno;
+00027C B930             526         MOVS.W  R3,#00H
+00027E 964842rr         527         MOV.B   ES,#SEG( _channel_table+10 )
+000282 8D62rrrr         528         MOV.W   R6,[R2+SOF( _channel_table+10 )]
+                        529 ; tout_api.c  269       
+                        530 ; tout_api.c  270               /*---------------------------------------------------------------
+                            ---*/
+                        531 ; tout_api.c  271               /* Determine whether the requesting task is the device owner.    
+                               */
+                        532 ; tout_api.c  272               /*---------------------------------------------------------------
+                            ---*/
+                        533 ; tout_api.c  273               ret_val = KS_lock( logical_dev_tbl[deviceno]->dev_res );
+000286 8906             534         MOV.W   R0,R6
+000288 D902             535         ASL.W   R0,#02H
+00028A B910             536         MOVS.W  R1,#00H
+00028C 9958rrrr         537         MOV.W   R5,#SEG( _logical_dev_tbl )
+000290 9948rrrr         538         MOV.W   R4,#SOF( _logical_dev_tbl )
+000294 0940             539         ADD.W   R4,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000296 964842rr         540         MOV.B   ES,#SEG( _logical_dev_tbl )
+00029A 8D10rrrr         541         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+00029E 8D00rrrr         542         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+0002A2 862C42           543         MOV.B   ES,R1L
+0002A5 8200             544         MOV.B   R0L,[R0]
+                        545         CALL    _KS_lock
+0002A7 C4rrrrrr        +545 ;       FCALL   _KS_lock
+                        546 ; tout_api.c  274       
+                        547 ; tout_api.c  275               if( ret_val == RC_BUSY )
+0002AB 99040009         548         CMP.W   R0,#09H
+0002AF F204             549         BNE     _37
+                        550 ; tout_api.c  276               {
+                        551 ; tout_api.c  277                       /*-------------------------------------------------------
+                            ---*/
+                        552 ; tout_api.c  278                       /* error: The requesting task is not the owner           
+                               */
+                        553 ; tout_api.c  279                       /*-------------------------------------------------------
+                            ---*/
+                        554 ; tout_api.c  280                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEV_BUSY) );
+0002B1 9908F807         555         MOV.W   R0,#0F807H
+0002B5 FE67             556         BR      _50
+0002B5 FE6700           556         BR      _50
+                        557 ; tout_api.c  281               }
+0002B8                  558 _37:
+                        559 ; tout_api.c  282       
+                        560 ; tout_api.c  283               if( ret_val == RC_GOOD )
+0002B8 6900             561         OR.W    R0,R0
+0002BA F20C             562         BNE     _38
+                        563 ; tout_api.c  284               {
+                        564 ; tout_api.c  285                       /*-------------------------------------------------------
+                            ---*/
+                        565 ; tout_api.c  286                       /* error: The requesting task has no pending RTXCio calls
+                               */
+                        566 ; tout_api.c  287                       /*-------------------------------------------------------
+                            ---*/
+                        567 ; tout_api.c  288                       KS_unlock( logical_dev_tbl[deviceno]->dev_res );
+0002BC 86AC42           568         MOV.B   ES,R5L
+0002BF 8A04             569         MOV.W   R0,[R4]
+0002C1 8C1402           570         MOV.W   R1,[R4+2]
+0002C4 862C42           571         MOV.B   ES,R1L
+0002C7 8200             572         MOV.B   R0L,[R0]
+                        573         CALL    _KS_unlock
+0002C9 C4rrrrrr        +573 ;       FCALL   _KS_unlock
+                        574 ; tout_api.c  289                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_BAD_WAIT) );
+0002CD 9908F809         575         MOV.W   R0,#0F809H
+0002D1 FE59             576         BR      _50
+0002D1 FE5900           576         BR      _50
+                        577 ; tout_api.c  290               }
+0002D4                  578 _38:
+                        579 ; tout_api.c  291       
+                        580 ; tout_api.c  292               /*---------------------------------------------------------------
+                            ---*/
+                        581 ; tout_api.c  293               /* The requesting task is indeed the owner so unlock the nested l
+                            ock*/
+                        582 ; tout_api.c  294               /*---------------------------------------------------------------
+                            ---*/
+                        583 ; tout_api.c  295               KS_unlock( logical_dev_tbl[deviceno]->dev_res );
+0002D4 86AC42           584         MOV.B   ES,R5L
+0002D7 8A04             585         MOV.W   R0,[R4]
+0002D9 8C1402           586         MOV.W   R1,[R4+2]
+0002DC 862C42           587         MOV.B   ES,R1L
+0002DF 8200             588         MOV.B   R0L,[R0]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                        589         CALL    _KS_unlock
+0002E1 C4rrrrrr        +589 ;       FCALL   _KS_unlock
+                        590 ; tout_api.c  296       
+                        591 ; tout_api.c  297               /*---------------------------------------------------------------
+                            -----*/
+                        592 ; tout_api.c  298               /* Verify completion of your request on the device.              
+                                 */
+                        593 ; tout_api.c  299               /*---------------------------------------------------------------
+                            -----*/
+                        594 ; tout_api.c  300               ret_val = KS_waitt(logical_dev_tbl[deviceno]->dev_sema, wait_time
+                            );
+0002E5 86AC42           595         MOV.B   ES,R5L
+0002E8 8A04             596         MOV.W   R0,[R4]
+0002EA 8C1402           597         MOV.W   R1,[R4+2]
+0002ED 862C42           598         MOV.B   ES,R1L
+0002F0 840001           599         MOV.B   R0L,[R0+1]
+0002F3 8A17             600         MOV.W   R1,[R7]
+                        601         CALL    _KS_waitt
+0002F5 C4rrrrrr        +601 ;       FCALL   _KS_waitt
+                        602 ; tout_api.c  301       
+                        603 ; tout_api.c  302               if( ret_val == RC_WAIT_CONFLICT )
+0002F9 99040001         604         CMP.W   R0,#01H
+0002FD F20C             605         BNE     _39
+                        606 ; tout_api.c  303               {
+                        607 ; tout_api.c  304                       /*-------------------------------------------------------
+                            ---*/
+                        608 ; tout_api.c  305                       /* Unlock the device's resource to free the device.      
+                               */
+                        609 ; tout_api.c  306                       /*-------------------------------------------------------
+                            ---*/
+                        610 ; tout_api.c  307                       KS_unlock(logical_dev_tbl[deviceno]->dev_res);
+0002FF 86AC42           611         MOV.B   ES,R5L
+000302 8A04             612         MOV.W   R0,[R4]
+000304 8C1402           613         MOV.W   R1,[R4+2]
+000307 862C42           614         MOV.B   ES,R1L
+00030A 8200             615         MOV.B   R0L,[R0]
+                        616         CALL    _KS_unlock
+00030C C4rrrrrr        +616 ;       FCALL   _KS_unlock
+                        617 ; tout_api.c  308                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_WAIT_CONFLICT) );
+000310 9908F80B         618         MOV.W   R0,#0F80BH
+000314 FE37             619         BR      _50
+000314 FE37             619         BR      _50
+                        620 ; tout_api.c  309               }
+000316                  621 _39:
+                        622 ; tout_api.c  310       
+                        623 ; tout_api.c  311               if( ret_val == RC_TIMEOUT )
+000316 99040005         624         CMP.W   R0,#05H
+00031A F203             625         BNE     _40
+                        626 ; tout_api.c  312                       return( ((IORC)RTXCIO_GOOD + (IORC)IO_TIMEOUT) );
+00031C 9908780C         627         MOV.W   R0,#0780CH
+000320 FE31             628         BR      _50
+000320 FE31             628         BR      _50
+000322                  629 _40:
+                        630 ; tout_api.c  313       
+                        631 ; tout_api.c  314               /*---------------------------------------------------------------
+                            -----*/
+                        632 ; tout_api.c  315               /* return successful results.                                    
+                                 */
+                        633 ; tout_api.c  316               /*---------------------------------------------------------------
+                            -----*/
+                        634 ; tout_api.c  317               if( (logical_dev_tbl[deviceno]->last_io_oper == IO_READ) ||
+                        635 ; tout_api.c  318                   (logical_dev_tbl[deviceno]->last_io_oper == IO_WRITE)   )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+000322 86AC42           636         MOV.B   ES,R5L
+000325 8A04             637         MOV.W   R0,[R4]
+000327 8C1402           638         MOV.W   R1,[R4+2]
+00032A 862C42           639         MOV.B   ES,R1L
+00032D 8C2006           640         MOV.W   R2,[R0+6]
+000330 F305             641         BEQ     _41
+000332 862C42           642         MOV.B   ES,R1L
+000335 9C04060001       643         CMP.W   [R0+6],#01H
+00033A F21C             644         BNE     _43
+00033A F21C             644         BNE     _43
+00033C                  645 _41:
+                        646 ; tout_api.c  319               {
+                        647 ; tout_api.c  320                       if( logical_dev_tbl[deviceno]->lost_data )
+00033C 862C42           648         MOV.B   ES,R1L
+00033F 844008           649         MOV.B   R2L,[R0+8]
+000342 F314             650         BEQ     _42
+                        651 ; tout_api.c  321                       {
+                        652 ; tout_api.c  322                           ret_code = (IORC)SETERROR + ((IORC) SETCLASS *
+                        653 ; tout_api.c  323                               (IORC)logical_dev_tbl[deviceno]->dev_cntlr->cntlr
+                            _number) +
+                        654 ; tout_api.c  324                               ((IORC) SETDEVICE * (IORC) deviceno) +
+                        655 ; tout_api.c  325                               (IORC)logical_dev_tbl[deviceno]->lost_data;
+000344 862C42           656         MOV.B   ES,R1L
+000347 8C400C           657         MOV.W   R4,[R0+12]
+00034A 8C500E           658         MOV.W   R5,[R0+14]
+00034D 86AC42           659         MOV.B   ES,R5L
+000350 8A34             660         MOV.W   R3,[R4]
+000352 D93B             661         ASL.W   R3,#0BH
+000354 D966             662         ASL.W   R6,#06H
+000356 0936             663         ADD.W   R3,R6
+000358 8144             664         MOV.B   R2L,R2L
+00035A 9059             665         SEXT.B  R2H
+00035C 0932             666         ADD.W   R3,R2
+00035E 99308000         667         ADD.W   R3,#08000H
+000362 8943             668         MOV.W   R4,R3
+                        669 ; tout_api.c  326                           logical_dev_tbl[deviceno]->lost_data = NO_LOST_DATA;
+000364 862C42           670         MOV.B   ES,R1L
+000367 B40008           671         MOV.B   [R0+8],#00H
+                        672 ; tout_api.c  327                       }
+00036A FE06             673         BR      _45
+00036A FE06             673         BR      _45
+00036C                  674 _42:
+                        675 ; tout_api.c  328                       else
+                        676 ; tout_api.c  329                           ret_code = (IORC)logical_dev_tbl[deviceno]->bytes_tra
+                            nsfered;
+00036C 862C42           677         MOV.B   ES,R1L
+00036F 8C4010           678         MOV.W   R4,[R0+16]
+                        679 ; tout_api.c  330               }
+000372 FE02             680         BR      _45
+000372 FE02             680         BR      _45
+000374                  681 _43:
+                        682 ; tout_api.c  331               else
+                        683 ; tout_api.c  332                       ret_code = (IORC)RTXCIO_GOOD + (IORC)IO_DEV_FREED;
+000374 9948780A         684         MOV.W   R4,#0780AH
+000374 9948780A         684         MOV.W   R4,#0780AH
+000378                  685 _45:
+                        686 ; tout_api.c  333       
+                        687 ; tout_api.c  334               /*---------------------------------------------------------------
+                            ---*/
+                        688 ; tout_api.c  335               /* Unlock the device's resource to free the device.              
+                               */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+                        689 ; tout_api.c  336               /*---------------------------------------------------------------
+                            ---*/
+                        690 ; tout_api.c  337               KS_unlock(logical_dev_tbl[deviceno]->dev_res);
+000378 862C42           691         MOV.B   ES,R1L
+00037B 8200             692         MOV.B   R0L,[R0]
+                        693         CALL    _KS_unlock
+00037D C4rrrrrr        +693 ;       FCALL   _KS_unlock
+                        694 ; tout_api.c  338               return( ret_code );
+000381 8904             695         MOV.W   R0,R4
+000381 890400           695         MOV.W   R0,R4
+                        696 ; tout_api.c  339       }
+000384                  697 _50:
+000384 A972             698         ADDS.W  R7,#02H
+000386 2F70             699         POP.W   R4, R5, R6
+000388 D680             700         RET
+000388 D680             700         RET
+                        701 ; tout_api.c  340       
+                        702 ; tout_api.c  341       /*=======================================================================
+                            ===*/
+                        703 ; tout_api.c  342       IORC  IO_chnl_reset( CHNLID chnlid )
+                        704 ; tout_api.c  343       {
+                        705         PUBLIC  _IO_chnl_reset
+00038A                  706 _IO_chnl_reset:
+00038A 0F30             707         PUSH.W  R4, R5
+                        708 ; tout_api.c  344               DEVID   deviceno;
+                        709 ; tout_api.c  345       
+                        710 ; tout_api.c  346               /*---------------------------------------------------------------
+                            ---*/
+                        711 ; tout_api.c  347               /* Check for a valid chnlid # and If the channel is inactive,    
+                               */
+                        712 ; tout_api.c  348               /* return an invalid channel error                               
+                               */
+                        713 ; tout_api.c  349               /*---------------------------------------------------------------
+                            ---*/
+                        714 ; tout_api.c  350               if( (chnlid == 0) || (chnlid > nchnls) ||
+                        715 ; tout_api.c  351                   (channel_table[chnlid].blink == NULLCCBE) )
+00038C 8920             716         MOV.W   R2,R0
+00038E 6900             717         OR.W    R0,R0
+000390 F313             718         BEQ     _57
+000392 964842rr         719         MOV.B   ES,#SEG( _nchnls )
+000396 9918rrrr         720         MOV.W   R1,#SOF( _nchnls )
+00039A 8A11             721         MOV.W   R1,[R1]
+00039C 4921             722         CMP.W   R2,R1
+00039E F80C             723         BG      _57
+0003A0 E9200016         724         MULU.W  R2,#016H
+0003A4 8902             725         MOV.W   R0,R2
+0003A6 B910             726         MOVS.W  R1,#00H
+0003A8 964842rr         727         MOV.B   ES,#SEG( _channel_table+4 )
+0003AC 8D10rrrr         728         MOV.W   R1,[R0+SOF( _channel_table+6 )]
+0003B0 8D00rrrr         729         MOV.W   R0,[R0+SOF( _channel_table+4 )]
+0003B4 6910             730         OR.W    R1,R0
+0003B6 F203             731         BNE     _58
+0003B6 F203             731         BNE     _58
+0003B8                  732 _57:
+                        733 ; tout_api.c  352                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) );
+                            
+0003B8 9908F801         734         MOV.W   R0,#0F801H
+0003BC FE30             735         BR      _61
+0003BC FE30             735         BR      _61
+0003BE                  736 _58:
+                        737 ; tout_api.c  353       
+                        738 ; tout_api.c  354               deviceno = channel_table[chnlid].io_deviceno;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+0003BE 8902             739         MOV.W   R0,R2
+0003C0 B910             740         MOVS.W  R1,#00H
+0003C2 964842rr         741         MOV.B   ES,#SEG( _channel_table+10 )
+0003C6 8D00rrrr         742         MOV.W   R0,[R0+SOF( _channel_table+10 )]
+                        743 ; tout_api.c  355       
+                        744 ; tout_api.c  356               /*---------------------------------------------------------------
+                            ---*/
+                        745 ; tout_api.c  357               /* Unlock the user from the resource.                            
+                               */
+                        746 ; tout_api.c  358               /*---------------------------------------------------------------
+                            ---*/
+                        747 ; tout_api.c  359               while( KS_unlock( logical_dev_tbl[deviceno]->dev_res ) != RC_GOOD
+                             );
+0003CA D902             748         ASL.W   R0,#02H
+0003CC B910             749         MOVS.W  R1,#00H
+0003CE 9958rrrr         750         MOV.W   R5,#SEG( _logical_dev_tbl )
+0003D2 9948rrrr         751         MOV.W   R4,#SOF( _logical_dev_tbl )
+0003D6 0940             752         ADD.W   R4,R0
+0003D8 964842rr         753         MOV.B   ES,#SEG( _logical_dev_tbl )
+0003DC 8D10rrrr         754         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+0003E0 8D00rrrr         755         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+0003E4 862C42           756         MOV.B   ES,R1L
+0003E7 8200             757         MOV.B   R0L,[R0]
+                        758         CALL    _KS_unlock
+0003E9 C4rrrrrr        +758 ;       FCALL   _KS_unlock
+0003ED 6900             759         OR.W    R0,R0
+0003EF F30C             760         BEQ     _60
+0003EF F30C00           760         BEQ     _60
+0003F2                  761 _59:
+0003F2 86AC42           762         MOV.B   ES,R5L
+0003F5 8A04             763         MOV.W   R0,[R4]
+0003F7 8C1402           764         MOV.W   R1,[R4+2]
+0003FA 862C42           765         MOV.B   ES,R1L
+0003FD 8200             766         MOV.B   R0L,[R0]
+                        767         CALL    _KS_unlock
+0003FF C4rrrrrr        +767 ;       FCALL   _KS_unlock
+000403 6900             768         OR.W    R0,R0
+000405 F2F6             769         BNE     _59
+000405 F2F600           769         BNE     _59
+000408                  770 _60:
+                        771 ; tout_api.c  360       
+                        772 ; tout_api.c  361               /*---------------------------------------------------------------
+                            ---*/
+                        773 ; tout_api.c  362               /* Set the device semaphore back to pending.                     
+                               */
+                        774 ; tout_api.c  363               /*---------------------------------------------------------------
+                            ---*/
+                        775 ; tout_api.c  364               KS_pend( logical_dev_tbl[deviceno]->dev_sema );
+000408 86AC42           776         MOV.B   ES,R5L
+00040B 8A04             777         MOV.W   R0,[R4]
+00040D 8C1402           778         MOV.W   R1,[R4+2]
+000410 862C42           779         MOV.B   ES,R1L
+000413 840001           780         MOV.B   R0L,[R0+1]
+                        781         CALL    _KS_pend
+000416 C4rrrrrr        +781 ;       FCALL   _KS_pend
+                        782 ; tout_api.c  365       
+                        783 ; tout_api.c  366               return( ((IORC)RTXCIO_GOOD + (IORC)IO_DEV_FREED) );
+00041A 9908780A         784         MOV.W   R0,#0780AH
+00041A 9908780A         784         MOV.W   R0,#0780AH
+                        785 ; tout_api.c  367       }
+00041E                  786 _61:
+00041E 2F30             787         POP.W   R4, R5
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+000420 D680             788         RET
+                        789 ; tout_api.c  368       #endif /* } T_DEV_WAITT */
+                        790 ; tout_api.c  369       #endif  /* } ASYNCH_IO */
+                        791 ; tout_api.c  370       
+                        792 ; tout_api.c  371       #endif   /* } TIMEOUT_IO */
+                        793 ; tout_api.c  372       
+                        794 ; tout_api.c  373       /* End of the TOUT_API.C module */
+                        796         EXTRN   HDATA(_nchnls)
+                        797         EXTRN   HCODE(_KS_pend)
+                        798         EXTRN   HCODE(_KS_waitt)
+                        799         EXTRN   HCODE(_KS_lock)
+                        800         EXTRN   HDATA(_channel_table)
+                        801         EXTRN   HDATA(_nldevs)
+                        802         EXTRN   HCODE(_process_io)
+                        803         EXTRN   HCODE(_KS_unlock)
+                        804         EXTRN   IDATA(__lc_bs)
+                        805         EXTRN   HDATA(_logical_dev_tbl)
+                        806         CALLS   'IO_readt', 'process_io'
+                        807         CALLS   'IO_writet', 'process_io'
+                        808         CALLS   'IO_dev_opent', 'process_io'
+                        809         CALLS   'IO_dev_closet', 'process_io'
+                        810         CALLS   'IO_controlt', 'process_io'
+                        811         CALLS   'IO_dev_waitt', 'KS_lock'
+                        812         CALLS   'IO_dev_waitt', 'KS_unlock'
+                        813         CALLS   'IO_dev_waitt', 'KS_waitt'
+                        814         CALLS   'IO_dev_waitt', 'KS_unlock'
+                        815         CALLS   'IO_chnl_reset', 'KS_unlock'
+                        816         CALLS   'IO_chnl_reset', 'KS_pend'

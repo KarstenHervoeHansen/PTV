@@ -1,0 +1,468 @@
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 1
+rtxcasm.asm
+
+
+
+      1					 NAME	 rtxcasm
+      2
+      3				     ;
+      4				     ;	 RTXC	 Version 3.2
+      5				     ;	 Copyright (c) 1986-1997.
+      6				     ;	 Embedded System Products, Inc.
+      7				     ;	 ALL RIGHTS RESERVED
+      8				     ;
+      9
+     10				     MASM51			 ; MASM	mode is	default,
+     11								 ; MASM51 enables 5.1 extensions
+     12
+     13				     INCLUDE saveregs.inc	 ; register save macros
+1    14				     ;	 TITLE	 saveregs.inc
+1    15
+1    16				     ;
+1    17				     ;	 RTXC	 Version 3.2
+1    18				     ;	 Copyright (c) 1986-1997.
+1    19				     ;	 Embedded System Products, Inc.
+1    20				     ;	 ALL RIGHTS RESERVED
+1    21				     ;
+1    22
+1    23				     ;
+1    24				     ; RTXC register save macros
+1    25				     ;												  0
+1    26
+1    27					     include rtxcopts.inc
+2    28				     ; rtxcopts.inc - RTXC assembly time options
+2    29
+2    30				     ;
+2    31				     ; RTXC    Version 3.2
+2    32				     ; Copyright (c) 1986-1997.
+2    33				     ; Embedded	System Products, Inc.
+2    34				     ; ALL RIGHTS RESERVED
+2    35				     ;
+2    36
+2    37				     INCLUDE binding.inc
+3    38				     ; binding.inc - RTXC binding assembly time	options
+3    39
+3    40				     ;
+3    41				     ; RTXC    Version 3.2
+3    42				     ; Copyright (c) 1986-1997.
+3    43				     ; Embedded	System Products, Inc.
+3    44				     ; ALL RIGHTS RESERVED
+3    45				     ;
+3    46
+3    47				     ;
+3    48				     ; choose _far or _near equ	1
+3    49				     ;
+3    50				     ; __HUGE__	requires ks_stk_far equ	1
+3    51				     ;
+3    52	      =0000		     ks_stk_near equ 0
+3    53	      =0001		     ks_stk_far	 equ 1
+3    54
+3    55	      =0000		     FPU = 0   ; 0=no extended context,	1=extended context, e.g., FPU
+3    56
+3    57	      =0200		     RTXCSTKSZ = 512   ; can be	changed	as needed
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 2
+rtxcasm.asm
+
+
+
+3    58						       ; NOTE: RTXCSTKSZ must match definition in binding.h
+3    59
+3    60				     ; End of file - binding.inc
+3    61
+2    62
+2    63				     ; End of file - rtxcopts.inc  ; RTXC binding options
+2    64
+1    65
+1    66				     saveregs MACRO
+1    67					 LOCAL skip,eom
+1    68					     push    ds	  ; save ds on stack
+1    69					     push    es	  ; save es on stack
+1    70
+1    71				     IF	CPU EQ 0
+1    72					     push    ax	 ; start of "pusha"
+1    73					     push    cx
+1    74					     push    dx
+1    75					     push    bx
+1    76					     push    sp	 ; sp -	not really used
+1    77					     push    bp
+1    78					     push    si
+1    79					     push    di	 ; end of "pusha"
+1    80				     ENDIF
+1    81				     IF	CPU EQ 2
+1    82					     pusha
+1    83				     ENDIF
+1    84				     IF	CPU EQ 3
+1    85					     PUSHSTATE
+1    86					     .386
+1    87					     pushad
+1    88					     POPSTATE
+1    89				     ENDIF
+1    90
+1    91					     mov     ds,cs:DEFSEG ; force ds to	SEG _isrcnt
+1    92					     inc     _isrcnt ; track interrupt level
+1    93					     cmp     _isrcnt,1 ; if not	at 1st level
+1    94					     jne     skip	; then no stack	switch
+1    95					     mov     si,OFFSET DGROUP:_rtxcstk ; else
+1    96					     mov     ax,SEG    DGROUP:_rtxcstk
+1    97					     mov     es,ax
+1    98					     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+1    99					     mov     es:0[si],sp
+1   100					     mov     ss,ax
+1   101					     mov     sp,si
+1   102					     jmp     eom
+1   103				     skip:
+1   104					     push    ss	   ; pass ss:sp	on stack
+1   105					     mov     ax,sp ; compatible	80286/8088 push	sp sequence
+1   106					     add     ax,2  ; note: push	sp executes differently	on 8088	vs 80286
+1   107					     push    ax	   ;   same code will run on 8088/80286
+1   108				     eom:
+1   109					     cld	  ; clear direction for	C routines
+1   110					 ENDM
+1   111
+1   112				     ;
+1   113				     ; fast C register save macros - used only by kernel _ks
+1   114				     ;
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 3
+rtxcasm.asm
+
+
+
+1   115				     ; this may	vary from one compiler to another
+1   116				     ;
+1   117				     ; skip saving volatile C registers	(es,ax,cx,dx,bx,sp) and	adjust
+1   118				     ; the frame as needed
+1   119				     ;
+1   120
+1   121				     fastsave MACRO
+1   122					     push    ds	  ; save ds on stack
+1   123
+1   124				     IFDEF __HUGE__ ; {
+1   125					     mov     ds,cs:DEFSEG ; force ds to	SEG _isrcnt
+1   126				     ENDIF ; } __HUGE__
+1   127
+1   128					     inc     _isrcnt ; track interrupt level (now := 1)
+1   129
+1   130				     IF	CPU EQ 0
+1   131					     push    es
+1   132
+1   133							    ; start of pusha
+1   134					     push    ss
+1   135					     push    cx
+1   136				     ;	     push    dx
+1   137				     ;	     push    bx
+1   138				     ;	     push    sp
+1   139					     sub     sp,6  ; faster than 3 x push
+1   140					     push    bp
+1   141					     push    si
+1   142					     push    di
+1   143				     ;			     ; end of pusha
+1   144				     ELSE ; CPU	EQ 2 or	3
+1   145					     push    es
+1   146
+1   147				     IF	CPU EQ 2
+1   148				     IF	ks_stk_far EQ 1
+1   149					     mov ax, ss	   ; store stack segment in ax,	stack offset is	in cx
+1   150				     ENDIF
+1   151					     pusha
+1   152				     ENDIF
+1   153				     IF	CPU EQ 3
+1   154					     PUSHSTATE
+1   155					     .386
+1   156					     pushad
+1   157					     POPSTATE
+1   158				     ENDIF
+1   159				     ENDIF
+1   160
+1   161				     IF	ks_stk_far EQ 1
+1   162					     mov     si,OFFSET DGROUP:_rtxcstk
+1   163					     mov     ax,SEG    DGROUP:_rtxcstk
+1   164					     mov     es,ax
+1   165					     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+1   166					     mov     es:0[si],sp
+1   167					     mov     ss,ax
+1   168					     mov     sp,si
+1   169				     ENDIF
+1   170
+1   171				     IF	ks_stk_near EQ 1
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 4
+rtxcasm.asm
+
+
+
+1   172					     mov     si,OFFSET DGROUP:_rtxcstk
+1   173					     mov     [si],sp
+1   174					     mov     sp,si
+1   175				     ENDIF
+1   176
+1   177					     sti	 ; enable interrupts
+1   178					 ENDM
+1   179
+1   180
+1   181				     ;
+1   182				     ; this is the normal exit path from the kernel
+1   183				     ; it is performed with interrupts disabled
+1   184				     ; cexit is	a macro, to be called after calls to all C interrupt handlers
+1   185				     ;
+1   186				     ; DS is also known	to be == DGROUP
+1   187				     ;
+1   188				     cexit MACRO
+1   189					     dec     _isrcnt  ;	decrement isr level
+1   190					     mov     sp,ax    ;	restore	ss:sp from returned value dx:ax
+1   191					     mov     ss,dx
+1   192
+1   193				     IF	CPU EQ 0
+1   194					     pop     di	     ; start of	"popa"
+1   195					     pop     si
+1   196					     pop     bp
+1   197				     ;	     add     sp,2    ; ignore mid push sp
+1   198					     pop     bx	     ; this is faster than "add	sp,2", bx overwritten
+1   199					     pop     bx
+1   200					     pop     dx
+1   201					     pop     cx
+1   202					     pop     ax	     ; end of "popa"
+1   203				     ENDIF
+1   204				     IF	CPU EQ 2
+1   205					     popa
+1   206				     ENDIF
+1   207				     IF	CPU EQ 3
+1   208					     PUSHSTATE
+1   209					     .386
+1   210					     popad
+1   211					     POPSTATE
+1   212				     ENDIF
+1   213
+1   214					     pop     es
+1   215					     pop     ds
+1   216
+1   217					     iret	     ; note: 16	bit ccr	even in	386 mode
+1   218					ENDM
+1   219
+1   220				     ; End of file - saveregs.inc
+1   221
+    222
+    223				     IF	CPU EQ 0
+    224					 .8087
+    225				     ELSE ; CPU	EQ 2 or	3
+    226					 .286p
+    227					 .287
+    228				     ENDIF
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 5
+rtxcasm.asm
+
+
+
+    229
+    230				     EXTRN _isrcnt:BYTE	     ; interrupt nesting counter, declared in isrc.c
+    231
+    232	0000			     RTXC_TEXT SEGMENT BYTE PUBLIC 'CODE'
+    233	0000			     RTXC_TEXT ENDS
+    234
+    235	0000			     _DATA SEGMENT WORD	PUBLIC 'DATA'
+    236	0000			     _DATA ENDS
+    237
+    238	0000			     _BSS SEGMENT WORD PUBLIC 'BSS'
+    239	0000			     _BSS ENDS
+    240
+    241				     ;;_CONST SEGMENT WORD PUBLIC 'CONST'
+    242				     ;;_CONST ENDS
+    243
+    244				     DGROUP GROUP _DATA, _BSS
+    245				     ;DGROUP GROUP _DATA, _CONST, _BSS,
+    246				     ASSUME CS:	RTXC_TEXT, DS: DGROUP, SS: DGROUP, ES: DGROUP
+    247
+    248	0000			     _DATA SEGMENT
+    249
+    250				     ;
+    251				     ; kernel stack area
+    252				     ;
+    253
+    254				     PUBLIC _rtxcstk, _rtxctos
+    255	0000  01FC*(00)		     _rtxctos  DB  RTXCSTKSZ-4 DUP (0) ; kernel	stack area, 0 to allow for checks
+    256								  ; must be defined in _DATA segment
+    257	01FC  00000000		     _rtxcstk  DD  0		  ; ss:sp - must be adjacent to	rtxctos
+    258	0200			     _DATA ENDS
+    259
+    260				     IFDEF __HUGE__ ; {
+    261				     EXTRN _rtxc:FAR	 ; rtxc	function decoder and task dispatcher
+    262				     ELSE ; } __HUGE__ {
+    263				     EXTRN _rtxc:NEAR	 ; rtxc	function decoder and task dispatcher
+    264				     ENDIF ; } __HUGE__
+    265
+    266	0000			     RTXC_TEXT SEGMENT
+    267
+    268	0000  0000s		     DEFSEG DW SEG _isrcnt	    ; NOTE: must be in CODE segment
+    269				     ;				    ; used in context save logic
+    270
+    271				     ;
+    272				     ; void far	isvcrtx(void) -	interrupt service for RTXC software interrupt
+    273				     ;
+    274				     PUBLIC _isvcrtx
+    275	0002			     _isvcrtx PROC FAR
+    276					     fastsave	     ; save minimal C context, see macro for details
+1   277	0002  1E			     push    ds	  ; save ds on stack
+1   278	0003  FE 06 0000e		     inc     _isrcnt ; track interrupt level (now := 1)
+1   279	0007  06			     push    es
+1   280	0008  8C D0			     mov ax, ss	   ; store stack segment in ax,	stack offset is	in cx
+1   281	000A  60			     pusha
+1   282	000B  BE 01FCr			     mov     si,OFFSET DGROUP:_rtxcstk
+1   283	000E  B8 0000s			     mov     ax,SEG    DGROUP:_rtxcstk
+1   284	0011  8E C0			     mov     es,ax
+1   285	0013  26: 8C 54	02		     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 6
+rtxcasm.asm
+
+
+
+1   286	0017  26: 89 24			     mov     es:0[si],sp
+1   287	001A  8E D0			     mov     ss,ax
+1   288	001C  8B E6			     mov     sp,si
+1   289	001E  FB			     sti	 ; enable interrupts
+    290	001F  E8 0000e			     call    _rtxc   ; FRAME * rtxc(FRAME ks_stk *) equivalent
+    291					     cexit	     ; fall through to cexit
+1   292	0022  FE 0E 0000e		     dec     _isrcnt  ;	decrement isr level
+1   293	0026  8B E0			     mov     sp,ax    ;	restore	ss:sp from returned value dx:ax
+1   294	0028  8E D2			     mov     ss,dx
+1   295	002A  61			     popa
+1   296	002B  07			     pop     es
+1   297	002C  1F			     pop     ds
+1   298	002D  CF			     iret	     ; note: 16	bit ccr	even in	386 mode
+    299							     ; note: stack does	not need adjustment
+    300							     ;	     since ss:sp will be overridden anyway
+    301	002E			     _isvcrtx ENDP
+    302
+    303				     IF	FPU EQ 1
+    304				     ;
+    305				     ; 80x87 hardware register context save area
+    306				     ;
+    307				     fpregs STRUC  ; see rtxstruc.h for	corresponding C	structure definition
+    308				     ;
+    309				     ; example of extended context for error handling
+    310				     ;	 note: must match FPREGS in rtxstruc.h
+    311				     ;
+    312				     ; errno	 dw ? ;	task image of RTL errno
+    313				     ; _doserrno dw ? ;	task image of RTL _doserrno
+    314				     ;
+    315				     control dw	?   ; control register */
+    316				     status  dw	?   ; status register */
+    317				     tag     dw	?   ; tag register */
+    318				     ip	     dd	?   ; instruction pointer */
+    319				     op	     dd	?   ; operand pointer */
+    320				     st0     dt	?   ; fpu data reg 0 */
+    321				     st1     dt	?   ; fpu data reg 1 */
+    322				     st2     dt	?   ; fpu data reg 2 */
+    323				     st3     dt	?   ; fpu data reg 3 */
+    324				     st4     dt	?   ; fpu data reg 4 */
+    325				     st5     dt	?   ; fpu data reg 5 */
+    326				     st6     dt	?   ; fpu data reg 6 */
+    327				     st7     dt	?   ; fpu data reg 7 */
+    328				     fpregs ENDS
+    329
+    330				     PUBLIC _fpuswap
+    331
+    332				     IFDEF __HUGE__ ; {
+    333				     ; void cdecl huge fpuswap(FPREGS huge *old, FPREGS	huge *new);
+    334				     _fpuswap PROC FAR
+    335					 arg old:DWORD,new:DWORD
+    336				     ELSE ; } __HUGE__ {
+    337				     ; void cdecl near fpuswap(FPREGS near *old, FPREGS	near *new);
+    338				     _fpuswap PROC
+    339					 arg old:WORD,new:WORD
+    340				     ENDIF ; } __HUGE__
+    341
+    342				     ;
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 7
+rtxcasm.asm
+
+
+
+    343				     ; note, this code is for BCC -f87/-f287 switch.  It is for	a real 80x87,
+    344				     ;	     not the Borland fp	emulator.
+    345				     ;
+    346				     ; note, entire routine is performed with interrupts disabled
+    347				     ;
+    348
+    349				     IF	CPU EQ 0
+    350					     push    bp		; make frame
+    351					     mov     bp,sp
+    352				     ELSE ; CPU	EQ 2 or	3
+    353					     enter   WORD PTR 0,0
+    354				     ENDIF
+    355
+    356				     IFDEF __HUGE__ ; HUGE {
+    357					     les     bx,DWORD PTR [old]	 ; get old (save) address passed on stack
+    358					     cmp     bx,0      ; check for 32 bit NULL ptr
+    359					     jne     fpsave
+    360					     mov     cx,es
+    361					     cmp     cx,0
+    362					     je	     fprstor
+    363				     fpsave:
+    364					     fsave   es:control.[bx] ; save current owner's fpu	regs
+    365				     fprstor:
+    366					     les     bx,DWORD PTR [new]	 ; get new (restore) address passed on stack
+    367					     frstor  es:control.[bx] ; restore new owner's fpu regs
+    368				     ELSE ; } HUGE {
+    369					     mov     bx,WORD PTR [old] ; get old (save)	address	passed on stack
+    370					     cmp     bx,0      ; quick check for no reg	save area (null	task)
+    371					     je	     fprstor
+    372					     fsave   control.[bx] ; save current owner's fpu regs
+    373				     fprstor:
+    374					     mov     bx,WORD PTR [new] ; get new (restore) address passed on stack
+    375					     frstor  control.[bx] ; restore new	owner's	fpu regs
+    376				     ENDIF ; } HUGE
+    377
+    378				     IF	CPU EQ 0
+    379					     mov     sp,bp
+    380					     pop     bp
+    381				     ELSE ; CPU	EQ 2 or	3
+    382					     leave
+    383				     ENDIF
+    384					     fwait		; wait around for frstor to complete
+    385					     ret
+    386				     _fpuswap ENDP
+    387				     ENDIF			; IF FPU EQ 1
+    388
+    389
+    390				     ;
+    391				     ; the following three functions, ut_enable, ut_disable, and ut_nop
+    392				     ; are optional.  they are provided	in case	the inline equivalents are
+    393				     ; not desired.  note, all three functions are declared as near functions.
+    394				     ; If standard _enable or enable() was used, then the far version found
+    395				     ; in cl.lib would be used.
+    396				     ;
+    397				     PUBLIC _ut_enable
+    398				     ; void cdecl near ut_enable(void);
+    399	002E			     _ut_enable	PROC near
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:27	    Page 8
+rtxcasm.asm
+
+
+
+    400	002E  FB			     sti
+    401	002F  C3			     ret
+    402	0030			     _ut_enable	ENDP
+    403
+    404				     PUBLIC _ut_disable
+    405				     ; void cdecl near ut_disable(void);
+    406	0030			     _ut_disable PROC near
+    407	0030  FA			     cli
+    408	0031  C3			     ret
+    409	0032			     _ut_disable ENDP
+    410
+    411				     PUBLIC _ut_nop
+    412				     ; void cdecl near ut_nop(void);
+    413	0032			     _ut_nop PROC near
+    414	0032  C3			     ret
+    415	0033			     _ut_nop ENDP
+    416
+    417				     PUBLIC _getflags
+    418				     ; int cdecl near getflags(void);
+    419	0033			     _getflags PROC far
+    420	0033  9C			     pushf
+    421	0034  58				     pop   ax
+    422	0035  CB			     ret
+    423	0036			     _getflags ENDP
+    424
+    425	0036			     RTXC_TEXT ENDS
+    426
+    427				     END
+

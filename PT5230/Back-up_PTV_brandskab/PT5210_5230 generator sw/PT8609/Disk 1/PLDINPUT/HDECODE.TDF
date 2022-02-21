@@ -1,0 +1,62 @@
+%SDI Black generator%
+
+SUBDESIGN hdecode
+(
+	clk,da[10..0],s2, s3, sound, 3or4:	INPUT;
+	upint,cb,hsync,addenable,checksum,count:	OUTPUT;
+	ramdata:									OUTPUT;
+)
+
+VARIABLE
+	hsync,checksum,pause,pause1:			DFF;
+	cb,addenable,count,ramdata,hint:		DFFE;
+
+BEGIN
+	%hint.clk	= hsync; 
+	hint.clrn	= !da6;
+	hint.d		= vcc;%
+
+	hint.clk	= clk;	%processor-interrupt%
+	hint.d		= VCC; 
+	hint.ena	= (da[10..0] == 1486);
+	hint.clrn	= !(da[10..0] == 1392);
+
+	cb.clk	= clk; 			%colorbar enable%
+	cb.d	= VCC;
+	cb.ena	= ((s2#s3) & da[10..0]==04);
+%	cb.clrn = !((s2#s3) & (da[10..0]==1428));%
+	cb.clrn = !((s2#s3) & (da[10..0]==1437));
+
+	checksum.clk	= clk;	%placering af checksum%
+	checksum.d 		= (	3or4 & da[10..0] == 1498 # 
+						!3or4 & da[10..0] == 1486);
+
+	addenable.clk	= clk; 	%checksums addder enable%
+	addenable.d		= VCC;
+	addenable.ena	= (sound & da[10..0]==1447);
+	addenable.clrn	= !pause1;%!((3or4 & da[10..0] == 1499) # 
+						(!3or4 & da[10..0] == 1487));%
+
+	pause1.clk		= clk; 	%ekstra reset til checksum ?!%
+	pause1.d		= (!3or4 & (da[10..0] == 1488) # (3or4 & (da[10..0] == 1500)));
+
+
+	pause.clk		= clk; 	%ekstra reset til ramdata ?!%
+	pause.d			= (!3or4 & (da[10..0] == 1486) # (3or4 & (da[10..0] == 1498)));
+
+	ramdata.clk		= clk; 	%data fra ram%
+	ramdata.d		= VCC;
+	ramdata.ena		= (sound & da[10..0]==1448 # (s2#s3) & da[10..0]==05);
+%	ramdata.clrn	= !(((s2#s3) & da[10..0]==1427) # pause);% %standard%
+	ramdata.clrn	= !(((s2#s3) & da[10..0]==1436) # pause); %ny version%
+		
+	count.clk	= clk; 		%lydtæller%
+	count.d	= VCC;
+	count.ena	= (sound & da[10..0] == 1448);
+	count.clrn= !(3or4 & da[10..0] == 1497 # !3or4 & da[10..0] == 1485);
+
+	hsync.clk	=clk; 		%load-pulse til adressedekoder%
+	hsync.d		=(da[10..0]==1439);
+	upint		= hint;
+END;
+

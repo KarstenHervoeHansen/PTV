@@ -1,0 +1,1386 @@
+Unit Unit_Mea;
+(*
+
+ Measure unit til:
+    xyY-mÜlinger
+    st-mÜlinger
+    gain select test
+
+
+Rettelser:
+930111   Y mÜlinger korrigeret for Fieldtime
+930304   RGB mÜlinger pÜ grundlag af XYZ          TastG
+940622   Sensor output format R,G,B               TastM og TastG
+941031   Gain selector test                       Ctrl F10
+950210   PM5639/02 barco option mÜlinger.         Tast F2 eller TastM
+980210   Diverse ëndringer ved mÜlinger:
+          Datofelt ëndres til ogsÜ at omfatte tid.
+          MÜlinger med ref.sensor pÜ EBU monitor tilfõjes.
+          Felterne adskilles med komma i stedet for |
+          Der laves automatisk mÜling med ref.sensor efter max 30 minutter.
+981124   Certifikatnummer og sensortype tilfõjet til log-fil.
+990212   Anvendt ref monitor (EBU/SMPTE) tilfõjet til log-fil.
+*)
+
+Interface
+
+uses  Unit_S39, dos;
+
+Procedure xyYMeasure(KMElement : KMEType; KMul : longint;
+          D6500Ref1,D6500Ref2 : real; NIT_fL_Factor : real;
+          OutputMode : byte);
+
+Procedure STMeasure(Offset : OffsetType; ADRef : real; ADCounts : WORD;
+                    FixRangeMax, OutputMode : byte);
+
+Procedure RGBMeasure(XYCrtMatrix : XYMatrixType);
+
+
+Procedure GainSelectTest;  { Ctrl F10 - not implemented}
+
+Procedure BarcoMeasure;    { Tast F2 eller Tast M }
+
+Procedure RefMeasurements; { Tast R }
+
+
+Implementation
+uses Crt, Unit_IIC, ComUtil, PepUtil;
+
+const  COMNo : byte = _COM1;
+       YPos         = 8;
+       RGBIMode     = 1;
+       XYMode       = 2;
+       RGBMode      = 3;
+
+var KM         : array[1..9] of real;
+    KUNo       : STR_10;
+    Overflow,
+    PowerOn    : boolean;
+    CieLuv     : integer;
+    X,Y,Z,                                   {X,Y,Z integralet}
+    XYZSum,
+    uvDiv,
+    fL,
+    FR,                          {fieldrate in mS}
+    uKoor, vKoor,
+    xKoor, yKoor,
+    zKoor           : real;
+
+
+
+Function ReadColorSensor(Flag : boolean) : string;
+var Sv : string;
+begin
+ COMStatus := ReadlnCOMPort(COMNo,Sv,2);
+  if Flag then
+  begin
+   GotoXY(6,19); ClrEol; write(Sv);
+  end;
+ if COMStatus = 0 then
+  ReadColorSensor := Sv
+ else
+  ReadColorSensor := '0,0,0,0';
+end;
+
+Procedure GetRGBChannel
+          (var R,G,B,FR : real; var Overflow : BOOLEAN; InStr : string;
+           OutputMode : byte);
+{Mode=1: R,G,B,I     Mode=2: XYZ      Mode=3: R,G,B}
+
+var   p     : byte;
+      Kode  : INTEGER;
+      s     : STR_10;
+begin
+  Overflow := InStr[1] = '-';
+  p := Pos(',',InStr);
+  if p > 0 then
+   s := Copy(InStr,1,p-1);
+  Val(s,R,Kode);
+  Delete(InStr,1,p);
+
+  p := Pos(',',InStr);
+  if p > 0 then
+   s := Copy(InStr,1,p-1);
+  Val(s,G,Kode);
+  Delete(InStr,1,p);
+
+  case OutputMode of
+  1:  begin                     { R,G,B,I mode }
+       p := Pos(',',InStr);
+       if p > 0 then
+        s := Copy(InStr,1,p-1);
+       Val(s,B,Kode);
+       Delete(InStr,1,p);
+       Val(InStr,FR,Kode);
+      end;
+  2:  begin                     { XYZ mode }
+       Val(InStr,B,Kode);
+       FR := 0;
+      end;
+  3:  begin                     { R,G,B mode    /916 BrÅgge }
+       Val(InStr,B,Kode);
+       FR := 25;
+      end;
+  end; {case}
+end;
+
+
+
+Procedure CalculateXYZ (MStr : STR_30; OutputMode : byte);
+var R,G,B,FR : real;
+    OFlow    : BOOLEAN;
+begin
+ GetRGBChannel(R,G,B,FR,OFlow,MStr,Outputmode);
+ FR := Abs(FR);
+ if FR <> 0 then                { MX output mode R,G,B,I  eller  R,G,B}
+  begin
+   X := (R*KMatr[1] + G*KMatr[2] + B*KMatr[3]) / FR * 20 / KorrMulFactor;
+   Y := (R*KMatr[4] + G*KMatr[5] + B*KMatr[6]) / FR * 20 / KorrMulFactor;
+   Z := (R*KMatr[7] + G*KMatr[8] + B*KMatr[9]) / FR * 20 / KorrMulFactor;
+  end
+  else
+  begin
+   X := 0; Y := 0; Z := 0;      { XYZ output mode }
+  end;
+ Overflow := OFlow;
+end;
+
+
+
+
+
+
+Procedure xyYMeasure(KMElement : KMEType; KMul : longint;
+          D6500Ref1,D6500Ref2 : real; NIT_fL_Factor : real;
+          OutputMode : byte);
+(*
+K-matrix indlëses kun en gang inden xyYMeasure-proceduren kaldes.
+Hvis der skiftes mÜlehoved, skal proceduren forlades og kaldes igen.
+Proceduren beregner x,y,X,Y,Z, mens beregningerne af u',v' og CIELUV er
+sat som kommentarer.
+Hvis Y er < 0.01 cd/m˝, blankes felterne for xy-mÜleresultaterne og
+i luminance skrives 'low'.
+*)
+
+
+var
+ svar          : string;
+
+Function CalculateCieLuv(uKoor,vKoor,uRef,vRef : real) : INTEGER;
+{Lininger for CIELUV-beregninger findes i Television Engineering Handbook,
+ McGraw Hill 1986 side 2.38-2.40 (ISBN 0-07-004779-0) }
+var CL, LSt, uSt, vSt : real;
+begin
+Lst := 100;          {Lst := 116 * (Exp(ln(Y/Yref))/3) - 16 }
+                     {color diff without luminance (Y/Yref = 1)}
+uSt := 13*Lst*(uKoor-uRef);
+vSt := 13*Lst*(vKoor-vRef);
+CL := Sqrt({Sqr(Lst)} + Sqr(ust) + Sqr(vst));
+CalculateCieLuv := Round(CL);
+end;
+
+
+begin
+ ClrScr;
+ COMStatus := writeCOMPort(COMNo,'MS,');
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := writeCOMPort(COMNo,'I?,');
+ COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+ KUNo := Copy(Svar,24,6);
+ if Length(KUNo) < 6 then
+  begin
+   writeln(Bell,'No color sensor !');
+   Exit;
+  end;
+
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := writeCOMPort(COMNo,'MA58,');
+ COMStatus := writeCOMPort(COMNo,'RM,');
+ COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+ if Svar <> '001' then
+  begin
+   writeln(Bell,'Not a PTV color sensor !  (E˝PROM addr 58 shall be = 1)');
+   Exit;
+  end;
+
+ CursorOff;
+ GotoXY(25,2); write('Measuring with color sensor KU',KUNo);
+ GotoXY(2,21); write('Terminate: press a key');
+ Drawbox1(29,YPos,51,YPos+4);
+ GotoXY(32,YPos+1); write('x= ');
+ GotoXY(32,YPos+2); write('y= ');
+{ GotoXY(45,YPos+1); write('u',#39,'= ');}
+{ GotoXY(45,YPos+2); write('v',#39,'= ');}
+ GotoXY(32,YPos+3); write('Y=         cd/m˝');
+{ GotoXY(25,YPos+4); write('CIELUV=       (D6500)');}
+ GotoXY(32,YPos+7); write('X=');
+ GotoXY(32,YPos+8); write('Z=');
+ GotoXY(2,19); write('MX:');
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ COMStatus := ClearInputQue(COMNo);
+ repeat
+  repeat
+   CalculateXYZ(ReadColorSensor(true),OutputMode);
+   XYZSum := X + Y + Z;
+    if Y > 0.01 then
+     begin
+      xKoor := X / XYZSum;
+      yKoor := Y / XYZSum;
+      uvDiv := -2*xKoor + 12*yKoor + 3;
+      uKoor := 4*xKoor / uvDiv;
+      vKoor := 9*yKoor / uvDiv;
+{      CieLuv := CalculateCieLuv(uKoor,vKoor,D6500Ref1,D6500Ref2);}
+      GotoXY(35,YPos+1);write(xKoor:6:4);
+      GotoXY(35,YPos+2);write(yKoor:6:4);
+{      GotoXY(49,YPos+1);write(uKoor:6:4);}
+{      GotoXY(49,YPos+2);write(vKoor:6:4);}
+      GotoXY(34,YPos+3);write(Y:7:2);
+{      GotoXY(33,YPos+4); write(CieLuv:4);}
+      GotoXY(35,YPos+7); write(X:6:2);
+      GotoXY(35,YPos+8); write(Z:6:2);
+     end
+    else
+     begin
+      GotoXY(35,YPos+1); write('      ');
+      GotoXY(35,YPos+2); write('      ');
+{      GotoXY(49,YPos+1); write('      ');}
+{      GotoXY(49,YPos+2); write('      ');}
+      GotoXY(35,YPos+3);
+       if  Overflow then
+         write('   ^^   ')
+        else
+         write('        ');
+{      GotoXY(35,YPos+4);write('     ');}  {cieluv}
+      GotoXY(35,YPos+7);write('           ');
+      GotoXY(35,YPos+8);write('           ');
+      GotoXY(6,19);
+      if COMStatus <> 0 then
+       write('Timeout');
+     end;
+  until (COMStatus <> 0) OR Keypressed;
+ COMStatus := writeCOMPort(COMNo,'MX,MC,');
+ until Keypressed;
+
+ ClrScr;
+ CursorOn;
+ COMStatus := writeCOMPort(COMNo,'MS,');
+end; {xyYMeasure}
+
+
+
+
+Procedure STMeasure(Offset : OffsetType; ADRef : real; ADCounts : WORD;
+                    FixRangeMax, OutputMode : byte);
+{
+Offset-vërdier fra EEPROM indlëses inden starten af STMeasure-proceduren.
+}
+var RVal,
+    GVal,
+    BVal,
+    FRate     : real;
+    Svar      : string;
+    KUNo      : STR_10;
+    RangeNo   : byte;
+    Overflow,
+    StopFlag  : BOOLEAN;
+
+
+Procedure SetFixRange (R : byte);
+var RStr : STR_10;
+begin
+ RStr := 'FG' + IntToStr(R) + ',';       { FG = fixed gain }
+ COMStatus := writeCOMPort(COMNo,RStr);
+ GotoXY(16,10); write(IntToStr(R));
+ GotoXY(19,13); write(Offset[R,0]:10:1,Offset[R,1]:10:1,Offset[R,2]:10:1);
+end;
+
+
+Procedure ReadPressedKey;
+begin
+ CASE Scancode OF
+  Tast0  : RangeNo := 0;
+  Tast1  : RangeNo := 1;
+  Tast2  : RangeNo := 2;
+  Tast3  : RangeNo := 3;
+  Tast4  : RangeNo := 4;
+  Tast5  : RangeNo := 5;
+  EndKey : StopFlag := true;
+ else
+  Beep(800,200);
+ end;
+ SetFixRange(RangeNo);
+ EmptyKeyboardBuffer;
+end;
+
+
+begin
+ ClrScr;
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ Delay(10);
+ COMStatus := writeCOMPort(COMNo,'MS,');
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := writeCOMPort(COMNo,'I?,');
+ COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+ KUNo := Copy(Svar,24,6);
+ if Length(KUNo) < 6 then
+  begin
+   writeln(Bell,'No color sensor !');
+   Exit;
+  end;
+ EmptyKeyboardBuffer;
+ CursorOff;
+ StopFlag := FALSE;
+ RangeNo := 0;
+ GotoXY(25,2); write('ST measurement with color sensor KU',KUNo);
+ GotoXY(26,8);  write('Red       Green      Blue            Field rate');
+ GotoXY(52,10); write('mV');
+ GotoXY(71,10); write('mS');
+ GotoXY(52,13); write('mV');
+ GotoXY(65,13); write('25.0  mS');
+ GotoXY(4,13); write('E˝PROM offset:');
+ GotoXY(2,21); write('Terminate: press End');
+ GotoXY(30,21); write('Gain 0 -> ',FixRangeMax,': Tryk 0 -> ',FixRangeMax);
+ GotoXY(11,10); write('Gain  :');
+ COMStatus := writeCOMPort(COMNo,'MC');
+ COMStatus := writeCOMPort(COMNo,'ST,');
+ SetFixRange(RangeNo);
+ COMStatus := ClearInputQue(COMNo);
+ repeat
+  repeat
+   GetRGBChannel(RVal,GVal,BVal,FRate,Overflow,ReadColorSensor(true),OutputMode);
+   RVal :=
+    (RVal * 1E3 * ADRef / ADCounts) - (Offset[RangeNo,0] * Abs(FRate) / 25); {mV}
+   GVal :=
+    (GVal * 1E3 * ADRef / ADCounts) - (Offset[RangeNo,1] * Abs(FRate) / 25);
+   BVal :=
+    (BVal * 1E3 * ADRef / ADCounts) - (Offset[RangeNo,2] * Abs(FRate) / 25);
+   if not Overflow then
+    begin
+     GotoXY(19,10); write(RVal:10:1,GVal:10:1,BVal:10:1);
+     GotoXY(59,10); write(FRate:10:1);
+    end
+    else
+    begin
+     GotoXY(19,10); write('                               ');
+     GotoXY(59,10); write('           ');
+    end;
+
+  until (COMStatus <> 0) or Keypressed;
+ if KeyPressed then
+  ReadPressedKey;
+ COMStatus := writeCOMPort(COMNo,'ST,MC,');
+ until StopFlag;
+
+ ClrScr;
+ CursorOn;
+ COMStatus := writeCOMPort(COMNo,'NR,');  {return to normal run}
+ COMStatus := writeCOMPort(COMNo,'MS,');
+end;
+
+
+
+Procedure RGBMeasure(XYCrtMatrix : XYMatrixType);   {TastG}
+var RBar,
+    GBar,
+    BBar     : real;
+    OverFlow : BOOLEAN;
+    Svar     : string;
+
+procedure CalculateRGB (MStr : STR_30);
+var R,G,B,FR : real;
+    OFlow    : BOOLEAN;
+begin
+ GetRGBChannel(R,G,B,FR,OFlow,MStr,XYMode);
+{ GotoXY(1,17); ClrEol;  write(R:7:2,G:7:2,B:7:2);}
+{ R:=46.3; G:=68.6;  B:=92.5;}
+ RBar := (R*1 + G*XYCrtMatrix[1] + B*XYCrtMatrix[2]);
+ GBar := (R*XYCrtMatrix[3] + G*1 + B*XYCrtMatrix[4]);
+ BBar := (R*XYCrtMatrix[5] + G*XYCrtMatrix[6] + B*1);
+ Overflow := OFlow;
+end;
+
+
+
+begin
+ ClrScr;
+ COMStatus := writeCOMPort(COMNo,'MS,');
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := writeCOMPort(COMNo,'I?,');
+ COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+ KUNo := Copy(Svar,24,6);
+ if Length(KUNo) < 6 then
+  begin
+   writeln(Bell,'No color sensor !');
+   Exit;
+  end;
+
+ COMStatus := writeCOMPort(COMNo,'MA58,');
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := writeCOMPort(COMNo,'RM,');
+ COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+ if Svar <> '001' then
+  begin
+   writeln(Bell,'Not a PTV color sensor !');
+   Exit;
+  end;
+
+ COMStatus := writeCOMPort(COMNo,'MA61,');
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := writeCOMPort(COMNo,'RM,');
+ COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+{ if (Svar <> '032') and (Svar <> '040') then
+  begin
+   writeln(Bell,'Not industry color sensor !');
+   Exit;
+  end;
+ }
+ CursorOff;
+ GotoXY(25,2); write('Measurement with color sensor KU',KUNo);
+ GotoXY(2,21); write('Terminate: press a key');
+ GotoXY(35,YPos-1); write('R= ');
+ GotoXY(35,YPos+1); write('G= ');
+ GotoXY(35,YPos+3); write('B= ');
+ COMStatus := writeCOMPort(COMNo,'MS,');
+ COMStatus := writeCOMPort(COMNo,'XY,');
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ COMStatus := ClearInputQue(COMNo);
+ repeat
+  repeat
+   CalculateRGB(ReadColorSensor(true));
+   GotoXY(38,YPos-1);write(RBar:6:2);
+   GotoXY(38,YPos+1);write(GBar:6:2);
+   GotoXY(38,YPos+3);write(BBar:6:2);
+  until (COMStatus <> 0) OR Keypressed;
+ COMStatus := writeCOMPort(COMNo,'XY,MC,');
+ until Keypressed;
+
+ COMStatus := writeCOMPort(COMNo,'MS,MX');
+ ClrScr;
+ CursorOn;
+
+end;
+
+
+Procedure GainSelectTest;  { Ctrl F10 }
+var svar     : string;
+    k,n      : byte;
+    FieldRate   : real;
+    Overflow    : boolean;
+    GOk         : array[1..3,0..4] of boolean;
+    RGBMeas     : array[1..3,0..5] of real;
+begin
+ writeln('Test of gain selector:');
+ writeln('Place measuring head on light box - press a key');
+ WaitForAnyKey;
+ WPOff;
+ writeDefaultGainFactor;
+ LampOn;
+ TrmDA8591(I2CIOAddr,144,70,St);
+ GainSelOk := true;
+ COMStatus := writeCOMPort(COMNo,'MS,');
+ COMStatus := writeCOMPort(COMNo,'SI250,'); delay(100);
+ COMStatus := writeCOMPort(COMNo,'MC,'); delay(100);
+ COMStatus := writeCOMPort(COMNo,'ST,'); delay(100);
+ writeln('Gain#    R       G       B');
+ for n := 0 to 5 do
+  begin
+    case n of
+     5 : TrmDA8591(I2CIOAddr,144,20,St);
+    end;
+   COMStatus := writeCOMPort(COMNo,'FG'+IntToStr(n)+',');
+   delay(1500);
+   COMStatus := ClearInputQue(COMNo);
+   COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+   COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+   GetRGBChannel(RGBMeas[1,n],RGBMeas[2,n],RGBMeas[3,n],FieldRate, Overflow , svar, 1);
+   writeln(n:3,RGBMeas[1,n]:8:0,RGBMeas[2,n]:8:0,RGBMeas[3,n]:8:0);
+  end;
+
+ for n := 0 to 4 do       { gain #  }
+  for k := 1 to 3 do      { channel }
+   begin
+    if RGBMeas[k,n+1] <> 0 then
+    GOk[k,n] := (((RGBMeas[k,n] * 4) / RGBMeas[k,n+1]) < 1.2) and
+                (((RGBMeas[k,n] * 4) / RGBMeas[k,n+1]) > 0.8)
+     else GOk[k,n] := false;
+   end;
+ writeln('Results must be 4 times (+- 20%) bigger for each gain range');
+ writeln('Measurement in ST-mode (counts directly from A/D converter)');
+ writeln;
+ writeln('               R       G       B');
+ for n := 0 to 4 do       { gain #  }
+  begin
+   write('Gain ',n,'-',n+1,': ');
+   for k := 1 to 3 do      { channel }
+    begin
+     if GOk[k,n] then
+     write('OK ':8) else write('FAILED':8);
+    end;
+   writeln;
+  end;
+
+ for n := 0 to 4 do       { gain #  }
+  for k := 1 to 3 do      { channel }
+   if GOk[k,n] <> true then
+    begin
+     GainSelOk := false;
+     TestFailed := true;
+    end;
+
+ COMStatus := writeCOMPort(COMNo,'NR,'); delay(100);
+ COMStatus := writeCOMPort(COMNo,'MS,'); delay(100);
+ LampOff;
+
+end; { GainSelectTest }
+
+
+
+Procedure TogglePower;
+begin
+ gotoxy(23,19);
+ if PowerOn then
+  begin
+   IICPort64 := IICPort64 AND $DF;      { power off }
+   Trm8574(I2CIOAddr,64,IICPort64,St);
+   PowerOn := false;
+   write('OFF');
+  end
+  else
+  begin
+   IICPort64 := IICPort64 OR $20;       { power on }
+   Trm8574(I2CIOAddr,64,IICPort64,St);
+   PowerOn := true;
+   write('ON ');
+  end;
+ Delay(100);
+end;
+
+
+
+
+
+Procedure BarcoMeasure;
+(*
+MÜleresultater udlëses fra sensoren.
+Sensoren skal ved power-up starte i Barco-mode - dvs starte med at udlëse
+resultater i Barco format.
+*)
+var
+ svar    : string;
+ BarcoTestSlut,
+ Timeout : boolean;
+
+begin
+ ClrScr;
+ BarcoTestSlut := false;
+ Timeout := false;
+ BarcoMeasureOk := true;
+
+ InitBottomWindowBarco;
+ CursorOff;
+ gotoxy(22,2); write('Measurement with color sensor in Barco mode');
+ gotoxy(10,12); write('Connect the color sensor to Barco interface - press a key');
+
+ WaitForAnyKey;
+ gotoxy(10,1);
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+ gotoxy(10,12); ClrEol;
+
+ gotoxy(22,5); write('Results shall be read in Barco format:');
+ gotoxy(22,7); write('       RGB*rrrrr*ggggg*bbbbb*');
+ Drawbox1(28,8,51,10);
+
+ gotoxy(2,15);
+ writeln('Net adapter test:');
+ writeln(' Connect net adapter and press SPACE several times');
+ writeln(' Results shall be read with POWER=ON and POWER=OFF');;
+
+ gotoxy(2,19);
+ writeln('POWER from jack plug = ON');
+
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+  if length(svar) > 10 then
+   begin
+    gotoxy(29,9);write(svar);
+    if (pos('RGB*',svar) <> 1) or
+       (svar[10] <> '*') or
+       (svar[16] <> '*') or
+       (svar[22] <> '*') then
+     begin
+      BarcoMeasureOk := false;
+      TestFailed := true;
+     end
+   end { if }
+   else
+   if COMStatus <> 0 then
+    begin
+     BarcoMeasureOk := false;
+     TestFailed := true;
+     Timeout := true;
+    end;
+
+  if KeyPressed then
+   case scancode of
+     TastSpace : TogglePower;
+     EndKey    : BarcoTestSlut := true;
+   end; { case }
+
+ until BarcoTestSlut or (not BarcoMeasureOk) or Timeout;
+
+ gotoxy(2,16); ClrEol;
+ gotoxy(2,17); ClrEol;
+ if BarcoMeasureOk then
+   write('The sensor reads Barco format correctly')
+  else
+   begin
+    if Timeout then
+     write(Bell,'No data from the sensor (timeout = 3 sec) ')
+    else
+     write(Bell,'The sensor does not read Barco format !!');
+   end;
+
+ gotoxy(2,19); ClrEol;
+ gotoxy(2,18); ClrEol;
+ write('Press a key');
+ WaitForAnyKey;
+
+ IICPort64 := IICPort64 OR $20;       { power on }
+ Trm8574(I2CIOAddr,64,IICPort64,St);
+ PowerOn := true;
+
+ InitBottomWindow;
+ CursorOn;
+end; {BarcoMeasure}
+
+
+
+Function GetWeekCode (Message : Str_1): str_4;
+var
+ InStr         : str_4;
+ n,
+ xpos,ypos     : byte;
+ ValidWeekCode : boolean;
+begin
+ write('Week code (week year) for ',Message,'-filter  (wwyy)  (* = no change): ');
+ xpos := whereX;
+ ypos := whereY;
+ repeat
+  ValidWeekCode := true;
+  gotoxy(xpos,ypos);
+  ClrEol;
+  readln(InStr);
+  if InStr = '*' then
+   InStr := '****';
+  if not (InStr = '****') then
+   for n := 1 to Length(InStr) do
+    if not (InStr[n] in ['0'..'9']) then
+     ValidWeekCode := false;
+
+  ValidWeekCode := ValidWeekCode and (Length(InStr) = 4);
+ until ValidWeekCode;
+
+ gotoxy(1,ypos);
+ ClrEol;
+ writeln('Week code for ',Message,'-filter: ',InStr);
+
+ GetWeekCode := InStr;
+end;
+
+
+Function GetZoneCode (Message : Str_1): str_2;
+var
+ InStr         : str_2;
+ n,
+ xpos,ypos     : byte;
+ ValidZoneCode : boolean;
+begin
+ write('Zone code for ',Message,'-filter  (xx)  (* = no change): ');
+ xpos := whereX;
+ ypos := whereY;
+ repeat
+  ValidZoneCode := true;
+  gotoxy(xpos,ypos);
+  ClrEol;
+  readln(InStr);
+  if InStr = '*' then
+   InStr := '**';
+  if not (InStr = '**') then
+   for n := 1 to Length(InStr) do
+    if not (InStr[n] in ['0'..'9']) then
+     ValidZoneCode := false;
+
+  ValidZoneCode:= ValidZoneCode and (Length(InStr) = 2);
+ until ValidZoneCode;
+
+ gotoxy(1,ypos);
+ ClrEol;
+ writeln('Zone code for ',Message,'-filter: ',InStr);
+
+ GetZoneCode := InStr;
+end;
+
+
+
+Function GetFilterDesign : str_3;
+var
+ InStr         : str_3;
+ n,
+ xpos,ypos     : byte;
+ ValidDesignData : boolean;
+begin
+ write('Design code for XYZ-filtre (xyz)  (ENTER=332   * = no change): ');
+ xpos := whereX;
+ ypos := whereY;
+ repeat
+  ValidDesignData := true;
+  gotoxy(xpos,ypos);
+  ClrEol;
+  readln(InStr);
+  if InStr = '' then
+   InStr := '332';
+  if InStr = '*' then
+   InStr := '***';
+  if not (InStr = '***') then
+   for n := 1 to Length(InStr) do
+    if not (InStr[n] in ['0'..'9']) then
+     ValidDesignData := false;
+
+  ValidDesignData:= ValidDesignData and (Length(InStr) = 3);
+ until ValidDesignData;
+
+ gotoxy(1,ypos);
+ ClrEol;
+ writeln('Design data for XYZ-filtre: ',InStr);
+
+ GetFilterDesign := InStr;
+end;
+
+
+Function GetCertNo : str_6;
+var
+ InStr         : str_6;
+ n,
+ xpos,ypos     : byte;
+ ValidCertNo : boolean;
+begin
+ write('Type 5 digit ceritificate number (ENTER = no number): ');
+ xpos := whereX;
+ ypos := whereY;
+ repeat
+  ValidCertNo := true;
+  gotoxy(xpos,ypos);
+  ClrEol;
+  readln(InStr);
+  if InStr = '' then
+   InStr := '*****';
+  if not (InStr = '*****') then
+   for n := 1 to Length(InStr) do
+    if not (InStr[n] in ['0'..'9']) then
+     ValidCertNo := false;
+
+  ValidCertNo:= ValidCertNo and (Length(InStr) = 5);
+ until ValidCertNo;
+
+ gotoxy(1,ypos);
+ ClrEol;
+ writeln('Certificate number: ',InStr);
+
+ GetCertNo := InStr;
+end; { GetCertNo }
+
+
+
+Function GetComments : str_30;
+var
+ InStr    : str_30;
+begin
+ write('Note (max 30 characters): ');
+ readln(InStr);
+ GetComments := InStr;
+end;
+
+
+
+
+
+Procedure RefMeasurements;
+const
+ NoMeas   = 10;
+ BeepFreq = 1500;
+ BeepTime = 50;
+ RefTimeFileName = 'REFTIME.DAT';
+type
+ Logdatatype = record
+                KU,
+                CalDate,
+                CalTime      : str_6;
+                EBURef,
+                SMPTERef,
+                BWRef,
+                EBUMeas,
+                SMPTEmeas,
+                BWmeas       : array[1..3] of real;
+                Halogenmeas  : array[1..2] of real;
+                WeekCode     : array[1..3] of str_4;
+                ZoneCode     : array[1..3] of str_2;
+                FilterDesign : str_3;
+                SWRev        : str_4;
+                CertNo       : str_6;
+                SensorType   : str_4;
+                RefMonitor   : str_8;
+                Comments     : str_30;
+               end;
+var
+ RefTimeFile   : text;
+ DateRead,
+ DateNow,
+ TimeRead,
+ TimeNow,
+ RefMeasTime,
+ SensorMeasTime,
+ InStr,
+ RefKUStr,
+ KUStr         : Str_8;
+ hours1,
+ minutes1,
+ hours2,
+ minutes2,
+ n             : byte;
+ ElapsedMinutes: longint;
+ k,p           : integer;
+ KMElement     : KMEType;
+ LogData       : Logdatatype;
+ XYXSum        : real;
+ RefSensorMeasOk,
+ NewRefMeas    : boolean;
+ dd : string;
+begin
+ ClrScr;
+
+ if EBUSetOn = false then
+  begin
+   EBUWhite;
+   SMPTEWhite;
+   SaveMonitorOnTime;
+  end;
+
+(*
+ if CheckMonitorOnTime = false then
+  exit;
+*)
+ assign(RefTimeFile,RefTimeFileName); { lës dato og tid fra fil }
+ {$I-}
+ reset(RefTimeFile);
+ {$I+}
+ readln(RefTimeFile,DateRead);
+ readln(RefTimeFile,TimeRead);
+ close(RefTimeFile);
+
+ DateNow := dato;                     { lës aktuel dato og tid }
+ TimeNow := time(1);
+ p := pos(':',TimeNow);
+ val(copy(TimeNow,1,p-1),hours2,k);
+ val(copy(TimeNow,p+1,2),minutes2,k);
+ p := pos(':',TimeRead);
+ val(copy(TimeRead,1,p-1),hours1,k);
+ val(copy(TimeRead,p+1,2),minutes1,k);
+                                        { beregn antal passerede minutter }
+ ElapsedMinutes := ((hours2 * 60) + minutes2) - ((hours1 * 60) + minutes1);
+
+ NewRefMeas := false;
+{ NewRefMeas := true; temporary change: JK}
+
+ if DateRead <> DateNow then
+   NewRefMeas := true
+  else
+   if ElapsedMinutes > MaxTimeBetweenRefMeas then
+    NewRefMeas := true;
+
+ ClrScr;
+
+ if NewRefMeas then
+  begin
+    writeln;
+    TextColor(White);TextBackGround(Red);
+    write('Connect ref sensor I - press a key  (ESC=stop)');
+    TextColor(Yellow);TextBackGround(Blue);
+    if GetKeycode = Escape then
+     begin
+      gotoxy(1,whereY); ClrEol;
+      exit;
+     end;
+    gotoxy(1,whereY); ClrEol;
+    COMStatus := writeCOMPort(COMNo,'MS,');
+    Delay(40);
+    COMStatus := writeCOMPort(COMNo,'MS,');
+    Delay(40);
+    RefKUStr := ReadKU;
+    if RefKUStr <> '900000' then
+     begin
+      writeln;
+      writeln(Bell,'Wrong ref sensor  (KU',RefKUStr,')');
+      exit;
+     end;
+
+    ReadKMatrix(Silent);
+    if not ReadKorrMatrixOk then
+     begin
+      writeln(Bell,'Sensor not connected');
+      exit;
+     end;
+
+
+    writeln('Ref sensor I:');
+  (*
+
+    write('Place the ref sensor on EBU monitor - press a key  (ESC=stop)');
+    if GetKeycode = Escape then
+     begin
+      writeln;
+      exit;
+     end;
+
+    COMStatus := writeCOMPort(COMNo,'MX,');
+    Delay(20);
+    COMStatus := writeCOMPort(COMNo,'MC,');
+    Delay(20);
+    COMStatus := ClearInputQue(COMNo);
+    gotoxy(1,whereY);
+    ClrEol;
+    write('EBU monitor:   .');
+    for n := 1 to NoMeas do
+     begin
+      CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+      write('.');
+     end;
+
+    XYZSum := X + Y + Z;
+    if XYZSum = 0 then
+     begin
+      gotoxy(15,whereY);
+      ClrEol;
+      writeln(Bell,'  data = 0  -  measuremenet stopped');
+      exit;
+     end;
+    Logdata.EBURef[1] := X / XYZSum;
+    Logdata.EBURef[2] := Y / XYZSum;
+    Logdata.EBURef[3] := Y;
+    gotoxy(15,whereY);
+    ClrEol;
+    gotoxy(20,whereY);
+    write(Logdata.EBURef[1]:9:4,Logdata.EBURef[2]:9:4,Logdata.EBURef[3]:9:1,'  ');
+    RefSensorMeasOk :=
+      ((xyrefsens[1,1] + xyTolRefSensor) > Logdata.EBURef[1] ) and
+      ((xyrefsens[1,1] - xyTolRefSensor) < Logdata.EBURef[1] ) and
+      ((xyrefsens[1,2] + xyTolRefSensor) > Logdata.EBURef[2] ) and
+      ((xyrefsens[1,2] - xyTolRefSensor) < Logdata.EBURef[2] ) and
+      ((xyrefsens[1,3] + YTolRefSensor)  > Logdata.EBURef[3] ) and
+      ((xyrefsens[1,3] - YTolRefSensor)  < Logdata.EBURef[3] );
+
+    if RefSensorMeasOk then
+      writeln('   OK')
+     else
+      begin
+       TextColor(White);TextBackGround(Red);
+       Beep(300,1000);
+       Delay(500);
+       Beep(300,1000);
+       writeln('   FAILED ');
+       TextColor(Yellow);TextBackGround(Blue);
+       writeln('Sensor ref:        ',xyrefsens[1,1]:9:4,xyrefsens[1,2]:9:4,xyrefsens[1,3]:9:1);
+       writeln('Sensor tol:      Ò ',xyTolRefSensor:9:4,xyTolRefSensor:9:4,YTolRefSensor:9:1);
+       exit;
+      end;
+
+    Beep(BeepFreq,BeepTime);
+
+*)
+    write('Place the ref sensor on SMPTE monitor - press a key  (ESC=stop)');
+    if GetKeycode = Escape then
+     begin
+      writeln;
+      exit;
+     end;
+
+    COMStatus := writeCOMPort(COMNo,'MX,');
+    Delay(20);
+    COMStatus := writeCOMPort(COMNo,'MC,');
+    Delay(20);
+    COMStatus := ClearInputQue(COMNo);
+    gotoxy(1,whereY);
+    ClrEol;
+    write('SMPTE monitor: .');
+    for n := 1 to NoMeas do
+     begin
+      CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+      write('.');
+     end;
+
+    XYZSum := X + Y + Z;
+    if XYZSum = 0 then
+     begin
+      gotoxy(15,whereY);
+      ClrEol;
+      writeln(Bell,'  data = 0  -  measurement stopped');
+      exit;
+     end;
+    Logdata.SMPTERef[1] := X / XYZSum;
+    Logdata.SMPTERef[2] := Y / XYZSum;
+    Logdata.SMPTERef[3] := Y;
+    gotoxy(15,whereY);
+    ClrEol;
+    gotoxy(20,whereY);
+    write(Logdata.SMPTERef[1]:9:4,Logdata.SMPTERef[2]:9:4,Logdata.SMPTERef[3]:9:1,'  ');
+    RefSensorMeasOk :=
+      ((xyrefsens[2,1] + xyTolRefSensor) > Logdata.SMPTERef[1] ) and
+      ((xyrefsens[2,1] - xyTolRefSensor) < Logdata.SMPTERef[1] ) and
+      ((xyrefsens[2,2] + xyTolRefSensor) > Logdata.SMPTERef[2] ) and
+      ((xyrefsens[2,2] - xyTolRefSensor) < Logdata.SMPTERef[2] ) and
+      ((xyrefsens[2,3] + YTolRefSensor)  > Logdata.SMPTERef[3] ) and
+      ((xyrefsens[2,3] - YTolRefSensor)  < Logdata.SMPTERef[3] );
+
+    if RefSensorMeasOk then
+      writeln('   OK')
+     else
+      begin
+       TextColor(White);TextBackGround(Red);
+       Beep(300,1000);
+       Delay(500);
+       Beep(300,1000);
+       writeln('   FEJL   ');
+       TextColor(Yellow);TextBackGround(Blue);
+       writeln('Sensor ref:        ',xyrefsens[2,1]:9:4,xyrefsens[2,2]:9:4,xyrefsens[2,3]:9:1);
+       writeln('Sensor tol:      Ò ',xyTolRefSensor:9:4,xyTolRefSensor:9:4,YTolRefSensor:9:1);
+       exit;
+      end;
+
+    Beep(BeepFreq,BeepTime);
+(*
+    write('Place the ref sensor on Philips B/W monitor - press a key  (ESC=stop)');
+    if GetKeycode = Escape then
+     begin
+      writeln;
+      exit;
+     end;
+    COMStatus := writeCOMPort(COMNo,'MX,');
+    COMStatus := writeCOMPort(COMNo,'MC,');
+    COMStatus := ClearInputQue(COMNo);
+    gotoxy(1,whereY);
+    ClrEol;
+    write('BW monitor:    .');
+    for n := 1 to NoMeas do
+     begin
+      CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+      write('.');
+     end;
+
+    XYZSum := X + Y + Z;
+    if XYZSum = 0 then
+     begin
+      gotoxy(15,whereY);
+      ClrEol;
+      writeln(Bell,'  data = 0  -  measurement stopped');
+      exit;
+     end;
+    Logdata.BWRef[1] := X / XYZSum;
+    Logdata.BWRef[2] := Y / XYZSum;
+    Logdata.BWRef[3] := Y;
+    gotoxy(15,whereY);
+    ClrEol;
+    gotoxy(20,whereY);
+    writeln(Logdata.BWRef[1]:9:4,Logdata.BWRef[2]:9:4,Logdata.BWRef[3]:9:1);
+    Beep(BeepFreq,BeepTime);
+*)
+
+    { skriv dato og tid for ref. mÜling til fil }
+    assign(RefTimeFile,RefTimeFileName);
+    rewrite(RefTimeFile);
+    writeln(RefTimeFile,dato:6);
+    writeln(RefTimeFile,time(1):5);
+    close(RefTimeFile);
+    RefMeasTime := time(1);
+
+  end; { if NewRefMeas ... }
+
+
+ writeln;
+ write('Connect color sensor - press a key  (ESC=stop)');
+ if GetKeycode = Escape then
+  begin
+   writeln;
+   exit;
+  end;
+
+ gotoxy(1,whereY);
+ ClrEol;
+
+ delay(1000);                  { wait for sensor to power up }
+ COMStatus := writeCOMPort(COMNo,'MS,MS,');
+ delay(100);
+ COMStatus := writeCOMPort(COMNo,'MS,');
+ delay(100);
+ COMStatus := ClearInputQue(COMNo);
+
+ ReadKMatrix(Silent);
+ if not ReadKorrMatrixOk then
+  ReadKMatrix(Silent);
+ if not ReadKorrMatrixOk then
+  begin
+   writeln(Bell,'Sensor not connected');
+   exit;
+  end;
+
+ KUStr := ReadKU;
+ writeln('Color sensor KU',KuStr,':');
+(*
+ write('Place the color sensor on EBU monitor - press a key  (ESC=stop)');
+ if GetKeycode = Escape then
+  begin
+   writeln;
+   exit;
+  end;
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ Delay(20);
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ Delay(20);
+ COMStatus := ClearInputQue(COMNo);
+ gotoxy(1,whereY);
+ ClrEol;
+ write('EBU monitor:   .');
+ for n := 1 to NoMeas do
+  begin
+   CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+   write('.');
+  end;
+
+ XYZSum := X + Y + Z;
+ if XYZSum = 0 then
+  begin
+   gotoxy(15,whereY);
+   ClrEol;
+   writeln(Bell,'  data = 0  -  measurement stopped');
+   exit;
+  end;
+ Logdata.EBUMeas[1] := X / XYZSum;
+ Logdata.EBUMeas[2] := Y / XYZSum;
+ Logdata.EBUMeas[3] := Y;
+ gotoxy(15,whereY);
+ ClrEol;
+ gotoxy(20,whereY);
+ writeln(Logdata.EBUMeas[1]:9:4,Logdata.EBUMeas[2]:9:4,Logdata.EBUMeas[3]:9:1);
+ Beep(BeepFreq,BeepTime);
+*)
+
+ write('Place the color sensor on SMPTE monitor - press a key  (ESC=stop)');
+ if GetKeycode = Escape then
+  begin
+   writeln;
+   exit;
+  end;
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ Delay(20);
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ Delay(20);
+ COMStatus := ClearInputQue(COMNo);
+ gotoxy(1,whereY);
+ ClrEol;
+ write('SMPTE monitor: .');
+ for n := 1 to NoMeas do
+  begin
+   CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+   write('.');
+  end;
+
+ XYZSum := X + Y + Z;
+ if XYZSum = 0 then
+  begin
+   gotoxy(15,whereY);
+   ClrEol;
+   writeln(Bell,'  data = 0  - measurement stopped');
+   exit;
+  end;
+ Logdata.SMPTEMeas[1] := X / XYZSum;
+ Logdata.SMPTEMeas[2] := Y / XYZSum;
+ Logdata.SMPTEMeas[3] := Y;
+ gotoxy(15,whereY);
+ ClrEol;
+ gotoxy(20,whereY);
+ writeln(Logdata.SMPTEMeas[1]:9:4,Logdata.SMPTEMeas[2]:9:4,Logdata.SMPTEMeas[3]:9:1);
+ Beep(BeepFreq,BeepTime);
+
+
+(*
+ write('Place the color sensor on Philips BW monitor - press a key  (ESC=stop)');
+ if GetKeycode = Escape then
+  begin
+   writeln;
+   exit;
+  end;
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ COMStatus := ClearInputQue(COMNo);
+ gotoxy(1,whereY);
+ ClrEol;
+ write('BW monitor:    .');
+ for n := 1 to NoMeas do
+  begin
+   CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+   write('.');
+  end;
+
+ XYZSum := X + Y + Z;
+ if XYZSum = 0 then
+  begin
+   gotoxy(15,whereY);
+   ClrEol;
+   writeln(Bell,'  data = 0  -  measurement stopped');
+   exit;
+  end;
+ Logdata.BWMeas[1] := X / XYZSum;
+ Logdata.BWMeas[2] := Y / XYZSum;
+ Logdata.BWMeas[3] := Y;
+ gotoxy(15,whereY);
+ ClrEol;
+ gotoxy(20,whereY);
+ writeln(Logdata.BWMeas[1]:9:4,Logdata.BWMeas[2]:9:4,Logdata.BWMeas[3]:9:1);
+ Beep(BeepFreq,BeepTime);
+
+
+ write('Place the color sensor on halogen lamp - press a key  (ESC=stop)');
+ if GetKeycode = Escape then
+  begin
+   writeln;
+   exit;
+  end;
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ COMStatus := ClearInputQue(COMNo);
+ gotoxy(1,whereY);
+ ClrEol;
+ write('Halogen lampe: .');
+ for n := 1 to NoMeas do
+  begin
+   CalculateXYZ(ReadColorSensor(false),RGBIOutputMode);
+   write('.');
+  end;
+
+ XYZSum := X + Y + Z;
+ if XYZSum = 0 then
+  begin
+   gotoxy(15,whereY);
+   ClrEol;
+   writeln(Bell,'  data = 0  -  measurement stopped');
+   exit;
+  end;
+ Logdata.HalogenMeas[1] := X / XYZSum;
+ Logdata.HalogenMeas[2] := Y / XYZSum;
+ gotoxy(15,whereY);
+ ClrEol;
+ gotoxy(20,whereY);
+ writeln(Logdata.HalogenMeas[1]:9:4,Logdata.HalogenMeas[2]:9:4);
+ Beep(BeepFreq,BeepTime);
+ *)
+ COMStatus := writeCOMPort(COMNo,'MS,');
+
+
+ Logdata.WeekCode[1] := GetWeekCode('X');
+ Logdata.WeekCode[2] := GetWeekCode('Y');
+ Logdata.WeekCode[3] := GetWeekCode('Z');
+
+ Logdata.ZoneCode[1] := GetZoneCode('X');
+ Logdata.ZoneCode[2] := GetZoneCode('Y');
+ Logdata.ZoneCode[3] := GetZoneCode('Z');
+
+ Logdata.FilterDesign := GetFilterDesign;
+
+ Logdata.SWRev := ReadSWRev;
+ writeln('Sensor SW rev : ',Logdata.SWRev);
+ Logdata.CertNo := GetCertNo;
+
+ Logdata.SensorType := IntToStr(SensorVer);
+ writeln('Sensor type : ',Logdata.SensorType);
+
+ ReadRefMonitor(false);
+ if RefMonitorValue = MonEBU then
+   Logdata.RefMonitor := 'EBU'
+  else
+   Logdata.RefMonitor := 'SMPTE';
+ writeln('Ref monitor : ',Logdata.RefMonitor);
+
+ Logdata.Comments := GetComments;
+
+ LogFilename := 'SENSOR' + Copy(dato,1,2) + '.LOG';   { SENSORxx.LOG   xx=Ür}
+ write('Save results in the file "',HDDrive+PathName+LogFilename,'" ?  Yes/No  ');
+
+ if GetKeycode <> TastY then
+  begin
+   write(' N');
+   writeln;
+   exit;
+  end;
+
+ write(' Y');
+ writeln;
+ SensorMeasTime := time(1);
+ Assign(Logfile,HDDrive+PathName+LogFilename);
+ {$I-}
+ Reset(Logfile);
+ {$I+}
+ if IOResult = 0 then
+   Append(Logfile)
+  else
+   begin
+    Rewrite(Logfile);
+
+    write(Logfile,'KU    , Date  , Time    , EBU ,   ,     , SMPTE,  ,     ,  BW ,    ,Halogen,, Ref EBU,,     , Ref SMPTE');
+    writeln(Logfile,',,   , Ref BW, ,Design, Zone,,,Weekcode,,   ,SW rev');
+    write(LogFile,'      ,       ,         , x   ,y  ,Y    , x  ,y   ,Y    , x   ,y   ,x  ,y   ,x   ,y   ,Y    ,');
+    writeln(LogFile,'x   ,y   ,Y    ,x   ,y   ,RGB,  R,G,B ,R   ,G   ,B   ,    ,CertNo ,Type, Ref mon, Comments');
+    for n := 1 to 190 do
+     write(Logfile,'-');
+    writeln(Logfile);
+   end;
+
+ if NewRefMeas then
+  begin
+   write(Logfile,RefKUStr,', ',dato:6,', ',RefMeasTime:8);
+   write(Logfile,',    ,    ,     ,    ,    ,     ,    ,    ,    ,    '); { meas }
+   write(Logfile,',',Logdata.EBURef[1]*10000:4:0,',',Logdata.EBURef[2]*10000:4:0,',',Logdata.EBURef[3]:5:1);
+   write(Logfile,',',Logdata.SMPTERef[1]*10000:4:0,',',Logdata.SMPTERef[2]*10000:4:0,',',Logdata.SMPTERef[3]:5:1);
+   write(Logfile,',',Logdata.BWRef[1]*10000:4:0,',',Logdata.BWRef[2]*10000:4:0);
+   writeln(Logfile,',   ,  ,  ,  ,    ,    ,    ,    ,       ,    ,        , ref sensor');
+  end;
+
+  write(Logfile,KUStr,', ',dato:6,', ',SensorMeasTime:8);
+  write(Logfile,',',Logdata.EBUMeas[1]*10000:4:0,',',Logdata.EBUMeas[2]*10000:4:0,',',Logdata.EBUMeas[3]:5:1);
+  write(Logfile,',',Logdata.SMPTEMeas[1]*10000:4:0,',',Logdata.SMPTEMeas[2]*10000:4:0,',',Logdata.SMPTEMeas[3]:5:1);
+  write(Logfile,',',Logdata.BWMeas[1]*10000:4:0,',',Logdata.BWMeas[2]*10000:4:0);
+  write(Logfile,',',Logdata.HalogenMeas[1]*10000:4:0,',',Logdata.HalogenMeas[2]*10000:4:0);
+  write(Logfile,',    ,    ,     ,    ,    ,     ,    ,    ');  { ref }
+  write(Logfile,',',Logdata.FilterDesign:3);
+  write(Logfile,',',Logdata.ZoneCode[1]:2,',',Logdata.ZoneCode[2]:2,',',Logdata.ZoneCode[3]:2);
+  write(Logfile,',',Logdata.WeekCode[1]:4,',',Logdata.WeekCode[2]:4,',',Logdata.WeekCode[3]:4);
+  write(Logfile,',',Logdata.SWRev:4);
+  write(Logfile,',',Logdata.CertNo:7);
+  write(Logfile,',',Logdata.SensorType:4);
+  write(Logfile,',',Logdata.RefMonitor:8);
+  writeln(Logfile,', ',Logdata.Comments);
+
+
+ Close(Logfile);
+ EmptyKeyboardBuffer;
+end;
+
+
+
+
+
+
+begin
+ {evt. initialisering}
+
+ PowerOn := true;
+end.

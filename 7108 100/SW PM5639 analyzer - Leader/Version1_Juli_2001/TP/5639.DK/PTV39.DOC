@@ -1,0 +1,283 @@
+
+---------------- Dokumentation for 5639 CRT sensorer -------------------
+
+Skrevet:  Peter Frederiksen, P-DPE, oktober 1991
+
+Opdateret:
+930107    PF         (serie II sensorer incl. /IND  )
+
+
+
+ Indl‘sning af default data i EEPROM:
+          F›lgende data placeres i den skrivebeskyttede del af EEPROM'en:
+
+           Apparat ID: PHILIPS,4008109yyyy0,KUxxxxxx
+                       (addr: 62 - 90)
+                       xxxxxx = KU-nummer
+                       yyyy   = 12NC nummer
+
+           Intern ID:  1 0 0 0     /90
+                       1 0 0 16    /91
+                       1 0 0 32    /IND
+                       1 0 0 48    xx CRT sensor
+                       2 0 0 0     PESA
+                       (addr: 58 - 61)
+                       (data l‘ses kun ved sensor power on)
+
+           Kalibreringsstatus:   inden kalibrering:    --
+                                 efter kalibrering:    OK
+                                 (addr: 56 - 57)
+
+           Antal sider i EEPROM: 4
+                                 (data l‘ses kun ved opstart)
+                                 (addr: 52)
+
+           EEPROM skrivebeskyttelse: 120
+                                     (data l‘ses kun ved opstart)
+                                     (addr: 54 - 55)
+
+           Antal CRT-fosforer:  30
+                                (addr: 53)
+
+           Gain-konstanter: 255 255  0 64  0 16  0  4  0  1 (SW <= 5.7)
+                            255 255 64 64 64 64 64 64 64 64 (SW <> 5.7)
+                            ovenst†ende er default - de aktuelle beregnes
+                            ved gain kalibrering.
+                            (addr: 2 - 37)
+
+           Pregainkonstanter:  beregnes ved kalibrering
+                               (addr: 97 - 102)
+
+
+ Fielddetektor.
+            Kun i serie I CRT sensorer
+            F›lsomhed: bedre end 0.1 cd/mý.
+            Kommando F? udf›res
+            Svar: nn.n     (- foran resultatet indikerer ul†st,
+                           nn.n er m†letiden i ms)
+
+
+
+ Offsetkalibrering
+            Color sensoren anbringes p† et m›rkt jordet underlag.
+            Kommandoen MO udf›res og offsetkonstanter for de
+            6 gainomr†der for R,G og B udregnes og gemmes af color
+            sensoren i EEPROM i adresserne 121 - 156.
+            Default gain-konstanter skal v‘re indl‘st i EEPROM inden
+            offsetkalibrering.
+
+ Gainkalibrering
+             NB!  Offsetkalibrering skal v‘re udf›rt f›rst.
+             Der m†les i MX- og MC-mode.
+             Luminans indstilles s† m†leresultatet er < 10000.
+              Kommando FG0    Svar: "x,Y0,z"
+              Kommando FG1    Svar: "x,Y1,z"
+                Ovenst†ende fixerer gain i hhv. gain 0 og 1.
+                Korrektionsfaktor1 (K1) beregnes til Y0/Y1.
+                Der midles over mindst 7 m†linger
+              Processen gentages for:
+                Y ÷ 2500, FG1/FG2, K2 = Y1/Y2
+                Y ÷ 600 , FG2/FG3, K3 = Y2/Y3
+                Y ÷ 125 , FG3/FG4, K4 = Y3/Y4
+                Y ÷ 35  , FG4/FG5, K5 = Y4/Y5
+              Herefter kan gainfaktorerne GA1-GA5 beregnes udfra
+                GA1 = K1*16384
+                GA2 = K1*K2*16384
+                GA3 = K1*K2*K3*16384
+                GA4 = K1*K2*K3*K4*16384
+                GA5 = K1*K2*K3*K4*K5*16384
+                Produkterne K1 .. K1*K2*K3*K4*K5 m† ikke afvige
+                mere end 5% fra nominel.
+              Gainfaktorerne afrundes, opdeles i byte og skrives
+              i EEprom til adresserne 2 - 37.
+              Bem‘rk: Omgivende lys undg†s.
+
+           Max m†lev‘rdi i de 6 gainomr†der er:
+            gain 0:    65535
+            gain 1:    16384
+            gain 2:     4096
+            gain 3:     1024
+            gain 4:      256
+            gain 5:       64
+
+           Ved overflow vises m†leresultatet med et - foran.
+
+
+
+ Indl‘ring af K-matrix og pregainkonstanter:
+
+            Color sensoren placeres p† en monitor, hvor xy-koordinaterne
+            for r›d, gr›n, bl† og hvid samt luminansen i hvid er kendt.
+
+            Color sensoren skal m†le i MX-mode.
+            Derefter m†les der med r›d, gr›n, bl† og hvid sk‘rm:
+
+            M†lekanal:      R        G        B
+            -------------------------------------
+            R›d sk‘rm:     XR       YR       ZR
+            Gr›n sk‘rm:    XG       YG       ZG
+            Bl† sk‘rm:     XB       YB       ZB
+            Hvid sk‘rm:    X65      Y65      Z65
+
+            hvor XR = m†lev‘rdi for r›d kanal p† r›d sk‘rm
+            hvor YR = m†lev‘rdi for gr›n kanal p† r›d sk‘rm
+            hvor ZR = m†lev‘rdi for bl† kanal p† r›d sk‘rm
+            hvor X65 = m†lev‘rdi for r›d kanal p† hvid sk‘rm
+                   osv.
+
+            Derefter l›ses liningssystemet for at finde K-matrix:
+                      Ú  ¿            Ú  ¿
+                      ³XR³            ³xr³
+                  K * ³YR³  =    NR * ³yr³
+                      ³ZR³            ³zr³
+                      À  Ù            À  Ù
+                      Ú  ¿            Ú  ¿
+                      ³XG³            ³xg³
+                  K * ³YG³  =    NG * ³yg³
+                      ³ZG³            ³zg³
+                      À  Ù            À  Ù
+                      Ú  ¿            Ú  ¿
+                      ³XB³            ³xb³
+                  K * ³YB³  =    NB * ³yb³
+                      ³ZB³            ³zb³
+                      À  Ù            À  Ù
+                      Ú   ¿           Ú   ¿
+                      ³X65³           ³x65³
+                  K * ³Y65³  =  N65 * ³y65³
+                      ³Z65³           ³z65³
+                      À   Ù           À   Ù
+
+                  N65 = LUM / y65.
+
+            hvor
+                xr  = x-koordinat for r›d sk‘rm
+                yr  = y-koordinat for r›d sk‘rm
+                zr  = z-koordinat for r›d sk‘rm
+                xg  = x-koordinat for gr›n sk‘rm
+                x65 = x-koordinat for hvid sk‘rm
+                          osv.
+
+                NR, NG og NB er konstanter.
+
+                LUM er luminansen p† hvid sk‘rm.
+                    Ú       ¿
+                    ³a  b  c³
+                K = ³d  e  f³    (K-matrix).
+                    ³g  h  j³
+                    À       Ù
+
+            Elementerne a,b,c .. j multipliceres alle med 100000 og
+            skrives til adresserne 103 - 120 som integers i r‘kkef›lgen:
+            a-high, a-low, b-high .. j-low
+
+            Pregain-konstanterne beregnes:
+                XFact:   = Y65 / X65
+                YFact:   = 1
+                ZFact:   = Y65 / Z65
+            XFact, YFact og ZFact multipliceres med 1024 og skrives
+            til adresserne 97 - 102 som integers i r‘kkef›lgen:
+            XFact-high, XFact-low, YFact-high .. ZFact-low
+
+
+ Indl‘ring af CRT-matrix #1 og #2:
+
+            Color sensoren placeres p† en monitor med
+              EBU fosfor for CRT-matrix #1
+            og
+              SMPTE C fosfor for CRT-matrix #2:
+
+            M†lekanal:      R        G        B
+            -------------------------------------
+            R›d sk‘rm:     XR       YR       ZR
+            Gr›n sk‘rm:    XG       YG       ZG
+            Bl† sk‘rm:     XB       YB       ZB
+
+            Matricen normeres og pregainkontanterne (se 7.a) multipliceres p†
+            m†leresultaterne fra r›d og bl† kanal:
+            Ú                                        ¿
+            ³      1            YR         (ZR*ZFact)³
+            ³                ÄÄÄÄÄÄÄÄÄÄ    ÄÄÄÄÄÄÄÄÄÄ³
+            ³                (XR*XFact)    (XR*XFact)³
+            ³                                        ³
+            ³                                        ³    Ú         ¿
+            ³ (XG*XFact)                  (ZR*ZFact) ³    ³ a  b  c ³
+            ³ ÄÄÄÄÄÄÄÄÄÄ                  ÄÄÄÄÄÄÄÄÄÄ ³ =  ³ d  e  f ³
+            ³     YG           1              YG     ³    ³ g  h  j ³
+            ³                                        ³    À         Ù
+            ³                                        ³
+            ³ (XB*XFact)       YB              1     ³
+            ³ ÄÄÄÄÄÄÄÄÄÄ    ÄÄÄÄÄÄÄÄÄÄ               ³
+            ³ (ZB*ZFact)    (ZB*ZFact)               ³
+            À                                        Ù
+
+
+            MulFact := 8192.
+
+            For r›d farve udf›res:
+              A := g
+
+              Disse 2 beregninger gentages 10 gange:
+               B := d - (A * f)
+               A := g - (B * h)
+
+              m := -1 * A * MulFact
+              l := -1 * B * MulFact
+
+
+            For gr›n farve udf›res:
+              A := h
+
+              Disse 2 beregninger gentages 10 gange:
+               B := b - (A * c)
+               A := h - (B * g)
+
+              p := -1 * A * MulFact
+              n := -1 * B * MulFact
+
+
+            For bl† farve udf›res:
+              A := f
+
+              Disse 2 beregninger gentages 10 gange:
+               B := c - (A * b)
+               A := f - (B * d)
+
+              r := -1 * A * MulFact
+              q := -1 * B * MulFact
+
+                  Ú       ¿
+                  ³k  l  m³
+              C = ³n  o  p³    (CRT-matrix).
+                  ³q  r  s³
+                  À       Ù
+
+            Elementerne l,m,n,p,q,r skrives til adresserne
+               1004 - 1015 for CRT-matrix #1 og
+               984 - 995   for CRT-matrix #2
+            som integers i r‘kkef›lgen: l-high, l-low, m-high .. s-low.
+
+
+ Indl‘ring af CRT-navne #1, #2 og #3 - #30:
+
+            (NULL er ASCII-tegn #0)
+
+            F›lgende navne skrives til EEPROM:
+            CRT-navn #1:        EBU<NULL>        fra adresse 1016
+            CRT-navn #2:        SMPTE C<NULL>    fra adresse 996
+            CRT-navn #3 - #30:  <NULL>           fra adresse 976 956 936 .. osv
+
+
+
+
+ Registrering af kalibrering:
+
+                    CRT-matrix #1 og CRT-matrix #2 samt
+                    data fra adresse 2 - 156 l‘ses fra EEPROM, gemmes
+                    i en fil og skrives ud p† en printer.
+
+                    Papiret underskrives af operat›ren og vedl‘gges
+                    color sensoren ved levering.
+
+
+
+

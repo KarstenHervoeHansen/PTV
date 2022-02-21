@@ -1,0 +1,81 @@
+%Tilføjelse af bevægeligt vindue til Philips PM5644 billdede%
+
+SUBDESIGN ramadrda
+(
+	clk, count_enable, oe			: INPUT;
+	klik, adjust,frameb,bbcklik		: INPUT;
+	window,16x9,hsync,field2		: INPUT;
+	abu[14..0]						: OUTPUT;
+)
+
+VARIABLE
+	tnode[14..0] 			: TRI_STATE_NODE;
+	hsound[13..0],adjust1	: DFF;
+	offset[9..0]			: DFF;
+	ramtekst[10..0]			: DFF;
+
+BEGIN
+	hsound[13..0].clk  = clk;
+	hsound[13..0].clrn = !adjust;
+
+	offset[].clk	= field2;
+
+	ramtekst[].clk	= clk;
+%	ramtekst[].ena	= window;%
+
+	adjust1.clk	 = clk;
+	adjust1.d	 = adjust;
+
+    IF offset[].q==940 THEN
+	  offset[].d=500;
+	 ELSIF (16x9 & offset[].q==936)==1 THEN
+	  offset[].d=588;
+	 ELSIF offset[].q==00 THEN
+	  offset[].d=588;  
+	 ELSE	
+ 	  offset[].d  =offset[].q+2; 
+	END IF; 	
+
+
+	IF count_enable==1 THEN
+		IF (hsound[13..0].q ==12031 ) THEN  %12031% %2815%
+		  hsound[13..0].d = 512;
+		ELSE
+		  hsound[13..0].d = hsound[13..0].q+1;
+		END IF;
+	  ELSE
+		  hsound[8..0].d = hsound[8..0].q;
+		  hsound9.d = hsound9.q # adjust1.q;
+		  hsound[13..10].d = hsound[13..10].q;
+	END IF;
+
+	IF hsync==1 THEN   %tæller til ramtekst (bevægelse)%
+		ramtekst[9..0].d  = offset[9..0];
+		ramtekst10.d 	  = GND;
+	   ELSIF window==1 THEN
+		ramtekst[10..0].d = ramtekst[].q+1;
+	   ELSE
+		ramtekst[10..0].d = ramtekst[].q;
+	END IF;
+	
+
+				  %klik til EBU og BBC:%
+	tnode14	= TRI(!window & (klik & !frameb # frameb & bbcklik), !oe); 
+	tnode13	= TRI(hsound13 # window, !oe);
+	tnode12	= TRI(hsound12 # window, !oe);
+	tnode11	= TRI(hsound11 # window, !oe);
+	tnode10	= TRI((!window & hsound10) # (window & ramtekst10), !oe);
+	tnode9	= TRI((!window & hsound9) # (window & ramtekst9), !oe);
+	tnode8	= TRI((!window & hsound8) # (window & ramtekst8), !oe);
+	tnode7	= TRI((!window & hsound7) # (window & ramtekst7), !oe);
+	tnode6	= TRI((!window & hsound6) # (window & ramtekst6), !oe);
+	tnode5	= TRI((!window & hsound5) # (window & ramtekst5), !oe);
+	tnode4	= TRI((!window & hsound4) # (window & ramtekst4), !oe);
+	tnode3	= TRI((!window & hsound3) # (window & ramtekst3), !oe);
+	tnode2	= TRI((!window & hsound2) # (window & ramtekst2), !oe);
+	tnode1	= TRI((!window & hsound1) # (window & ramtekst1), !oe);
+	tnode0	= TRI((!window & hsound0) # (window & ramtekst0), !oe);
+	abu[14..0]		= tnode[14..0];
+END;
+
+

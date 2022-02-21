@@ -1,0 +1,378 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\BootProgram\Source\work\xadrivr.src
+ADDR   CODE            LINE SOURCELINE
+                          2 ; options: -IC:\cxa\include -Ml -Cxag3 -Sd -A1 -O1 -DWritableSector=0
+                          3 ;          -DBootProgram=1 -g
+                          5 $NOZPAGE
+                          6         NAME    XADRIVR
+000000                   31 XADRIVR_PR      SEGMENT HCODE
+000000                   32         RSEG    XADRIVR_PR
+                         33         ALIGN   1
+                         35         PUBLIC  _Udr_InitUart
+000000                   36 _Udr_InitUart:
+000000 08033B            45         CLR     033BH
+000003 08033A            47         CLR     033AH
+000006 964524EC          49         AND.B   0424H,#0ECH
+00000A 080286            51         CLR     0286H
+00000D 08138C            53         SETB    038CH
+000010 08238C            54         MOV     C,038CH
+000013 08338D            55         MOV     038DH,C
+000016 B6r0rr            57         MOV.B   _txBufTail,#00H
+000019 B6r0rr            58         MOV.B   _txBufHead,#00H
+00001C B6r0rr            60         MOV.B   _rxBufTail,#00H
+00001F B6r0rr            61         MOV.B   _rxBufHead,#00H
+000022 080rrr            63         CLR     _trxStopped
+000025 081rrr            65         SETB    _trxEmpty
+000028 964824D8          67         MOV.B   0424H,#0D8H
+00002C 910402            69         CMP.B   R0L,#02H
+00002F F307              70         BEQ     _12
+000031 910401            71         CMP.B   R0L,#01H
+000034 F309              72         BEQ     _13
+000036 910403            73         CMP.B   R0L,#03H
+000039 F30C              74         BEQ     _14
+00003B FE10              75         BR      _15
+00003E                   77 _12:
+00003E 964857FF          79         MOV.B   0457H,#0FFH
+000042 964856F4          81         MOV.B   0456H,#0F4H
+000046 FE0E              83         BR      _18
+000048                   85 _13:
+000048 964857FF          87         MOV.B   0457H,#0FFH
+00004C 964856E8          89         MOV.B   0456H,#0E8H
+000050 FE09              91         BR      _18
+000052                   93 _14:
+000052 964857FF          95         MOV.B   0457H,#0FFH
+000056 964856FC          97         MOV.B   0456H,#0FCH
+00005A FE04              99         BR      _18
+00005C                  101 _15:
+00005C 964857FF         103         MOV.B   0457H,#0FFH
+000060 964856D0         105         MOV.B   0456H,#0D0H
+000064                  107 _18:
+000064 96455C0F         109         AND.B   045CH,#0FH
+000068 081286           111         SETB    0286H
+00006B B64125           113         MOV.B   0425H,#01H
+00006E 08133B           115         SETB    033BH
+000071 08133A           117         SETB    033AH
+000074 D680             119         RET
+                        123         ALIGN   1
+                        125         PUBLIC  _Udr_Uart_RX_Interrupt
+000076                  126 _Udr_Uart_RX_Interrupt:
+000076 0F0F             130         PUSH.W  R0, R1, R2, R3
+000078 873443           131         PUSH.B  CS
+00007B 873441           132         PUSH.B  DS
+00007E 964841rr         133         MOV.B   DS,#SEG( __DS )
+000082 873442           134         PUSH.B  ES
+000085 873403           135         PUSH.B  SSEL
+000088 9646037F         136         OR.B    SSEL,#07FH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+00008C 860425           138         MOV.B   R0L,0425H
+00008F 91050E           139         AND.B   R0L,#0EH
+000092 F312             140         BEQ     _22
+000094 08232B           142         MOV     C,032BH
+000097 F003             143         BCC     _19
+000099 96r8rrFB         145         MOV.B   _rcvChar,#0FBH
+000099 96r8rrFB00       145         MOV.B   _rcvChar,#0FBH
+00009E                  146 _19:
+00009E 08232A           148         MOV     C,032AH
+0000A1 F003             149         BCC     _20
+0000A3 96r8rrFA         151         MOV.B   _rcvChar,#0FAH
+0000A3 96r8rrFA00       151         MOV.B   _rcvChar,#0FAH
+0000A8                  152 _20:
+0000A8 082329           154         MOV     C,0329H
+0000AB F003             155         BCC     _21
+0000AD 96r8rrFD         157         MOV.B   _rcvChar,#0FDH
+0000AD 96r8rrFD00       157         MOV.B   _rcvChar,#0FDH
+0000B2                  158 _21:
+0000B2 964525F1         160         AND.B   0425H,#0F1H
+0000B6 FE02             162         BR      _23
+0000B6 FE02             162         BR      _23
+0000B8                  163 _22:
+0000B8 97r4rr64         165         MOV.B   _rcvChar,0464H
+0000B8 97r4rr64         165         MOV.B   _rcvChar,0464H
+0000BC                  166 _23:
+0000BC 080320           168         CLR     0320H
+0000BF 082rrr           170         MOV     C,_UART_Handshake
+0000C2 F115             171         BCS     _24
+0000C4 C500AB           173         CALL    _Udr_FreeSpaceInRxBuf
+0000C7 910402           174         CMP.B   R0L,#02H
+0000CA F93C             175         BL      _31
+0000CC A6r1rr           177         ADDS.B  _rxBufHead,#01H
+0000CF 860rrr           178         MOV.B   R0L,_rxBufHead
+0000D2 8110             179         MOV.B   R0H,R0L
+0000D4 9019             180         SEXT.B  R0H
+0000D6 E80B40           181         DIV.W   R0,#040H
+0000D9 861rrr           182         MOV.B   _rxBufHead,R0H
+0000DC 8101             184         MOV.B   R0L,R0H
+0000DE 9019             185         SEXT.B  R0H
+0000E0 862rrr           186         MOV.B   R1L,_rcvChar
+0000E3 964842rr         187         MOV.B   ES,#SEG( _rxBuf )
+0000E7 8528rrrr         188         MOV.B   [R0+SOF( _rxBuf )],R1L
+0000EB FE2C             190         BR      _31
+0000EB FE2C00           190         BR      _31
+0000EE                  191 _24:
+0000EE 96r4rr13         193         CMP.B   _rcvChar,#013H
+0000F2 F203             194         BNE     _25
+0000F4 081rrr           196         SETB    _trxStopped
+0000F7 FE26             197         BR      _31
+0000F7 FE2600           197         BR      _31
+0000FA                  198 _25:
+0000FA 96r4rr11         200         CMP.B   _rcvChar,#011H
+0000FE F204             201         BNE     _26
+000100 080rrr           203         CLR     _trxStopped
+000103 081321           205         SETB    0321H
+000106 FE1E             207         BR      _31
+000106 FE1E             207         BR      _31
+000108                  208 _26:
+000108 C50089           210         CALL    _Udr_FreeSpaceInRxBuf
+00010B 910402           211         CMP.B   R0L,#02H
+00010E F80A             212         BG      _27
+000110 081rrr           214         SETB    _rcvStopped
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000113 080rrr           216         CLR     _trxEmpty
+000116 080337           218         CLR     0337H
+000119 96486413         220         MOV.B   0464H,#013H
+00011D 080321           222         CLR     0321H
+000120 081337           224         SETB    0337H
+000124                  226 _27:
+000124 A6r1rr           228         ADDS.B  _rxBufHead,#01H
+000127 860rrr           229         MOV.B   R0L,_rxBufHead
+00012A 8110             230         MOV.B   R0H,R0L
+00012C 9019             231         SEXT.B  R0H
+00012E E80B40           232         DIV.W   R0,#040H
+000131 861rrr           233         MOV.B   _rxBufHead,R0H
+000134 8101             235         MOV.B   R0L,R0H
+000136 9019             236         SEXT.B  R0H
+000138 862rrr           237         MOV.B   R1L,_rcvChar
+00013B 964842rr         238         MOV.B   ES,#SEG( _rxBuf )
+00013F 8528rrrr         239         MOV.B   [R0+SOF( _rxBuf )],R1L
+000144                  241 _31:
+000144 871403           243         POP.B   SSEL
+000147 871442           244         POP.B   ES
+00014A 871441           245         POP.B   DS
+00014D 871443           246         POP.B   CS
+000150 2F0F             247         POP.W   R0, R1, R2, R3
+000152 D690             248         RETI
+0000A8                  249         HCSEG AT 0A8H
+0000A8 008Errrrrrrrrr   250         DW      08E00H,_36
+       rrrrrr               
+000000                  251 XADRIVR_CO      SEGMENT CODE
+000000                  252         RSEG    XADRIVR_CO
+000000                  252         RSEG    XADRIVR_CO
+000000                  253 _36:
+000000 D4rrrrrr         254         FJMP    _Udr_Uart_RX_Interrupt
+000154                  255         RSEG    XADRIVR_PR
+                        257         ALIGN   1
+                        259         PUBLIC  _Udr_Uart_TX_Interrupt
+000154                  260 _Udr_Uart_TX_Interrupt:
+000154 0F01             264         PUSH.W  R0
+000156 873441           265         PUSH.B  DS
+000159 964841rr         266         MOV.B   DS,#SEG( __DS )
+00015D 873442           267         PUSH.B  ES
+000160 873403           268         PUSH.B  SSEL
+000163 9646037F         269         OR.B    SSEL,#07FH
+000167 080321           271         CLR     0321H
+00016A 082rrr           273         MOV     C,_trxStopped
+00016D F11B             274         BCS     _38
+00016F 860rrr           275         MOV.B   R0L,_txBufTail
+000172 460rrr           276         CMP.B   R0L,_txBufHead
+000175 F317             277         BEQ     _38
+000177 860rrr           279         MOV.B   _txBufTail,R0L
+00017A A6r1rr           280         ADDS.B  _txBufTail,#01H
+00017D 860rrr           281         MOV.B   R0L,_txBufTail
+000180 8110             282         MOV.B   R0H,R0L
+000182 9019             283         SEXT.B  R0H
+000184 E80B10           284         DIV.W   R0,#010H
+000187 861rrr           285         MOV.B   _txBufTail,R0H
+00018A 080337           287         CLR     0337H
+00018D 8101             289         MOV.B   R0L,R0H
+00018F 9019             290         SEXT.B  R0H
+000191 964842rr         291         MOV.B   ES,#SEG( _txBuf )
+000195 8500rrrr         292         MOV.B   R0L,[R0+SOF( _txBuf )]
+000199 860C64           293         MOV.B   0464H,R0L
+00019C 080321           295         CLR     0321H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+00019F 081337           297         SETB    0337H
+0001A2 FE02             299         BR      _39
+0001A2 FE02             299         BR      _39
+0001A4                  300 _38:
+0001A4 081rrr           302         SETB    _trxEmpty
+0001A4 081rrr00         302         SETB    _trxEmpty
+0001A8                  303 _39:
+0001A8 871403           305         POP.B   SSEL
+0001AB 871442           306         POP.B   ES
+0001AE 871441           307         POP.B   DS
+0001B1 2F01             308         POP.W   R0
+0001B3 D690             309         RETI
+0000AC                  310         HCSEG AT 0ACH
+0000AC 008Errrrrrrrrr   311         DW      08E00H,_41
+       rrrrrr               
+000004                  312         RSEG    XADRIVR_CO
+000004                  312         RSEG    XADRIVR_CO
+000004                  313 _41:
+000004 D4rrrrrr         314         FJMP    _Udr_Uart_TX_Interrupt
+0001B5                  315         RSEG    XADRIVR_PR
+0001B5 00               317         ALIGN   1
+                        319         PUBLIC  _Udr_ReceiveByte
+0001B6                  320 _Udr_ReceiveByte:
+0001B6 0F30             326         PUSH.W  R4, R5
+0001B8 8951             329         MOV.W   R5,R1
+0001BA 8940             330         MOV.W   R4,R0
+0001BC 860rrr           335         MOV.B   R0L,_rxBufHead
+0001BF 460rrr           336         CMP.B   R0L,_rxBufTail
+0001C2 F328             337         BEQ     _45
+0001C4 860rrr           339         MOV.B   R0L,_rxBufTail
+0001C7 9019             340         SEXT.B  R0H
+0001C9 A901             341         ADDS.W  R0,#01H
+0001CB 8910             342         MOV.W   R1,R0
+0001CD 9819             343         SEXT.W  R1
+0001CF E9090040         344         DIV.D   R0,#040H
+0001D3 862rrr           345         MOV.B   _rxBufTail,R1L
+0001D6 082rrr           347         MOV     C,_UART_Handshake
+0001D9 F011             348         BCC     _44
+0001DB 082rrr           350         MOV     C,_rcvStopped
+0001DE F00E             351         BCC     _44
+0001E0 C5001D           352         CALL    _Udr_FreeSpaceInRxBuf
+0001E3 910404           353         CMP.B   R0L,#04H
+0001E6 F90A             354         BL      _44
+0001E8 080rrr           356         CLR     _rcvStopped
+0001EB 080rrr           358         CLR     _trxEmpty
+0001EE 080337           360         CLR     0337H
+0001F1 96486411         362         MOV.B   0464H,#011H
+0001F5 080321           364         CLR     0321H
+0001F8 081337           366         SETB    0337H
+0001FC                  368 _44:
+0001FC 860rrr           370         MOV.B   R0L,_rxBufTail
+0001FF 9019             371         SEXT.B  R0H
+000201 964842rr         372         MOV.B   ES,#SEG( _rxBuf )
+000205 8500rrrr         373         MOV.B   R0L,[R0+SOF( _rxBuf )]
+000209 86AC42           374         MOV.B   ES,R5L
+00020C 820C             375         MOV.B   [R4],R0L
+00020E 910800           377         MOV.B   R0L,#00H
+000211 FE03             378         BR      _46
+000214                  380 _45:
+000214 9108FF           382         MOV.B   R0L,#0FFH
+000218                  384 _46:
+000218 2F30             385         POP.W   R4, R5
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+00021A D680             387         RET
+                        390         ALIGN   1
+                        392         PUBLIC  _Udr_FreeSpaceInRxBuf
+00021C                  393 _Udr_FreeSpaceInRxBuf:
+00021C 860rrr           398         MOV.B   R0L,_rxBufTail
+00021F 460rrr           399         CMP.B   _rxBufHead,R0L
+000222 FB04             400         BLT     _49
+000224 910040           402         ADD.B   R0L,#040H
+000227 260rrr           403         SUB.B   R0L,_rxBufHead
+00022A D680             404         RET
+00022A D680             404         RET
+00022C                  405 _49:
+00022C 260rrr           407         SUB.B   R0L,_rxBufHead
+000230                  409 _50:
+000230 D680             410         RET
+                        412         ALIGN   1
+                        414         PUBLIC  _Udr_SendByte
+000232                  415 _Udr_SendByte:
+000232 862rrr           422         MOV.B   R1L,_txBufHead
+000235 9039             423         SEXT.B  R1H
+000237 A911             424         ADDS.W  R1,#01H
+000239 8921             425         MOV.W   R2,R1
+00023B 8932             426         MOV.W   R3,R2
+00023D 9839             427         SEXT.W  R3
+00023F E9290010         428         DIV.D   R2,#010H
+000243 862rrr           429         MOV.B   R1L,_txBufTail
+000246 9039             430         SEXT.B  R1H
+000248 4931             431         CMP.W   R3,R1
+00024A F32C             432         BEQ     _54
+00024C A6r1rr           434         ADDS.B  _txBufHead,#01H
+00024F 862rrr           435         MOV.B   R1L,_txBufHead
+000252 8132             436         MOV.B   R1H,R1L
+000254 9039             437         SEXT.B  R1H
+000256 E81B10           438         DIV.W   R1,#010H
+000259 863rrr           439         MOV.B   _txBufHead,R1H
+00025C 8123             441         MOV.B   R1L,R1H
+00025E 9039             442         SEXT.B  R1H
+000260 964842rr         443         MOV.B   ES,#SEG( _txBuf )
+000264 8509rrrr         444         MOV.B   [R1+SOF( _txBuf )],R0L
+000268 082rrr           446         MOV     C,_trxEmpty
+00026B F019             447         BCC     _53
+00026D 082rrr           448         MOV     C,_trxStopped
+000270 F116             449         BCS     _53
+000272 080rrr           451         CLR     _trxEmpty
+000275 A6r1rr           453         ADDS.B  _txBufTail,#01H
+000278 860rrr           454         MOV.B   R0L,_txBufTail
+00027B 8110             456         MOV.B   R0H,R0L
+00027D 9019             457         SEXT.B  R0H
+00027F E80B10           458         DIV.W   R0,#010H
+000282 861rrr           459         MOV.B   _txBufTail,R0H
+000285 080337           461         CLR     0337H
+000288 8101             463         MOV.B   R0L,R0H
+00028A 9019             464         SEXT.B  R0H
+00028C 964842rr         465         MOV.B   ES,#SEG( _txBuf )
+000290 8500rrrr         466         MOV.B   R0L,[R0+SOF( _txBuf )]
+000294 860C64           467         MOV.B   0464H,R0L
+000297 080321           469         CLR     0321H
+00029A 081337           471         SETB    0337H
+00029E                  473 _53:
+00029E 910800           475         MOV.B   R0L,#00H
+0002A1 D680             476         RET
+0002A4                  478 _54:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+0002A4 9108FE           480         MOV.B   R0L,#0FEH
+0002A8                  482 _55:
+0002A8 D680             483         RET
+000000                  488 XADRIVR_CLR_BI@DS       SEGMENT BIT JOIN
+000000                  489         RSEG    XADRIVR_CLR_BI@DS
+000000 RESERVED         490 _trxStopped:    DBIT    1
+000000
+000000                  493 XADRIVR_CLR_NE@DS       SEGMENT DATA JOIN CLEAR
+000000                  494         RSEG    XADRIVR_CLR_NE@DS
+000000                  495 _txBuf: DS      16
+   |  RESERVED             
+00000F
+                        498         PUBLIC  _txBufHead
+000010 RESERVED         499 _txBufHead:     DS      1
+000010
+                        502         PUBLIC  _txBufTail
+000011 RESERVED         503 _txBufTail:     DS      1
+000011
+                        504         EXTRN   DATA(__DS)
+000001                  506         RSEG    XADRIVR_CLR_BI@DS
+000001 RESERVED         507 _rcvStopped:    DBIT    1
+000001
+000012                  510         RSEG    XADRIVR_CLR_NE@DS
+                        511         PUBLIC  _rxBufHead
+000012 RESERVED         512 _rxBufHead:     DS      1
+000012
+000013 RESERVED         514 _rcvChar:       DS      1
+000013
+                        517         PUBLIC  _rxBufTail
+000014 RESERVED         518 _rxBufTail:     DS      1
+000014
+000002                  520         RSEG    XADRIVR_CLR_BI@DS
+000002 RESERVED         521 _trxEmpty:      DBIT    1
+000002
+000003 RESERVED         523 _UART_Handshake:        DBIT    1
+000003
+000015                  526         RSEG    XADRIVR_CLR_NE@DS
+000015                  527 _rxBuf: DS      64
+   |  RESERVED             
+000054
+                        528         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        529         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        530         CALLS   'Udr_Uart_RX_Interrupt', 'Udr_FreeSpaceInRxBuf'
+                        531         CALLS   'Udr_ReceiveByte', 'Udr_FreeSpaceInRxBuf'

@@ -1,0 +1,281 @@
+#include <dos.h>
+#include <xa.h>
+
+#include "52sync.h"
+#include "menutree.h"
+#include "menu.h"
+#include "keyb_drv.h"
+#include "iniic.h"
+#include "conio.h"
+#include "text.h"
+
+#define DispX 15
+#define DispY 15
+
+UC Button;
+UC Old_Button;
+
+UC Button_Command;
+UC Old_Button_Command;
+
+UC Repeat_Count;
+UC Repeat_Delay;
+
+bit Button_Enable;
+bit New_Button_Ready;
+bit Repeat_Function;
+bit Repeat_On;
+bit Combi_On;
+bit Vertical_Repeat;
+
+bit Alarm_LED;
+bit Remote_LED;
+
+/***************************************************************************/
+/*	Send_LED_Info																				*/
+/*																									*/
+/* Written by:		Kim Engedahl, VDE     												*/
+/*	Date:		950509																			*/
+/*	Revised:	950509																			*/
+/*																									*/
+/* Module:		KEYB_DRV.C																	*/
+/*	Function:	                                             					*/
+/*	Syntax:		bit Send_LED_Info( UC LED_Status);       						*/
+/*	Remarks:		                                                            */
+/*	Returns:																						*/
+/***************************************************************************/
+UC Update_LEDs() {
+
+	UC tmp = Keyb_Mask;
+	return(0);
+
+	if ( !Remote_LED)
+		tmp |= 0x20;
+
+	if ( Alarm_LED) {
+		textcolor( BLACK);
+		textbackground( RED);
+
+		gotoxy( DispX + 45, DispY);
+		putch( ' ');
+
+		textbackground( GREEN);
+	}
+	else {
+		textcolor( WHITE);
+		textbackground( BLACK);
+
+		gotoxy( DispX + 45, DispY );
+		putch( ' '); printf( "  ALARM");
+
+		textcolor( BLACK);
+		textbackground( GREEN);
+	}
+
+	return( 0);
+
+//	return( Write_Keyb_IIC( PCF8574P_LED, ( tmp | Keyb_Mask)));
+}
+
+
+/***************************************************************************/
+/*	Read_Keyboard																				*/
+/*																									*/
+/* Written by:		Kim Engedahl, VDE     												*/
+/*	Date:		950509																			*/
+/*	Revised:	950509																			*/
+/*																									*/
+/* Module:		KEYB_DRV.C																	*/
+/*	Function:	                                             					*/
+/*	Syntax:		UC Read_Keyboard();                      						*/
+/*	Remarks:		                                                            */
+/*	Returns:		0xFF if error, otherwise the key(s) pressed ie. 0-0x1F		*/
+/***************************************************************************/
+UC Read_Keyboard() {
+	UI temp;
+
+//	if ( !(( temp = Read_Keyb_IIC( PCF8574P_KEYB)) & 0xFF00))
+//		return((( UC) temp) & Keyb_Mask);
+
+	Stop_Keyb_IIC();
+	return( 0xFF);
+}
+
+
+/***************************************************************************/
+/*	Keyboard_Scan																				*/
+/*																									*/
+/* Written by:		Kim Engedahl, VDE     												*/
+/*	Date:		950509																			*/
+/*	Revised:	950522																			*/
+/*																									*/
+/* Module:		KEYB_DRV.C																	*/
+/*	Function:	                                             					*/
+/*	Syntax:                                                 						*/
+/*	Remarks:		                                                            */
+/*	Returns:                                                  					*/
+/***************************************************************************/
+UC Button_Ready() {
+
+	int temp;
+	struct dostime_t t, t_old;
+	UC i;
+
+	_dos_gettime( &t);
+	if ( t.hsecond != t_old.hsecond) {
+		Timer0_Interrupt();
+		t_old = t;
+	}
+
+	if ( !Do_Keyboard_Scan)
+		return( FALSE);
+
+	Do_Keyboard_Scan = FALSE;
+											// TBD Test for any error condition
+
+	if ( bioskey( 1))
+		temp = bioskey( 0);
+	else
+		temp = 0;
+
+	if ( temp) {
+		AutoESCTimer = 0;
+		AutoESCSignal = FALSE;
+	}
+
+	switch ( temp) {
+		case kbAltF1:
+			break;
+
+		case kbAltF2:
+			break;
+
+		case kbAltF3:
+			break;
+
+		case kbAltF4:
+			break;
+
+		case kbAltF5:
+			break;
+
+		case kbAltF6:
+			break;
+
+		case kbEsc:
+			Button_Command =  250;
+			return( TRUE);
+			break;
+
+		case kbUp:
+			Button_Command =  UP_Button;
+			return( TRUE);
+			break;
+
+		case kbDown:
+			Button_Command = DOWN_Button;
+			return( TRUE);
+			break;
+
+		case kbRight:
+			Button_Command = RIGHT_Button;
+			return( TRUE);
+			break;
+
+		case kbLeft:
+			Button_Command = LEFT_Button;
+			return( TRUE);
+			break;
+
+		case kbEnter:
+			Button_Command = EXEC_Button;
+			return( TRUE);
+			break;
+
+		case kbF1:
+			if (SDIBlkUnit[0].Present == TRUE) {
+				SDIBlkUnit[0].Present = FALSE;
+//				TypeOfUnitsPresent -= SDIBlkMask;
+			}
+			else {
+				SDIBlkUnit[0].Present = TRUE;
+//				TypeOfUnitsPresent += SDIBlkMask;
+			}
+			PowerOn_Reset();
+			return( TRUE);
+			break;
+
+		case kbF2:
+			if ( AnalogSignalUnit.Present == TRUE) {
+				AnalogSignalUnit.Present = FALSE;
+//				TypeOfUnitsPresent -= AnalogSignalMask;
+			}
+			else {
+				AnalogSignalUnit.Present = TRUE;
+//				TypeOfUnitsPresent += AnalogSignalMask;
+			}
+
+			PowerOn_Reset();
+			return( TRUE);
+			break;
+
+
+		case kbF3:
+			if ( SDISignalUnit.Present == TRUE) {
+				SDISignalUnit.Present = FALSE;
+//				TypeOfUnitsPresent -= SDISignalMask;
+			}
+			else {
+				SDISignalUnit.Present = TRUE;
+//				TypeOfUnitsPresent += SDISignalMask;
+			}
+			PowerOn_Reset();
+			return( TRUE);
+			break;
+
+		case kbF4:
+			if ( AES_EBUUnit.Present == TRUE) {
+				AES_EBUUnit.Present = FALSE;
+//				TypeOfUnitsPresent -= AES_EBUSignalMask;
+			}
+			else {
+				AES_EBUUnit.Present = TRUE;
+//				TypeOfUnitsPresent += AES_EBUSignalMask;
+			}
+			PowerOn_Reset();
+			return( TRUE);
+			break;
+
+		case kbF6:
+			Button_Command = PRESET_Button;
+			return( TRUE);
+			break;
+
+		case kbF7:
+			Button_Command = OUTPUT_Button;
+			return( TRUE);
+			break;
+
+		case kbF8:
+			Button_Command = GENLOCK_Button;
+			return( TRUE);
+			break;
+
+		case kbF9:
+			PowerOn_Reset( MASTER_Button);
+			return( TRUE);
+			break;
+
+		case kbF10:
+			PowerOn_Reset( FACTORY_Button);
+			return( TRUE);
+			break;
+
+		default:
+			New_Button_Ready = 0;
+			Button_Command = NO_Button;
+			return( FALSE);
+			break;
+	}
+
+}

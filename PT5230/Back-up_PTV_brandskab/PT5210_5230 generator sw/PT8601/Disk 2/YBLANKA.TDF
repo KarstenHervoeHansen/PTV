@@ -1,0 +1,117 @@
+INCLUDE "lpm_add_sub.inc";
+
+SUBDESIGN Yblanka
+(
+	clk,ab[11..0],txt[7..0]:	INPUT;
+	sb[2..0],enable:			INPUT;
+	yout[11..0]:				OUTPUT;
+)
+VARIABLE
+	dout[11..0],yout[11..0]:	DFFE;
+	textadd:			 		lpm_add_sub WITH (LPM_WIDTH=7);
+
+BEGIN
+	textadd.dataa[6..0]	= dout[11..5].q;
+	textadd.datab[6..0] = txt[6..0];
+	textadd.cin			= VCC;
+	textadd.add_sub		= GND;
+
+	yout[11..5].d = textadd.result[];
+	yout[4..0].d  = dout[4..0].q;
+	yout[].clk	  = clk;
+
+%	yout[].ena	  = !enable;%
+
+	dout[].clk 	  = clk;
+	dout[].ena	  = !enable;	%Til linie 23 og 623%
+	IF (sb[] == 0)  THEN
+	 dout[].d	  = ab[];
+	ELSE
+	   dout[4..0].d= H"15"; 
+    CASE sb[] IS
+	  WHEN 1 =>
+	   TABLE
+		 ab[11..5]   => dout[11..5].d;
+		  B"0000xxx" => B"0001101"; %7%
+		  B"0001xxx" => B"0010100"; %15%
+		  B"0010xxx" => B"0011100"; %23%
+		  B"0011xxx" => B"0100011"; %31%  %Hvidniveau%
+		  B"0100xxx" => B"0101010"; %39%
+		  B"0101xxx" => B"0110010"; %47%
+		  B"0110xxx" => B"0111001"; %55%
+		  B"0111xxx" => B"0111110"; %63%
+		  B"1000xxx" => B"1001000"; %71%
+		  B"1001xxx" => B"1001100"; %79%
+		  B"1010xxx" => B"1010001"; %87%
+		  B"1011xxx" => B"1011010"; %95%  %Tekst-baggrund%
+		  B"1100xxx" => B"1011111"; %103% %Blanking%
+		  B"1101xxx" => B"1101101"; %111%
+		  B"1110xxx" => B"1110101"; %119%
+		  B"1111xxx" => B"1111100"; %127%
+	   END TABLE;
+	  WHEN 2 =>
+		TABLE
+		 ab[11..5]   => dout[11..5].d;
+		  B"0000xxx" => B"0011110"; %7%
+		  B"0001xxx" => B"0100011"; %15%
+		  B"0010xxx" => B"0101001"; %23%
+		  B"0011xxx" => B"0101111"; %31%  %Hvidniveau%
+		  B"0100xxx" => B"0110101"; %39%
+		  B"0101xxx" => B"0111010"; %47%
+		  B"0110xxx" => B"1000000"; %55%
+		  B"0111xxx" => B"1000100"; %63%
+		  B"1000xxx" => B"1001100"; %71%
+		  B"1001xxx" => B"1001111"; %79%
+		  B"1010xxx" => B"1010011"; %87%
+		  B"1011xxx" => B"1011010"; %95%  %Tekst-baggrund%
+		  B"1100xxx" => B"1011110"; %103% %Blanking%
+		  B"1101xxx" => B"1101001"; %111%
+		  B"1110xxx" => B"1101110"; %119%
+		  B"1111xxx" => B"1110011"; %127%
+	   END TABLE;
+	  WHEN 3 =>
+		TABLE
+		 ab[11..5]   => dout[11..5].d;
+		  B"0000xxx" => B"1000001"; %7%
+		  B"0001xxx" => B"1000100"; %15%
+		  B"0010xxx" => B"1000110"; %23%
+		  B"0011xxx" => B"1001000"; %31%  %Hvidniveau%
+		  B"0100xxx" => B"1001010"; %39%
+		  B"0101xxx" => B"1001101"; %47%
+		  B"0110xxx" => B"1001111"; %55%
+		  B"0111xxx" => B"1010010"; %63%
+		  B"1000xxx" => B"1010011"; %71%
+		  B"1001xxx" => B"1010110"; %79%
+		  B"1010xxx" => B"1010111"; %87%
+		  B"1011xxx" => B"1011010"; %95%  %Tekst-baggrund%
+		  B"1100xxx" => B"1011100"; %103% %Blanking%
+		  B"1101xxx" => B"1011110"; %111%
+		  B"1110xxx" => B"1100001"; %119%
+		  B"1111xxx" => B"1100011"; %127%
+	   END TABLE;
+ 	  WHEN 4 =>
+		TABLE
+		 ab[11..5]   => dout[11..5].d;
+		  B"0000xxx" => B"1010010"; %7%
+		  B"0001xxx" => B"1010011"; %15%
+		  B"0010xxx" => B"1010011"; %23%
+		  B"0011xxx" => B"1010100"; %31%  %Hvidniveau%
+		  B"0100xxx" => B"1010101"; %39%
+		  B"0101xxx" => B"1010101"; %47%
+		  B"0110xxx" => B"1010110"; %55%
+		  B"0111xxx" => B"1011000"; %63%
+		  B"1000xxx" => B"1011001"; %71%
+		  B"1001xxx" => B"1011001"; %79%
+		  B"1010xxx" => B"1011001"; %87%
+		  B"1011xxx" => B"1011010"; %95%  %Tekst-baggrund%
+		  B"1100xxx" => B"1011010"; %103% %Blanking%
+		  B"1101xxx" => B"1011010"; %111%
+		  B"1110xxx" => B"1011010"; %119%
+		  B"1111xxx" => B"1011011"; %127%
+	   END TABLE;
+WHEN OTHERS => 
+       dout[11..0].d   = H"B55";
+	 END CASE;
+	END IF;
+END;
+

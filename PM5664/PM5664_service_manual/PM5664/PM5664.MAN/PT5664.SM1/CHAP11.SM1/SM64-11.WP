@@ -1,0 +1,54 @@
+@OVERSKRIFT 1 = 11. Control Board - Unit 7
+@OVERSKRIFT 2 = 11.1 General Information
+This unit contains a microcontroller which controls the function of the instrument and a graticule gen-erator which controls the CRT display.
+
+The circuit can be separated into a microprocessor circuit, a reset circuit, a control input circuit, an intensity control, a display/keyboard circuit and a graticule generator.
+
+The unit also contains an amplifier for external reference signal.
+
+@OVERSKRIFT 2 = 11.2 Circuit Description
+@OVERSKRIFT 3 = 11.2.1 Microprocessor Circuit
+The Microprocessor circuit is based on the microcontroller V103, which is used in a standard configuration with V104 as address latch, V101 as external RAM, V102 as external ROM, battery back-up B101, and an address decoder, V109, for addressing the external ports.
+From the input port V201 the microprocessor re-ceives information on activation of the keyboard, the actual field (1st or 2nd), whether the variable gain is on or off, and whether the actual input <R>video signal is a 625 or 525 line signal.
+
+Other microprocessor input are reset, remote control input (via the I<M^>2<D>C bus), field interrupt, line counter input, ready flag from the graticule generator, and an I<M^>2<D>C bus.
+
+The Graticule Generator and Intensity Control are both controlled by the microprocessor via the output port V303.
+
+The clock signal from the Crystal Oscillator is buf-fered by transistor Q102 and fed to the Graticule Generator.
+
+@OVERSKRIFT 3 = 11.2.2 Reset Circuit
+A Reset circuit with voltage sensor V105 is intro-duced to get a controlled power-up and power-down. If the supply voltage reaches the low level of 3.6V, determined by R104 and R105, the Vol-<R>tage Sensor resets the microprocessor and blocks the RAM. This makes the battery backup take over the power supply of the RAM.
+
+@OVERSKRIFT 3 = 11.2.3 Remote Control Input
+From the Control Input it is possible to activate the store and recall functions. The selection of function is sensed by the microprocessor when reading the I<M^>2<D>C port V107. 
+
+@OVERSKRIFT 3 = 11.2.4 Intensity Control
+The heart of the intensity control is the <MI>Program-mable Gate Array<D> (PGA), which is downloaded by the microprocessor when the monitor is turned on. The intensity of the CRT is decoded by V111, controlled by the microprocessor. V111 also filters the field information from the Sync Separator on Unit 4 to avoid triggering errors. The gamut window sig-nal for the Gamut Detector (Unit 8) is also derived from V111.
+
+@OVERSKRIFT 3 = 11.2.5 Display/Keyboard Circuit
+The keyboard switches and display indicator LEDs are located on Unit 6 and connected to Unit 7 <R>through the connector XP. The switches and the LEDs are working in a matrix. Here the microprocessor activates the relevant switches for the selected set-up through V202 and Q201-204 and <R>reads the switches in the  "vertically direction" by means of V201. The relevant LEDs for the set-up are activat-ed in the "horizontally direction" by the LED scanning circuit V205 and in the "vertically direction" by V206 and the IC V203 driver. V207 is an oscillator/divider which provides the relevant scanning frequency.
+@OVERSKRIFT 3 = 11.2.6 Graticule Generator
+The Electronic Graticule generator provides the electronic graticule and menu text on the CRT display. The system distinguishes between three kind of figures:
+1. Graticules
+2. Characters 
+3. Voltages 
+
+The idea is to generate the requested figure in small parts by creating a horizontal and vertical voltage sweep on the output of V308-A and B (HGV and VGV).
+
+The generator receives its orders from the microprocessor via the port V308 and the control lines <MO>BEGIN<D>, <MO>LOADPOS<D>, and <MO>UPDATE<D>.
+
+The END-signal is a reply message from the gen-erator back to the microprocessor.
+
+@FED = 1. Graticules
+A graticule is started when the CPU begins ad-dressing the graticule memory V304 and the <MO><R>BEGIN<D> signal goes low. This enables frequency divider V318 which via V315-D and V314-D drives the address counter V301-302. Data information is then transmitted from memory V304 to the <MI>Digital-to Analog Converter<D> (DAC) V306 for each piece of line in the graticule. The DAC contains a 12-bit D/A converter for both horizontal as well as vertical data information. For each piece of line 4 byte is needed from the memory to load the double D/A converter. The DAC outputs are current outputs, but they are converted into voltages by the four <R>opamps V1-A-B and V2-A-B. This voltage is <R>sampled by V309 and V310, which then drive integrators V308-A and -B. 
+
+By feeding back HGV and VGV outputs to the input of the sample/hold amplifiers, the outputs will be proportional with the actual and the previous sample value. Thus it will take the same amount of time to draw the line-part in question, no matter what length it is. With R304 and R308 it is possible to adjust the horizontal shape and vertical shape respectically.
+
+The D6-pulse through V316-B signals that a part of the graticule line should be blanked. The D7-pulse through V315-C and V317-B signals that the graticule "drawing" is finished by generating the <MO>END<D>-signal to the microprocessor.
+
+@FED = 2. Characters
+When a character is drawn, the microprocessor starts by sending the <MO>LOADPOS<D> pulse and the most significant bits to the DAC via V110-C-D and V305. This is to locate the position on the screen from which the charater is drawn. Then the microprocessor sends a <MO>BEGIN<D> pulse and the memory V304 delivers the least significant bits to the DAC until the character is finished.
+
+@FED = 3. Voltages
+Generation of a voltage is in general done the <R>same way as generation of a character. Only the microprocessor sends an <MO>UPDATE<D> pulse instead of the <MO>BEGIN<D> pulse. The DAC values will then be sampled one time via V312-D, V316-A, V315-A-B and V106-F without starting the address counter V301. The voltage on the outputs HGV and VGV will then correspond to the input values. 

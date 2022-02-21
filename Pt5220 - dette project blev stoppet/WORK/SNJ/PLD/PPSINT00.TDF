@@ -1,0 +1,62 @@
+%
+Title           PT5220 PPS INTERFACE
+Pattern          
+Revision        0
+Author          SNJ
+Company         PTV
+Date            990413
+%
+
+TITLE "PPSINT00";
+
+constant cmax = 1729;
+
+SUBDESIGN PPSINT00
+(	
+
+CLOCK		:	INPUT;
+PP4S		:	INPUT;
+WINDOW_GPS	:	INPUT;
+GPS_SEL		:	INPUT;
+HRESET_GPS	:	OUTPUT;
+FRAME_GPS	:	OUTPUT;
+	
+)
+	
+VARIABLE
+
+PP4S_D[2..1]	:	DFF;
+FLAG		:	DFF;
+COUNT[11..0]	:	DFF;
+TIME0		:	DFF;
+FRAME_GPS	:	DFF;
+HRESET_GPS	:	DFF;
+BEGIN
+
+
+
+
+PP4S_D[2..1].clk=clock;
+FLAG.clk=clock;
+PP4S_D1=PP4S;
+PP4S_D2=PP4S_D1;
+FLAG= PP4S_D1 & !PP4S_D2;
+
+COUNT[].clk=clock;
+IF FLAG THEN
+  COUNT[]=0;
+ELSIF COUNT11 == 1 THEN
+  COUNT[]=COUNT[];
+ELSE
+  COUNT[]=COUNT[]+1;
+END IF; 
+
+TIME0.clk=clock;
+TIME0 = COUNT[]==1728;
+FRAME_GPS.clk = CLOCK;
+FRAME_GPS = COUNT11 # (FRAME_GPS & (COUNT[] != 512)); 
+
+HRESET_GPS.clk= CLOCK;
+HRESET_GPS=GPS_SEL & TIME0 & !WINDOW_GPS;
+
+END;

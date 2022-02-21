@@ -1,0 +1,107 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\BootProgram\Source\1_5\xaintfc.src
+ADDR   CODE            LINE SOURCELINE
+                          2 ; options: -IC:\cxa\include -Ml -Cxag3 -Sd -A1 -O1 -DWritableSector=0
+                          3 ;          -DBootProgram=1 -g
+                          5 $NOZPAGE
+                          6         NAME    XAINTFC
+000000                   17 XAINTFC_PR      SEGMENT HCODE
+000000                   18         RSEG    XAINTFC_PR
+                         19         ALIGN   1
+                         21         PUBLIC  _Udr_InChar
+000000                   22 _Udr_InChar:
+000000 A97E              26         ADDS.W  R7,#0EH
+000002 9128rr            30         MOV.B   R1L,#SEG( __lc_bs )
+000005 7133              31         XOR.B   R1H,R1H
+000007 8907              32         MOV.W   R0,R7
+                         33         CALL    _Udr_ReceiveByte
+000009 C4rrrrrr         +33 ;       FCALL   _Udr_ReceiveByte
+00000D 9104FF            34         CMP.B   R0L,#0FFH
+000010 F203              35         BNE     _3
+000012 9108FF            37         MOV.B   R0L,#0FFH
+000015 FE02              38         BR      _4
+000015 FE0200            38         BR      _4
+000018                   39 _3:
+000018 8207              41         MOV.B   R0L,[R7]
+00001A                   43 _4:
+00001A A972              44         ADDS.W  R7,#02H
+00001C D680              46         RET
+                         48         ALIGN   1
+                         50         PUBLIC  _Udr_PutChar
+00001E                   51 _Udr_PutChar:
+00001E 0F10              55         PUSH.W  R4
+000020 8180              58         MOV.B   R4L,R0L
+000022                   63 _6:
+000022 8108              64         MOV.B   R0L,R4L
+                         67         CALL    _Udr_SendByte
+000024 C4rrrrrr         +67 ;       FCALL   _Udr_SendByte
+000028 9104FE            70         CMP.B   R0L,#0FEH
+00002B F3FB              71         BEQ     _6
+00002D 2F10              73         POP.W   R4
+00002F D680              75         RET
+000031 00                78         ALIGN   1
+                         80         PUBLIC  _Udr_PutNChar
+000032                   81 _Udr_PutNChar:
+000032 0F30              87         PUSH.W  R4, R5
+000034 8951              89         MOV.W   R5,R1
+000036 8940              90         MOV.W   R4,R0
+000038 FE09              94         BR      _10
+00003A                   96 _8:
+00003A                   96 _8:
+00003A                   97 _9:
+00003A 86AC42            98         MOV.B   ES,R5L
+00003D 8204              99         MOV.B   R0L,[R4]
+                        100         CALL    _Udr_SendByte
+00003F C4rrrrrr        +100 ;       FCALL   _Udr_SendByte
+000043 9104FE           101         CMP.B   R0L,#0FEH
+000046 F3F9             102         BEQ     _9
+000048 99400001         104         ADD.W   R4,#01H
+00004C                  106 _10:
+00004C 86AC42           107         MOV.B   ES,R5L
+00004F 8204             108         MOV.B   R0L,[R4]
+000051 F2F4             109         BNE     _8
+000053 2F30             111         POP.W   R4, R5
+000055 D680             113         RET
+000057 00               115         ALIGN   1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        117         PUBLIC  _Udr_CPutNChar
+000058                  118 _Udr_CPutNChar:
+000058 0F30             124         PUSH.W  R4, R5
+00005A FE10             129         BR      _14
+00005C                  131 _12:
+00005C                  131 _12:
+00005C                  132 _13:
+00005C 8915             133         MOV.W   R1,R5
+00005E 8904             134         MOV.W   R0,R4
+000060 862C43           135         MOV.B   CS,R1L
+000063 8020             136         MOVC.B  R1L,[R0+]
+000065 8102             137         MOV.B   R0L,R1L
+                        138         CALL    _Udr_SendByte
+000067 C4rrrrrr        +138 ;       FCALL   _Udr_SendByte
+00006B 9104FE           139         CMP.B   R0L,#0FEH
+00006E F3F6             140         BEQ     _13
+000070 99400001         142         ADD.W   R4,#01H
+000074 99510000         143         ADDC.W  R5,#00H
+000078 8915             144         MOV.W   R1,R5
+00007A 8904             145         MOV.W   R0,R4
+00007C                  147 _14:
+00007C 8951             148         MOV.W   R5,R1
+00007E 8940             149         MOV.W   R4,R0
+000080 862C43           150         MOV.B   CS,R1L
+000083 8020             151         MOVC.B  R1L,[R0+]
+000085 F2EB             152         BNE     _12
+000087 2F30             154         POP.W   R4, R5
+000089 D680             156         RET
+                        162         EXTRN   HCODE(_Udr_SendByte)
+                        165         EXTRN   HCODE(_Udr_ReceiveByte)
+                        166         EXTRN   IDATA(__lc_bs)
+                        167         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        168         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        169         CALLS   'Udr_InChar', 'Udr_ReceiveByte'
+                        170         CALLS   'Udr_PutChar', 'Udr_SendByte'
+                        171         CALLS   'Udr_PutNChar', 'Udr_SendByte'
+                        172         CALLS   'Udr_CPutNChar', 'Udr_SendByte'

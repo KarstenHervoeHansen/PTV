@@ -1,0 +1,205 @@
+|PALASM  pins: (CLK,FIELDM,FIELDG,LOADHG,LOADHM,DATAIN[7..0],LOAD1,LOAD2
+|            ,RAMADDR[7..2],ENBB,ENSY,G,LINELATCH,OUTCLK,EN0,EN1,EN2,FIELDUD,HINT,line7),
+|      nodes:(BB,UP,DOWN,PUP,PDOWN,H[10..0],CA1728,STOP,RAMADDR[1..0]
+|            ,LOADC,TYPE[3..0],DATAIN[10..8],TYPEBUF[3..0],DBUS[10..0],
+ |UPWR1,UPWR2,
+| pedoff,fieldlatch,flag)
+
+ |CONDITIONING: dff(UPWR[2..1],CLK)
+ |UPWR1=LOAD1'
+ |UPWR2=LOAD2'
+|UPWR1=LOAD1
+|UPWR2=LOAD2
+
+
+|CONDITIONING: dff(TYPEBUF[3..0],UPWR1)
+|TYPEBUF[3..0]= DATAIN[7..4] 
+
+|CONDITIONING: dff(TYPE[3..0],CLK)
+|TYPE[3..0] = ( TYPEBUF[3..0] & LINELATCH )
+|           # ( TYPE[3..0]    & LINELATCH')
+
+
+|CONDITIONING: dff(DATAIN[10..8],UPWR1)
+|DATAIN[10..8]= DATAIN[2..0]
+
+|CONDITIONING: dff(pedoff,UPWR1)
+|pedoff = DATAIN3 
+
+
+|CONDITIONING: dff(DBUS[10..0],UPWR2)
+|DBUS[10..0] = ( DATAIN[10..0] )
+
+ 
+|           
+|CONDITIONING: dff(LOADC,CLK)
+|LOADC= ( LOADHG & G ) # ( LOADHM & G' )
+
+|CONDITIONING: dff(H[10..0],CLK)
+|map: H[10..0]->H[10..0]
+| {
+|     n->n+1 , LOADC' & CA1728'
+|     n->0   , LOADC' & CA1728
+| }
+|H[10..0]= DBUS[10..0] & LOADC
+
+|CA1728 = ((H[10..0]==1727) & G )
+|       # ((H[10..0]==1715) & G')
+
+|flag= ((dbus[10..0]> 1727) & G )
+|    # ((dbus[10..0]> 1715) & G')
+
+|CONDITIONING: dff(fieldLATCH,CLK)
+|fieldLATCH = ((H[10..0]==1724) & G )
+|           # ((H[10..0]==1712) & G')
+
+|CONDITIONING: dff(FIELDUD,CLK)
+|FIELDUD = ( fieldlatch & ( (G & FIELDG ) # (G' & FIELDM ) ) )
+|        # ( FIELDUD & fieldlatch' )
+|        # ( flag )
+
+|CONDITIONING: tff(HINT,CLK)
+|HINT = (HINT & (H[10..0]==0)) # ( HINT' & (H[10..0]==38) )
+|
+|CONDITIONING: dff(LINELATCH,CLK)
+|LINELATCH = CA1728
+
+
+
+TYPE[3..0]	SYNC	BURST		SETUP I NTSC
+
+0		VV	NO BURST	00
+1		VU	NO BURST	00
+2		UV	NO BURST	00
+3		UU	NO BURST	00
+4		V1	NO BURST	00	NOT USED
+5		V1	NO BURST	00	NOT USED
+6		U1	NO BURST	00
+7		U1	NO BURST	00	NOT USED
+8		S1	NO BURST	00
+9		SU	NO BURST	P0
+10		S1	   BURST	00
+11		SU	   BURST	P0
+12		S1	NO BURST	0P
+13		S1	NO BURST	PP
+14		S1	   BURST	0P
+15		S1	   BURST	PP
+
+
+ |vu = type[3..0]==1
+ |uv = type[3..0]==2
+ |vv = type[3..0]==0
+ |uu = type[3..0]==3
+|VX = TYPE3' & TYPE1'
+|UX = TYPE3' & TYPE1
+|SX = TYPE3
+|
+|BURST = TYPE3 & TYPE1
+|
+|P1 = TYPE3 & TYPE0		| 9.5 
+|P2 = TYPE3 & TYPE2' & TYPE0	|30.0
+|P3 = TYPE3 & TYPE2  & TYPE0'	|41.0
+|P4 = TYPE3 & TYPE2 		|62.0
+|
+|XV = TYPE3' & TYPE2' & TYPE0'
+|XU = TYPE2' & TYPE0
+
+ |VX =0| TYPE3' & TYPE1'
+ |UX =0| TYPE3' & TYPE1
+ |SX =1| TYPE3
+ |
+ |BURST = 1|TYPE3 & TYPE1
+ |
+ |P1 = 1|TYPE3 & TYPE0		| 9.5 
+ |P2 = 0|TYPE3 & TYPE2' & TYPE0	|30.0
+ |P3 = 0|TYPE3 & TYPE2  & TYPE0'	|41.0
+ |P4 = 1|TYPE3 & TYPE2 		|62.0
+ |
+ |XV = 0|TYPE3' & TYPE2' & TYPE1'
+ |XU = 0|TYPE2' & TYPE0
+
+
+|CONDITIONING: dff(DOWN,CLK)
+
+|DOWN = (VX & (H[10..0] ==(i+   0))      ) |  0.000 usec
+|     # (UX & (H[10..0] ==(i+   0))      ) |  0.000 usec
+|     # (SX & (H[10..0] ==(i+   0))      ) |  0.000 usec
+|     # (XV & (H[10..0] ==(i+ 864)) & G  ) | 32.000 usec
+|     # (XV & (H[10..0] ==(i+ 858)) & G' ) | 31.778 usec
+|     # (XU & (H[10..0] ==(i+ 864)) & G  ) | 32.000 usec
+|     # (XU & (H[10..0] ==(i+ 858)) & G' ) | 31.778 usec
+
+
+|CONDITIONING: dff(up,CLK)
+
+|UP   = (VX & (H[10..0] == (i+737 )) & G ) | 27.300 usec
+|     # (VX & (H[10..0] == (i+731 )) & G') | 27.078 usec
+|     # (UX & (H[10..0] == (i+63  ))     ) | 2.35 usec
+|     # (SX & (H[10..0] == (i+127 ))     ) | 4.7
+|     # (XV & (H[10..0] == (i+1601)) & G ) | 59.3
+|     # (XV & (H[10..0] == (i+1589)) & G') | 58.856
+|     # (XU & (H[10..0] == (i+927 )) & G ) | 34.35  usec
+|     # (XU & (H[10..0] == (i+921 )) & G') | 34.128 usec
+
+|CONDITIONING: dff(BB,CLK)
+
+|BB =  (BURST & (H[10..0] == (i+138+9)) & G    )
+|   #  (BURST & (H[10..0] == (i+139)) & G'    )
+
+
+|CONDITIONING: dff(pup,CLK)
+|PUP = (P1 & (H[10..0] == (i +  254)) & G' & pedoff')   | 9.400 usec
+|    # (P3 & (H[10..0] == (i + 1112)) & G' & pedoff')   |41.178 usec
+|
+|CONDITIONING: dff(PDOWN,CLK)
+|PDOWN = (P2 & (H[10..0] == (i+  818)) & G' & pedoff' )   |30.278 usec 
+|      # (P4 & (H[10..0] == (i+ 1676)) & G' & pedoff' ) |62.056 usec
+
+
+|CONDITIONING: ff(STOP,CLK)
+|
+|STOP= ((RAMADDR[7..0]==126) )
+|    # ((RAMADDR[7..0]==146) )
+|    # ((RAMADDR[7..0]==178) )
+|    # ((RAMADDR[7..0]==210) )
+|    # ((RAMADDR[7..0]==242) )
+|    # ((STOP & BB'&UP'&DOWN'&PUP'&PDOWN'))
+0
+
+|CONDITIONING: ff(RAMADDR[7..0],CLK)
+|MAP: RAMADDR[7..0]->RAMADDR[7..0]
+|{
+|  n-> 0   , BB 
+|  n-> 128 , DOWN 
+|  n-> 160 , UP 
+|  n-> 192 , PUP 
+|  n-> 224 , PDOWN 
+|  n-> n+1 , STOP' & BB' & up' & DOWN' & pup' & PDOWN' & ((RAMADDR[1..0])/=2)  
+|  n-> n+2 , STOP' & BB' & up' & DOWN' & pup' & PDOWN' & ((RAMADDR[1..0])==2)  
+|  n-> n   , STOP & BB'&UP'&DOWN'&PUP'&PDOWN'
+|} 
+
+rem denne linie brugse ikke |stopbb=h[10..0]>511
+|stopbb=0
+|CONDITIONING: ff(ENBB,CLK)
+|ENBB = (BB  )
+|     # (ENBB & ( up # DOWN # pup # PDOWN # stopbb) ' )
+
+
+|CONDITIONING: ff(ENsy,CLK)
+|ENsy = (( up # DOWN # pup # PDOWN ) )
+|      # ( ENsy & BB' )
+
+
+|CONDITIONING: ff(OUTCLK,CLK)
+|OUTCLK = (STOP' & (RAMADDR[1..0]==1))'
+|CONDITIONING: ff(EN0,CLK)
+|EN0 = OUTCLK
+|CONDITIONING: ff(EN1,CLK)
+|EN1  = EN0
+|CONDITIONING: ff(EN2,CLK)
+|EN2 = (OUTCLK & EN0 )'
+
+
+|CONDITIONING: tff(line7,CLK)
+|line7 =( ( G & ( h[10..0]==335 ) & line7' &  (type[3..0]==15) & pedoff )  # ( ( h[10..0]==800 ) & line7 ) ) 

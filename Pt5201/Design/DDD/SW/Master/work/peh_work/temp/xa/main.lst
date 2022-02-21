@@ -1,0 +1,116 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+F:\PTV\Pt5201\Design\DDD\SW\Master\work\peh_work\temp\xa\main.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\cxa\rtxc\xa\include -I. -Ml
+                          3 ;          -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    MAIN
+                         10 ; main.c      1 /* rtxcmain.c - C main() module */
+                         11 ; main.c      2 
+                         12 ; main.c      3 /*
+                         13 ; main.c      4  *   RTXC    
+                         14 ; main.c      5  *   Copyright (c)
+                         15 ; main.c      6  *   Embedded System Products, Inc.
+                         16 ; main.c      7  *   ALL RIGHTS RESERVED
+                         17 ; main.c      8 */
+                         18 ; main.c      9 
+                         19 ; main.c     10 /*** 15/4-99 TK.    Added ptvmain call.   ***/
+                         20 ; main.c     11 
+                         21 ; main.c     12 #include "reg8051.h"
+                         24 ; main.c     13 #include "sysopts.h"
+                         27 ; main.c     14 
+                         28 ; main.c     15 #include "rtxcapi.h"
+                        155 ; main.c     16 #include "enable.h"
+                        158 ; main.c     17 #include "periphal.h"
+                        161 ; main.c     18 #include "ext0drv.h"
+                        371 ; main.c     19 #include "plddrv.h"
+                        374 ; main.c     20 
+                        375 ; main.c     21 extern void ptvmain(void);
+                        376 ; main.c     22 
+                        377 ; main.c     23 /* CONFIG */
+                        378 ; main.c     24 
+                        379 ; main.c     25 extern void rtxcinit(void);         // initialize RTXC
+                        380 ; main.c     26 
+                        381 ; main.c     27 extern void ticktimer_start(void);  // initialize tick timer
+                        382 ; main.c     28 
+                        383 ; main.c     29 extern char setintlvl(char);        // function to set task PPL
+                        384 ; main.c     30 
+                        385 ; main.c     31 /* C main() module -- THE NULLTASK */
+                        386 ; main.c     32 void main(void)
+                        387 ; main.c     33 { 
+000000                  388 MAIN_PR SEGMENT HCODE
+000000                  389         RSEG    MAIN_PR
+                        390         ALIGN   1
+                        392         PUBLIC  _main
+000000                  393 _main:
+                        397 ; main.c     34 #ifndef PTV
+                        398 ; main.c     35   int i;
+                        399 ; main.c     36 #endif
+                        400 ; main.c     37   pld_init();                                                           // initia
+                            lize PLD (audio/SPG)
+                        402         CALL    _pld_init
+000000 C4rrrrrr        +402 ;       FCALL   _pld_init
+                        403 ; main.c     38   ext0_init();                  // initialize tick Timer source
+                        405         CALL    _ext0_init
+000004 C4rrrrrr        +405 ;       FCALL   _ext0_init
+                        406 ; main.c     39   ticktimer_start();            // initialize tick Timer
+                        408         CALL    _ticktimer_start
+000008 C4rrrrrr        +408 ;       FCALL   _ticktimer_start
+                        409 ; main.c     40 
+                        410 ; main.c     41   // kernel initialization
+                        411 ; main.c     42   rtxcinit();                   // initialize RTXC
+                        413         CALL    _rtxcinit
+00000C C4rrrrrr        +413 ;       FCALL   _rtxcinit
+                        414 ; main.c     43 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        415 ; main.c     44   /* set task processor priority level in global variables */
+                        416 ; main.c     45   /* and enable interrupts at task PPL */
+                        417 ; main.c     46   setintlvl(TASK_INT_LEVEL);
+000010 910800           419         MOV.B   R0L,#00H
+                        420         CALL    _setintlvl
+000013 C4rrrrrr        +420 ;       FCALL   _setintlvl
+                        421 ; main.c     47 
+                        422 ; main.c     48   /* enable interrupts */
+                        423 ; main.c     49   EA = 1;
+000017 081337           425         SETB    0337H
+                        426 ; main.c     50 
+                        427 ; main.c     51   ptvmain();
+                        429         CALL    _ptvmain
+00001A C4rrrrrr        +429 ;       FCALL   _ptvmain
+                        430 ; main.c     52 
+                        431 ; main.c     53   for (;;) /* loop forever (null task) */
+00001E                  433 _3:
+00001E FEFF             434         BR      _3
+                        435 ; main.c     54   {
+                        436 ; main.c     55   }
+                        437 ; main.c     56 
+                        438 ; main.c     57   /*
+                        439 ; main.c     58    * user supplied shutdown code should be inserted here
+                        440 ; main.c     59    * typically, the null task never stops, but it may
+                        441 ; main.c     60    * be aborted in some circumstances where it is desirable
+                        442 ; main.c     61    * to stop multi-tasking.
+                        443 ; main.c     62   */
+                        444 ; main.c     63  }
+000020 D680             446         RET
+                        448 ; main.c     64 
+                        449 ; main.c     65 /* end of rtxcmain.c */
+                        454         EXTRN   HCODE(_rtxcinit)
+                        457         EXTRN   HCODE(_ticktimer_start)
+                        460         EXTRN   HCODE(_pld_init)
+                        463         EXTRN   HCODE(_ptvmain)
+                        466         EXTRN   HCODE(_setintlvl)
+                        469         EXTRN   HCODE(_ext0_init)
+                        470         EXTRN   HCODE(__START)
+                        471         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        472         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        473         CALLS   'main', 'pld_init'
+                        474         CALLS   'main', 'ext0_init'
+                        475         CALLS   'main', 'ticktimer_start'
+                        476         CALLS   'main', 'rtxcinit'
+                        477         CALLS   'main', 'setintlvl'
+                        478         CALLS   'main', 'ptvmain'

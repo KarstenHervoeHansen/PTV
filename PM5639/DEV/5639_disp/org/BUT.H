@@ -1,0 +1,17 @@
+/***************************************************************************/
+/*	Copyright PHILIPS TV TEST EQUIPMENT A/S, BRONDBY 1997							*/
+/*	Project:		PM5639 Display Unit														*/
+/*	Module:		BUT.H																			*/
+/*	Author:		Kim Engedahl, DEV															*/
+/*	Org. date:	951017																		*/
+/*	Rev. date:	970822 KEn	DEV															*/
+/*	Status:		Version 2.3																	*/
+/*																									*/
+/*	Changes:																						*/
+/*	950822 Released as version 2.3														*/
+/*	951207 Released as version 2.2														*/
+/***************************************************************************/
+
+extern void butcheck( void);
+
+extern void tbutcheck( void);

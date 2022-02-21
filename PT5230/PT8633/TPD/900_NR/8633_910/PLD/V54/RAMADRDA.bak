@@ -1,0 +1,130 @@
+%/* FILE NAME        ramadrda.TDF                                           */%
+% * PURPOSE          Subdesign file for 8633 V63 generator      .           */%
+% *                  Sound Ram Address generator                            * %
+% *                  Modified for moving TDC Logo similar to 8603/905       */%
+% * TEST                                                                    */%
+% * LAST UPDT:       11.10.2002                                             */%
+% * NOTES:           New design for long logo 256 x 44 with 2 x 64 Sound    */%
+% *                  RAM                                                    */%
+% */                                                                        */%
+
+SUBDESIGN ramadrda
+  (
+  clk, count_enable, oe, adjust   : INPUT;
+  klik,bbcklik,frameb             : INPUT;
+  window,16x9,hsync,MOVEBIT,mres  : INPUT;
+  moveklik                        : INPUT;     % new %
+  abu[14..0]                      : OUTPUT;
+  RAMRST                          : OUTPUT;    % new %
+  )
+
+VARIABLE
+tnode[14..0]            :TRI_STATE_NODE;
+sound_ram[13..0]        :DFF;
+logo_ram[14..0]         :DFF;
+adjust1                 :DFF;
+offset[9..0]            :DFF;
+linenr[4..0]            :DFF;
+updown                  :DFFE;
+RAMRST                  :DFFE;  % new %
+rst                     :DFF;   % new %
+klikb                   :DFF;   % new %
+
+BEGIN
+  sound_ram[13..0].clk  = clk;
+  sound_ram[13..0].clrn = !adjust;
+  offset[].clk          = MOVEBIT;
+  logo_ram[].clk        = clk;
+
+  adjust1.clk           = clk;
+  adjust1.d             = adjust;
+
+	rst.clk  = MOVEBIT;
+	rst.d		 = (!16x9 & offset[].q == 16) # (16x9 & offset[].q == 594); % 612 %	
+
+  updown.clk            = MOVEBIT;
+  updown.d              = VCC;
+  updown.ena            = (offset[] == 336);
+  updown.clrn           = !rst.q;            % !(offset[] == 16); %
+
+
+	RAMRST.clk   = MOVEBIT;
+	RAMRST.ena	 = VCC;
+	RAMRST.d	   = (offset[] == 858) & updown;    % 874 980929 ? %
+
+
+	klikb.clk    = hsync;
+	klikb.d	     = (!RAMRST.q & moveklik) # (klik & !moveklik); % beep %
+%
+  IF updown == 1 THEN
+    offset[].d = offset[].q-4;
+  ELSE  
+    offset[].d = offset[].q+4; 
+  END IF;   
+%
+
+  IF updown == 1 THEN
+	  offset[].d  = offset[].q-4;
+  ELSIF offset[].q == 0 THEN
+	  offset[].d  = 634;     % center:634 max:338 min: 938 % 
+	 ELSE	
+ 	  offset[].d  = offset[].q+4; 
+	END IF; 	
+
+  offset[].clrn = mres; 
+
+  linenr[].clk  = hsync;   %tæller til adressering af de 32 logolinier%
+                           %LSB til tæller er movebit   JK %
+  IF MOVEBIT == 1 THEN
+    IF linenr[].q == 31 THEN
+      linenr[].d = 10;
+    ELSE
+      linenr[].d = linenr[].q+1;
+    END IF;
+  ELSE
+    linenr[].d = 10;
+  END IF;
+
+  IF count_enable == 1 THEN
+    IF (sound_ram[13..0].q == 12031 ) THEN      % 12031 % % 2815 %
+%                             ^^^^^-> we now have sound with click: JK %
+      sound_ram[13..0].d = 512; % 0x200: LowAudioRam %
+    ELSE
+      sound_ram[13..0].d = sound_ram[13..0].q+1;
+    END IF;
+  ELSE
+    sound_ram[8..0].d   = sound_ram[8..0].q;
+    sound_ram9.d        = sound_ram9.q # adjust1.q;
+    sound_ram[13..10].d = sound_ram[13..10].q;
+  END IF;
+  
+  IF hsync == 1 THEN           %tæller til logo_ram (bevægelse)%
+    logo_ram[14..10].d = linenr[4..0].q;
+    logo_ram[9..0].d   = offset[9..0];
+  ELSIF window == 1 THEN
+    logo_ram[14..0].d  = logo_ram[].q+1;
+  ELSE
+    logo_ram[14..0].d  = logo_ram[].q;
+  END IF;
+
+
+  tnode14 = TRI((!window & (klik & !frameb # frameb & bbcklik)) # (window & logo_ram14), !oe); 
+  tnode13  = TRI((!window & sound_ram13) # (window & logo_ram13), !oe);
+  tnode12  = TRI((!window & sound_ram12) # (window & logo_ram12), !oe);
+  tnode11  = TRI((!window & sound_ram11) # (window & logo_ram11), !oe);
+  tnode10  = TRI((!window & sound_ram10) # (window & logo_ram10), !oe);
+  tnode9   = TRI((!window & sound_ram9)  # (window & logo_ram9), !oe);
+  tnode8   = TRI((!window & sound_ram8)  # (window & logo_ram8), !oe);
+  tnode7   = TRI((!window & sound_ram7)  # (window & logo_ram7), !oe);
+  tnode6   = TRI((!window & sound_ram6)  # (window & logo_ram6), !oe);
+  tnode5   = TRI((!window & sound_ram5)  # (window & logo_ram5), !oe);
+  tnode4   = TRI((!window & sound_ram4)  # (window & logo_ram4), !oe);
+  tnode3   = TRI((!window & sound_ram3)  # (window & logo_ram3), !oe);
+  tnode2   = TRI((!window & sound_ram2)  # (window & logo_ram2), !oe);
+  tnode1   = TRI((!window & sound_ram1)  # (window & logo_ram1), !oe);
+  tnode0   = TRI((!window & sound_ram0)  # (window & logo_ram0), !oe);
+
+  abu[14..0] = tnode[14..0];
+END;
+
+

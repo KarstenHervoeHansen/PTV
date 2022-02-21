@@ -1,0 +1,33 @@
+SUBDESIGN adrdkdd1
+(
+	f8_g,f4_m,fh_g,fh_m,rdcb,wrcb,ps:					input;
+	syssel,a11,a12,a13,a14,a15,psen,a16,a17,a18,a19:	input;
+	sys_h,vint,ldlsbph,ldmsbph,ldtxtram:				output;
+	ldstatus,enprom,csram1,csram2,wrram1,wrram2:		output;
+	lnrlsb,lnrmsb,csram,wrram,page1,ldpage:				output;
+	psbuf,dualram:										output;
+)
+
+BEGIN
+	sys_h = (fh_g & !syssel) # (fh_m & syssel);	
+	vint = (f8_g & !syssel) # (f4_m & syssel);
+	ldstatus = !(!ps & !a11 & !a12 & !a13 & !a14 & a15 & !wrcb);
+	ldlsbph = !(!ps & a11 & !a12 & !a13 & !a14 & a15 & !wrcb);
+	ldmsbph = !(!ps & !a11 & a12 & !a13 & !a14 & a15 & !wrcb);
+	ldpage = !(a11 & a12 & !a13 & !a14 & a15 & !wrcb);
+	enprom = psen & (rdcb # (a15 & !a16 & !a17 & !a18));
+	page1 = !ps;
+	lnrlsb = !(!ps & !a11 & !a12 & a13 & !a14 & a15 & !wrcb);
+	lnrmsb = !(!ps & a11 & !a12 & a13 & !a14 & a15 & !wrcb);
+	ldtxtram = !(!ps & !a11 & a12 & a13 & !a14 & a15 & (wrcb XOR rdcb));
+
+	csram1 = ps & !(ps & !a15 & psen);
+	csram2 = ps & !(ps & a15 & psen);	
+	wrram1 = (wrcb # !ps # a15 # !psen);
+	wrram2 = (wrcb # !ps # !a15 # !psen);
+	csram = ps & !(ps & !a15 & psen);
+	wrram = (wrcb # !ps # !a15 # !psen);
+	psbuf = ps;
+	dualram = !(!ps & !a11 & !a12 & !a13 & a14 & a15 & !wrcb);
+END;
+

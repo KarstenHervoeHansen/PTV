@@ -1,0 +1,110 @@
+%/* FILE NAME        adrdkdd1.TDF                                           */%
+% * PURPOSE          Subdesign file for 8633 V54 address decoder.           */%
+% *                                                                         */%
+% * TEST                                                                    */%
+% * LAST UPDT:       26.09.2002                                             */%
+% * NOTES:                                                                  */%
+%          ldstatus: 0x8000 - 0x87FF  V73 StatusPort                          %
+%          ldlsbph:  0x8800 - 0x8FFF  V71 LineOffsetReg low /* OffsetPortL */ %
+%          ldmsbph:  0x9000 - 0x97FF  V72 LineOffsetReg hi  /* OffsetPortH */ %
+%          ldpage:   0x9800 - 0x9FFF  unused                                  %
+%          enprom:   0x8000 - 0xFFFF  V53 PROM Enable                         %
+%          lnrlsb:   0xA000 - 0xA7FF  V65 LineTypeReg low   /* LinePortL */   %
+%          lnrmsb:   0xA800 - 0xAFFF  V66 LineTypeReg hi    /* LinePortH */   %
+%          ldtxtram: 0xB000 - 0xBFFF  TextPort[512]                           %
+%          dualram:  0xC000 - 0xC7FF  TextStatusPort                          %
+%                                                                             %
+%          Modified for 2 x 64 k Sound RAM:                                   %
+%          New chip select constructed: cs_sound_ram_lo, cs_sound_ram_hi,     %
+%          wr_sound_ram_lo, wr_sound_ram_hi, cs_logo_ram_lo,                  %
+%          cs_logo_ram_hi, wr_logo_ram_lo. wr_logo_ram_hi                     %
+%                                                                             %
+%  Sound data resides now original sound ram locations.  Logo data resides    %
+%  in the two added ram chips.                                                %
+%  Chip select select now as follows:                                          %
+%   cs_sound_ram_lo:     0x00000 - 0x07FFF  V56   SoundRam read low            %
+%   cs_sound_ram_hi:     0x08000 - 0x0FFFF  v57   SoundRam read hi             %
+%   wr_sound_ram_lo:     0x00000 - 0x07FFF  V56   SoundRam write low           %
+%   wr_sound_ram_hi:     0x08000 - 0x0FFFF  v57   SoundRam write hi            %
+%   cs_logo_ram_lo:      0x10000 - 0x17FFF  V56_2 SoundRam read low            %
+%   cs_logo_ram_hi:      0x18000 - 0x1FFFF  v57_2 SoundRam read hi             %
+%   wr_logo_ram_lo:      0x10000 - 0x17FFF  V56_2 SoundRam write low           %
+%   wr_logo_ram_hi:      0x18000 - 0x1FFFF  v57_2 SoundRam write hi            %
+%                                                                              %
+%   New pins introduced:                                                       %
+%   cs_logo_ram_lo pin 46                                                      %
+%   cs_logo_ram_hi pin 41                                                      %
+%   wr_logo_ram_lo pin 39                                                      %
+%   wr_logo_ram_hi pin 79                                                      %
+% */                                                                         */%
+
+
+SUBDESIGN adrdkdd1
+  (
+  f8_g,f4_m,fh_g,fh_m,rdcb,wrcb,ps:                input;
+  syssel,a11,a12,a13,a14,a15,psen,a16,a17,a18,a19: input;
+
+  window:                                          input;
+
+  sys_h,vint,ldlsbph,ldmsbph,ldtxtram:             output;
+  ldstatus,enprom:                                 output;
+  cs_sound_ram_lo,cs_sound_ram_hi:                 output;
+  wr_sound_ram_lo,wr_sound_ram_hi:                 output;
+  lnrlsb,lnrmsb,csram,wrram,page1,ldpage:          output;
+  psbuf,dualram:                                   output;
+
+  cs_logo_ram_lo,cs_logo_ram_hi:                   output;
+  wr_logo_ram_lo,wr_logo_ram_hi:                   output;
+  )
+
+BEGIN
+  sys_h    = (fh_g & !syssel) # (fh_m & syssel);  
+  vint     = (f8_g & !syssel) # (f4_m & syssel);
+  ldstatus = !(!ps & !a11 & !a12 & !a13 & !a14 & a15 & !wrcb);
+  ldlsbph  = !(!ps &  a11 & !a12 & !a13 & !a14 & a15 & !wrcb);
+  ldmsbph  = !(!ps & !a11 &  a12 & !a13 & !a14 & a15 & !wrcb);
+
+% ldpage   = !(a11 & a12 & !a13 & !a14 & a15 & !wrcb); %
+
+  enprom   = psen & (rdcb # (a15 & !a16 & !a17 & !a18));
+  page1    = !ps;
+  lnrlsb   = !(!ps & !a11 & !a12 & a13 & !a14 & a15 & !wrcb);
+  lnrmsb   = !(!ps &  a11 & !a12 & a13 & !a14 & a15 & !wrcb);
+  ldtxtram = !(!ps & !a11 &  a12 & a13 & !a14 & a15 & (wrcb XOR rdcb));
+
+  wr_sound_ram_lo  = (wrcb # !ps #  a15 # a16 # !psen);
+  wr_sound_ram_hi  = (wrcb # !ps # !a15 # a16 # !psen);
+
+  wr_logo_ram_lo   = (wrcb # !ps #  a15 # !a16 # !psen);
+  wr_logo_ram_hi   = (wrcb # !ps # !a15 # !a16 # !psen);
+
+% window is now used to select appropriate parts of sound ram.  If window
+  is hi, logo ram is selected and logo data output.  If window is low,
+  sound ram is selected and sound data is output.
+%
+
+  IF ps == 1 THEN
+    cs_sound_ram_lo = ps & !(ps & !a15 & !a16 & psen);
+    cs_sound_ram_hi = ps & !(ps &  a15 & !a16 & psen);
+    cs_logo_ram_lo  = ps & !(ps & !a15 &  a16 & psen);
+    cs_logo_ram_hi  = ps & !(ps &  a15 &  a16 & psen);
+  ELSE
+    IF window == 1 THEN   
+      cs_sound_ram_lo   = VCC;
+      cs_sound_ram_hi   = VCC;
+      cs_logo_ram_lo    = GND;
+      cs_logo_ram_hi    = GND;
+    ELSE
+      cs_sound_ram_lo   = GND;
+      cs_sound_ram_hi   = GND;
+      cs_logo_ram_lo    = VCC;
+      cs_logo_ram_hi    = VCC;
+    END IF;
+  END IF;
+
+  csram   = ps & !(ps & !a15 & psen);
+  wrram   = (wrcb # !ps # !a15 # !psen);
+  psbuf   = ps;
+  dualram = !(!ps & !a11 & !a12 & !a13 & a14 & a15 & !wrcb);
+END;
+

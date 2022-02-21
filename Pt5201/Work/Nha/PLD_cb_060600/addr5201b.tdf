@@ -1,0 +1,70 @@
+% Adressedekoder til PT 5201 inclusive resetkredsløb der får
+  mastercontroller til at starte som 16 bit controller.
+  000204/NHa.
+%
+
+SUBDESIGN addr5201b
+(
+	clk,psenm,wrl,wrh,rd,reset,alem						: INPUT;
+	boot,ps												: INPUT;
+	am[18..0],ctsin,adin								: INPUT;
+	clkstatus,hoffset,we_prom,oe_prom,ce_prom	: OUTPUT;
+	we_boot,oe_boot,ce_boot,nvramen,ramen	 	 		: OUTPUT;
+	cts,sramcs,sramoe,sramwe,engain,enled,enbutton		: OUTPUT;
+	tstled,enreada,enwrite,addr,start,enwritea,enwriteb	: OUTPUT;
+	enreadb,enupdata,encheck							: OUTPUT;
+)
+VARIABLE
+	d[4..0]:	                DFF;
+
+BEGIN
+	addr      = (am[17..4]==H"3500");%lavet for af hjælpe med at route kredsen, PIA er for lille%
+	clkstatus = !(boot & adin & am[3..0]==H"0" & !wrl & psenm);
+	hoffset   = !(boot & adin & am[3..0]==H"2"  & !wrl & psenm);
+
+	we_prom   = !(am18 & !boot & !wrl); %kun skrivning hvis boot er 0%
+	oe_prom   = !(%(am18 XOR boot) & %(!psenm OR (!rd & !boot))) ;%oe er høj ved skrivning%
+	ce_prom   = !(am18 XOR boot) ;
+
+	we_boot   = !(boot & am18 & (am17 OR am16 OR am15) & !wrl OR 
+				ps & boot & am18 & !am17 & !am16 & !am15 & !wrl);
+	oe_boot   = !(!psenm & !am18 & !boot) & !(boot & am18 & !rd);
+	ce_boot   = !(!boot & !am18 & !am17 & !am16 & !am15 & !psenm OR  %Boot-program%
+				boot & am18 & (am17 OR am16 OR am15) & (rd XOR wrl) %OR% %data til bootprom%
+				%ps  boot & am18 & !am17 & !am16 & !am15 & (rd XOR wrl)%); %nyt bootprogram%
+
+	nvramen   = !(boot & am18 & !am17 & !am16 & !am15 %& (rd XOR wrl)%);
+
+	ramen     = (boot & !am18 & !am17 %& (rd XOR wrl)%); %fjern rd og wr ??%
+
+	sramcs    = !boot;
+	sramoe    = gnd;
+	sramwe    = !boot # !(!am18 & am17 & !am16 & psenm & !wrl & ps); % hvorfor ps bit i dette udtryk ??%
+	enupdata  = !boot # !(!am18 & am17 & !am16 & psenm & ps);
+
+	engain 	  = ((am18 XOR boot) & adin & am[3..0]==H"4" & !wrl & psenm);
+	enled	  = !((am18 XOR boot) & adin & am[3..0]==H"6" & !wrl & psenm);
+	enbutton  = !((am18 XOR boot) & adin & am[3..0]==H"8" & !rd & psenm);
+	tstled    = !((am18 XOR boot) & adin & am[3..0]==H"A" & !wrl & psenm);
+	enreada   = !((am18 XOR boot) & adin & am[3..0]==H"E" & !rd & psenm); %PLD status%
+	enreadb   = !((am18 XOR boot) & adin & am[3..0]==H"F" & !rd & psenm); %RS232 status%
+	enwrite   = !((am18 XOR boot) & adin & am[3..0]==H"C" & !wrl & psenm); %BB/spg reset%
+	enwritea  = !((am18 XOR boot) & adin & am[3..0]==H"E" & !wrl & psenm); %PLD%
+	enwriteb  = !((am18 XOR boot) & adin & am[3..0]==H"F" & !wrl & psenm); %RS232%
+	encheck	  = !((am18 XOR boot) & adin & am[3..0]==H"D" & !rd & psenm);  %Check af, om de er master processor%
+
+	d[4..0].clk	    = clk;   %Her bruges 27 MHz som clock%
+	d[4..0].clrn	= reset; %Mres clearer tæller, når den er 0%
+							 %holder cts høj så controller bliver 16 bit %
+	IF reset==1 & !(d[]==31) THEN 
+	  d[4..0].d = d[4..0].q+1;
+     ELSE
+	  d[].d = d[].q; 
+	END IF;
+
+	cts = !(reset & d4 & d3 & d2 & d1 & d0) # ctsin;
+	
+	start=reset;
+
+END;
+

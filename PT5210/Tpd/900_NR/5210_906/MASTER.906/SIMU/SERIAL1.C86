@@ -1,0 +1,325 @@
+/*
+********************************************************************
+* Project	: PT5210  MASTER
+* Filename	: SERIAL1.C
+* Version	: 0.0	961111
+* Purpose	: RS232 drivers for RX1/TX1 (port P1.4/P1.5)
+* Org.date	: 960903
+* Author	: PRC
+********************************************************************
+HISTORY:
+961111 Added SndRequest_n(), SndSpecial(), SndAsc_n()
+961101 Added SndRequest() routine.
+961031 Added request answering handling and more delimiters.
+961014 Added Re-send. A checksum is sent after each command. If answer
+	is not 0x80 within 2 ms, the command is repeated (3 times).
+960703 Routine names changed to Snd.. (Char, Int, Long, Asc, Void)
+*/
+#include <stdio.h>
+#include <xa.h>             /* define 8051 registers */
+//#include <intrpt.h>
+
+// Set address for receiving
+#define FifoLength  32
+#define UC unsigned char
+#define UI unsigned int
+#define UL unsigned long
+
+#define MaxTransmit 3
+
+extern near UC myaddress;
+
+/*static bit SM2_1 @ 0x325;
+static bit TB8_1 @ 0x323;
+static bit request;
+*/
+near struct
+{  char Buffer[FifoLength];	// define receive-buffer
+	unsigned char Input;
+	unsigned char Output;
+}  RxBuf1;
+
+near UC CmdToSend[20];	// command buffer
+near UC CmdIndex;	// index to buffer
+near UC rstate;		// state of receive-machine
+near UC rep_no;		// no. of resend
+near UC cksum;		// checksum of sent command
+near UC v24stat;	// status for transmission
+
+
+near UC TEST;
+
+// *****************************************************************
+
+void Serial1_init(void)
+{
+	RxBuf1.Input = 0;
+	RxBuf1.Output = FifoLength - 1;
+	RxBuf1.Buffer[0] = '\0';
+//   SWE |= 2;		// enable 'wait_for_answer' interrupt
+//   ERI1= 1;  	// enable serial interrupt
+//   SM2_1= 0;
+}
+// *****************************************************************
+
+near UC AnswerBuf[30];	// global buffer to save answer and checksum
+bit AnswerError;	// global flag for checksum error in answer
+static UI answertout;	// local time-out counter
+
+#define False 0
+#define True 1
+// *****************************************************************
+
+void Serial1_int(void)
+{}
+// *****************************************************************
+
+bit AnswerCheck(void)
+{}
+// *****************************************************************
+
+void pause1(UI tid)
+{}
+// *****************************************************************
+
+void waitanswer(void)
+// (former Low priority (SW)interrupt,) called from Serial1_int.
+// Purpose is to wait for command-confirm code from units and re-send
+// command in case of checksum error or time-out.
+
+{}
+// *****************************************************************
+
+void put_char1 (UC c)  {
+}
+// *****************************************************************
+
+char get_char1 (void) {
+}
+// *****************************************************************
+
+UC SndChar(UC adr, char* A, UC x)
+{	gotoxy( 55, 2);
+	printf( "                         ");
+	gotoxy( 55, 2);
+	printf( "C: %d %s %d", adr, A, x);
+	return( TEST);
+}
+// *****************************************************************
+
+UC SndInt(UC adr, char* A, UI x)
+{	gotoxy( 55, 3);
+	printf( "                         ");
+	gotoxy( 55, 3);
+
+	delay(100);
+
+	printf( "I: %d %s %5d", adr, A, x);
+	return( TEST);
+}
+// *****************************************************************
+
+UC SndInt2(UC adr, char* A, UI x, UI y)
+{	gotoxy( 55, 3);
+	printf( "                         ");
+	gotoxy( 55, 3);
+
+	delay(100);
+
+	printf( "I: %d %s %5d  %5d", adr, A, x, y);
+	return( TEST);
+}
+// *****************************************************************
+
+UC SndInt3(UC adr, char* A, UI x, UI y, UI z)
+{	gotoxy( 55, 3);
+	printf( "                         ");
+	gotoxy( 55, 3);
+
+	delay(100);
+
+	printf( "I: %d %s %5d  %5d", adr, A, x, y);
+	return( TEST);
+}
+// *****************************************************************
+
+UC SndLong(UC adr, char* A, UL x)
+{	gotoxy( 55, 4);
+	printf( "                         ");
+	gotoxy( 55, 4);
+	printf( "L: %d %s %7.0f", adr, A, (float) x);
+	return( TEST);
+}
+// *****************************************************************
+
+UC SndVoid(UC adr, char* A)
+{ 	gotoxy( 55, 5);
+	printf( "                         ");
+	gotoxy( 55, 5);
+	printf( "V: %d %s", adr, A);
+	return( TEST);
+ }
+// *****************************************************************
+
+/***************************************************************************/
+/*	SndAsc																		  SERIAL1.C	*/
+/*																									*/
+/* Author:		Preben Christiansen, DEV, 960903										*/
+/* Revised:		971024, KEn, DEV     													*/
+/*																									*/
+/*	Function:	Transmit command: <cc'aa..a'> or <ccn,'aa..a'>					*/
+/*	Remarks:		if (n > 9): <cc'aa..'> otherwise <ccn,'aa..a'>					*/
+/*					strlen( aa..a) <= 16														*/
+/*	Returns:		0: OK																			*/
+/*					1: Unit reports a checksum error in command						*/
+/*					2: No acknowledge from unit											*/
+/*	Updates:		cksum																			*/
+/***************************************************************************/
+UC SndAsc( UC adr, char *A, UC n, const char *st) {
+
+	gotoxy( 55, 6);
+	printf( "                         ");
+	gotoxy( 55, 6);
+	printf( "A: %d %s %d %s", adr, A, n, st);
+	return( TEST);
+}
+
+/***************************************************************************/
+/*	SndRequest																	  SERIAL1.C	*/
+/*																									*/
+/* Author:		Preben Christiansen, DEV, 960903										*/
+/* Revised:		971024, KEn, DEV     													*/
+/*																									*/
+/*	Function:	Transmit command: <cc?> or <ccn?>									*/
+/*	Remarks:		if ( n > 9): <cc?> otherwise <ccn?>									*/
+/*	Returns:		0: OK																			*/
+/*					1: Unit reports a checksum error in command						*/
+/*					2: No acknowledge from unit											*/
+/*	Updates:																						*/
+/***************************************************************************/
+UC SndRequest( UC adr, char *A, UC n) {
+
+return( TEST);
+}
+
+UC SndSpecial(UC adr, char* A, char C)
+{ return( TEST);
+}
+/***************************************************************************/
+/*	RecInt																		  SERIAL1.C	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 961023												*/
+/* Revised:		971023				     													*/
+/*																									*/
+/*	Function:	--																				*/
+/*	Remarks:		--																				*/
+/*	Returns:		--																				*/
+/*	Updates:		error 0: OK																	*/
+/*					      1: Unit reports a checksum error in command				*/
+/*					      2: No acknowledge from unit									*/
+/*					      3: checksum error in answer from unit						*/
+/*					      4: No answer from unit											*/
+/***************************************************************************/
+UI RecInt( UC address, char* cmd, UC* error) {
+
+	if (( *error = SndRequest( address, cmd, 0xFF)) == 0) {
+		if (( *error = AnswerCheck()) == 0)
+			return((UI) atoi( AnswerBuf));
+		else
+			*error += 2;
+	}
+
+	return( 0xFFFF);
+}
+
+/***************************************************************************/
+/*	RecLong																		  SERIAL1.C	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 961023												*/
+/* Revised:		971023, KEn, DEV	     													*/
+/*																									*/
+/*	Function:	--																				*/
+/*	Remarks:		--																				*/
+/*	Returns:		--																				*/
+/*	Updates:		error 0: OK																	*/
+/*					      1: Unit reports a checksum error in command				*/
+/*					      2: No acknowledge from unit									*/
+/*					      3: checksum error in answer from unit						*/
+/*					      4: No answer from unit											*/
+/***************************************************************************/
+UL RecLong( UC address, char* cmd, UC* error) {
+
+	if (( *error = SndRequest( address, cmd, 0xFF)) == 0) {
+		if (( *error = AnswerCheck()) == 0)
+			return( (UL) atol( AnswerBuf));
+		else
+			*error += 2;
+	}
+
+	return( 0xFFFFFFFF);
+}
+
+/***************************************************************************/
+/*	RecAsc																		  SERIAL1.C	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 961023												*/
+/* Revised:		971029, KEn, DEV	     													*/
+/*																									*/
+/*	Function:	--																				*/
+/*	Remarks:		Returns answer as received by unit									*/
+/*	Returns:		NULL, if any error, otherwise a pointer to AnswerBuf			*/
+/*	Updates:		error 0: OK																	*/
+/*					      1: Unit reports a checksum error in command				*/
+/*					      2: No acknowledge from unit									*/
+/*					      3: checksum error in answer from unit						*/
+/*					      4: No answer from unit											*/
+/***************************************************************************/
+char* RecAsc( UC address, char* cmd, UC val, UC* error) {
+
+	if (( *error = SndRequest( address, cmd, val)) == 0) {
+		if (( *error = AnswerCheck()) == 0)
+			return( AnswerBuf);
+		else
+			*error += 2;
+	}
+
+	return( NULL);
+}
+
+/***************************************************************************/
+/*	RecStr																		  SERIAL1.C	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 961031												*/
+/* Revised:		971031, KEn, DEV	     													*/
+/*																									*/
+/*	Function:	--																				*/
+/*	Remarks:		Removes quotes if contained in answer								*/
+/*	Returns:		NULL, if any error, otherwise a pointer to AnswerBuf			*/
+/*	Updates:		error 0: OK																	*/
+/*					      1: Unit reports a checksum error in command				*/
+/*					      2: No acknowledge from unit									*/
+/*					      3: checksum error in answer from unit						*/
+/*					      4: No answer from unit											*/
+/***************************************************************************/
+char* RecStr( UC address, char* cmd, UC val, UC* error) {
+
+	UC tmp;
+
+	if (( *error = SndRequest( address, cmd, val)) == 0) {
+		if (( *error = AnswerCheck()) == 0) {
+
+			tmp = strlen( AnswerBuf) - 1;						// Point to last entry
+
+			if (( AnswerBuf[tmp] == '"') && ( AnswerBuf[0] == '"')) {
+
+				AnswerBuf[tmp] = '\0';							// Remove quotes
+				return( &AnswerBuf[1]);
+			}
+			return( AnswerBuf);
+		}	
+		else
+			*error += 2;
+	}
+
+	return( NULL);
+}

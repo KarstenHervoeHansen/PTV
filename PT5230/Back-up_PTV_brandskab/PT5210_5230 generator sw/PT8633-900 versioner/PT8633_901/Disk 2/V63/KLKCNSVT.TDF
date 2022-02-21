@@ -1,0 +1,41 @@
+SUBDESIGN klkcnsvt
+(
+	clk1,clk,ad1,ad0,syssel:	INPUT;
+	ramrst,16x9:				INPUT;
+	klik1,klik2ud,moveklik:		OUTPUT;
+)
+VARIABLE
+	d[6..0],rammemo:           	DFF;
+	klik1,klik2:				DFFE;
+
+BEGIN
+	klik1.clk	= clk1;   %klik-afkoder EBU klik%
+	klik1.clrn	= !((d[]==20 %& !syssel %));
+	klik1.ena	= ((d[]==14 # (d[]==13 & syssel)) & (ad0 # ad1));
+	klik1.d		= VCC;
+
+	klik2.clk	= clk1;   %klik-afkoder BBC-klik%
+	klik2.clrn	= !((d[]==34 & !syssel) # (d[]==35 & syssel));
+	klik2.ena	= ((d[]==20 %& !syssel # d[]==20 & syssel%)
+				  & (ad0 & !ad1));
+	klik2.d		= VCC;
+
+	klik2ud     = klik1 & (!ad0 & ad1) # klik2 & (ad0 & !ad1);
+
+	moveklik	= (ad0 # ad1);
+
+	d[].clk		= !clk;    %Frame-tæller%
+
+	rammemo.clk = ramrst;
+	rammemo.d	= GND% ej synkronitet til SVT  !16x9 & !syssel  ej synkr. i 525L og 16x9.%;
+	rammemo.clrn= !(d[]==0);
+
+	IF rammemo==1 THEN
+	  d[].d	 = 0;
+	 ELSIF (d[].q==74 & !syssel) # (d[].q==89 & syssel) THEN
+	  d[].d  =0;
+	 ELSE
+	  d[].d	 = d[].q+1;
+	END IF;
+END;
+

@@ -1,0 +1,781 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\work\temp\xa\genlock.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -I..\..\rtxcdef\xa
+                          3 ;          -I..\..\rtxc\xa\include -I..\..\code\include\1_0 -I..\..\app_spec\xa
+                          4 ;          -Ml -O2 -s
+                          6 $NOZPAGE
+                          7         NAME    GENLOCK
+                         11 ; genlock.c    1        /************************************************************************
+                            ****/
+                         12 ; genlock.c    2        /* MODULE:                                                               
+                               */
+                         13 ; genlock.c    3        /*  genlock.c - Genlock generator                                        
+                               */
+                         14 ; genlock.c    4        /************************************************************************
+                            ****/
+                         15 ; genlock.c    5        /* FUNCTIONS:                                                            
+                               */
+                         16 ; genlock.c    6        /*                                                                       
+                               */
+                         17 ; genlock.c    7        /*      int GenlockInit( void)                                           
+                                                                                                                             
+                                                                                    */
+                         18 ; genlock.c    8        /*      int GenlockVersion( char* result)                                
+                                                                                                                             
+                                                            */
+                         19 ; genlock.c    9        /*      int GenlockUpdate( void)                                         
+                                                                                                                             
+                                                                                    */
+                         20 ; genlock.c   10        /*      int SetGenlockSystem( int system)                                
+                                                                                                                             
+                                                            */
+                         21 ; genlock.c   11        /*      int SetGenlockDelay( UL delay)                                   
+                                                                                                                             
+                                                            */      
+                         22 ; genlock.c   12        /*                                                                       
+                               */
+                         23 ; genlock.c   13        /* TASKS:                                                                
+                               */
+                         24 ; genlock.c   14        /*                                                                       
+                               */
+                         25 ; genlock.c   15        /* NOTES:                                                                
+                               */
+                         26 ; genlock.c   16        /*                                                                       
+                               */
+                         27 ; genlock.c   17        /************************************************************************
+                            ****/
+                         28 ; genlock.c   18        /*
+                         29 ; genlock.c   19         *   PTV software for PT5201    
+                         30 ; genlock.c   20         *   Copyright (c) 
+                         31 ; genlock.c   21         *   ProTeleVision Technologies A/S.
+                         32 ; genlock.c   22         *   ALL RIGHTS RESERVED
+                         33 ; genlock.c   23        */
+                         34 ; genlock.c   24        /************************************************************************
+                            ****/
+                         35 ; genlock.c   25        #include <string.h>
+                         39 ; genlock.c   26        
+                         40 ; genlock.c   27        #include "define.h"        // Standard PTV defines
+                         43 ; genlock.c   28        #include "genlock.h"
+                         50 ; genlock.c   29        #include "tables.h"
+                         53 ; genlock.c   30        #include "led_hw.h"
+                         60 ; genlock.c   31        #include "sio0drv.h"
+                        393 ; genlock.c   32        #include "instru.h"
+                        492 ; genlock.c   33        #include "cbar.h"
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        495 ; genlock.c   34        
+                        496 ; genlock.c   35        GenlockObject GenlockSetup;
+                        497 ; genlock.c   36        
+                        498 ; genlock.c   37        /************************************************************************
+                            **/
+                        499 ; genlock.c   38        /* GenlockDefaults                                                       
+                                                                                                                             
+                                                            GENLOCK.C       */
+                        500 ; genlock.c   39        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        501 ; genlock.c   40        /* Author:       Kim Engedahl, DEV, 000607                               
+                                                                                                                             
+                                            */
+                        502 ; genlock.c   41        /* Revised:      000607, KEn, DEV                                        
+                                                                                                                             
+                                                    */
+                        503 ; genlock.c   42        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        504 ; genlock.c   43        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                        505 ; genlock.c   44        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        506 ; genlock.c   45        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        507 ; genlock.c   46        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        508 ; genlock.c   47        /************************************************************************
+                            **/
+                        509 ; genlock.c   48        void GenlockDefaults( void)
+                        510 ; genlock.c   49        {
+000000                  511 GENLOCK_PR      SEGMENT HCODE
+000000                  512         RSEG    GENLOCK_PR
+                        513         ALIGN   1
+                        515         PUBLIC  _GenlockDefaults
+000000                  516 _GenlockDefaults:
+                        520 ; genlock.c   50                Settings.GenlockSetup.System = GenlockSetup.System = Internal;
+000000 964842rr         522         MOV.B   ES,#SEG( _GenlockSetup )
+000004 9908rrrr         523         MOV.W   R0,#SOF( _GenlockSetup )
+000008 B200             524         MOV.B   [R0],#00H
+00000A 964842rr         525         MOV.B   ES,#SEG( _Settings+2 )
+00000E 9908rrrr         526         MOV.W   R0,#SOF( _Settings+2 )
+000012 B200             527         MOV.B   [R0],#00H
+                        528 ; genlock.c   51                Settings.GenlockSetup.Delay = GenlockSetup.Delay = 0;
+000014 964842rr         530         MOV.B   ES,#SEG( _GenlockSetup+2 )
+000018 9908rrrr         531         MOV.W   R0,#SOF( _GenlockSetup+2 )
+00001C BB00             532         MOV.W   [R0+],#00H
+00001E BA00             533         MOV.W   [R0],#00H
+000020 964842rr         534         MOV.B   ES,#SEG( _Settings+4 )
+000024 9908rrrr         535         MOV.W   R0,#SOF( _Settings+4 )
+000028 BB00             536         MOV.W   [R0+],#00H
+00002A BA00             537         MOV.W   [R0],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        538 ; genlock.c   52        
+                        539 ; genlock.c   53                NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+00002C 9918rrrr         541         MOV.W   R1,#SEG( _Settings )
+000030 9908rrrr         542         MOV.W   R0,#SOF( _Settings )
+000034 964842rr         543         MOV.B   ES,#SEG( _SettingsPtr )
+000038 9928rrrr         544         MOV.W   R2,#SOF( _SettingsPtr )
+00003C 8A22             545         MOV.W   R2,[R2]
+00003E 9938004A         546         MOV.W   R3,#04AH
+                        547         CALL    _NV_Store
+000042 C4rrrrrr        +547 ;       FCALL   _NV_Store
+                        548 ; genlock.c   54        }
+000046 D680             550         RET
+                        552 ; genlock.c   55        
+                        553 ; genlock.c   56        /************************************************************************
+                            **/
+                        554 ; genlock.c   57        /* GenlockInit                                                           
+                                                                                                                             
+                                                              GENLOCK.C     */
+                        555 ; genlock.c   58        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        556 ; genlock.c   59        /* Author:       Kim Engedahl, DEV, 000331                               
+                                                                                                                             
+                                            */
+                        557 ; genlock.c   60        /* Revised:      000914, KEn, DEV                                        
+                                                                                                                             
+                                                    */
+                        558 ; genlock.c   61        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        559 ; genlock.c   62        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                        560 ; genlock.c   63        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        561 ; genlock.c   64        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        562 ; genlock.c   65        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        563 ; genlock.c   66        /************************************************************************
+                            **/
+                        564 ; genlock.c   67        int GenlockInit( void)
+                        565 ; genlock.c   68        {
+                        566         ALIGN   1
+                        568         PUBLIC  _GenlockInit
+000048                  569 _GenlockInit:
+                        573 ; genlock.c   69                sio0SndCommand( 12, SPG_V24_address, "GZ;");
+000048 9908000C         575         MOV.W   R0,#0CH
+00004C 9938rrrr         576         MOV.W   R3,#SEG( _3 )
+000050 9928rrrr         577         MOV.W   R2,#SOF( _3 )
+000054 0F0C             578         PUSH.W  R2, R3
+000056 99180015         580         MOV.W   R1,#015H
+                        581         CALL    _sio0SndCommand
+00005A C4rrrrrr        +581 ;       FCALL   _sio0SndCommand
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+00005E A974             582         ADDS.W  R7,#04H
+                        584 ; genlock.c   70        
+                        585 ; genlock.c   71                sio0SndCommand( 20, SPG_V24_address, "GV%lu;", Calibration.Genloc
+                            kCalibration.HPHZeroG);
+000060 964842rr         587         MOV.B   ES,#SEG( _Calibration+122 )
+000064 9918rrrr         588         MOV.W   R1,#SOF( _Calibration+122 )
+000068 8B01             589         MOV.W   R0,[R1+]
+00006A 8A11             590         MOV.W   R1,[R1]
+00006C 0F03             591         PUSH.W  R0, R1
+00006E 9918rrrr         593         MOV.W   R1,#SEG( _4 )
+000072 9908rrrr         594         MOV.W   R0,#SOF( _4 )
+000076 0F03             595         PUSH.W  R0, R1
+000078 99180015         597         MOV.W   R1,#015H
+00007C 99080014         598         MOV.W   R0,#014H
+                        599         CALL    _sio0SndCommand
+000080 C4rrrrrr        +599 ;       FCALL   _sio0SndCommand
+000084 99700008         600         ADD.W   R7,#08H
+                        602 ; genlock.c   72                sio0SndCommand( 20, SPG_V24_address, "GF%lu;", Calibration.Genloc
+                            kCalibration.PhaseG);
+000088 964842rr         604         MOV.B   ES,#SEG( _Calibration+126 )
+00008C 9918rrrr         605         MOV.W   R1,#SOF( _Calibration+126 )
+000090 8B01             606         MOV.W   R0,[R1+]
+000092 8A11             607         MOV.W   R1,[R1]
+000094 0F03             608         PUSH.W  R0, R1
+000096 9918rrrr         610         MOV.W   R1,#SEG( _5 )
+00009A 9908rrrr         611         MOV.W   R0,#SOF( _5 )
+00009E 0F03             612         PUSH.W  R0, R1
+0000A0 99180015         614         MOV.W   R1,#015H
+0000A4 99080014         615         MOV.W   R0,#014H
+                        616         CALL    _sio0SndCommand
+0000A8 C4rrrrrr        +616 ;       FCALL   _sio0SndCommand
+0000AC 99700008         617         ADD.W   R7,#08H
+                        619 ; genlock.c   73        
+                        620 ; genlock.c   74                sio0SndCommand( 20, SPG_V24_address, "GY%lu;", Calibration.Genloc
+                            kCalibration.HPHZeroM);
+0000B0 964842rr         622         MOV.B   ES,#SEG( _Calibration+130 )
+0000B4 9918rrrr         623         MOV.W   R1,#SOF( _Calibration+130 )
+0000B8 8B01             624         MOV.W   R0,[R1+]
+0000BA 8A11             625         MOV.W   R1,[R1]
+0000BC 0F03             626         PUSH.W  R0, R1
+0000BE 9918rrrr         628         MOV.W   R1,#SEG( _6 )
+0000C2 9908rrrr         629         MOV.W   R0,#SOF( _6 )
+0000C6 0F03             630         PUSH.W  R0, R1
+0000C8 99180015         632         MOV.W   R1,#015H
+0000CC 99080014         633         MOV.W   R0,#014H
+                        634         CALL    _sio0SndCommand
+0000D0 C4rrrrrr        +634 ;       FCALL   _sio0SndCommand
+0000D4 99700008         635         ADD.W   R7,#08H
+                        637 ; genlock.c   75                sio0SndCommand( 20, SPG_V24_address, "GG%lu;", Calibration.Genloc
+                            kCalibration.PhaseM);
+0000D8 964842rr         639         MOV.B   ES,#SEG( _Calibration+134 )
+0000DC 9918rrrr         640         MOV.W   R1,#SOF( _Calibration+134 )
+0000E0 8B01             641         MOV.W   R0,[R1+]
+0000E2 8A11             642         MOV.W   R1,[R1]
+0000E4 0F03             643         PUSH.W  R0, R1
+0000E6 9918rrrr         645         MOV.W   R1,#SEG( _7 )
+0000EA 9908rrrr         646         MOV.W   R0,#SOF( _7 )
+0000EE 0F03             647         PUSH.W  R0, R1
+0000F0 99180015         649         MOV.W   R1,#015H
+0000F4 99080014         650         MOV.W   R0,#014H
+                        651         CALL    _sio0SndCommand
+0000F8 C4rrrrrr        +651 ;       FCALL   _sio0SndCommand
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000FC 99700008         652         ADD.W   R7,#08H
+                        654 ; genlock.c   76        
+                        655 ; genlock.c   77                sio0SndCommand( 20, SPG_V24_address, "GX%u;", Calibration.Genlock
+                            Calibration.DACUserValue);
+000100 964842rr         657         MOV.B   ES,#SEG( _Calibration+120 )
+000104 9908rrrr         658         MOV.W   R0,#SOF( _Calibration+120 )
+000108 8A00             659         MOV.W   R0,[R0]
+00010A 0F01             660         PUSH.W  R0
+00010C 9918rrrr         662         MOV.W   R1,#SEG( _8 )
+000110 9908rrrr         663         MOV.W   R0,#SOF( _8 )
+000114 0F03             664         PUSH.W  R0, R1
+000116 99080014         666         MOV.W   R0,#014H
+00011A 99180015         667         MOV.W   R1,#015H
+                        668         CALL    _sio0SndCommand
+00011E C4rrrrrr        +668 ;       FCALL   _sio0SndCommand
+000122 A976             669         ADDS.W  R7,#06H
+                        671 ; genlock.c   78        
+                        672 ; genlock.c   79                GenlockSetup.System = Settings.GenlockSetup.System;
+000124 964842rr         674         MOV.B   ES,#SEG( _Settings+2 )
+000128 9908rrrr         675         MOV.W   R0,#SOF( _Settings+2 )
+00012C 8200             676         MOV.B   R0L,[R0]
+00012E 964842rr         677         MOV.B   ES,#SEG( _GenlockSetup )
+000132 9918rrrr         678         MOV.W   R1,#SOF( _GenlockSetup )
+000136 8209             679         MOV.B   [R1],R0L
+                        680 ; genlock.c   80                GenlockSetup.Delay = Settings.GenlockSetup.Delay;
+000138 964842rr         682         MOV.B   ES,#SEG( _Settings+4 )
+00013C 9918rrrr         683         MOV.W   R1,#SOF( _Settings+4 )
+000140 8B01             684         MOV.W   R0,[R1+]
+000142 8A11             685         MOV.W   R1,[R1]
+000144 964842rr         686         MOV.B   ES,#SEG( _GenlockSetup+2 )
+000148 9928rrrr         687         MOV.W   R2,#SOF( _GenlockSetup+2 )
+00014C 8B0A             688         MOV.W   [R2+],R0
+00014E 8A1A             689         MOV.W   [R2],R1
+                        690 ; genlock.c   81        
+                        691 ; genlock.c   82                return( 0);
+000150 B900             693         MOV.W   R0,#00H
+                        694 ; genlock.c   83        }
+000152 D680             696         RET
+                        698 ; genlock.c   84        
+                        699 ; genlock.c   85        /************************************************************************
+                            **/
+                        700 ; genlock.c   86        /* GenlockVersion                                                        
+                                                                                                                             
+                                                              GENLOCK.C     */
+                        701 ; genlock.c   87        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        702 ; genlock.c   88        /* Author:       Kim Engedahl, DEV, 000504                               
+                                                                                                                             
+                                            */
+                        703 ; genlock.c   89        /* Revised:      000603, KEn, DEV                                        
+                                                                                                                             
+                                                    */
+                        704 ; genlock.c   90        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        705 ; genlock.c   91        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                        706 ; genlock.c   92        /* Remarks:                                                              
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                            *
+                            /
+                        707 ; genlock.c   93        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        708 ; genlock.c   94        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        709 ; genlock.c   95        /************************************************************************
+                            **/
+                        710 ; genlock.c   96        int GenlockVersion( char* result)
+                        711 ; genlock.c   97        {
+                        712         ALIGN   1
+                        714         PUBLIC  _GenlockVersion
+000154                  715 _GenlockVersion:
+                        721 ; genlock.c   98                return( sio0SndRequest( 12, SPG_V24_address, result, "GI?"));
+000154 9938rrrr         723         MOV.W   R3,#SEG( _9 )
+000158 9928rrrr         724         MOV.W   R2,#SOF( _9 )
+00015C 0F0C             725         PUSH.W  R2, R3
+00015E 8931             727         MOV.W   R3,R1
+000160 8920             728         MOV.W   R2,R0
+000162 9908000C         729         MOV.W   R0,#0CH
+000166 99180015         730         MOV.W   R1,#015H
+                        731         CALL    _sio0SndRequest
+00016A C4rrrrrr        +731 ;       FCALL   _sio0SndRequest
+00016E A974             732         ADDS.W  R7,#04H
+                        737 ; genlock.c   99        }
+000170 D680             739         RET
+                        741 ; genlock.c  100        
+                        742 ; genlock.c  101        /************************************************************************
+                            **/
+                        743 ; genlock.c  102        /* GenlockUpdate                                                         
+                                                                                                                             
+                                                              GENLOCK.C     */
+                        744 ; genlock.c  103        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        745 ; genlock.c  104        /* Author:       Kim Engedahl, DEV, 000413                               
+                                                                                                                             
+                                            */
+                        746 ; genlock.c  105        /* Revised:      000509, KEn, DEV                                        
+                                                                                                                             
+                                                    */
+                        747 ; genlock.c  106        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        748 ; genlock.c  107        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                        749 ; genlock.c  108        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        750 ; genlock.c  109        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        751 ; genlock.c  110        /* Updates:                                                              
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                            *
+                            /
+                        752 ; genlock.c  111        /************************************************************************
+                            **/
+                        753 ; genlock.c  112        int GenlockUpdate( void)
+                        754 ; genlock.c  113        {
+                        755         ALIGN   1
+                        757         PUBLIC  _GenlockUpdate
+000172                  758 _GenlockUpdate:
+                        762 ; genlock.c  114                SetGenlockSystem( GenlockSetup.System);
+000172 964842rr         764         MOV.B   ES,#SEG( _GenlockSetup )
+000176 9908rrrr         765         MOV.W   R0,#SOF( _GenlockSetup )
+00017A 8200             766         MOV.B   R0L,[R0]
+00017C B110             767         MOVS.B  R0H,#00H
+00017E C5000B           768         CALL    _SetGenlockSystem
+                        769 ; genlock.c  115          SetGenlockDelay( GenlockSetup.Delay);
+000181 964842rr         771         MOV.B   ES,#SEG( _GenlockSetup+2 )
+000185 9918rrrr         772         MOV.W   R1,#SOF( _GenlockSetup+2 )
+000189 8B01             773         MOV.W   R0,[R1+]
+00018B 8A11             774         MOV.W   R1,[R1]
+00018D C50077           775         CALL    _SetGenlockDelay
+                        776 ; genlock.c  116        
+                        777 ; genlock.c  117                return( OK);
+000190 9908FFFF         779         MOV.W   R0,#0FFFFH
+                        780 ; genlock.c  118        }
+000194 D680             782         RET
+                        784 ; genlock.c  119        
+                        785 ; genlock.c  120        /************************************************************************
+                            **/
+                        786 ; genlock.c  121        /* SetGenlockSystem                                                      
+                                                                                                                             
+                                                      GENLOCK.C     */
+                        787 ; genlock.c  122        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        788 ; genlock.c  123        /* Author:       Kim Engedahl, DEV, 000331                               
+                                                                                                                             
+                                            */
+                        789 ; genlock.c  124        /* Revised:      000619, KEn, DEV                                        
+                                                                                                                             
+                                                    */
+                        790 ; genlock.c  125        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        791 ; genlock.c  126        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                        792 ; genlock.c  127        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        793 ; genlock.c  128        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        794 ; genlock.c  129        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        795 ; genlock.c  130        /************************************************************************
+                            **/
+                        796 ; genlock.c  131        int SetGenlockSystem( int system)
+                        797 ; genlock.c  132        {
+                        798         ALIGN   1
+                        800         PUBLIC  _SetGenlockSystem
+000196                  801 _SetGenlockSystem:
+000196 0F10             805         PUSH.W  R4
+000198 A978             807         ADDS.W  R7,#08H
+                        813 ; genlock.c  133                char cmd[7];
+                        814 ; genlock.c  134        
+                        815 ; genlock.c  135                switch ( system)
+00019A 8940             817         MOV.W   R4,R0
+00019C 99440000         818         CMP.W   R4,#00H
+0001A0 F32D             819         BEQ     _19
+0001A2 99440003         820         CMP.W   R4,#03H
+0001A6 F307             821         BEQ     _15
+0001A8 99440001         822         CMP.W   R4,#01H
+0001AC F30F             823         BEQ     _16
+0001AE 99440002         824         CMP.W   R4,#02H
+0001B2 F317             825         BEQ     _17
+0001B4 FE21             826         BR      _18
+                        829 ; genlock.c  136                {
+                        830 ; genlock.c  137                        case Internal:
+                        831 ; genlock.c  138                                strcpy( cmd, "GM0;");
+                        832 ; genlock.c  139                                break;
+                        833 ; genlock.c  140        
+                        834 ; genlock.c  141                        case MHzLock10:
+0001B6                  836 _15:
+                        837 ; genlock.c  142                                strcpy( cmd, "GM2;");
+0001B6 9128rr           839         MOV.B   R1L,#SEG( __lc_bs )
+0001B9 7133             840         XOR.B   R1H,R1H
+0001BB 8907             841         MOV.W   R0,R7
+0001BD 9938rrrr         842         MOV.W   R3,#SEG( _11 )
+0001C1 9928rrrr         843         MOV.W   R2,#SOF( _11 )
+                        844         CALL    _strcpy
+0001C5 C4rrrrrr        +844 ;       FCALL   _strcpy
+                        845 ; genlock.c  143                                break;
+0001C9 FE23             847         BR      _22
+                        848 ; genlock.c  144        
+                        849 ; genlock.c  145                        case BurstLockPAL:
+0001CC                  851 _16:
+                        852 ; genlock.c  146                                strcpy( cmd, "GM8;");
+0001CC 9128rr           854         MOV.B   R1L,#SEG( __lc_bs )
+0001CF 7133             855         XOR.B   R1H,R1H
+0001D1 8907             856         MOV.W   R0,R7
+0001D3 9938rrrr         857         MOV.W   R3,#SEG( _12 )
+0001D7 9928rrrr         858         MOV.W   R2,#SOF( _12 )
+                        859         CALL    _strcpy
+0001DB C4rrrrrr        +859 ;       FCALL   _strcpy
+                        860 ; genlock.c  147                                break;
+0001DF FE18             862         BR      _22
+                        863 ; genlock.c  148        
+                        864 ; genlock.c  149                        case BurstLockNTSC:
+0001E2                  866 _17:
+                        867 ; genlock.c  150                                strcpy( cmd, "GM10;");
+0001E2 9128rr           869         MOV.B   R1L,#SEG( __lc_bs )
+0001E5 7133             870         XOR.B   R1H,R1H
+0001E7 8907             871         MOV.W   R0,R7
+0001E9 9938rrrr         872         MOV.W   R3,#SEG( _13 )
+0001ED 9928rrrr         873         MOV.W   R2,#SOF( _13 )
+                        874         CALL    _strcpy
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+0001F1 C4rrrrrr        +874 ;       FCALL   _strcpy
+                        875 ; genlock.c  151                                break;
+0001F5 FE0D             877         BR      _22
+                        878 ; genlock.c  152        
+                        879 ; genlock.c  153                        default:
+0001F8                  881 _18:
+                        882 ; genlock.c  154                                return( FAIL);
+0001F8 B900             884         MOV.W   R0,#00H
+0001FA FE3D             885         BR      _23
+0001FC                  887 _19:
+0001FC 9128rr           891         MOV.B   R1L,#SEG( __lc_bs )
+0001FF 7133             892         XOR.B   R1H,R1H
+000201 8907             893         MOV.W   R0,R7
+000203 9938rrrr         894         MOV.W   R3,#SEG( _10 )
+000207 9928rrrr         895         MOV.W   R2,#SOF( _10 )
+                        896         CALL    _strcpy
+00020B C4rrrrrr        +896 ;       FCALL   _strcpy
+                        897 ; genlock.c  155                }
+000210                  899 _22:
+                        900 ; genlock.c  156        
+                        901 ; genlock.c  157                Settings.ActivePreset = 0;
+000210 964842rr         903         MOV.B   ES,#SEG( _Settings )
+000214 9908rrrr         904         MOV.W   R0,#SOF( _Settings )
+000218 BA00             905         MOV.W   [R0],#00H
+                        907 ; genlock.c  158        
+                        908 ; genlock.c  159                Settings.GenlockSetup.System = GenlockSetup.System = system;
+00021A 964842rr         910         MOV.B   ES,#SEG( _GenlockSetup )
+00021E 9908rrrr         911         MOV.W   R0,#SOF( _GenlockSetup )
+000222 8288             912         MOV.B   [R0],R4L
+000224 964842rr         913         MOV.B   ES,#SEG( _Settings+2 )
+000228 9908rrrr         914         MOV.W   R0,#SOF( _Settings+2 )
+00022C 8288             915         MOV.B   [R0],R4L
+                        916 ; genlock.c  160                NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+00022E 9918rrrr         918         MOV.W   R1,#SEG( _Settings )
+000232 9908rrrr         919         MOV.W   R0,#SOF( _Settings )
+000236 964842rr         920         MOV.B   ES,#SEG( _SettingsPtr )
+00023A 9928rrrr         921         MOV.W   R2,#SOF( _SettingsPtr )
+00023E 8A22             922         MOV.W   R2,[R2]
+000240 9938004A         923         MOV.W   R3,#04AH
+                        924         CALL    _NV_Store
+000244 C4rrrrrr        +924 ;       FCALL   _NV_Store
+                        925 ; genlock.c  161        
+                        926 ; genlock.c  162                LEDSet( GenlockLED, false);
+000248 99084000         928         MOV.W   R0,#04000H
+00024C B910             929         MOV.W   R1,#00H
+                        930         CALL    _LEDSet
+00024E C4rrrrrr        +930 ;       FCALL   _LEDSet
+                        931 ; genlock.c  163                
+                        932 ; genlock.c  164                return( sio0SndCommand( 12, SPG_V24_address, "%s", cmd));
+000252 9908000C         934         MOV.W   R0,#0CH
+000256 99180015         935         MOV.W   R1,#015H
+00025A 9168rr           936         MOV.B   R3L,#SEG( __lc_bs )
+00025D 7177             937         XOR.B   R3H,R3H
+00025F 8927             938         MOV.W   R2,R7
+000261 0F0C             939         PUSH.W  R2, R3
+000263 9938rrrr         941         MOV.W   R3,#SEG( _14 )
+000267 9928rrrr         942         MOV.W   R2,#SOF( _14 )
+00026B 0F0C             943         PUSH.W  R2, R3
+                        945         CALL    _sio0SndCommand
+00026D C4rrrrrr        +945 ;       FCALL   _sio0SndCommand
+000271 99700008         946         ADD.W   R7,#08H
+                        948 ; genlock.c  165        }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+000276                  950 _23:
+000276 99700008         951         ADD.W   R7,#08H
+00027A 2F10             953         POP.W   R4
+00027C D680             955         RET
+                        957 ; genlock.c  166        
+                        958 ; genlock.c  167        /************************************************************************
+                            **/
+                        959 ; genlock.c  168        /* SetGenlockDelay                                                       
+                                                                                                                             
+                                                            GENLOCK.C       */
+                        960 ; genlock.c  169        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        961 ; genlock.c  170        /* Author:       Kim Engedahl, DEV, 000331                               
+                                                                                                                             
+                                            */
+                        962 ; genlock.c  171        /* Revised:      000731, KEn, DEV                                        
+                                                                                                                             
+                                                    */
+                        963 ; genlock.c  172        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        964 ; genlock.c  173        /* Function: Broadcast common delay to BB and CBar                       
+                                                                                                    */
+                        965 ; genlock.c  174        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        966 ; genlock.c  175        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        967 ; genlock.c  176        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        968 ; genlock.c  177        /************************************************************************
+                            **/
+                        969 ; genlock.c  178        int SetGenlockDelay( UL delay)
+                        970 ; genlock.c  179        {
+                        971         ALIGN   1
+                        973         PUBLIC  _SetGenlockDelay
+00027E                  974 _SetGenlockDelay:
+00027E 0F30             978         PUSH.W  R4, R5
+                        982 ; genlock.c  180                Settings.ActivePreset = 0;
+000280 964842rr         984         MOV.B   ES,#SEG( _Settings )
+000284 9928rrrr         985         MOV.W   R2,#SOF( _Settings )
+000288 BA20             986         MOV.W   [R2],#00H
+                        987 ; genlock.c  181        
+                        988 ; genlock.c  182                Settings.GenlockSetup.Delay = GenlockSetup.Delay = delay;
+00028A 8951             990         MOV.W   R5,R1
+00028C 8940             991         MOV.W   R4,R0
+00028E 964842rr         992         MOV.B   ES,#SEG( _GenlockSetup+2 )
+000292 9908rrrr         993         MOV.W   R0,#SOF( _GenlockSetup+2 )
+000296 8B48             994         MOV.W   [R0+],R4
+000298 8A58             995         MOV.W   [R0],R5
+00029A 964842rr         998         MOV.B   ES,#SEG( _Settings+4 )
+00029E 9908rrrr         999         MOV.W   R0,#SOF( _Settings+4 )
+0002A2 8B48            1000         MOV.W   [R0+],R4
+0002A4 8A58            1001         MOV.W   [R0],R5
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                       1002 ; genlock.c  183                NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+0002A6 9918rrrr        1004         MOV.W   R1,#SEG( _Settings )
+0002AA 9908rrrr        1005         MOV.W   R0,#SOF( _Settings )
+0002AE 964842rr        1006         MOV.B   ES,#SEG( _SettingsPtr )
+0002B2 9928rrrr        1007         MOV.W   R2,#SOF( _SettingsPtr )
+0002B6 8A22            1008         MOV.W   R2,[R2]
+0002B8 9938004A        1009         MOV.W   R3,#04AH
+                       1010         CALL    _NV_Store
+0002BC C4rrrrrr       +1010 ;       FCALL   _NV_Store
+                       1011 ; genlock.c  184        
+                       1012 ; genlock.c  185                sio0SndCommand( 20, BB_V24_address, "HO%lu;", delay);
+0002C0 8915            1014         MOV.W   R1,R5
+0002C2 8904            1015         MOV.W   R0,R4
+0002C4 0F03            1018         PUSH.W  R0, R1
+0002C6 9918rrrr        1021         MOV.W   R1,#SEG( _24 )
+0002CA 9908rrrr        1022         MOV.W   R0,#SOF( _24 )
+0002CE 0F03            1023         PUSH.W  R0, R1
+0002D0 99180034        1025         MOV.W   R1,#034H
+0002D4 99080014        1026         MOV.W   R0,#014H
+                       1027         CALL    _sio0SndCommand
+0002D8 C4rrrrrr       +1027 ;       FCALL   _sio0SndCommand
+0002DC 99700008        1028         ADD.W   R7,#08H
+                       1030 ; genlock.c  186                sio0SndCommand( 20, BB_V24_address, "JO%lu;", delay);
+0002E0 8915            1032         MOV.W   R1,R5
+0002E2 8904            1033         MOV.W   R0,R4
+0002E4 0F03            1035         PUSH.W  R0, R1
+0002E6 9918rrrr        1038         MOV.W   R1,#SEG( _25 )
+0002EA 9908rrrr        1039         MOV.W   R0,#SOF( _25 )
+0002EE 0F03            1040         PUSH.W  R0, R1
+0002F0 99180034        1042         MOV.W   R1,#034H
+0002F4 99080014        1043         MOV.W   R0,#014H
+                       1044         CALL    _sio0SndCommand
+0002F8 C4rrrrrr       +1044 ;       FCALL   _sio0SndCommand
+0002FC 99700008        1045         ADD.W   R7,#08H
+                       1047 ; genlock.c  187                sio0SndCommand( 20, BB_V24_address, "KO%lu;", delay);
+000300 0F30            1049         PUSH.W  R4, R5
+000302 9918rrrr        1051         MOV.W   R1,#SEG( _26 )
+000306 9908rrrr        1052         MOV.W   R0,#SOF( _26 )
+00030A 0F03            1053         PUSH.W  R0, R1
+00030C 99180034        1055         MOV.W   R1,#034H
+000310 99080014        1056         MOV.W   R0,#014H
+                       1057         CALL    _sio0SndCommand
+000314 C4rrrrrr       +1057 ;       FCALL   _sio0SndCommand
+000318 99700008        1058         ADD.W   R7,#08H
+                       1060 ; genlock.c  188        
+                       1061 ; genlock.c  189                SetCBDelay( CBSetup.Delay);     // The delay routine also takes t
+                            he genlock
+00031C 964842rr        1063         MOV.B   ES,#SEG( _CBSetup+4 )
+000320 9918rrrr        1064         MOV.W   R1,#SOF( _CBSetup+4 )
+000324 8B01            1065         MOV.W   R0,[R1+]
+000326 8A11            1066         MOV.W   R1,[R1]
+                       1067         CALL    _SetCBDelay
+000328 C4rrrrrr       +1067 ;       FCALL   _SetCBDelay
+                       1068 ; genlock.c  190                                                                                 
+                                                                            //  offset into account.                         
+                                                                                                                             
+                                                            
+                       1069 ; genlock.c  191                return( OK);
+00032C 9908FFFF        1071         MOV.W   R0,#0FFFFH
+                       1072 ; genlock.c  192        }
+000330 2F30            1074         POP.W   R4, R5
+000332 D680            1076         RET
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                       1082         EXTRN   HCODE(_SetCBDelay)
+000000                 1083 GENLOCK_INI_FA  SEGMENT HDATA INSEGMENT INIT
+000000                 1084         RSEG    GENLOCK_INI_FA
+000000 474D383B00      1085 _12:    DB      047H,04DH,038H,03BH,000H
+000005 4747256C753B00  1086 _7:     DB      047H,047H,025H,06CH,075H,03BH,000H
+                       1089         EXTRN   HCODE(_sio0SndCommand)
+00000C 4B4F256C753B00  1090 _26:    DB      04BH,04FH,025H,06CH,075H,03BH,000H
+000013 4746256C753B00  1091 _5:     DB      047H,046H,025H,06CH,075H,03BH,000H
+00001A 484F256C753B00  1092 _24:    DB      048H,04FH,025H,06CH,075H,03BH,000H
+000021 47493F00        1093 _9:     DB      047H,049H,03FH,000H
+                       1095         EXTRN   HDATA(_CBSetup)
+000025 257300          1096 _14:    DB      025H,073H,000H
+                       1099         EXTRN   HCODE(_LEDSet)
+                       1102         EXTRN   HCODE(_strcpy)
+000028 474D303B00      1103 _10:    DB      047H,04DH,030H,03BH,000H
+                       1105         EXTRN   HDATA(_SettingsPtr)
+00002D 475A3B00        1106 _3:     DB      047H,05AH,03BH,000H
+000031 475825753B00    1107 _8:     DB      047H,058H,025H,075H,03BH,000H
+000000                 1110 GENLOCK_CLR_FA  SEGMENT HDATA INSEGMENT CLEAR
+000000                 1111         RSEG    GENLOCK_CLR_FA
+                       1112         PUBLIC  _GenlockSetup
+                       1113         ALIGN   1
+000000                 1114 _GenlockSetup:  DS      6
+   |  RESERVED             
+000005
+                       1116         EXTRN   HDATA(_Settings)
+                       1119         EXTRN   HCODE(_NV_Store)
+000037                 1120         RSEG    GENLOCK_INI_FA
+000037 474D323B00      1121 _11:    DB      047H,04DH,032H,03BH,000H
+00003C 4A4F256C753B00  1122 _25:    DB      04AH,04FH,025H,06CH,075H,03BH,000H
+                       1124         EXTRN   HDATA(_Calibration)
+000043 4756256C753B00  1125 _4:     DB      047H,056H,025H,06CH,075H,03BH,000H
+                       1126         EXTRN   IDATA(__lc_bs)
+00004A 4759256C753B00  1127 _6:     DB      047H,059H,025H,06CH,075H,03BH,000H
+000051 474D31303B00    1128 _13:    DB      047H,04DH,031H,030H,03BH,000H
+                       1131         EXTRN   HCODE(_sio0SndRequest)
+                       1132         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1133         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1134         CALLS   'GenlockDefaults', 'NV_Store'
+                       1135         CALLS   'GenlockInit', 'sio0SndCommand'
+                       1136         CALLS   'GenlockVersion', 'sio0SndRequest'
+                       1137         CALLS   'GenlockUpdate', 'SetGenlockSystem'
+                       1138         CALLS   'GenlockUpdate', 'SetGenlockDelay'
+                       1139         CALLS   'SetGenlockSystem', 'strcpy'
+                       1140         CALLS   'SetGenlockSystem', 'NV_Store'
+                       1141         CALLS   'SetGenlockSystem', 'LEDSet'
+                       1142         CALLS   'SetGenlockSystem', 'sio0SndCommand'
+                       1143         CALLS   'SetGenlockDelay', 'NV_Store'
+                       1144         CALLS   'SetGenlockDelay', 'sio0SndCommand'
+                       1145         CALLS   'SetGenlockDelay', 'SetCBDelay'

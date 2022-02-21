@@ -1,0 +1,80 @@
+%SDI test signal generator%
+
+SUBDESIGN hdecodw
+(
+	clk,da[10..0],sound, 3or4,adjust,syssel	: INPUT;
+	window									: INPUT;
+	hint,hsync,addenable,checksum,count		: OUTPUT;
+	rambit,hload1,ramadj,frameb,upint		: OUTPUT;
+)
+VARIABLE
+	hsync,checksum,pause,hload1:			DFF;
+	framereset,upint:						DFF;
+	addenable,count,ramdata,hint,ramadj:	DFFE;
+	frameb:	DFFE;
+
+BEGIN
+	hint.clk	= clk;		%processor-interrupt%
+	hint.d		= VCC; 
+	hint.ena	= (da[10..0] == 1485);
+	hint.clrn	= !(da[10..0] == 1391);
+
+	hload1.clk	    = clk;	%Loadpuls til promadresse (segment nr.)%
+	hload1.d		= (da[10..0] == 1487);%1485 970821 test movement% 
+
+	checksum.clk	= clk;	%placering af checksum%
+	checksum.d 		= sound & (3or4 & da[10..0] == 1598 # 
+						!3or4 & da[10..0] == 1586);
+
+	ramadj.clk	    = clk;	%Nulstil lyd ved fejlsekvens%
+	ramadj.d		= VCC; 
+	ramadj.ena		= sound & (!adjust) & (da[10..0] == 1553); 
+	ramadj.clrn		= !hsync.q; 
+
+	addenable.clk	= clk; 	%checksums addder enable%
+	addenable.d		= VCC;
+	addenable.ena	= (sound & da[10..0]==1547);%1447+96%
+	addenable.clrn	= !((3or4 & da[10..0] == 1601) # 
+						(!3or4 & da[10..0] == 1589));
+
+	pause.clk		= clk; 	%ekstra reset til ramdata ?!%
+	pause.d			= (!3or4 & (da[10..0] == 1585) # 
+                      (3or4 & (da[10..0] == 1597)));
+
+	framereset.clk	= clk; 	%reset til BBC klik-generator%
+	framereset.d	= ( (da[10..0] == 1556) # (da[10..0] == 1562) #
+                        (da[10..0] == 1568) # (da[10..0] == 1574) #
+						(da[10..0] == 1580) # (da[10..0] == 1586) #
+						(da[10..0] == 1592) # (da[10..0] == 1598));
+
+	frameb.clk		= clk; 	%Set bit i de kanaler, der skal have langt
+							 klik, dvs. BBC-klik i subframe B%
+	frameb.d		= VCC;
+	frameb.ena		= ( (da[10..0] == 1553) # (da[10..0] == 1559) #
+                        (da[10..0] == 1565) # (da[10..0] == 1571) #
+						(da[10..0] == 1577) # (da[10..0] == 1583) #
+						(da[10..0] == 1589) # (da[10..0] == 1595));
+	frameb.clrn		= !framereset.q;
+
+	ramdata.clk		= clk; 	%data fra ram%
+	ramdata.d		= VCC;
+	ramdata.ena		= (sound & da[10..0]==1541);
+	ramdata.clrn	= !(pause);
+
+	rambit			= ramdata %# window%;
+		
+	count.clk		= clk;	%lydtæller%
+	count.d			= VCC;
+	count.ena		= (sound & da[10..0] == 1549);
+	count.clrn		= !(3or4 & da[10..0] == 1598 #
+					   !3or4 & da[10..0] == 1586);
+
+	hsync.clk		= clk;	%load-pulse til adressedekoder%
+	hsync.d			= ((da[10..0]==1439) & !syssel) # 
+                      ((da[10..0]==1439) & syssel);
+
+	upint.clk		= clk;
+	upint.d	 		= (da[10..0]==1544);
+
+END;
+

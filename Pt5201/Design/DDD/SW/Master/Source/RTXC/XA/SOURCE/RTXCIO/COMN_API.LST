@@ -1,0 +1,975 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTXCIO\cc7179cb.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    COMN_API
+                          6 ; comn_api.c    1       /************************************************************************
+                            ****/
+                          7 ; comn_api.c    2       /* MODULE:                                                               
+                               */
+                          8 ; comn_api.c    3       /*   comn_api.c - common input/output application interface.             
+                               */
+                          9 ; comn_api.c    4       /************************************************************************
+                            ****/
+                         10 ; comn_api.c    5       /* FUNCTIONS:                                                            
+                               */
+                         11 ; comn_api.c    6       
+                         12 ; comn_api.c    7       #if defined( ASYNCH_IO ) || \ 
+                         13 ; comn_api.c    8           defined( SYNCH_IO ) || \ 
+                         14 ; comn_api.c    9           defined( TIMEOUT_IO )  /* { */
+                         15 ; comn_api.c   10       /*   CHNLID IO_chnl_open( DEVID, IOTYPE, IOCOMMAND, INITCHNL * )         
+                               */
+                         16 ; comn_api.c   11       /*     IORC IO_chnl_close( CHNLID )                                      
+                               */
+                         17 ; comn_api.c   12       /*-----------------------------------------------------------------------
+                            ---*/
+                         18 ; comn_api.c   13       /* SUPPORT FUNCTION:                                                     
+                               */
+                         19 ; comn_api.c   14       /*   IORC  process_io( IOPACK *iopack );                                 
+                               */
+                         20 ; comn_api.c   15       /*   const char *  IO_version(void);                                    *
+                            /
+                         21 ; comn_api.c   16       #endif /* } ASYNCH_IO | SYNCH_IO | TIMEOUT_IO */
+                         22 ; comn_api.c   17       /************************************************************************
+                            ****/
+                         23 ; comn_api.c   18       /*
+                         24 ; comn_api.c   19        *   RTXCio    
+                         25 ; comn_api.c   20        *   Copyright (c) 
+                         26 ; comn_api.c   21        *   Embedded System Products, Inc.
+                         27 ; comn_api.c   22        *   ALL RIGHTS RESERVED
+                         28 ; comn_api.c   23       */
+                         29 ; comn_api.c   24       /************************************************************************
+                            ****/
+                         30 ; comn_api.c   25       #include "rtxcapi.h"      /* RTXC - kernel types, declarations & prototyp
+                            es */
+                         31 ; comn_api.c   26       
+                         32 ; comn_api.c   27       #include "rtio_inc.h"                  /* RTXCio - Header file include fi
+                            le */
+                         33 ; comn_api.c   28       
+                         34 ; comn_api.c   29       extern const CHNLID  nchnls;         /* RTXCio - number of channels decla
+                            red */
+                         35 ; comn_api.c   30       extern const DEVID  nldevs;           /* RTXCio - number of devices decla
+                            red */
+                         36 ; comn_api.c   31       extern CCB_ENTRY * chnls_free;              /* pointer to free channel li
+                            st */
+                         37 ; comn_api.c   32       extern CCB_ENTRY * chnls_active;          /* pointer to active channel li
+                            st */
+                         38 ; comn_api.c   33       extern CCB_ENTRY   channel_table[];          /* channel control block tab
+                            le */
+                         39 ; comn_api.c   34       extern PDU_HEADER * logical_dev_tbl[];  /* logical to physical device tab
+                            le */
+                         40 ; comn_api.c   35       
+                         41 ; comn_api.c   36       /*=======================================================================
+                            ===*/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         42 ; comn_api.c   37       /*                      COMMON RTXCio API FUNCTIONS                      
+                               */
+                         43 ; comn_api.c   38       /*=======================================================================
+                            ===*/
+                         44 ; comn_api.c   39       
+                         45 ; comn_api.c   40       #if defined( ASYNCH_IO ) || \ 
+                         46 ; comn_api.c   41           defined( SYNCH_IO ) || \ 
+                         47 ; comn_api.c   42           defined( TIMEOUT_IO )  /* { */
+                         48 ; comn_api.c   43       /*=======================================================================
+                            ===*/
+                         49 ; comn_api.c   44       /*              THESE RTXCio API FUNCTIONS ARE ALWAYS INCLUDED!          
+                               */
+                         50 ; comn_api.c   45       /*=======================================================================
+                            ===*/
+                         51 ; comn_api.c   46       const char *  IO_version(void)
+                         52 ; comn_api.c   47       {
+                         53         PUBLIC  _IO_version
+000000                   54 COMN_API_PR     SEGMENT HCODE
+000000                   55         RSEG    COMN_API_PR
+000000                   55         RSEG    COMN_API_PR
+000000                   56 _IO_version:
+                         57 ; comn_api.c   48          return("RTXCio v1.4a XA-G3/Tasking v2.0 Mar-26-98");
+000000 9918rrrr          58         MOV.W   R1,#SEG( _3 )
+000004 9908rrrr          59         MOV.W   R0,#SOF( _3 )
+                         60 ; comn_api.c   49       }
+000008 D680              61         RET
+000008 D680              61         RET
+                         62 ; comn_api.c   50       
+                         63 ; comn_api.c   51       /*=======================================================================
+                            ===*/
+                         64 ; comn_api.c   52       CHNLID   IO_chnl_open( DEVID       deviceno,
+                         65 ; comn_api.c   53                                  IOTYPE      io_method,
+                         66 ; comn_api.c   54                                  IOCOMMAND   io_command,
+                         67 ; comn_api.c   55                                  INITCHNL *  otherinfo )
+                         68 ; comn_api.c   56       {
+                         69         PUBLIC  _IO_chnl_open
+00000A                   70 _IO_chnl_open:
+00000A 0F70              71         PUSH.W  R4, R5, R6
+00000C A97E              72         ADDS.W  R7,#0EH
+00000E 8962              73         MOV.W   R6,R2
+                         74 ; comn_api.c   57               PDU_HEADER * pduh;
+                         75 ; comn_api.c   58               CHNLID chnlid;
+                         76 ; comn_api.c   59       
+                         77 ; comn_api.c   60               /*---------------------------------------------------------------
+                            ---*/
+                         78 ; comn_api.c   61               /* If the IO_COMMAND does not equal any of the                   
+                               */
+                         79 ; comn_api.c   62               /* three command types then return in error.                     
+                               */
+                         80 ; comn_api.c   63               /*---------------------------------------------------------------
+                            ---*/
+                         81 ; comn_api.c   64               if( ( io_command != READ_IO  ) &&
+                         82 ; comn_api.c   65                   ( io_command != WRITE_IO ) &&
+                         83 ; comn_api.c   66                   ( io_command != RDWR_IO  ) )
+000010 99640008          84         CMP.W   R6,#08H
+000014 F30A              85         BEQ     _6
+000016 99640009          86         CMP.W   R6,#09H
+00001A F307              87         BEQ     _6
+00001C 9964000A          88         CMP.W   R6,#0AH
+000020 F304              89         BEQ     _6
+                         90 ; comn_api.c   67                          return( (CHNLID)((IORC)RTXCIO_ERROR + (IORC)IO_BAD_COM
+                            MAND) );
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000022 9908F803          91         MOV.W   R0,#0F803H
+                         92         BR      _21
+000026 D500E7           +92         JMP.L   _21
+000026 D500E700         +92         JMP.L   _21
+00002A                   93 _6:
+                         94 ; comn_api.c   68       
+                         95 ; comn_api.c   69               /*---------------------------------------------------------------
+                            ---*/
+                         96 ; comn_api.c   70               /* If the IO_METHOD does not equal any of the                    
+                               */
+                         97 ; comn_api.c   71               /* two method types then return in error.                        
+                               */
+                         98 ; comn_api.c   72               /*---------------------------------------------------------------
+                            ---*/
+                         99 ; comn_api.c   73               if( ( io_method != IO_DIRECT  ) && ( io_method != IO_BUFFERED ) )
+                            
+00002A 99140006         100         CMP.W   R1,#06H
+00002E F307             101         BEQ     _8
+000030 99140007         102         CMP.W   R1,#07H
+000034 F304             103         BEQ     _8
+                        104 ; comn_api.c   74                          return( (CHNLID)((IORC)RTXCIO_ERROR + (IORC)IO_BAD_MET
+                            HOD) );
+000036 9908F804         105         MOV.W   R0,#0F804H
+                        106         BR      _21
+00003A D500DD          +106         JMP.L   _21
+00003A D500DD00        +106         JMP.L   _21
+00003E                  107 _8:
+                        108 ; comn_api.c   75       
+                        109 ; comn_api.c   76               /*---------------------------------------------------------------
+                            ---*/
+                        110 ; comn_api.c   77               /* If the device is not valid then return in error.              
+                               */
+                        111 ; comn_api.c   78               /*---------------------------------------------------------------
+                            ---*/
+                        112 ; comn_api.c   79               if( ( deviceno <= 0 ) || ( deviceno > nldevs ) )
+00003E 99040000         113         CMP.W   R0,#00H
+000042 FD07             114         BLE     _9
+000044 964842rr         115         MOV.B   ES,#SEG( _nldevs )
+000048 9928rrrr         116         MOV.W   R2,#SOF( _nldevs )
+00004C 8A22             117         MOV.W   R2,[R2]
+00004E 4902             118         CMP.W   R0,R2
+000050 FD04             119         BLE     _10
+000050 FD04             119         BLE     _10
+000052                  120 _9:
+                        121 ; comn_api.c   80                      return( (CHNLID)((IORC)RTXCIO_ERROR + (IORC)IO_DEVICE_INVA
+                            LID) );
+000052 9908F802         122         MOV.W   R0,#0F802H
+                        123         BR      _21
+000056 D500CF          +123         JMP.L   _21
+000056 D500CF00        +123         JMP.L   _21
+00005A                  124 _10:
+                        125 ; comn_api.c   81       
+                        126 ; comn_api.c   82               /*---------------------------------------------------------------
+                            ---*/
+                        127 ; comn_api.c   83               /* Get the pysical device header of the device.                  
+                               */
+                        128 ; comn_api.c   84               /*---------------------------------------------------------------
+                            ---*/
+                        129 ; comn_api.c   85               pduh = logical_dev_tbl[deviceno];
+00005A 8920             130         MOV.W   R2,R0
+00005C 8A2F             131         MOV.W   [R7],R2
+00005E D922             132         ASL.W   R2,#02H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+000060 B930             133         MOVS.W  R3,#00H
+000062 964842rr         134         MOV.B   ES,#SEG( _logical_dev_tbl )
+000066 8D42rrrr         135         MOV.W   R4,[R2+SOF( _logical_dev_tbl )]
+00006A 8D52rrrr         136         MOV.W   R5,[R2+SOF( _logical_dev_tbl+2 )]
+                        137 ; comn_api.c   86       
+                        138 ; comn_api.c   87               /*---------------------------------------------------------------
+                            ---*/
+                        139 ; comn_api.c   88               /* If the device attribute is to update, then read or write comma
+                            nd */
+                        140 ; comn_api.c   89               /* is okay, or if the channel command is the equivalent to the   
+                               */
+                        141 ; comn_api.c   90               /* device attribute then okay. Else return in error.             
+                               */
+                        142 ; comn_api.c   91               /*---------------------------------------------------------------
+                            ---*/
+                        143 ; comn_api.c   92               if( (pduh->dev_attribute == ATTB_RDWR) ||
+                        144 ; comn_api.c   93                   ( io_command == (IOCOMMAND)pduh->dev_attribute ) )
+00006E 86AC42           145         MOV.B   ES,R5L
+000071 9C4404000A       146         CMP.W   [R4+4],#0AH
+000076 F304             147         BEQ     _11
+000078 86AC42           148         MOV.B   ES,R5L
+00007B 4C6C04           149         CMP.W   [R4+4],R6
+00007E F255             150         BNE     _13
+00007E F255             150         BNE     _13
+000080                  151 _11:
+                        152 ; comn_api.c   94               {
+                        153 ; comn_api.c   95                   /*-----------------------------------------------------------
+                            ---*/
+                        154 ; comn_api.c   96                   /* If channels are available then assign one, else return ZER
+                            O  */
+                        155 ; comn_api.c   97                   /* indicating no channels are available.                     
+                               */
+                        156 ; comn_api.c   98                   /*-----------------------------------------------------------
+                            ---*/
+                        157 ; comn_api.c   99                   if( chnls_free != NULLCCBE )
+000080 964842rr         158         MOV.B   ES,#SEG( _chnls_free )
+000084 9958rrrr         159         MOV.W   R5,#SOF( _chnls_free )
+000088 8B45             160         MOV.W   R4,[R5+]
+00008A 8A55             161         MOV.W   R5,[R5]
+00008C 964842rr         162         MOV.B   ES,#SEG( _chnls_free )
+000090 9908rrrr         163         MOV.W   R0,#SOF( _chnls_free )
+000094 8B48             164         MOV.W   [R0+],R4
+000096 8A58             165         MOV.W   [R0],R5
+000098 6954             166         OR.W    R5,R4
+00009A F345             167         BEQ     _12
+                        168 ; comn_api.c  100                   {
+                        169 ; comn_api.c  101                       if( chnls_active != NULLCCBE )
+00009C 964842rr         170         MOV.B   ES,#SEG( _chnls_active )
+0000A0 9938rrrr         171         MOV.W   R3,#SOF( _chnls_active )
+0000A4 8B23             172         MOV.W   R2,[R3+]
+0000A6 8A33             173         MOV.W   R3,[R3]
+0000A8 8953             174         MOV.W   R5,R3
+0000AA 8942             175         MOV.W   R4,R2
+0000AC 6932             176         OR.W    R3,R2
+0000AE F340             177         BEQ     _14
+0000B0 964842rr         178         MOV.B   ES,#SEG( _chnls_free )
+0000B4 9938rrrr         179         MOV.W   R3,#SOF( _chnls_free )
+0000B8 8B23             180         MOV.W   R2,[R3+]
+0000BA 8A33             181         MOV.W   R3,[R3]
+                        182 ; comn_api.c  102                       {
+                        183 ; comn_api.c  103                               chnls_active->blink = chnls_free;
+0000BC 86AC42           184         MOV.B   ES,R5L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000BF 8C2C04           185         MOV.W   [R4+4],R2
+0000C2 8C3C06           186         MOV.W   [R4+6],R3
+                        187 ; comn_api.c  104                               chnls_free = chnls_free->flink;
+0000C5 964842rr         188         MOV.B   ES,#SEG( _chnls_free )
+0000C9 9938rrrr         189         MOV.W   R3,#SOF( _chnls_free )
+0000CD 8B23             190         MOV.W   R2,[R3+]
+0000CF 8A33             191         MOV.W   R3,[R3]
+0000D1 866C42           192         MOV.B   ES,R3L
+0000D4 8C3202           193         MOV.W   R3,[R2+2]
+0000D7 8A22             194         MOV.W   R2,[R2]
+0000D9 964842rr         195         MOV.B   ES,#SEG( _chnls_free )
+0000DD 9948rrrr         196         MOV.W   R4,#SOF( _chnls_free )
+0000E1 8B2C             197         MOV.W   [R4+],R2
+0000E3 8A3C             198         MOV.W   [R4],R3
+                        199 ; comn_api.c  105                               chnls_active->blink->flink = chnls_active;
+0000E5 964842rr         200         MOV.B   ES,#SEG( _chnls_active )
+0000E9 9958rrrr         201         MOV.W   R5,#SOF( _chnls_active )
+0000ED 8B45             202         MOV.W   R4,[R5+]
+0000EF 8A55             203         MOV.W   R5,[R5]
+0000F1 86AC42           204         MOV.B   ES,R5L
+0000F4 8C2404           205         MOV.W   R2,[R4+4]
+0000F7 8C3406           206         MOV.W   R3,[R4+6]
+0000FA 866C42           207         MOV.B   ES,R3L
+0000FD 8A4A             208         MOV.W   [R2],R4
+0000FF 8C5A02           209         MOV.W   [R2+2],R5
+                        210 ; comn_api.c  106                               chnls_active = chnls_active->blink;
+000102 964842rr         211         MOV.B   ES,#SEG( _chnls_active )
+000106 9958rrrr         212         MOV.W   R5,#SOF( _chnls_active )
+00010A 8B45             213         MOV.W   R4,[R5+]
+00010C 8A55             214         MOV.W   R5,[R5]
+00010E 86AC42           215         MOV.B   ES,R5L
+000111 8C5406           216         MOV.W   R5,[R4+6]
+000114 8C4404           217         MOV.W   R4,[R4+4]
+000117 964842rr         218         MOV.B   ES,#SEG( _chnls_active )
+00011B 9928rrrr         219         MOV.W   R2,#SOF( _chnls_active )
+00011F 8B4A             220         MOV.W   [R2+],R4
+000121 8A5A             221         MOV.W   [R2],R5
+                        222 ; comn_api.c  107                       }
+000123 FE20             223         BR      _15
+000123 FE2000           223         BR      _15
+                        224 ; comn_api.c  108                       else
+                        225 ; comn_api.c  109                       {
+                        226 ; comn_api.c  110                               chnls_active = chnls_free;
+                        227 ; comn_api.c  111                               chnls_free = chnls_free->flink;
+                        228 ; comn_api.c  112                               chnls_active->flink = NULLCCBE;
+                        229 ; comn_api.c  113                       }
+                        230 ; comn_api.c  114                       chnls_active->blink = ( CCB_ENTRY *)&chnls_active;
+                        231 ; comn_api.c  115                       chnlid = chnls_active->chnl_number;
+                        232 ; comn_api.c  116                   }
+000126                  233 _12:
+                        234 ; comn_api.c  117                   else
+                        235 ; comn_api.c  118                       return( (CHNLID)0 );    /* NO FREE CHANNELS */
+000126 B900             236         MOV.W   R0,#00H
+000128 FE66             237         BR      _21
+000128 FE66             237         BR      _21
+                        238 ; comn_api.c  119               }
+00012A                  239 _13:
+                        240 ; comn_api.c  120               else
+                        241 ; comn_api.c  121                     return( (CHNLID)((IORC)RTXCIO_ERROR + (IORC)IO_CMND_MISMATC
+                            H) );
+00012A 9908F805         242         MOV.W   R0,#0F805H
+00012E FE63             243         BR      _21
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+00012E FE63             243         BR      _21
+000130                  244 _14:
+000130 964842rr         245         MOV.B   ES,#SEG( _chnls_free )
+000134 9958rrrr         246         MOV.W   R5,#SOF( _chnls_free )
+000138 8B45             247         MOV.W   R4,[R5+]
+00013A 8A55             248         MOV.W   R5,[R5]
+00013C 964842rr         249         MOV.B   ES,#SEG( _chnls_active )
+000140 9928rrrr         250         MOV.W   R2,#SOF( _chnls_active )
+000144 8B4A             251         MOV.W   [R2+],R4
+000146 8A5A             252         MOV.W   [R2],R5
+000148 86AC42           253         MOV.B   ES,R5L
+00014B 8A24             254         MOV.W   R2,[R4]
+00014D 8C3402           255         MOV.W   R3,[R4+2]
+000150 964842rr         256         MOV.B   ES,#SEG( _chnls_free )
+000154 9908rrrr         257         MOV.W   R0,#SOF( _chnls_free )
+000158 8B28             258         MOV.W   [R0+],R2
+00015A 8A38             259         MOV.W   [R0],R3
+00015C 86AC42           260         MOV.B   ES,R5L
+00015F BA40             261         MOV.W   [R4],#00H
+000161 BC4002           262         MOV.W   [R4+2],#00H
+000161 BC4002           262         MOV.W   [R4+2],#00H
+000164                  263 _15:
+000164 9938rrrr         264         MOV.W   R3,#SEG( _chnls_active )
+000168 9928rrrr         265         MOV.W   R2,#SOF( _chnls_active )
+00016C 964842rr         266         MOV.B   ES,#SEG( _chnls_active )
+000170 9958rrrr         267         MOV.W   R5,#SOF( _chnls_active )
+000174 8B45             268         MOV.W   R4,[R5+]
+000176 8A55             269         MOV.W   R5,[R5]
+000178 86AC42           270         MOV.B   ES,R5L
+00017B 8C2C04           271         MOV.W   [R4+4],R2
+00017E 8C3C06           272         MOV.W   [R4+6],R3
+000181 964842rr         273         MOV.B   ES,#SEG( _chnls_active )
+000185 9958rrrr         274         MOV.W   R5,#SOF( _chnls_active )
+000189 8B45             275         MOV.W   R4,[R5+]
+00018B 8A55             276         MOV.W   R5,[R5]
+00018D 86AC42           277         MOV.B   ES,R5L
+000190 8C0408           278         MOV.W   R0,[R4+8]
+                        279 ; comn_api.c  122       
+                        280 ; comn_api.c  123               /*---------------------------------------------------------------
+                            ---*/
+                        281 ; comn_api.c  124               /* Passed the tests, now setup the channel control block.        
+                               */
+                        282 ; comn_api.c  125               /*---------------------------------------------------------------
+                            ---*/
+                        283 ; comn_api.c  126               channel_table[chnlid].io_deviceno = deviceno;
+000193 99280016         284         MOV.W   R2,#016H
+000197 E420             285         MULU.W  R2,R0
+000199 8942             286         MOV.W   R4,R2
+00019B B950             287         MOVS.W  R5,#00H
+00019D 8A37             288         MOV.W   R3,[R7]
+00019F 964842rr         289         MOV.B   ES,#SEG( _channel_table+10 )
+0001A3 8D3Crrrr         290         MOV.W   [R4+SOF( _channel_table+10 )],R3
+                        291 ; comn_api.c  127               channel_table[chnlid].io_method = io_method;
+0001A7 964842rr         292         MOV.B   ES,#SEG( _channel_table+14 )
+0001AB 8D1Crrrr         293         MOV.W   [R4+SOF( _channel_table+14 )],R1
+                        294 ; comn_api.c  128               channel_table[chnlid].io_command = io_command;
+0001AF 964842rr         295         MOV.B   ES,#SEG( _channel_table+12 )
+0001B3 8D6Crrrr         296         MOV.W   [R4+SOF( _channel_table+12 )],R6
+                        297 ; comn_api.c  129       
+                        298 ; comn_api.c  130               /*---------------------------------------------------------------
+                            ---*/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        299 ; comn_api.c  131               /* If the channel is being setup for block I/O, then assign the  
+                               */
+                        300 ; comn_api.c  132               /* other information.                                            
+                               */
+                        301 ; comn_api.c  133               /*---------------------------------------------------------------
+                            ---*/
+                        302 ; comn_api.c  134               if(otherinfo != NULLIOINFO )
+0001B7 8C570E           303         MOV.W   R5,[R7+14]
+0001BA 8C470C           304         MOV.W   R4,[R7+12]
+0001BD 6954             305         OR.W    R5,R4
+0001BF F31B             306         BEQ     _16
+                        307 ; comn_api.c  135               {
+                        308 ; comn_api.c  136                 channel_table[chnlid].io_bytespblk = otherinfo->bytes_per_block
+                            ;
+0001C1 8C570E           309         MOV.W   R5,[R7+14]
+0001C4 8C470C           310         MOV.W   R4,[R7+12]
+0001C7 86AC42           311         MOV.B   ES,R5L
+0001CA 8A14             312         MOV.W   R1,[R4]
+0001CC 8942             313         MOV.W   R4,R2
+0001CE B950             314         MOVS.W  R5,#00H
+0001D0 964842rr         315         MOV.B   ES,#SEG( _channel_table+16 )
+0001D4 8D1Crrrr         316         MOV.W   [R4+SOF( _channel_table+16 )],R1
+                        317 ; comn_api.c  137                 channel_table[chnlid].io_blks2transfer= otherinfo->blocks_to_tr
+                            ansfer;
+0001D8 8C570E           318         MOV.W   R5,[R7+14]
+0001DB 8C470C           319         MOV.W   R4,[R7+12]
+0001DE 86AC42           320         MOV.B   ES,R5L
+0001E1 8C5404           321         MOV.W   R5,[R4+4]
+0001E4 8C4402           322         MOV.W   R4,[R4+2]
+0001E7 B930             323         MOVS.W  R3,#00H
+0001E9 964842rr         324         MOV.B   ES,#SEG( _channel_table+18 )
+0001ED 8D4Arrrr         325         MOV.W   [R2+SOF( _channel_table+18 )],R4
+0001F1 8D5Arrrr         326         MOV.W   [R2+SOF( _channel_table+20 )],R5
+0001F1 8D5Arrrr00       326         MOV.W   [R2+SOF( _channel_table+20 )],R5
+                        327 ; comn_api.c  138               }
+0001F6                  328 _16:
+0001F6                  328 _16:
+                        329 ; comn_api.c  139               return( chnlid );
+                        330 ; comn_api.c  140       }
+0001F6                  331 _21:
+0001F6 A972             332         ADDS.W  R7,#02H
+0001F8 2F70             333         POP.W   R4, R5, R6
+0001FA D680             334         RET
+0001FA D680             334         RET
+                        335 ; comn_api.c  141       
+                        336 ; comn_api.c  142       /*=======================================================================
+                            ===*/
+                        337 ; comn_api.c  143       IORC   IO_chnl_close( CHNLID  chnlid )
+                        338 ; comn_api.c  144       {
+                        339         PUBLIC  _IO_chnl_close
+0001FC                  340 _IO_chnl_close:
+0001FC 0F30             341         PUSH.W  R4, R5
+0001FE A97C             342         ADDS.W  R7,#0CH
+                        343 ; comn_api.c  145               CCB_ENTRY *pccbe;
+                        344 ; comn_api.c  146       
+                        345 ; comn_api.c  147               /*---------------------------------------------------------------
+                            ---*/
+                        346 ; comn_api.c  148               /* Is the channel id valid ?                                     
+                               */
+                        347 ; comn_api.c  149               /*---------------------------------------------------------------
+                            ---*/
+                        348 ; comn_api.c  150               if( (chnlid == 0) || (chnlid > nchnls) )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+000200 8920             349         MOV.W   R2,R0
+000202 6900             350         OR.W    R0,R0
+000204 F307             351         BEQ     _31
+000206 964842rr         352         MOV.B   ES,#SEG( _nchnls )
+00020A 9918rrrr         353         MOV.W   R1,#SOF( _nchnls )
+00020E 8A11             354         MOV.W   R1,[R1]
+000210 4921             355         CMP.W   R2,R1
+000212 F903             356         BL      _32
+000212 F903             356         BL      _32
+000214                  357 _31:
+                        358 ; comn_api.c  151                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) );
+                            
+000214 9908F801         359         MOV.W   R0,#0F801H
+000218 FE75             360         BR      _38
+000218 FE75             360         BR      _38
+00021A                  361 _32:
+                        362 ; comn_api.c  152       
+                        363 ; comn_api.c  153               /*---------------------------------------------------------------
+                            ---*/
+                        364 ; comn_api.c  154               /* Take the channel out of the active list of channels and insert
+                               */
+                        365 ; comn_api.c  155               /* it into the list of available channels.                       
+                               */
+                        366 ; comn_api.c  156               /*---------------------------------------------------------------
+                            ---*/
+                        367 ; comn_api.c  157               pccbe = &channel_table[chnlid];
+00021A E9200016         368         MULU.W  R2,#016H
+00021E B930             369         MOVS.W  R3,#00H
+000220 9918rrrr         370         MOV.W   R1,#SEG( _channel_table )
+000224 9908rrrr         371         MOV.W   R0,#SOF( _channel_table )
+000228 0902             372         ADD.W   R0,R2
+                        373 ; comn_api.c  158       
+                        374 ; comn_api.c  159               /*---------------------------------------------------------------
+                            ---*/
+                        375 ; comn_api.c  160               /* If the channel is inactive, return an invalid channel error   
+                               */
+                        376 ; comn_api.c  161               /*---------------------------------------------------------------
+                            ---*/
+                        377 ; comn_api.c  162               if( pccbe->blink == NULLCCBE )
+00022A 8931             378         MOV.W   R3,R1
+00022C 8920             379         MOV.W   R2,R0
+00022E 99200004         380         ADD.W   R2,#04H
+000232 8C1F02           381         MOV.W   [R7+2],R1
+000235 8A0F             382         MOV.W   [R7],R0
+000237 862C42           383         MOV.B   ES,R1L
+00023A 8C4004           384         MOV.W   R4,[R0+4]
+00023D 8C5006           385         MOV.W   R5,[R0+6]
+000240 6954             386         OR.W    R5,R4
+000242 F203             387         BNE     _33
+                        388 ; comn_api.c  163                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_CHNLID_INVALID) );
+                            
+000244 9908F801         389         MOV.W   R0,#0F801H
+000248 FE5D             390         BR      _38
+000248 FE5D             390         BR      _38
+00024A                  391 _33:
+                        392 ; comn_api.c  164       
+                        393 ; comn_api.c  165               /*---------------------------------------------------------------
+                            ---*/
+                        394 ; comn_api.c  166               /* first in the active channel list test.                        
+                               */
+                        395 ; comn_api.c  167               /*---------------------------------------------------------------
+                            ---*/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        396 ; comn_api.c  168               if( pccbe->blink != (CCB_ENTRY *)&chnls_active )
+00024A 9958rrrr         397         MOV.W   R5,#SEG( _chnls_active )
+00024E 9948rrrr         398         MOV.W   R4,#SOF( _chnls_active )
+000252 866C42           399         MOV.B   ES,R3L
+000255 4C5A02           400         CMP.W   [R2+2],R5
+000258 F201             401         BNE     _40
+00025A 4A4A             402         CMP.W   [R2],R4
+00025A 4A4A             402         CMP.W   [R2],R4
+00025C                  403 _40:
+00025C F310             404         BEQ     _34
+                        405 ; comn_api.c  169                       pccbe->blink->flink = pccbe->flink;
+00025E 8C1702           406         MOV.W   R1,[R7+2]
+000261 8A07             407         MOV.W   R0,[R7]
+000263 862C42           408         MOV.B   ES,R1L
+000266 8A40             409         MOV.W   R4,[R0]
+000268 8C5002           410         MOV.W   R5,[R0+2]
+00026B 866C42           411         MOV.B   ES,R3L
+00026E 8A02             412         MOV.W   R0,[R2]
+000270 8C1202           413         MOV.W   R1,[R2+2]
+000273 862C42           414         MOV.B   ES,R1L
+000276 8A48             415         MOV.W   [R0],R4
+000278 8C5802           416         MOV.W   [R0+2],R5
+00027B FE11             417         BR      _35
+00027B FE1100           417         BR      _35
+00027E                  418 _34:
+                        419 ; comn_api.c  170               else
+                        420 ; comn_api.c  171                       chnls_active = chnls_active->flink;
+00027E 964842rr         421         MOV.B   ES,#SEG( _chnls_active )
+000282 9918rrrr         422         MOV.W   R1,#SOF( _chnls_active )
+000286 8B01             423         MOV.W   R0,[R1+]
+000288 8A11             424         MOV.W   R1,[R1]
+00028A 862C42           425         MOV.B   ES,R1L
+00028D 8C1002           426         MOV.W   R1,[R0+2]
+000290 8A00             427         MOV.W   R0,[R0]
+000292 964842rr         428         MOV.B   ES,#SEG( _chnls_active )
+000296 9948rrrr         429         MOV.W   R4,#SOF( _chnls_active )
+00029A 8B0C             430         MOV.W   [R4+],R0
+00029C 8A1C             431         MOV.W   [R4],R1
+00029C 8A1C             431         MOV.W   [R4],R1
+00029E                  432 _35:
+                        433 ; comn_api.c  172       
+                        434 ; comn_api.c  173               /*---------------------------------------------------------------
+                            ---*/
+                        435 ; comn_api.c  174               /* Not end of the active channel list test.                      
+                               */
+                        436 ; comn_api.c  175               /*---------------------------------------------------------------
+                            ---*/
+                        437 ; comn_api.c  176               if( pccbe->flink != NULLCCBE )
+00029E 8C1702           438         MOV.W   R1,[R7+2]
+0002A1 8A07             439         MOV.W   R0,[R7]
+0002A3 862C42           440         MOV.B   ES,R1L
+0002A6 8C1002           441         MOV.W   R1,[R0+2]
+0002A9 8A00             442         MOV.W   R0,[R0]
+0002AB 6910             443         OR.W    R1,R0
+0002AD F310             444         BEQ     _36
+                        445 ; comn_api.c  177                       pccbe->flink->blink = pccbe->blink;
+0002AF 866C42           446         MOV.B   ES,R3L
+0002B2 8A02             447         MOV.W   R0,[R2]
+0002B4 8C1202           448         MOV.W   R1,[R2+2]
+0002B7 8C5702           449         MOV.W   R5,[R7+2]
+0002BA 8A47             450         MOV.W   R4,[R7]
+0002BC 86AC42           451         MOV.B   ES,R5L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+0002BF 8C5402           452         MOV.W   R5,[R4+2]
+0002C2 8A44             453         MOV.W   R4,[R4]
+0002C4 86AC42           454         MOV.B   ES,R5L
+0002C7 8C0C04           455         MOV.W   [R4+4],R0
+0002CA 8C1C06           456         MOV.W   [R4+6],R1
+0002CA 8C1C0600         456         MOV.W   [R4+6],R1
+0002CE                  457 _36:
+                        458 ; comn_api.c  178       
+                        459 ; comn_api.c  179               pccbe->flink = chnls_free;
+0002CE 964842rr         460         MOV.B   ES,#SEG( _chnls_free )
+0002D2 9918rrrr         461         MOV.W   R1,#SOF( _chnls_free )
+0002D6 8B01             462         MOV.W   R0,[R1+]
+0002D8 8A11             463         MOV.W   R1,[R1]
+0002DA 8C5702           464         MOV.W   R5,[R7+2]
+0002DD 8A47             465         MOV.W   R4,[R7]
+0002DF 86AC42           466         MOV.B   ES,R5L
+0002E2 8A0C             467         MOV.W   [R4],R0
+0002E4 8C1C02           468         MOV.W   [R4+2],R1
+                        469 ; comn_api.c  180               pccbe->blink = NULLCCBE;
+0002E7 866C42           470         MOV.B   ES,R3L
+0002EA BA20             471         MOV.W   [R2],#00H
+0002EC BC2002           472         MOV.W   [R2+2],#00H
+                        473 ; comn_api.c  181               chnls_free = pccbe;
+0002EF 8915             474         MOV.W   R1,R5
+0002F1 8904             475         MOV.W   R0,R4
+0002F3 964842rr         476         MOV.B   ES,#SEG( _chnls_free )
+0002F7 9928rrrr         477         MOV.W   R2,#SOF( _chnls_free )
+0002FB 8B0A             478         MOV.W   [R2+],R0
+0002FD 8A1A             479         MOV.W   [R2],R1
+                        480 ; comn_api.c  182       
+                        481 ; comn_api.c  183               /* valid close of channel */
+                        482 ; comn_api.c  184               return( ((IORC)RTXCIO_GOOD + (IORC)IO_CHNL_CLOSED) );
+0002FF 99087800         483         MOV.W   R0,#07800H
+0002FF 9908780000       483         MOV.W   R0,#07800H
+                        484 ; comn_api.c  185       }
+000304                  485 _38:
+000304 A974             486         ADDS.W  R7,#04H
+000306 2F30             487         POP.W   R4, R5
+000308 D680             488         RET
+000308 D680             488         RET
+                        489 ; comn_api.c  186       
+                        490 ; comn_api.c  187       /*=======================================================================
+                            ===*/
+                        491 ; comn_api.c  188       /*                      PROCESSING FUNCTION                              
+                               */
+                        492 ; comn_api.c  189       /*=======================================================================
+                            ===*/
+                        493 ; comn_api.c  190       IORC process_io( IOPACK *iopack )
+                        494 ; comn_api.c  191       {
+                        495         PUBLIC  _process_io
+00030A                  496 _process_io:
+00030A 0F30             497         PUSH.W  R4, R5
+00030C 9972000C         498         SUB.W   R7,#0CH
+                        499 ; comn_api.c  192       
+                        500 ; comn_api.c  193               IORC phys_result;      /* The results of the physical driver's ca
+                            ll */
+                        501 ; comn_api.c  194               /*---------------------------------------------------------------
+                            ---*/
+                        502 ; comn_api.c  195               /* Lock the physical drivers resource.                           
+                               */
+                        503 ; comn_api.c  196               /*---------------------------------------------------------------
+                            ---*/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        504 ; comn_api.c  197       #ifdef ASYNCH_IO     /* { */
+                        505 ; comn_api.c  198               KSRC ret_val;
+                        506 ; comn_api.c  199       
+                        507 ; comn_api.c  200               if( iopack->io_duration == IO_NOWAIT )
+000310 8951             508         MOV.W   R5,R1
+000312 8940             509         MOV.W   R4,R0
+000314 99000008         510         ADD.W   R0,#08H
+000318 8C1F06           511         MOV.W   [R7+6],R1
+00031B 8C0F04           512         MOV.W   [R7+4],R0
+00031E 86AC42           513         MOV.B   ES,R5L
+000321 9C44080002       514         CMP.W   [R4+8],#02H
+000326 F22C             515         BNE     _42
+                        516 ; comn_api.c  201               {
+                        517 ; comn_api.c  202                   ret_val = KS_lock( logical_dev_tbl[iopack->deviceno]->dev_res
+                             );
+000328 86AC42           518         MOV.B   ES,R5L
+00032B 8A04             519         MOV.W   R0,[R4]
+00032D D902             520         ASL.W   R0,#02H
+00032F B910             521         MOVS.W  R1,#00H
+000331 964842rr         522         MOV.B   ES,#SEG( _logical_dev_tbl )
+000335 8D10rrrr         523         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+000339 8D00rrrr         524         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+00033D 862C42           525         MOV.B   ES,R1L
+000340 8200             526         MOV.B   R0L,[R0]
+                        527         CALL    _KS_lock
+000342 C4rrrrrr        +527 ;       FCALL   _KS_lock
+                        528 ; comn_api.c  203       
+                        529 ; comn_api.c  204                   if( ret_val == RC_NESTED )
+000346 9904000A         530         CMP.W   R0,#0AH
+00034A F213             531         BNE     _41
+                        532 ; comn_api.c  205                   {
+                        533 ; comn_api.c  206                       /*-------------------------------------------------------
+                            ---*/
+                        534 ; comn_api.c  207                       /* return an error stating the device is busy            
+                               */
+                        535 ; comn_api.c  208                       /*-------------------------------------------------------
+                            ---*/
+                        536 ; comn_api.c  209                       KS_unlock( logical_dev_tbl[iopack->deviceno]->dev_res );
+00034C 86AC42           537         MOV.B   ES,R5L
+00034F 8A04             538         MOV.W   R0,[R4]
+000351 D902             539         ASL.W   R0,#02H
+000353 B910             540         MOVS.W  R1,#00H
+000355 964842rr         541         MOV.B   ES,#SEG( _logical_dev_tbl )
+000359 8D10rrrr         542         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+00035D 8D00rrrr         543         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+000361 862C42           544         MOV.B   ES,R1L
+000364 8200             545         MOV.B   R0L,[R0]
+                        546         CALL    _KS_unlock
+000366 C4rrrrrr        +546 ;       FCALL   _KS_unlock
+                        547 ; comn_api.c  210                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_NEED_WAIT) );
+00036A 9908F808         548         MOV.W   R0,#0F808H
+                        549         BR      _49
+00036E D500AD          +549         JMP.L   _49
+00036E D500AD00        +549         JMP.L   _49
+                        550 ; comn_api.c  211                   }
+000372                  551 _41:
+                        552 ; comn_api.c  212       
+                        553 ; comn_api.c  213                   if( ret_val == RC_BUSY )
+000372 99040009         554         CMP.W   R0,#09H
+000376 F213             555         BNE     _43
+                        556 ; comn_api.c  214                   {
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                        557 ; comn_api.c  215                       /*-------------------------------------------------------
+                            ---*/
+                        558 ; comn_api.c  216                       /* return an error stating the device is busy            
+                               */
+                        559 ; comn_api.c  217                       /*-------------------------------------------------------
+                            ---*/
+                        560 ; comn_api.c  218                       return( ((IORC)RTXCIO_ERROR + (IORC)IO_DEV_BUSY) );
+000378 9908F807         561         MOV.W   R0,#0F807H
+                        562         BR      _49
+00037C D500A6          +562         JMP.L   _49
+00037C D500A600        +562         JMP.L   _49
+                        563 ; comn_api.c  219                   }
+                        564 ; comn_api.c  220               }
+000380                  565 _42:
+                        566 ; comn_api.c  221               else
+                        567 ; comn_api.c  222               {
+                        568 ; comn_api.c  223       #endif    /* } ASYNCH_IO */
+                        569 ; comn_api.c  224       
+                        570 ; comn_api.c  225       #if defined( SYNCH_IO ) || \ 
+                        571 ; comn_api.c  226           defined( TIMEOUT_IO )  /* { */
+                        572 ; comn_api.c  227               KS_lockw( logical_dev_tbl[iopack->deviceno]->dev_res );
+000380 86AC42           573         MOV.B   ES,R5L
+000383 8A04             574         MOV.W   R0,[R4]
+000385 D902             575         ASL.W   R0,#02H
+000387 B910             576         MOVS.W  R1,#00H
+000389 964842rr         577         MOV.B   ES,#SEG( _logical_dev_tbl )
+00038D 8D10rrrr         578         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+000391 8D00rrrr         579         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+000395 862C42           580         MOV.B   ES,R1L
+000398 8200             581         MOV.B   R0L,[R0]
+                        582         CALL    _KS_lockw
+00039A C4rrrrrr        +582 ;       FCALL   _KS_lockw
+00039A C4rrrrrr        +582 ;       FCALL   _KS_lockw
+                        583 ; comn_api.c  228       #endif /* } SYNCH_IO | TIMEOUT_IO */
+                        584 ; comn_api.c  229       
+                        585 ; comn_api.c  230       #ifdef ASYNCH_IO     /* { */
+                        586 ; comn_api.c  231               }
+00039E                  587 _43:
+                        588 ; comn_api.c  232       #endif    /* } ASYNCH_IO */
+                        589 ; comn_api.c  233               /*---------------------------------------------------------------
+                            ---*/
+                        590 ; comn_api.c  234               /* Reset the following PDU's fields.                             
+                               */
+                        591 ; comn_api.c  235               /*---------------------------------------------------------------
+                            ---*/
+                        592 ; comn_api.c  236               logical_dev_tbl[iopack->deviceno]->last_io_oper = iopack->iofncid
+                            ;
+00039E 8C5F0A           593         MOV.W   [R7+10],R5
+0003A1 8C4F08           594         MOV.W   [R7+8],R4
+0003A4 99400004         595         ADD.W   R4,#04H
+0003A8 8C5F02           596         MOV.W   [R7+2],R5
+0003AB 8A4F             597         MOV.W   [R7],R4
+0003AD 8C170A           598         MOV.W   R1,[R7+10]
+0003B0 8C0708           599         MOV.W   R0,[R7+8]
+0003B3 862C42           600         MOV.B   ES,R1L
+0003B6 8C0004           601         MOV.W   R0,[R0+4]
+0003B9 8C370A           602         MOV.W   R3,[R7+10]
+0003BC 8C2708           603         MOV.W   R2,[R7+8]
+0003BF 866C42           604         MOV.B   ES,R3L
+0003C2 8A12             605         MOV.W   R1,[R2]
+0003C4 D912             606         ASL.W   R1,#02H
+0003C6 8921             607         MOV.W   R2,R1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+0003C8 B930             608         MOVS.W  R3,#00H
+0003CA 964842rr         609         MOV.B   ES,#SEG( _logical_dev_tbl )
+0003CE 8D32rrrr         610         MOV.W   R3,[R2+SOF( _logical_dev_tbl+2 )]
+0003D2 8D22rrrr         611         MOV.W   R2,[R2+SOF( _logical_dev_tbl )]
+0003D6 866C42           612         MOV.B   ES,R3L
+0003D9 8C0A06           613         MOV.W   [R2+6],R0
+                        614 ; comn_api.c  237               logical_dev_tbl[iopack->deviceno]->lost_data = NO_LOST_DATA;
+0003DC 8C170A           615         MOV.W   R1,[R7+10]
+0003DF 8C0708           616         MOV.W   R0,[R7+8]
+0003E2 862C42           617         MOV.B   ES,R1L
+0003E5 8A00             618         MOV.W   R0,[R0]
+0003E7 D902             619         ASL.W   R0,#02H
+0003E9 B910             620         MOVS.W  R1,#00H
+0003EB 964842rr         621         MOV.B   ES,#SEG( _logical_dev_tbl )
+0003EF 8D10rrrr         622         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+0003F3 8D00rrrr         623         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+0003F7 862C42           624         MOV.B   ES,R1L
+0003FA B40008           625         MOV.B   [R0+8],#00H
+                        626 ; comn_api.c  238               logical_dev_tbl[iopack->deviceno]->bytes_transfered = 0;
+0003FD 862C42           627         MOV.B   ES,R1L
+000400 BC0010           628         MOV.W   [R0+16],#00H
+                        629 ; comn_api.c  239       
+                        630 ; comn_api.c  240       
+                        631 ; comn_api.c  241               /*---------------------------------------------------------------
+                            ---*/
+                        632 ; comn_api.c  242               /* Physical driver's resource has been locked.                   
+                               */
+                        633 ; comn_api.c  243               /* Call the physical driver for the device specified.            
+                               */
+                        634 ; comn_api.c  244               /* IO_WAIT & IO_TIMED act the same.                              
+                               */
+                        635 ; comn_api.c  245               /*---------------------------------------------------------------
+                            ---*/
+                        636 ; comn_api.c  246               phys_result = (IORC)logical_dev_tbl[iopack->deviceno]->dev_cntlr-
+                            >io_funcs[iopack->iofncid]( iopack );
+000403 8C170A           637         MOV.W   R1,[R7+10]
+000406 8C0708           638         MOV.W   R0,[R7+8]
+000409 862C42           639         MOV.B   ES,R1L
+00040C 8A00             640         MOV.W   R0,[R0]
+00040E D902             641         ASL.W   R0,#02H
+000410 8940             642         MOV.W   R4,R0
+000412 B950             643         MOVS.W  R5,#00H
+000414 964842rr         644         MOV.B   ES,#SEG( _logical_dev_tbl )
+000418 8D54rrrr         645         MOV.W   R5,[R4+SOF( _logical_dev_tbl+2 )]
+00041C 8D44rrrr         646         MOV.W   R4,[R4+SOF( _logical_dev_tbl )]
+000420 86AC42           647         MOV.B   ES,R5L
+000423 8C540E           648         MOV.W   R5,[R4+14]
+000426 8C440C           649         MOV.W   R4,[R4+12]
+000429 9940000C         650         ADD.W   R4,#0CH
+00042D 8C170A           651         MOV.W   R1,[R7+10]
+000430 8C0708           652         MOV.W   R0,[R7+8]
+000433 862C42           653         MOV.B   ES,R1L
+000436 8C0004           654         MOV.W   R0,[R0+4]
+000439 D902             655         ASL.W   R0,#02H
+00043B B910             656         MOVS.W  R1,#00H
+00043D 0940             657         ADD.W   R4,R0
+00043F 86AC42           658         MOV.B   ES,R5L
+000442 8C5402           659         MOV.W   R5,[R4+2]
+000445 8A44             660         MOV.W   R4,[R4]
+000447 8C170A           661         MOV.W   R1,[R7+10]
+00044A 8C0708           662         MOV.W   R0,[R7+8]
+00044D C4rrrrrr         663         FCALL   __ICALL
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+000451 8940             664         MOV.W   R4,R0
+                        665 ; comn_api.c  247       
+                        666 ; comn_api.c  248               /*---------------------------------------------------------------
+                            ---*/
+                        667 ; comn_api.c  249               /* Distinquish whether Asynchronous or synchronous/timeout and ta
+                            ke */
+                        668 ; comn_api.c  250               /* the appropriate actions.                                      
+                               */
+                        669 ; comn_api.c  251               /*---------------------------------------------------------------
+                            ---*/
+                        670 ; comn_api.c  252               if( iopack->io_duration != IO_NOWAIT )
+000453 8C1706           671         MOV.W   R1,[R7+6]
+000456 8C0704           672         MOV.W   R0,[R7+4]
+000459 862C42           673         MOV.B   ES,R1L
+00045C 9A040002         674         CMP.W   [R0],#02H
+000460 F313             675         BEQ     _44
+                        676 ; comn_api.c  253               {
+                        677 ; comn_api.c  254                       /*-------------------------------------------------------
+                            ---*/
+                        678 ; comn_api.c  255                       /* Unlock the physical driver's resource after the physic
+                            al */
+                        679 ; comn_api.c  256                       /* device has completed the request.                     
+                               */
+                        680 ; comn_api.c  257                       /*-------------------------------------------------------
+                            ---*/
+                        681 ; comn_api.c  258                       KS_unlock( logical_dev_tbl[iopack->deviceno]->dev_res );
+000462 8C170A           682         MOV.W   R1,[R7+10]
+000465 8C0708           683         MOV.W   R0,[R7+8]
+000468 862C42           684         MOV.B   ES,R1L
+00046B 8A00             685         MOV.W   R0,[R0]
+00046D D902             686         ASL.W   R0,#02H
+00046F B910             687         MOVS.W  R1,#00H
+000471 964842rr         688         MOV.B   ES,#SEG( _logical_dev_tbl )
+000475 8D10rrrr         689         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+000479 8D00rrrr         690         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+00047D 862C42           691         MOV.B   ES,R1L
+000480 8200             692         MOV.B   R0L,[R0]
+                        693         CALL    _KS_unlock
+000482 C4rrrrrr        +693 ;       FCALL   _KS_unlock
+                        694 ; comn_api.c  259               }
+000486 FE20             695         BR      _47
+000486 FE20             695         BR      _47
+000488                  696 _44:
+                        697 ; comn_api.c  260               else
+                        698 ; comn_api.c  261                       if( (iopack->iofncid == IO_DEV_OPEN) || (iopack->iofncid 
+                            == IO_DEV_CLOSE) )
+000488 8C1702           699         MOV.W   R1,[R7+2]
+00048B 8A07             700         MOV.W   R0,[R7]
+00048D 862C42           701         MOV.B   ES,R1L
+000490 9A040002         702         CMP.W   [R0],#02H
+000494 F307             703         BEQ     _45
+000496 8C1702           704         MOV.W   R1,[R7+2]
+000499 8A07             705         MOV.W   R0,[R7]
+00049B 862C42           706         MOV.B   ES,R1L
+00049E 9A040003         707         CMP.W   [R0],#03H
+0004A2 F212             708         BNE     _47
+0004A2 F212             708         BNE     _47
+0004A4                  709 _45:
+                        710 ; comn_api.c  262                               KS_unlock( logical_dev_tbl[iopack->deviceno]->dev
+                            _res );
+0004A4 8C170A           711         MOV.W   R1,[R7+10]
+0004A7 8C0708           712         MOV.W   R0,[R7+8]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+0004AA 862C42           713         MOV.B   ES,R1L
+0004AD 8A00             714         MOV.W   R0,[R0]
+0004AF D902             715         ASL.W   R0,#02H
+0004B1 B910             716         MOVS.W  R1,#00H
+0004B3 964842rr         717         MOV.B   ES,#SEG( _logical_dev_tbl )
+0004B7 8D10rrrr         718         MOV.W   R1,[R0+SOF( _logical_dev_tbl+2 )]
+0004BB 8D00rrrr         719         MOV.W   R0,[R0+SOF( _logical_dev_tbl )]
+0004BF 862C42           720         MOV.B   ES,R1L
+0004C2 8200             721         MOV.B   R0L,[R0]
+                        722         CALL    _KS_unlock
+0004C4 C4rrrrrr        +722 ;       FCALL   _KS_unlock
+0004C4 C4rrrrrr        +722 ;       FCALL   _KS_unlock
+                        723 ; comn_api.c  263       
+                        724 ; comn_api.c  264               return( phys_result );
+0004C8                  725 _47:
+0004C8 8904             726         MOV.W   R0,R4
+0004C8 8904             726         MOV.W   R0,R4
+                        727 ; comn_api.c  265       }
+0004CA                  728 _49:
+0004CA 9970000C         729         ADD.W   R7,#0CH
+0004CE 2F30             730         POP.W   R4, R5
+0004D0 D680             731         RET
+                        732 ; comn_api.c  266       
+                        733 ; comn_api.c  267       #endif /* } ASYNCH_IO | SYNCH_IO | TIMEOUT_IO */
+                        734 ; comn_api.c  268       
+                        735 ; comn_api.c  269       /* End of the COMN_API.C module */
+                        737         EXTRN   HDATA(_nchnls)
+                        738         EXTRN   HDATA(_chnls_active)
+                        739         EXTRN   HCODE(_KS_lock)
+                        740         EXTRN   HDATA(_channel_table)
+                        741         EXTRN   HDATA(_nldevs)
+                        742         EXTRN   HCODE(_KS_unlock)
+                        743         EXTRN   HCODE(__ICALL)
+                        744         EXTRN   HDATA(_chnls_free)
+                        745         EXTRN   HDATA(_logical_dev_tbl)
+                        746         EXTRN   HCODE(_KS_lockw)
+000000                  747 COMN_API_INI_FA SEGMENT HDATA INSEGMENT INIT
+000000                  748         RSEG    COMN_API_INI_FA
+000000 52545843696F20   749 _3:     DB      052H,054H,058H,043H,069H,06FH,020H,076H,031H,02EH,034H,061H
+       76312E3461           
+00000C 2058412D47332F   750         DB      020H,058H,041H,02DH,047H,033H,02FH,054H,061H,073H,06BH,069H
+       5461736B69           
+000018 6E672076322E30   751         DB      06EH,067H,020H,076H,032H,02EH,030H,020H,04DH,061H,072H,02DH
+       204D61722D           
+000024 32362D393800     752         DB      032H,036H,02DH,039H,038H,000H
+                        753         CALLS   'process_io', 'KS_lock'
+                        754         CALLS   'process_io', 'KS_unlock'
+                        755         CALLS   'process_io', 'KS_lockw'
+                        756         CALLS   'process_io', 'KS_unlock'

@@ -1,0 +1,333 @@
+%
+Used in AX-controller in PT5220.
+I/O-port to Sync Backplane, TimeKeeper, Remote-RS232, Hardware Monitor, LEDs
+
+990517 PF
+
+Rettelser:
+990824   Tilføjet PLD Code Number register (PLD_CODENO)
+         CS_TIMEKEEPER_ENABLE and'ed med !FLA_PGM_PORT[0];         
+
+%
+
+title "I/O Interface for XA-Controller";
+
+constant SW_VERSION              = H"010A";      -- eks. 10d = 0Ah = Software version 1.0 for PLD software
+                                                 -- 01 = ændringsciffer i 12NC
+constant PLD_OK                  = H"4F4B";      -- Register for check of PLD init = OK
+                                                 -- 4F4B = 'OK'
+constant PLD_CODENO              = H"076A";      -- Register for 12NC of PLD SW
+                                                 -- eks: 12NC = 4008 002 7143 = 27143 = 6A07
+-- I/O ports on XA-controller   90000-9FFFF
+constant WDI_ADDR                = H"90000";
+constant WDI_CONTR_ADDR          = H"90002";
+constant FLA_READY_ADDR          = H"90004";
+constant LED_ADDR                = H"90006";
+constant SERIAL_ADDR             = H"90020";
+constant PLD_SW_ADDR             = H"90070";
+constant PLD_OK_ADDR             = H"90072";
+constant PLD_CODENO_ADDR         = H"90074";
+constant DISP_DATA_ADDR          = H"90080";
+constant DISP_CONTR_ADDR         = H"90082";
+
+-- I/O ports for sync backplane A0000-AFFFF
+constant ID_OPTION_ADDR          = H"A0000";
+constant RESET_ADDR              = H"A0002";
+constant RESET_CONTR_ADDR        = H"A0004";
+constant PROGRAM_ADDR            = H"A0006";
+constant CH_OVER_ADDR            = H"A0008";
+constant FAN_ADDR                = H"A000A";
+
+constant FLA_PGM_ADDR            = H"EBFFE";
+
+-- 32kx8 TimeKeeper w. SRAM  80000-8FFFF  (64k)
+constant TIMEKEEPER_ENABLE_ADDR  = B"1000XXXXXXXXXXXXXXXX";
+
+-- Flash user sectors  EC000-FFFFF  (80k)
+constant FLASH_USER_ENABLE_START_ADDR  = H"EC000";
+
+constant FLASH_BOOT_ENABLE_START_ADDR  = H"E0000";
+constant FLASH_BOOT_ENABLE_END_ADDR    = H"EBFFD";
+
+subdesign pld_xa
+
+(
+DM[15..0],
+DISP_DATA[7..0]         : bidir;
+
+AM[2..0],
+ALE,
+RD,
+WRL,
+CH_OVER_STATUS[1..0],
+CTS,
+DSR,
+DCD,
+HWM_T_CRIT_A,
+HWM_INT,
+RX_COM,
+TX_XA,
+FLA_READY,
+TIME_IRQ,
+SDA,
+SCL,
+T1,
+CLK29M, WAIT,
+PIN13,PIN27,PIN34,PIN69,
+PIN70,PIN71,PIN72,PIN73,PIN74,PIN75,
+PIN79,PIN80,PIN81,PIN82,PIN83,PIN84,PIN85,PIN86,PIN87,PIN88,
+PIN93,PIN99,PIN117
+                       : input;
+
+ID_OPTION[11..0],
+RESET[11..0],
+
+DISP_CONTR[2..0],
+PROGRAM[1..0],
+RTS,
+DTR,
+RS422_SELECT,
+CH_OVER_CONTR,
+FAN,
+TX_COM,
+RX_XA,
+INT0_XA,
+INT1_XA,
+T0_XA,
+WDI,
+TIMEKEEPER_ENABLE,
+FLASH_ENABLE,
+FLA_PGM,
+LED14,
+LED15
+                       : output;	
+)
+
+variable
+AL[15..0]                  : latch;    -- HC573 addr latch
+RESET_PORT[11..0]          : dffe;     -- HC574 register with clock enable
+RESET_CONTR_PORT           : dffe;
+ID_OPTION_PORT[11..0]      : dffe;
+DISP_DATA_PORT[7..0]       : dffe;
+DISP_CONTR_PORT[2..0]      : dffe;     -- bit0=EN  bit1=RW  bit2=RS
+PROGRAM_PORT               : dffe;
+FAN_PORT                   : dffe;
+CH_OVER_CONTR_PORT         : dffe;
+SERIAL_CONTR_PORT[2..0]    : dffe;     -- RTS, DTR, RS422_SELECT
+WDI_PORT                   : dffe;
+WDI_CONTR_PORT             : dffe;     -- Control of WDI port,  0 = tri-state  1 = enabled
+FLA_PGM_PORT[1..0]         : dffe;
+LED_PORT[1..0]             : dffe;
+
+RESET_BUF[11..0]           : tri;
+CH_OVER_STATUS_PORT[1..0]  : tri;         -- HC244 buffer
+PLD_SW_PORT[15..0]         : tri;         -- PLD software version
+PLD_CODENO_PORT[15..0]     : tri;         -- PLD code number 12NC
+PLD_OK_PORT[15..0]         : tri;         -- PLD init OK
+DISP_DATA_BUF[7..0]        : tri;
+SERIAL_STATUS_PORT[2..0]   : tri;         -- CTS, DSR, DCD
+FLA_READY_PORT             : tri;
+DISP_D7_STATUS_PORT        : tri;         -- LCD display status for bit #7
+WDI_BUF                    : tri;         -- WDI output
+
+
+CS_RESET,                                 -- chip selects for ports
+CS_RESET_CONTR,
+CS_ID_OPTION,
+CS_PROGRAM,
+CS_DISP_DATA,
+CS_DISP_CONTR,
+CS_CH_OVER,
+CS_PLD_SW,
+CS_PLD_CODENO,
+CS_PLD_OK,
+CS_SERIAL,
+CS_WDI,
+CS_WDI_CONTR,
+CS_TIMEKEEPER_ENABLE,
+CS_FLASH_ENABLE,
+CS_FLASH_USER_ENABLE,
+CS_FLASH_BOOT_ENABLE,
+CS_FAN,
+CS_FLA_PGM,
+CS_FLA_READY,
+CS_LED                     : node;
+
+ADDR[19..0],
+ADDRx[19..0],
+FLA_BOOT_ENABLE            : node;
+dm_node[15..0]             : tri_state_node;
+
+
+begin
+-- Internal addr latch:
+-- Alle adresser er byte-adresser, dvs kun lige adresser er gyldige
+AL[].ena = ALE;
+AL[15..0].d = DM[15..0];
+ADDR[19..4] = AL[15..0];
+ADDR[3..1] = AM[2..0];
+ADDR[0] = GND;
+
+-- chip selects
+CS_RESET = (ADDR[19..0] == RESET_ADDR) & !FLA_PGM_PORT[0];
+CS_RESET_CONTR = (ADDR[19..0] == RESET_CONTR_ADDR) & !FLA_PGM_PORT[0];
+CS_ID_OPTION = (ADDR[19..0] == ID_OPTION_ADDR) & !FLA_PGM_PORT[0];
+CS_PROGRAM = (ADDR[19..0] == PROGRAM_ADDR) & !FLA_PGM_PORT[0];
+CS_DISP_DATA = (ADDR[19..0] == DISP_DATA_ADDR) & !FLA_PGM_PORT[0];
+CS_DISP_CONTR = (ADDR[19..0] == DISP_CONTR_ADDR) & !FLA_PGM_PORT[0];
+CS_CH_OVER = (ADDR[19..0] == CH_OVER_ADDR) & !FLA_PGM_PORT[0];
+CS_FAN = (ADDR[19..0] == FAN_ADDR) & !FLA_PGM_PORT[0];
+CS_PLD_SW = (ADDR[19..0] == PLD_SW_ADDR) & !FLA_PGM_PORT[0];
+CS_PLD_OK = (ADDR[19..0] == PLD_OK_ADDR) & !FLA_PGM_PORT[0];
+CS_SERIAL = (ADDR[19..0] == SERIAL_ADDR) & !FLA_PGM_PORT[0];
+CS_WDI = (ADDR[19..0] == WDI_ADDR) & !FLA_PGM_PORT[0];
+CS_WDI_CONTR = (ADDR[19..0] == WDI_CONTR_ADDR) & !FLA_PGM_PORT[0];
+CS_FLA_READY = (ADDR[19..0] == FLA_READY_ADDR) & !FLA_PGM_PORT[0];
+CS_LED = (ADDR[19..0] == LED_ADDR) & !FLA_PGM_PORT[0];
+CS_PLD_SW = (ADDR[19..0] == PLD_SW_ADDR) & !FLA_PGM_PORT[0];
+CS_PLD_CODENO = (ADDR[19..0] == PLD_CODENO_ADDR) & !FLA_PGM_PORT[0];
+
+if FLA_PGM_PORT[0] == GND then
+ CS_FLA_PGM = (ADDR[19..0] == FLA_PGM_ADDR);  -- addr bit 17-19 are used directly
+else
+ ADDRx[16..0] = ADDR[16..0];                  -- addr bit 17-19 are xor'ed with '111'
+ ADDRx[17] = !ADDR[17];
+ ADDRx[18] = !ADDR[18];
+ ADDRx[19] = !ADDR[19];
+ CS_FLA_PGM = (ADDRx[19..0] == FLA_PGM_ADDR);
+end if;
+
+CS_TIMEKEEPER_ENABLE = (ADDR[19..0] == TIMEKEEPER_ENABLE_ADDR) & !FLA_PGM_PORT[0];
+CS_FLASH_USER_ENABLE = (ADDR[19..0] >= FLASH_USER_ENABLE_START_ADDR);
+CS_FLASH_BOOT_ENABLE = (ADDR[19..0] >= FLASH_BOOT_ENABLE_START_ADDR) & 
+                       (ADDR[19..0] <= FLASH_BOOT_ENABLE_END_ADDR);
+
+CS_FLASH_ENABLE = CS_FLASH_USER_ENABLE # (CS_FLASH_BOOT_ENABLE & FLA_BOOT_ENABLE);
+
+-- output ports
+RESET_PORT[].clk = WRL; 
+RESET_PORT[].d = DM[11..0];  
+RESET_PORT[].ena = CS_RESET;  
+RESET_BUF[].in = RESET_PORT[];
+RESET_BUF[].oe = RESET_CONTR_PORT;
+RESET[] = RESET_BUF[].out;
+
+RESET_CONTR_PORT.clk = WRL; 
+RESET_CONTR_PORT.d = DM[0];  
+RESET_CONTR_PORT.ena = CS_RESET_CONTR;  
+
+ID_OPTION_PORT[].clk = WRL; 
+ID_OPTION_PORT[].d = DM[11..0]; 
+ID_OPTION_PORT[].ena = CS_ID_OPTION; 
+ID_OPTION[] = ID_OPTION_PORT[];
+
+DISP_DATA_PORT[].clk = WRL; 
+DISP_DATA_PORT[].d = DM[7..0]; 
+DISP_DATA_PORT[].ena = CS_DISP_DATA; 
+DISP_DATA_BUF[].oe = !DISP_CONTR_PORT[1]; 
+DISP_DATA_BUF[].in = DISP_DATA_PORT[];
+DISP_DATA[] = DISP_DATA_BUF[].out;
+
+DISP_CONTR_PORT[].clk = WRL; 
+DISP_CONTR_PORT[].d = DM[2..0]; 
+DISP_CONTR_PORT[].ena = CS_DISP_CONTR; 
+DISP_CONTR[] = DISP_CONTR_PORT[];
+
+SERIAL_CONTR_PORT[].clk = WRL; 
+SERIAL_CONTR_PORT[].d = DM[2..0]; 
+SERIAL_CONTR_PORT[].ena = CS_SERIAL; 
+RTS = SERIAL_CONTR_PORT[0];
+DTR = SERIAL_CONTR_PORT[1];
+RS422_SELECT = SERIAL_CONTR_PORT[2];
+
+PROGRAM_PORT.clk = WRL; 
+PROGRAM_PORT.d = DM[0]; 
+PROGRAM_PORT.ena = CS_PROGRAM; 
+PROGRAM[0] = PROGRAM_PORT;
+PROGRAM[1] = PROGRAM_PORT;
+
+CH_OVER_CONTR_PORT.clk = WRL; 
+CH_OVER_CONTR_PORT.d = DM[0]; 
+CH_OVER_CONTR_PORT.ena = CS_CH_OVER; 
+CH_OVER_CONTR = CH_OVER_CONTR_PORT;
+
+FAN_PORT.clk = WRL; 
+FAN_PORT.d = DM[0]; 
+FAN_PORT.ena = CS_FAN; 
+FAN = FAN_PORT;
+
+WDI_PORT.clk = WRL; 
+WDI_PORT.d = DM[0]; 
+WDI_PORT.ena = CS_WDI; 
+WDI_BUF.in = WDI_PORT;
+WDI_BUF.oe = WDI_CONTR_PORT;
+WDI = WDI_BUF.out;
+
+WDI_CONTR_PORT.clk = WRL; 
+WDI_CONTR_PORT.d = DM[0]; 
+WDI_CONTR_PORT.ena = CS_WDI_CONTR; 
+
+FLA_PGM_PORT[].clk = WRL; 
+FLA_PGM_PORT[].d = DM[1..0]; 
+FLA_PGM_PORT[].ena = CS_FLA_PGM; 
+FLA_BOOT_ENABLE = FLA_PGM_PORT[1];
+FLA_PGM = FLA_PGM_PORT[0];
+
+LED_PORT[].clk = WRL; 
+LED_PORT[].d = DM[1..0]; 
+LED_PORT[].ena = CS_LED; 
+LED14 = !LED_PORT[0];
+LED15 = !LED_PORT[1];
+
+TIMEKEEPER_ENABLE = !CS_TIMEKEEPER_ENABLE;               -- enable signal = active low
+FLASH_ENABLE = !CS_FLASH_ENABLE;                         -- enable signal = active low
+
+
+
+-- input ports
+PLD_SW_PORT[].oe = !(RD # !CS_PLD_SW); 
+PLD_SW_PORT[15..0].in = SW_VERSION; 
+dm_node[] = PLD_SW_PORT[].out;
+
+PLD_CODENO_PORT[].oe = !(RD # !CS_PLD_CODENO); 
+PLD_CODENO_PORT[15..0].in = PLD_CODENO; 
+dm_node[] = PLD_CODENO_PORT[].out;
+
+PLD_OK_PORT[].oe = !(RD # !CS_PLD_OK);
+PLD_OK_PORT[].in = PLD_OK; 
+dm_node[] = PLD_OK_PORT[].out;
+
+CH_OVER_STATUS_PORT[].oe = !(RD # !CS_CH_OVER); 
+CH_OVER_STATUS_PORT[1..0].in = CH_OVER_STATUS[]; 
+dm_node[1..0] = CH_OVER_STATUS_PORT[].out;
+
+SERIAL_STATUS_PORT[].oe = !(RD # !CS_SERIAL); 
+SERIAL_STATUS_PORT[0].in = CTS; 
+SERIAL_STATUS_PORT[1].in = DSR; 
+SERIAL_STATUS_PORT[2].in = DCD; 
+dm_node[2..0] = SERIAL_STATUS_PORT[].out;
+
+FLA_READY_PORT.oe = !(RD # !CS_FLA_READY); 
+FLA_READY_PORT.in = FLA_READY; 
+dm_node[0] = FLA_READY_PORT.out;
+
+DISP_D7_STATUS_PORT.oe = !(RD # !CS_DISP_CONTR); 
+DISP_D7_STATUS_PORT.in = DISP_DATA[7]; 
+dm_node[0] = DISP_D7_STATUS_PORT.out;
+
+
+DM[] = dm_node[];                        -- connect read-buffers to DM-databus
+
+INT1_XA = HWM_T_CRIT_A &                 -- interrupts from HWM
+          HWM_INT;
+          
+INT0_XA = TIME_IRQ;                      -- time code interrupt to INT0
+
+TX_COM = TX_XA;                          -- internal serial RS-232 lines
+RX_XA = RX_COM;
+
+T0_XA = CTS;                             -- RS-232 handshake signal to T0
+
+
+end;
+

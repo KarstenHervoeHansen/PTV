@@ -1,0 +1,683 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\2_3\temp\xa\keyscan.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -I..\..\rtxcdef\xa
+                          3 ;          -I..\..\rtxc\xa\include -I..\..\code\include\1_1 -I..\..\app_spec\xa
+                          4 ;          -Ml -O2 -s
+                          6 $NOZPAGE
+                          7         NAME    KEYSCAN
+                         11 ; keyscan.c    1        // 990818 SAA Adjusted speed and delay in repeat
+                         12 ; keyscan.c    2        //
+                         13 ; keyscan.c    3        
+                         14 ; keyscan.c    4        #include "rtxcobj.h"
+                        344 ; keyscan.c    5        
+                        345 ; keyscan.c    6        #include "define.h"                             /* Standard PTV definitio
+                            ns */
+                        348 ; keyscan.c    7        #include "KeyCodes.h"                                   /* defines codes 
+                            used for key queue */
+                        351 ; keyscan.c    8        #include "Key_hw.h"                             /* Haedware interface to 
+                            keyboard   */
+                        354 ; keyscan.c    9        
+                        355 ; keyscan.c   10        
+                        356 ; keyscan.c   11        /* Define parameters for keyboard scanning */
+                        357 ; keyscan.c   12        
+                        358 ; keyscan.c   13        #define ScanRate        20              /* Scanrate in Milliseconds */
+                        359 ; keyscan.c   14        
+                        360 ; keyscan.c   15        #define DebounceTimeout 1       /* Number of readings identical
+                        361 ; keyscan.c   16                                       to the first before keyaccept */
+                        362 ; keyscan.c   17        
+                        363 ; keyscan.c   18        #define RepDelay        50      /* Time (in scanrate units)  before repea
+                            ting */
+                        364 ; keyscan.c   19        
+                        365 ; keyscan.c   20        #define AutoEscDelay    3000    /* 60 sec = 1 minut */
+                        366 ; keyscan.c   21        
+                        367 ; keyscan.c   22        #define InitRepRate     15      /* Time between each rep (initial value) 
+                            */
+                        368 ; keyscan.c   23        #define Acc2RepRate     15      /* Time between each rep acc level 2 */
+                        369 ; keyscan.c   24        #define Acc3RepRate     15      /* Time between each rep acc level 3 */
+                        370 ; keyscan.c   25        #define Acc4RepRate     15      /* Time between each rep acc level 4 */
+                        371 ; keyscan.c   26        
+                        372 ; keyscan.c   27        #define Acc2            10      /* Number of keys sent before changing
+                        373 ; keyscan.c   28                                                to acceleration level 2*/
+                        374 ; keyscan.c   29        
+                        375 ; keyscan.c   30        #define Acc3            50      /* Number of keys sent before changing
+                        376 ; keyscan.c   31                                                to acceleration level 3*/
+                        377 ; keyscan.c   32        
+                        378 ; keyscan.c   33        #define Acc4            300     /* Number of keys sent before changing
+                        379 ; keyscan.c   34                                                to acceleration level 4*/
+                        380 ; keyscan.c   35        
+                        381 ; keyscan.c   36        
+                        382 ; keyscan.c   37        /*#define Acc2            10     Number of keys sent before changing
+                        383 ; keyscan.c   38                                                to acceleration level 2*/
+                        384 ; keyscan.c   39        
+                        385 ; keyscan.c   40        /*#define Acc3            19     Number of keys sent before changing
+                        386 ; keyscan.c   41                                                to acceleration level 3*/
+                        387 ; keyscan.c   42        
+                        388 ; keyscan.c   43        /*#define Acc4            28     Number of keys sent before changing
+                        389 ; keyscan.c   44                                                to acceleration level 4*/
+                        390 ; keyscan.c   45        
+                        391 ; keyscan.c   46        /* Define states for state-machine */
+                        392 ; keyscan.c   47        enum KeyStates{
+                        393 ; keyscan.c   48                KeyDebounce,
+                        394 ; keyscan.c   49                KeyStable,
+                        395 ; keyscan.c   50                KeyRepeat,
+                        396 ; keyscan.c   51                KeyFree
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        397 ; keyscan.c   52        };
+                        398 ; keyscan.c   53        
+                        399 ; keyscan.c   54        /* Task definition */
+                        400 ; keyscan.c   55        TStream *KeyScanStream;
+                        401 ; keyscan.c   56        
+                        402 ; keyscan.c   57        static TTimer *KeyScanTimer;
+                        403 ; keyscan.c   58        
+                        404 ; keyscan.c   59        /*  Task for scanning keyboard */
+                        405 ; keyscan.c   60        void keyscan( void)
+                        406 ; keyscan.c   61        {
+000000                  407 KEYSCAN_PR      SEGMENT HCODE
+000000                  408         RSEG    KEYSCAN_PR
+                        409         ALIGN   1
+000000                  415 KEYSCAN_CLR_FA  SEGMENT HDATA INSEGMENT CLEAR
+000000                  416         RSEG    KEYSCAN_CLR_FA
+                        417         ALIGN   1
+000000                  418 _3:     DS      2
+   |  RESERVED             
+000001
+                        419         ALIGN   1
+000002                  420 _4:     DS      2
+   |  RESERVED             
+000003
+                        421         ALIGN   1
+000004                  422 _5:     DS      2
+   |  RESERVED             
+000005
+000006 RESERVED         423 _6:     DS      1
+000006
+000007 RESERVED         424 _7:     DS      1
+000007
+000008 RESERVED         425 _8:     DS      1
+000008
+                        426         PUBLIC  _keyscan
+000000                  427         RSEG    KEYSCAN_PR
+000000                  427         RSEG    KEYSCAN_PR
+000000                  428 _keyscan:
+000000 0F30             432         PUSH.W  R4, R5
+                        440 ; keyscan.c   62                /* Internal vars */
+                        441 ; keyscan.c   63          static UC KeyState, OldKeyCode, RepRate;
+                        442 ; keyscan.c   64          static KeyPress Key;
+                        443 ; keyscan.c   65          static UI KeyCount, KeyTimer;
+                        444 ; keyscan.c   66        
+                        445 ; keyscan.c   67                KeyScanStream = newTStream( 2, 10);
+000002 B902             447         MOV.W   R0,#02H
+000004 9918000A         448         MOV.W   R1,#0AH
+                        449         CALL    _newTStream
+000008 C4rrrrrr        +449 ;       FCALL   _newTStream
+00000C 964842rr         450         MOV.B   ES,#SEG( _KeyScanStream )
+000010 9928rrrr         451         MOV.W   R2,#SOF( _KeyScanStream )
+000014 8B0A             452         MOV.W   [R2+],R0
+000016 8A1A             453         MOV.W   [R2],R1
+                        454 ; keyscan.c   68                KS_purgequeue( KeyScanStream->ID);
+000018 862C42           456         MOV.B   ES,R1L
+00001B 840012           457         MOV.B   R0L,[R0+18]
+                        458         CALL    _KS_purgequeue
+00001E C4rrrrrr        +458 ;       FCALL   _KS_purgequeue
+                        459 ; keyscan.c   69        
+                        460 ; keyscan.c   70                KeyScanTimer = newTTimer();
+                        462         CALL    _newTTimer
+000022 C4rrrrrr        +462 ;       FCALL   _newTTimer
+000026 964842rr         463         MOV.B   ES,#SEG( _KeyScanTimer )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+00002A 9928rrrr         464         MOV.W   R2,#SOF( _KeyScanTimer )
+00002E 8B0A             465         MOV.W   [R2+],R0
+000030 8A1A             466         MOV.W   [R2],R1
+                        467 ; keyscan.c   71                KeyScanTimer->SetPeriod( KeyScanTimer, 20);
+000032 862C42           469         MOV.B   ES,R1L
+000035 8C400A           470         MOV.W   R4,[R0+10]
+000038 8C500C           471         MOV.W   R5,[R0+12]
+00003B 99280014         472         MOV.W   R2,#014H
+00003F C4rrrrrr         473         FCALL   __ICALL
+                        474 ; keyscan.c   72        
+                        475 ; keyscan.c   73                /* Initialisation part */
+                        476 ; keyscan.c   74          KeyState   = KeyDebounce ;  /* Initial state */
+000043 964842rr         478         MOV.B   ES,#SEG( _8 )
+000047 9908rrrr         479         MOV.W   R0,#SOF( _8 )
+00004B B200             480         MOV.B   [R0],#00H
+                        481 ; keyscan.c   75          OldKeyCode = KeyNone;       /* Program last key as 'none' */
+00004D 964842rr         483         MOV.B   ES,#SEG( _7 )
+000051 9908rrrr         484         MOV.W   R0,#SOF( _7 )
+000055 9208FF           485         MOV.B   [R0],#0FFH
+                        486 ; keyscan.c   76          Key.Repeat = RepeatOff;
+000058 964842rr         488         MOV.B   ES,#SEG( _5+1 )
+00005C 9908rrrr         489         MOV.W   R0,#SOF( _5+1 )
+000060 B200             490         MOV.B   [R0],#00H
+                        491 ; keyscan.c   77          RepRate    = InitRepRate;
+000062 964842rr         493         MOV.B   ES,#SEG( _6 )
+000066 9908rrrr         494         MOV.W   R0,#SOF( _6 )
+00006A 92080F           495         MOV.B   [R0],#0FH
+                        496 ; keyscan.c   78          KeyTimer   = 1;
+00006D 964842rr         498         MOV.B   ES,#SEG( _3 )
+000071 9908rrrr         499         MOV.W   R0,#SOF( _3 )
+000075 BA01             500         MOV.W   [R0],#01H
+                        501 ; keyscan.c   79        
+                        502 ; keyscan.c   80          /* Get initial key press */
+                        503 ; keyscan.c   81          /* OR : does above initialisation give the init key as the first ? */
+                        504 ; keyscan.c   82          /* Set up timer for scan rate */
+                        505 ; keyscan.c   83        
+                        506 ; keyscan.c   84                /* Task loop start */
+                        507 ; keyscan.c   85                for (;;)
+000078                  509 _9:
+                        510 ; keyscan.c   86          {
+                        511 ; keyscan.c   87                /* Wait for timeout */
+                        512 ; keyscan.c   88                        KeyScanTimer->TimeOut->Wait( KeyScanTimer->TimeOut, 0);
+000078 964842rr         514         MOV.B   ES,#SEG( _KeyScanTimer )
+00007C 9918rrrr         515         MOV.W   R1,#SOF( _KeyScanTimer )
+000080 8B01             516         MOV.W   R0,[R1+]
+000082 8A11             517         MOV.W   R1,[R1]
+000084 862C42           518         MOV.B   ES,R1L
+000087 8C4016           519         MOV.W   R4,[R0+22]
+00008A 8C5018           520         MOV.W   R5,[R0+24]
+00008D 86AC42           521         MOV.B   ES,R5L
+000090 8C540C           522         MOV.W   R5,[R4+12]
+000093 8C440A           523         MOV.W   R4,[R4+10]
+000096 862C42           524         MOV.B   ES,R1L
+000099 8C1018           525         MOV.W   R1,[R0+24]
+00009C 8C0016           526         MOV.W   R0,[R0+22]
+00009F B930             527         MOV.W   R3,#00H
+0000A1 B920             528         MOV.W   R2,#00H
+0000A3 C4rrrrrr         529         FCALL   __ICALL
+                        530 ; keyscan.c   89        
+                        531 ; keyscan.c   90                        /* Get actual key scan reading */
+                        532 ; keyscan.c   91            switch ( KeyboardGet( &Key.Code) )
+0000A7 9918rrrr         534         MOV.W   R1,#SEG( _5 )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+0000AB 9908rrrr         535         MOV.W   R0,#SOF( _5 )
+                        536         CALL    _KeyboardGet
+0000AF C4rrrrrr        +536 ;       FCALL   _KeyboardGet
+                        537 ; keyscan.c   92            {
+                        538 ; keyscan.c   93                case OK:
+                        539 ; keyscan.c   94                break;
+                        540 ; keyscan.c   95        
+                        541 ; keyscan.c   96                                default:
+                        542 ; keyscan.c   97                break;
+                        543 ; keyscan.c   98            }/*end switch*/
+                        544 ; keyscan.c   99        
+                        545 ; keyscan.c  100            /* Execute state machine */
+                        546 ; keyscan.c  101            switch ( KeyState){
+0000B3 964842rr         548         MOV.B   ES,#SEG( _8 )
+0000B7 9908rrrr         549         MOV.W   R0,#SOF( _8 )
+0000BB 8200             550         MOV.B   R0L,[R0]
+0000BD 910400           551         CMP.B   R0L,#00H
+0000C0 F30D             552         BEQ     _10
+0000C2 910403           553         CMP.B   R0L,#03H
+0000C5 F364             554         BEQ     _13
+0000C7 910401           555         CMP.B   R0L,#01H
+                        556         BEQ     _15
+0000CA F202            +556 ;       BNE     _LG_4
+0000CC D500A7          +556 ;       JMP.L   _15
+0000CC D500A700        +556 ;       JMP.L   _15
+0000D0                 +556 _LG_4:
+0000D0 910402           557         CMP.B   R0L,#02H
+                        558         BEQ     _17
+0000D3 F202            +558 ;       BNE     _LG_6
+0000D5 D500F7          +558 ;       JMP.L   _17
+0000D5 D500F7          +558 ;       JMP.L   _17
+0000D8                 +558 _LG_6:
+                        559         BR      _36
+0000D8 D50170          +559         JMP.L   _36
+                        560 ; keyscan.c  102                    case KeyDebounce:
+0000DC                  562 _10:
+                        563 ; keyscan.c  103                    if (Key.Code != OldKeyCode)
+0000DC 964842rr         565         MOV.B   ES,#SEG( _5 )
+0000E0 9908rrrr         566         MOV.W   R0,#SOF( _5 )
+0000E4 8200             567         MOV.B   R0L,[R0]
+0000E6 964842rr         568         MOV.B   ES,#SEG( _7 )
+0000EA 9918rrrr         569         MOV.W   R1,#SOF( _7 )
+0000EE 8211             570         MOV.B   R0H,[R1]
+0000F0 4101             571         CMP.B   R0L,R0H
+                        572         BNE     _23
+0000F2 F302            +572 ;       BEQ     _LG_8
+0000F4 D5015D          +572 ;       JMP.L   _23
+0000F4 D5015D00        +572 ;       JMP.L   _23
+0000F8                 +572 _LG_8:
+                        573 ; keyscan.c  104                {
+                        574 ; keyscan.c  105                    KeyTimer = DebounceTimeout;
+                        575 ; keyscan.c  106                }
+                        576 ; keyscan.c  107                else
+                        577 ; keyscan.c  108                {
+                        578 ; keyscan.c  109                  if (0 == --KeyTimer)
+0000F8 964842rr         580         MOV.B   ES,#SEG( _3 )
+0000FC 9918rrrr         581         MOV.W   R1,#SOF( _3 )
+000100 8A11             582         MOV.W   R1,[R1]
+000102 A91F             583         ADDS.W  R1,#0FH
+000104 964842rr         584         MOV.B   ES,#SEG( _3 )
+000108 9928rrrr         585         MOV.W   R2,#SOF( _3 )
+00010C 8A1A             586         MOV.W   [R2],R1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+00010E 6911             587         OR.W    R1,R1
+                        588         BNE     _36
+000110 F302            +588 ;       BEQ     _LG_10
+000112 D50153          +588 ;       JMP.L   _36
+000112 D5015300        +588 ;       JMP.L   _36
+000116                 +588 _LG_10:
+                        589 ; keyscan.c  110                  {
+                        590 ; keyscan.c  111                          if ( Key.Code == KeyNone )
+000116 9104FF           592         CMP.B   R0L,#0FFH
+000119 F20D             593         BNE     _11
+                        594 ; keyscan.c  112                    {
+                        595 ; keyscan.c  113                          KeyState     = KeyFree;
+00011B 964842rr         597         MOV.B   ES,#SEG( _8 )
+00011F 9908rrrr         598         MOV.W   R0,#SOF( _8 )
+000123 B203             599         MOV.B   [R0],#03H
+                        600 ; keyscan.c  114                      KeyTimer     = AutoEscDelay;
+000125 964842rr         602         MOV.B   ES,#SEG( _3 )
+000129 9908rrrr         603         MOV.W   R0,#SOF( _3 )
+00012D 9A080BB8         604         MOV.W   [R0],#0BB8H
+                        605 ; keyscan.c  115                    }
+000131 FE0C             607         BR      _12
+000131 FE0C00           607         BR      _12
+000134                  608 _11:
+                        609 ; keyscan.c  116                    else
+                        610 ; keyscan.c  117                    {
+                        611 ; keyscan.c  118                        KeyTimer     = RepDelay;
+000134 964842rr         613         MOV.B   ES,#SEG( _3 )
+000138 9908rrrr         614         MOV.W   R0,#SOF( _3 )
+00013C 9A080032         615         MOV.W   [R0],#032H
+                        616 ; keyscan.c  119                      KeyState     = KeyStable;
+000140 964842rr         618         MOV.B   ES,#SEG( _8 )
+000144 9908rrrr         619         MOV.W   R0,#SOF( _8 )
+000148 B201             620         MOV.B   [R0],#01H
+                        621 ; keyscan.c  120                    }
+00014A                  623 _12:
+                        624 ; keyscan.c  121        
+                        625 ; keyscan.c  122                    Key.Repeat   = RepeatOff;
+00014A 964842rr         627         MOV.B   ES,#SEG( _5+1 )
+00014E 9908rrrr         628         MOV.W   R0,#SOF( _5+1 )
+000152 B200             629         MOV.B   [R0],#00H
+                        630 ; keyscan.c  123                    KeyCount     = 1;
+000154 964842rr         632         MOV.B   ES,#SEG( _4 )
+000158 9908rrrr         633         MOV.W   R0,#SOF( _4 )
+00015C BA01             634         MOV.W   [R0],#01H
+                        635 ; keyscan.c  124                    RepRate    = InitRepRate;
+00015E 964842rr         637         MOV.B   ES,#SEG( _6 )
+000162 9908rrrr         638         MOV.W   R0,#SOF( _6 )
+000166 92080F           639         MOV.B   [R0],#0FH
+                        640 ; keyscan.c  125                                                        KeyScanStream->Put( KeySc
+                            anStream, &Key);
+000169 964842rr         642         MOV.B   ES,#SEG( _KeyScanStream )
+00016D 9918rrrr         643         MOV.W   R1,#SOF( _KeyScanStream )
+000171 8B01             644         MOV.W   R0,[R1+]
+000173 8A11             645         MOV.W   R1,[R1]
+000175 862C42           646         MOV.B   ES,R1L
+000178 8C400E           647         MOV.W   R4,[R0+14]
+00017B 8C5010           648         MOV.W   R5,[R0+16]
+00017E 9938rrrr         649         MOV.W   R3,#SEG( _5 )
+000182 9928rrrr         650         MOV.W   R2,#SOF( _5 )
+000186 C4rrrrrr         651         FCALL   __ICALL
+                        652 ; keyscan.c  126                  }
+                        653 ; keyscan.c  127                }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        654 ; keyscan.c  128                break;
+                        656         BR      _36
+00018A D50117          +656         JMP.L   _36
+                        657 ; keyscan.c  129        
+                        658 ; keyscan.c  130                                case KeyFree:
+00018E                  660 _13:
+                        661 ; keyscan.c  131                if (Key.Code != OldKeyCode)
+00018E 964842rr         663         MOV.B   ES,#SEG( _5 )
+000192 9908rrrr         664         MOV.W   R0,#SOF( _5 )
+000196 8200             665         MOV.B   R0L,[R0]
+000198 964842rr         666         MOV.B   ES,#SEG( _7 )
+00019C 9918rrrr         667         MOV.W   R1,#SOF( _7 )
+0001A0 8211             668         MOV.B   R0H,[R1]
+0001A2 4101             669         CMP.B   R0L,R0H
+0001A4 F30C             670         BEQ     _14
+                        671 ; keyscan.c  132                {
+                        672 ; keyscan.c  133                        KeyTimer = DebounceTimeout;
+0001A6 964842rr         674         MOV.B   ES,#SEG( _3 )
+0001AA 9908rrrr         675         MOV.W   R0,#SOF( _3 )
+0001AE BA01             676         MOV.W   [R0],#01H
+                        677 ; keyscan.c  134                  KeyState = KeyDebounce;
+0001B0 964842rr         679         MOV.B   ES,#SEG( _8 )
+0001B4 9908rrrr         680         MOV.W   R0,#SOF( _8 )
+0001B8 B200             681         MOV.B   [R0],#00H
+                        682 ; keyscan.c  135                }
+                        684         BR      _36
+0001BA D500FF          +684         JMP.L   _36
+0001BA D500FF00        +684         JMP.L   _36
+0001BE                  685 _14:
+                        686 ; keyscan.c  136                else
+                        687 ; keyscan.c  137                {
+                        688 ; keyscan.c  138                        if (KeyTimer != 0)
+0001BE 964842rr         690         MOV.B   ES,#SEG( _3 )
+0001C2 9908rrrr         691         MOV.W   R0,#SOF( _3 )
+0001C6 8A00             692         MOV.W   R0,[R0]
+                        693         BEQ     _36
+0001C8 F202            +693 ;       BNE     _LG_16
+0001CA D500F7          +693 ;       JMP.L   _36
+0001CA D500F700        +693 ;       JMP.L   _36
+0001CE                 +693 _LG_16:
+                        694 ; keyscan.c  139                  {
+                        695 ; keyscan.c  140                        KeyTimer--;
+0001CE A90F             697         ADDS.W  R0,#0FH
+0001D0 964842rr         698         MOV.B   ES,#SEG( _3 )
+0001D4 9918rrrr         699         MOV.W   R1,#SOF( _3 )
+0001D8 8A09             700         MOV.W   [R1],R0
+                        701 ; keyscan.c  141                    if (KeyTimer == 0)
+0001DA 6900             703         OR.W    R0,R0
+                        704         BNE     _36
+0001DC F302            +704 ;       BEQ     _LG_18
+0001DE D500ED          +704 ;       JMP.L   _36
+0001DE D500ED00        +704 ;       JMP.L   _36
+0001E2                 +704 _LG_18:
+                        705 ; keyscan.c  142                    {
+                        706 ; keyscan.c  143                        Key.Code = KeyAutoEsc;
+0001E2 964842rr         708         MOV.B   ES,#SEG( _5 )
+0001E6 9908rrrr         709         MOV.W   R0,#SOF( _5 )
+0001EA 92081B           710         MOV.B   [R0],#01BH
+                        711 ; keyscan.c  144                                                                KeyScanStream->Pu
+                            t( KeyScanStream, &Key);
+0001ED 964842rr         713         MOV.B   ES,#SEG( _KeyScanStream )
+0001F1 9918rrrr         714         MOV.W   R1,#SOF( _KeyScanStream )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+0001F5 8B01             715         MOV.W   R0,[R1+]
+0001F7 8A11             716         MOV.W   R1,[R1]
+0001F9 862C42           717         MOV.B   ES,R1L
+0001FC 8C400E           718         MOV.W   R4,[R0+14]
+0001FF 8C5010           719         MOV.W   R5,[R0+16]
+000202 9938rrrr         720         MOV.W   R3,#SEG( _5 )
+000206 9928rrrr         721         MOV.W   R2,#SOF( _5 )
+00020A C4rrrrrr         722         FCALL   __ICALL
+                        723 ; keyscan.c  145                      Key.Code = KeyNone;
+00020E 964842rr         725         MOV.B   ES,#SEG( _5 )
+000212 9908rrrr         726         MOV.W   R0,#SOF( _5 )
+000216 9208FF           727         MOV.B   [R0],#0FFH
+                        728 ; keyscan.c  146                    }
+                        729 ; keyscan.c  147                  }
+                        730 ; keyscan.c  148                }
+                        731 ; keyscan.c  149                break;
+                        733         BR      _36
+000219 D500CF          +733         JMP.L   _36
+                        734 ; keyscan.c  150        
+                        735 ; keyscan.c  151              case KeyStable:
+00021C                  737 _15:
+                        738 ; keyscan.c  152                if (Key.Code != OldKeyCode)
+00021C 964842rr         740         MOV.B   ES,#SEG( _5 )
+000220 9908rrrr         741         MOV.W   R0,#SOF( _5 )
+000224 8200             742         MOV.B   R0L,[R0]
+000226 964842rr         743         MOV.B   ES,#SEG( _7 )
+00022A 9918rrrr         744         MOV.W   R1,#SOF( _7 )
+00022E 8211             745         MOV.B   R0H,[R1]
+000230 4101             746         CMP.B   R0L,R0H
+000232 F30C             747         BEQ     _16
+                        748 ; keyscan.c  153                {
+                        749 ; keyscan.c  154                        KeyTimer = DebounceTimeout;
+000234 964842rr         751         MOV.B   ES,#SEG( _3 )
+000238 9908rrrr         752         MOV.W   R0,#SOF( _3 )
+00023C BA01             753         MOV.W   [R0],#01H
+                        754 ; keyscan.c  155                  KeyState = KeyDebounce;
+00023E 964842rr         756         MOV.B   ES,#SEG( _8 )
+000242 9908rrrr         757         MOV.W   R0,#SOF( _8 )
+000246 B200             758         MOV.B   [R0],#00H
+                        759 ; keyscan.c  156                }
+                        761         BR      _36
+000248 D500B8          +761         JMP.L   _36
+000248 D500B800        +761         JMP.L   _36
+00024C                  762 _16:
+                        763 ; keyscan.c  157                else
+                        764 ; keyscan.c  158                {
+                        765 ; keyscan.c  159                        if (0 == KeyTimer--)
+00024C 964842rr         767         MOV.B   ES,#SEG( _3 )
+000250 9908rrrr         768         MOV.W   R0,#SOF( _3 )
+000254 8A00             769         MOV.W   R0,[R0]
+000256 8910             770         MOV.W   R1,R0
+000258 A90F             771         ADDS.W  R0,#0FH
+00025A 964842rr         772         MOV.B   ES,#SEG( _3 )
+00025E 9928rrrr         773         MOV.W   R2,#SOF( _3 )
+000262 8A0A             774         MOV.W   [R2],R0
+000264 6911             775         OR.W    R1,R1
+                        776         BNE     _36
+000266 F302            +776 ;       BEQ     _LG_22
+000268 D500A8          +776 ;       JMP.L   _36
+000268 D500A800        +776 ;       JMP.L   _36
+00026C                 +776 _LG_22:
+                        777 ; keyscan.c  160                  {
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        778 ; keyscan.c  161                        KeyState = KeyRepeat;
+00026C 964842rr         780         MOV.B   ES,#SEG( _8 )
+000270 9908rrrr         781         MOV.W   R0,#SOF( _8 )
+000274 B202             782         MOV.B   [R0],#02H
+                        783 ; keyscan.c  162                    KeyTimer = RepRate;
+000276 964842rr         785         MOV.B   ES,#SEG( _3 )
+00027A 9908rrrr         786         MOV.W   R0,#SOF( _3 )
+00027E 9A08000F         787         MOV.W   [R0],#0FH
+                        788 ; keyscan.c  163                    Key.Repeat = Repeat1;
+000282 964842rr         790         MOV.B   ES,#SEG( _5+1 )
+000286 9908rrrr         791         MOV.W   R0,#SOF( _5+1 )
+00028A B201             792         MOV.B   [R0],#01H
+                        793 ; keyscan.c  164                                                        KeyScanStream->Put( KeySc
+                            anStream, &Key);
+00028C 964842rr         795         MOV.B   ES,#SEG( _KeyScanStream )
+000290 9918rrrr         796         MOV.W   R1,#SOF( _KeyScanStream )
+000294 8B01             797         MOV.W   R0,[R1+]
+000296 8A11             798         MOV.W   R1,[R1]
+000298 862C42           799         MOV.B   ES,R1L
+00029B 8C400E           800         MOV.W   R4,[R0+14]
+00029E 8C5010           801         MOV.W   R5,[R0+16]
+0002A1 9938rrrr         802         MOV.W   R3,#SEG( _5 )
+0002A5 9928rrrr         803         MOV.W   R2,#SOF( _5 )
+0002A9 C4rrrrrr         804         FCALL   __ICALL
+                        805 ; keyscan.c  165                    KeyCount++;
+0002AD 964842rr         807         MOV.B   ES,#SEG( _4 )
+0002B1 9908rrrr         808         MOV.W   R0,#SOF( _4 )
+0002B5 8A00             809         MOV.W   R0,[R0]
+0002B7 A901             810         ADDS.W  R0,#01H
+0002B9 964842rr         811         MOV.B   ES,#SEG( _4 )
+0002BD 9918rrrr         812         MOV.W   R1,#SOF( _4 )
+0002C1 8A09             813         MOV.W   [R1],R0
+                        814 ; keyscan.c  166                  }
+                        815 ; keyscan.c  167                }
+                        816 ; keyscan.c  168                break;
+0002C3 FE7B             818         BR      _36
+                        819 ; keyscan.c  169        
+                        820 ; keyscan.c  170              case KeyRepeat:
+0002C6                  822 _17:
+                        823 ; keyscan.c  171                if (Key.Code != OldKeyCode)
+0002C6 964842rr         825         MOV.B   ES,#SEG( _5 )
+0002CA 9908rrrr         826         MOV.W   R0,#SOF( _5 )
+0002CE 8200             827         MOV.B   R0L,[R0]
+0002D0 964842rr         828         MOV.B   ES,#SEG( _7 )
+0002D4 9918rrrr         829         MOV.W   R1,#SOF( _7 )
+0002D8 8211             830         MOV.B   R0H,[R1]
+0002DA 4101             831         CMP.B   R0L,R0H
+0002DC F30B             832         BEQ     _18
+                        833 ; keyscan.c  172                {
+                        834 ; keyscan.c  173                        KeyTimer   = DebounceTimeout;
+0002DE 964842rr         836         MOV.B   ES,#SEG( _3 )
+0002E2 9908rrrr         837         MOV.W   R0,#SOF( _3 )
+0002E6 BA01             838         MOV.W   [R0],#01H
+                        839 ; keyscan.c  174                  KeyState   = KeyDebounce;
+0002E8 964842rr         841         MOV.B   ES,#SEG( _8 )
+0002EC 9908rrrr         842         MOV.W   R0,#SOF( _8 )
+0002F0 B200             843         MOV.B   [R0],#00H
+                        844 ; keyscan.c  175                }
+0002F2 FE63             846         BR      _36
+0002F2 FE63             846         BR      _36
+0002F4                  847 _18:
+                        848 ; keyscan.c  176                else
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        849 ; keyscan.c  177                {
+                        850 ; keyscan.c  178                        if (0 == KeyTimer--)
+0002F4 964842rr         852         MOV.B   ES,#SEG( _3 )
+0002F8 9908rrrr         853         MOV.W   R0,#SOF( _3 )
+0002FC 8A00             854         MOV.W   R0,[R0]
+0002FE 8910             855         MOV.W   R1,R0
+000300 A90F             856         ADDS.W  R0,#0FH
+000302 964842rr         857         MOV.B   ES,#SEG( _3 )
+000306 9928rrrr         858         MOV.W   R2,#SOF( _3 )
+00030A 8A0A             859         MOV.W   [R2],R0
+00030C 6911             860         OR.W    R1,R1
+00030E F255             861         BNE     _36
+                        862 ; keyscan.c  179                  {
+                        863 ; keyscan.c  180        
+                        864 ; keyscan.c  181                                                        if (KeyCount == Acc2)
+000310 964842rr         866         MOV.B   ES,#SEG( _4 )
+000314 9908rrrr         867         MOV.W   R0,#SOF( _4 )
+000318 8A00             868         MOV.W   R0,[R0]
+00031A 9904000A         869         CMP.W   R0,#0AH
+00031E F20B             870         BNE     _19
+                        871 ; keyscan.c  182                    {
+                        872 ; keyscan.c  183                        Key.Repeat = Repeat2;
+000320 964842rr         874         MOV.B   ES,#SEG( _5+1 )
+000324 9918rrrr         875         MOV.W   R1,#SOF( _5+1 )
+000328 B212             876         MOV.B   [R1],#02H
+                        877 ; keyscan.c  184                      RepRate    = Acc2RepRate;
+00032A 964842rr         879         MOV.B   ES,#SEG( _6 )
+00032E 9918rrrr         880         MOV.W   R1,#SOF( _6 )
+000332 92180F           881         MOV.B   [R1],#0FH
+                        882 ; keyscan.c  185                    }
+000336                  884 _19:
+                        885 ; keyscan.c  186        
+                        886 ; keyscan.c  187                    if (KeyCount == Acc3)
+000336 99040032         888         CMP.W   R0,#032H
+00033A F20B             889         BNE     _20
+                        890 ; keyscan.c  188                    {
+                        891 ; keyscan.c  189                        Key.Repeat = Repeat3;
+00033C 964842rr         893         MOV.B   ES,#SEG( _5+1 )
+000340 9918rrrr         894         MOV.W   R1,#SOF( _5+1 )
+000344 B213             895         MOV.B   [R1],#03H
+                        896 ; keyscan.c  190                            RepRate    = Acc3RepRate;
+000346 964842rr         898         MOV.B   ES,#SEG( _6 )
+00034A 9918rrrr         899         MOV.W   R1,#SOF( _6 )
+00034E 92180F           900         MOV.B   [R1],#0FH
+                        901 ; keyscan.c  191                    }
+000352                  903 _20:
+                        904 ; keyscan.c  192                                                        
+                        905 ; keyscan.c  193                                                        if (KeyCount == Acc4)
+000352 9904012C         907         CMP.W   R0,#012CH
+000356 F20B             908         BNE     _21
+                        909 ; keyscan.c  194                    {
+                        910 ; keyscan.c  195                        Key.Repeat = Repeat4;
+000358 964842rr         912         MOV.B   ES,#SEG( _5+1 )
+00035C 9918rrrr         913         MOV.W   R1,#SOF( _5+1 )
+000360 B214             914         MOV.B   [R1],#04H
+                        915 ; keyscan.c  196                      RepRate    = Acc4RepRate;
+000362 964842rr         917         MOV.B   ES,#SEG( _6 )
+000366 9918rrrr         918         MOV.W   R1,#SOF( _6 )
+00036A 92180F           919         MOV.B   [R1],#0FH
+                        920 ; keyscan.c  197                    }
+00036E                  922 _21:
+                        923 ; keyscan.c  198        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        924 ; keyscan.c  199                    if (KeyCount < 1000)
+00036E 990403E8         926         CMP.W   R0,#03E8H
+000372 F006             927         BCC     _22
+                        928 ; keyscan.c  200                        KeyCount++;
+000374 A901             930         ADDS.W  R0,#01H
+000376 964842rr         931         MOV.B   ES,#SEG( _4 )
+00037A 9918rrrr         932         MOV.W   R1,#SOF( _4 )
+00037E 8A09             933         MOV.W   [R1],R0
+00037E 8A09             933         MOV.W   [R1],R0
+000380                  934 _22:
+                        935 ; keyscan.c  201        
+                        936 ; keyscan.c  202                    KeyTimer = RepRate;
+000380 964842rr         938         MOV.B   ES,#SEG( _3 )
+000384 9908rrrr         939         MOV.W   R0,#SOF( _3 )
+000388 9A08000F         940         MOV.W   [R0],#0FH
+                        941 ; keyscan.c  203        
+                        942 ; keyscan.c  204                                                        KeyScanStream->Put( KeySc
+                            anStream, &Key);
+00038C 964842rr         944         MOV.B   ES,#SEG( _KeyScanStream )
+000390 9918rrrr         945         MOV.W   R1,#SOF( _KeyScanStream )
+000394 8B01             946         MOV.W   R0,[R1+]
+000396 8A11             947         MOV.W   R1,[R1]
+000398 862C42           948         MOV.B   ES,R1L
+00039B 8C400E           949         MOV.W   R4,[R0+14]
+00039E 8C5010           950         MOV.W   R5,[R0+16]
+0003A1 9938rrrr         951         MOV.W   R3,#SEG( _5 )
+0003A5 9928rrrr         952         MOV.W   R2,#SOF( _5 )
+0003A9 C4rrrrrr         953         FCALL   __ICALL
+                        954 ; keyscan.c  205                                                }
+                        955 ; keyscan.c  206                }
+                        956 ; keyscan.c  207                break;
+0003AD FE06             958         BR      _36
+0003B0                  960 _23:
+0003B0 964842rr         961         MOV.B   ES,#SEG( _3 )
+0003B4 9908rrrr         962         MOV.W   R0,#SOF( _3 )
+0003B8 BA01             963         MOV.W   [R0],#01H
+                        964 ; keyscan.c  208        
+                        965 ; keyscan.c  209                default:
+                        966 ; keyscan.c  210                        break;
+                        967 ; keyscan.c  211                                }/*end switch*/
+0003BA                  969 _36:
+                        970 ; keyscan.c  212        
+                        971 ; keyscan.c  213                                OldKeyCode = Key.Code;
+0003BA 964842rr         973         MOV.B   ES,#SEG( _5 )
+0003BE 9908rrrr         974         MOV.W   R0,#SOF( _5 )
+0003C2 8200             975         MOV.B   R0L,[R0]
+0003C4 964842rr         976         MOV.B   ES,#SEG( _7 )
+0003C8 9918rrrr         977         MOV.W   R1,#SOF( _7 )
+0003CC 8209             978         MOV.B   [R1],R0L
+                        980         BR      _9
+0003CE D5FE54          +980         JMP.L   _9
+                        981 ; keyscan.c  214                        }
+                        982 ; keyscan.c  215                        /*End task loop*/
+                        983 ; keyscan.c  216        } /* End Keyscan task  */
+0003D1 2F30             985         POP.W   R4, R5
+0003D3 D680             987         RET
+                        989 ; keyscan.c  217        
+                        990 ; keyscan.c  218        
+                        991 ; keyscan.c  219        
+                        998         EXTRN   HCODE(_newTStream)
+000009                 1002         RSEG    KEYSCAN_CLR_FA
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+000009 RESERVED        1003         ALIGN   1
+000009
+00000A                 1004 _KeyScanTimer:  DS      4
+   |  RESERVED             
+00000D
+                       1007         EXTRN   HCODE(_newTTimer)
+                       1010         EXTRN   HCODE(_KS_purgequeue)
+                       1015         EXTRN   HCODE(_KeyboardGet)
+                       1018         PUBLIC  _KeyScanStream
+                       1019         ALIGN   1
+00000E                 1020 _KeyScanStream: DS      4
+   |  RESERVED             
+000011
+                       1021         EXTRN   HCODE(__ICALL)
+                       1022         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1023         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1024         CALLS   'keyscan', 'newTStream'
+                       1025         CALLS   'keyscan', 'KS_purgequeue'
+                       1026         CALLS   'keyscan', 'newTTimer'
+                       1027         CALLS   'keyscan', 'KeyboardGet'

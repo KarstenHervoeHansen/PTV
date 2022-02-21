@@ -1,0 +1,737 @@
+///////////////////////////////////////////////////////////////////////////////
+//
+// File:          setup.rul
+//
+// Description:   This is the main source file for the setup program to 
+//                install NI serial software for Windows 95 and NT .  
+//                It is written for InstallShield3
+//
+///////////////////////////////////////////////////////////////////////////////
+
+declare
+
+// Constant declarations.
+#define SPACE_REQUIRED          1000000         // Disk space in bytes.
+#define APP_NAME                "Serial Software"
+#define PROGRAM_FOLDER_NAME     "NI Serial Software for Windows 95"
+#define APPBASE_PATH            "niserial\\"
+#define COMPANY_NAME            "National Instruments"
+#define PRODUCT_NAME            "NI Serial Software for Windows 95"
+#define PRODUCT_VERSION         "1.2"
+#define DEINSTALL_KEY           "NISerialDeinstKey"
+#define UNINSTALL_NAME          "NI Serial Software for Windows 95"
+#define PRODUCT_KEY             "serdiag.exe"
+#define EMPTY_STR                      ""
+#define SERIAL_OEMX_STRING         "N.I. AT-485/4 Communications Port"
+
+#define REMOVE_OLD_WARN_TITLE_STR      "Setup Warning"
+#define REMOVE_OLD_WARN_STR1   "Setup was unable to properly configure Windows 95 to automatically remove certain old driver components."
+#define REMOVE_OLD_WARN_STR2           "  You can proceed with the installation, however,"
+#define REMOVE_OLD_WARN_STR3           " please contact National Instruments to report this problem."
+
+#define PRODUCT_NAME_NT            "NI Serial Software for Windows NT"
+#define PRODUCT_VERSION_NT         "1.2"
+#define PROGRAM_FOLDER_NAME_NT    "NI Serial Software for Windows NT"
+#define UNINSTALL_NAME_NT         "NI Serial Software for Windows NT"
+
+// Global variable declarations.
+        STRING  svFolder, svDir, szMsg, szFileSet, szTitle, svUninstLogFile;
+        STRING  svTarget, szProgram, szParam, szTemp, szAppPath, svResult;
+        BOOL    bSpaceOk, bWinNT, bWin95, RebootRequired;
+        NUMBER  nResult, PercentComplete, PercentOut, OneStep;
+	STRING  OutString;
+
+// Function declarations.
+	prototype WinNTInstall();
+	prototype Win95Install();
+        prototype SetupScreen();
+        prototype CheckRequirements();
+	prototype TransferFiles(STRING, NUMBER, NUMBER, STRING, NUMBER, NUMBER);
+	prototype RemoveOemXFiles();
+	prototype RemoveDlls();
+
+program
+
+StartHere:
+        Disable( BACKGROUND );
+
+
+        // Set up thr installation screen.
+        SetupScreen();
+        Enable( DIALOGCACHE );
+
+
+   // Create a Welcome dialog.
+   WelcomeDlg:
+        Disable( BACKBUTTON );
+        Welcome( "NI Serial Software", 0 );
+        Enable( BACKBUTTON );
+
+        // Test target system for proper configuration.
+        CheckRequirements();
+	
+   // Set installation info., which is required for registry entries.
+      if (bWinNT) then
+	      InstallationInfo( COMPANY_NAME, PRODUCT_NAME_NT, PRODUCT_VERSION_NT, PRODUCT_KEY );
+      else
+	      InstallationInfo( COMPANY_NAME, PRODUCT_NAME, PRODUCT_VERSION, PRODUCT_KEY );
+      endif;
+
+   // Ask user for a destination location for the installation.--
+   GetTargetDirectory:
+        svTarget = TARGETDISK ^ APPBASE_PATH;
+        if ( AskDestPath( "", szMsg,
+                          svTarget, 0 ) = 12 ) then
+           goto WelcomeDlg;
+        endif;
+
+        // Perform space check of target drive.
+        bSpaceOk = TRUE;
+        if (GetDiskSpace( svTarget ) < SPACE_REQUIRED) then
+           szMsg = "There is not enough space available on the disk\n" +
+                   "'" + svTarget + "' \n" +
+                   "Please free up some space or change the target location\n" +
+                   "to a different disk";
+           MessageBox( szMsg, WARNING );
+           bSpaceOk = FALSE;
+        endif;
+
+         // If not enough space, ask user to try again.
+        if (bSpaceOk = FALSE) goto GetTargetDirectory;
+
+        // Set the App Paths key for the main program.
+        szAppPath = svTarget;
+        RegDBSetItem( REGDB_APPPATH, szAppPath );
+        szProgram = svTarget ^ "serdiag.exe";
+        RegDBSetItem( REGDB_APPPATH_DEFAULT, szProgram );
+
+   // Call a function to remove any oem*.inf files a previous install may
+   // have created.  
+   if (bWin95) then
+	   RemoveOemXFiles();
+   endif;
+
+   // If user had Win 3.1 serial software, Remove the win 3.1 configuration utility
+   if (bWin95) then
+   	RebootRequired = FALSE;
+   	RemoveDlls();
+   endif;
+
+   ToTransferFiles:
+	Enable(STATUS);
+        TARGETDIR = svTarget;
+
+        // Prepare InstallShield to record deinstallation information.
+        DeinstallStart( svTarget, svUninstLogFile, DEINSTALL_KEY, 0 );
+
+	// Install the Win95 or the WinNT serial software
+	if (bWinNT)	then
+	        RegDBSetItem( REGDB_UNINSTALL_NAME, UNINSTALL_NAME_NT );
+		WinNTInstall();
+	else
+	        RegDBSetItem( REGDB_UNINSTALL_NAME, UNINSTALL_NAME );
+		Win95Install();
+	endif;
+
+   FinalInstallProcess:
+	// If setup was unable to delete old .cpl file
+	if (bWin95) then
+   	if (RebootRequired = TRUE) then
+         SprintfBox(WARNING,
+                    "Restart Alert",
+                    "\nSetup was unable to remove or replace certain dynamically loadable Serial software " +
+                    "components.  These components are from previous Serial software installations and " +
+                    "will not be removed or replaced until Windows 95 is restarted.\n\n"+
+                    "When this installation is complete, you should restart Windows 95 before " +
+                    "configuring or using your new Serial software.\n");
+   	endif;
+	endif;
+
+   // Announce setup complete and launch README file.
+        SetStatusWindow( 100, "Installation complete." );
+	Delay(1);
+ 	Disable( STATUSDLG );
+
+        LaunchApp( "NOTEPAD.EXE", svTarget ^ "README.TXT" );
+        Delay( 8 );
+
+        szMsg = "Setup is complete.";
+        MessageBox( szMsg, INFORMATION );
+
+	exit;
+
+/*---------------------------------------------------------------------------*\
+ *
+ * Function:  WinNTInstall
+ *
+ *  Purpose:  This function installs the Serial Software for Windows 95
+ *
+ *    Input:
+ *
+ *  Returns:
+ *
+ * Comments:
+\*---------------------------------------------------------------------------*/
+function  WinNTInstall()
+begin
+
+         VarSave(SRCTARGETDIR);
+         SRCDIR=SRCDIR ^ "\\WINNT";
+
+ 	PercentComplete = 0;
+	OneStep = 100/7; // Change this if you add more steps
+
+   // Copy the readme files without updating the status bar.  
+	
+   PercentOut = PercentComplete + OneStep;
+   TransferFiles("Copying NI Serial Readme file...",
+                        PercentComplete, PercentOut,
+                        "README.TXT",
+                        1,
+                        0);
+   PercentComplete = PercentOut;
+
+   // Transfer diagnostics file
+   PercentOut = PercentComplete + OneStep;
+   TransferFiles("Copying NI Serial files...",
+                        PercentComplete, PercentOut,
+                        "serdiag.z",
+                        2,
+                        COMP_NORMAL);
+   PercentComplete = PercentOut;
+
+   // Transfer .INF file
+   TARGETDIR = WINDIR ^ "\\inf";    // Needed for MessageBoxes and CompressGet
+   PercentOut = PercentComplete + OneStep;
+   TransferFiles("Copying NI Serial INF files...",
+                        PercentComplete, PercentOut,
+                        "niserial.inf",
+                        1,
+                        0);
+   PercentComplete = PercentOut;
+
+  // Install the Serial driver components that are shared
+      TARGETDIR = WINDIR ^ "\\system32\\drivers";  // Needed for MessageBoxes and CompressGet
+      PercentOut = PercentComplete + OneStep;
+
+      // Back up serial.sys if it is not already backed up
+      if (FindFile(TARGETDIR, "serial.bak", svResult)	< 0) then
+		VarSave(SRCTARGETDIR);
+		SRCDIR = WINDIR ^ "\\system32\\drivers"; 
+	 	RenameFile("serial.sys", "serial.bak");
+		VarRestore(SRCTARGETDIR);
+      endif;
+      // We do not want serial.sys to be uninstalled, so disable and enable
+      // LOGGING around this
+      Disable(LOGGING);
+      TransferFiles("Copying NI Serial system files...",
+                        PercentComplete, PercentOut,
+                        "serial.z",
+                        2,
+                        COMP_NORMAL|LOCKEDFILE);
+      PercentComplete = PercentOut;
+      Enable(LOGGING);
+      TARGETDIR = WINDIR ^ "\system32";  // Needed for MessageBoxes and CompressGet
+      PercentOut = PercentComplete + OneStep;
+      TransferFiles("Copying NI Serial system files...",
+                      PercentComplete, PercentOut,
+		       "niports.z",
+                       2,
+                       COMP_NORMAL|LOCKEDFILE);
+     PercentComplete = PercentOut;
+
+   Delay( 1 );
+
+   // Create registry entries for the Pcmcia cards
+
+      PercentOut = PercentComplete + OneStep;
+      StatusUpdate(ON, PercentOut);
+      SetStatusWindow( PercentComplete, "Creating Registry Entries...." );
+      
+      RegDBSetDefaultRoot(HKEY_LOCAL_MACHINE);
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-485",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-485",
+			 "Driver",
+			 REGDB_STRING,
+			 "NI485_Serial",
+			 -1 );
+	
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-232",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-232",
+			 "Driver",
+			 REGDB_STRING,
+			 "NI232_Serial",
+			 -1 );
+
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-485/2",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-485/2",
+			 "Driver",
+			 REGDB_STRING,
+			 "NI485_2_Serial",
+			 -1 );
+
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-232/2",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\Pcmcia\\DataBase\\National Instruments\\PCMCIA-232/2",
+			 "Driver",
+			 REGDB_STRING,
+			 "NI232_2_Serial",
+			 -1 );
+
+
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\NI485_Serial1",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\NI485_Serial1\\Parameters",
+			 "Pcmcia",
+			 REGDB_NUMBER,
+			 "1",
+			 -1 );
+
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\NI232_Serial1",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\NI232_Serial1\\Parameters",
+			 "Pcmcia",
+			 REGDB_NUMBER,
+			 "1",
+			 -1 );
+
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\NI485_2_Serial1",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\NI485_2_Serial1\\Parameters",
+			 "Pcmcia",
+			 REGDB_NUMBER,
+			 "1",
+			 -1 );
+
+      RegDBCreateKeyEx("System\\CurrentControlSet\\Services\\NI232_2_Serial1",
+			" NIPorts");
+      RegDBSetKeyValueEx("System\\CurrentControlSet\\Services\\NI232_2_Serial1\\Parameters",
+			 "Pcmcia",
+			 REGDB_NUMBER,
+			 "1",
+			 -1 );
+
+     PercentComplete = PercentOut;
+
+   Delay( 1 );
+
+	
+
+
+   // Create program folders and icons.
+	PercentOut = PercentComplete + OneStep;
+   	StatusUpdate(ON, 100);
+        SetStatusWindow( PercentComplete, "Creating Program Folder and Icons...." );
+
+           svFolder = PROGRAM_FOLDER_NAME_NT;
+           CreateProgramFolder( svFolder );
+           ShowProgramFolder( svFolder, 0 );
+           LongPathToShortPath( svTarget );
+           Delay(1);
+
+        szProgram = svTarget ^ "SERDIAG.EXE";
+           AddFolderIcon( svFolder, "Diagnostics", szProgram,
+                          svTarget,
+                          WINDIR ^ "\\system32\\niports.cpl",   // Pull the icon from niserui.dll
+                          0, EMPTY_STR, REPLACE );
+           Delay( 1 );
+
+//         szParam = svTarget ^ "NISERIAL.HLP";
+//         AddFolderIcon( svFolder, "Help", "WINHELP.EXE" + " " + szParam,
+//                        svTarget,
+//         		  WINDIR ^ "\\winhlp32.exe",
+//                        1, EMPTY_STR, REPLACE );
+//         Delay( 1 );
+
+           szParam   = svTarget ^ "README.TXT";
+           AddFolderIcon( svFolder, "Readme ", "NOTEPAD.EXE " + szParam,
+                          svTarget,
+                          "", 0, "", REPLACE );
+           Delay( 1 );
+
+           szProgram = WINDIR ^ "UNINST.EXE";
+           LongPathToShortPath( szProgram );
+           LongPathToShortPath( svUninstLogFile );
+           szProgram = szProgram + " -f" + svUninstLogFile;
+           AddFolderIcon( svFolder, "UnInstall", szProgram,
+                          WINDIR, "", 0, "", REPLACE );
+	   Delay( 1 );
+
+         VarRestore(SRCTARGETDIR);
+ end;
+
+
+/*---------------------------------------------------------------------------*\
+ *
+ * Function:  Win95Install
+ *
+ *  Purpose:  This function installs the Serial Software for Windows 95
+ *
+ *    Input:
+ *
+ *  Returns:
+ *
+ * Comments:
+\*---------------------------------------------------------------------------*/
+function  Win95Install()
+begin
+
+
+         VarSave(SRCTARGETDIR);
+         SRCDIR=SRCDIR ^ "\\WIN95";
+
+ 	PercentComplete = 0;
+	OneStep = 100/5; // Change this if you add more steps
+
+   // Copy the readme files without updating the status bar.  
+	
+   PercentOut = PercentComplete + OneStep;
+   TransferFiles("Copying NI Serial Readme file...",
+                        PercentComplete, PercentOut,
+                        "README.TXT",
+                        1,
+                        0);
+   PercentComplete = PercentOut;
+
+   // Transfer diagnostics and help files 
+   PercentOut = PercentComplete + OneStep;
+   TransferFiles("Copying NI Serial files...",
+                        PercentComplete, PercentOut,
+                        "misc.z",
+                        2,
+                        COMP_NORMAL);
+   PercentComplete = PercentOut;
+
+  // Transfer .INF file
+   TARGETDIR = WINDIR ^ "\\inf";    // Needed for MessageBoxes and CompressGet
+   PercentOut = PercentComplete + OneStep;
+   TransferFiles("Copying NI Serial INF files...",
+                        PercentComplete, PercentOut,
+                        "inf.z",
+                        2,
+                        COMP_NORMAL);
+   PercentComplete = PercentOut;
+
+  // Install the Serial driver components that are shared
+      TARGETDIR = WINSYSDIR;  // Needed for MessageBoxes and CompressGet
+      PercentOut = PercentComplete + OneStep;
+
+      TransferFiles("Copying NI Serial system files...",
+                        PercentComplete, PercentOut,
+                        "drv.z",
+                        2,
+                        COMP_NORMAL|LOCKEDFILE);
+      PercentComplete = PercentOut;
+
+   Delay( 1 );
+
+   // Create program folders and icons.
+	PercentOut = PercentComplete + OneStep;
+   	StatusUpdate(ON, 100);
+        SetStatusWindow( PercentComplete, "Creating Program Folder and Icons...." );
+
+           svFolder = PROGRAM_FOLDER_NAME;
+           CreateProgramFolder( svFolder );
+           ShowProgramFolder( svFolder, 0 );
+           LongPathToShortPath( svTarget );
+           Delay(1);
+
+        szProgram = svTarget ^ "SERDIAG.EXE";
+           AddFolderIcon( svFolder, "Diagnostics", szProgram,
+                          svTarget,
+                          WINSYSDIR ^ "\\niserui.dll",   // Pull the icon from niserui.dll
+                          0, EMPTY_STR, REPLACE );
+           Delay( 1 );
+
+//         szParam = svTarget ^ "NISERIAL.HLP";
+//         AddFolderIcon( svFolder, "Help", "WINHELP.EXE" + " " + szParam,
+//                        svTarget,
+//         		  WINDIR ^ "\\winhlp32.exe",
+//                        1, EMPTY_STR, REPLACE );
+//         Delay( 1 );
+
+           szParam   = svTarget ^ "README.TXT";
+           AddFolderIcon( svFolder, "Readme ", "NOTEPAD.EXE " + szParam,
+                          svTarget,
+                          "", 0, "", REPLACE );
+           Delay( 1 );
+
+           szProgram = WINDIR ^ "UNINST.EXE";
+           LongPathToShortPath( szProgram );
+           LongPathToShortPath( svUninstLogFile );
+           szProgram = szProgram + " -f" + svUninstLogFile;
+           AddFolderIcon( svFolder, "UnInstall", szProgram,
+                          WINDIR, "", 0, "", REPLACE );
+	   Delay( 1 );
+
+         VarRestore(SRCTARGETDIR);
+ end;
+
+/*---------------------------------------------------------------------------*\
+ *
+ * Function:  SetupScreen
+ *
+ *  Purpose:  This function will set up the screen look.  This includes
+ *            colors, fonts, text to be displayed, etc.
+ *
+ *
+ *    Input:
+ *
+ *  Returns:
+ *
+ * Comments:
+\*---------------------------------------------------------------------------*/
+function SetupScreen()
+        number nDx, nDy;
+begin
+        GetExtents( nDx, nDy );
+
+        Enable( FULLWINDOWMODE );
+        Enable( INDVFILESTATUS );
+        Enable( BITMAP256COLORS );
+
+        SetTitle( COMPANY_NAME + "\n" + APP_NAME , 24, WHITE );
+
+        SetColor( BACKGROUND, BK_BLUE ); // Dark blue.
+        SetColor( STATUSBAR, BLUE );     // Bright blue.
+        Enable( BACKGROUND );
+
+        Delay( 1 );
+
+end;
+
+
+/*---------------------------------------------------------------------------*\
+ *
+ * Function:  CheckRequirements
+ *
+ *  Purpose:  This function will check all minimum requirements for the
+ *            application being installed.  If any fail, then the user
+ *            is informed and the installation is terminated.
+ *
+ *
+ *    Input:
+ *
+ *  Returns:
+ *
+ * Comments:
+\*---------------------------------------------------------------------------*/
+function CheckRequirements()
+number nvDx, nvDy;
+number nvResult;
+STRING svResult;
+
+begin
+
+        // Check screen resolution.
+        GetExtents( nvDx, nvDy );
+        if (nvDy < 480) then
+           MessageBox( "This program requires VGA or better resolution.", WARNING );
+           exit;
+        endif;
+
+	bWin95 = FALSE;
+	bWinNT = FALSE;
+
+        // Determine the target system's operating system.
+        GetSystemInfo( OS, nvResult, svResult );
+        if (nvResult =  IS_WINDOWS95) then
+		bWin95 = TRUE;
+	endif;
+
+        if (nvResult =  IS_WINDOWSNT) then
+	        GetSystemInfo( OSMAJOR, nvResult, svResult );
+		if (nvResult = 4) then
+			bWinNT = TRUE;
+		endif;
+	endif;
+	if ((bWin95 = FALSE) && (bWinNT = FALSE))	then
+           MessageBox( "This software requires Windows 95 or Windows NT 4.0",
+			 WARNING );
+           exit;
+        endif;
+
+end;
+
+
+
+// The following function is used to transfer a particular compressed library.
+// The incoming parameters control possible message boxes and the percentage
+// complete status bar.
+function TransferFiles(StatusMsg, PercentIn, PercentOut, FileName, FileType, Type)
+NUMBER Result;
+STRING OutString;
+begin
+
+   StatusUpdate(ON, PercentOut);
+
+   // Perform the file copy.
+   SetStatusWindow(PercentIn, StatusMsg);
+   if (FileType = 2) then	
+	   Result = CompressGet(FileName, "*.*", Type);
+   else
+	   Result = CopyFile(FileName, FileName);
+   endif;
+		
+   if (Result < 0) then
+      OutString = "General file system error.  " +
+                  "Please check your target location and try again." +
+                  "\n\n Error Number: %d" +
+                  "\n Related File: %s";
+      SprintfBox(SEVERE, "File System Error", OutString, Result, ERRORFILENAME);
+      exit;
+   endif;
+end;
+
+
+
+
+
+//
+// Function:      RemoveOemXFiles
+//
+// Purpose:       This function removes oemx.inf files that may have
+//                been created by a previous install of our software
+//                in the Windows 95 system directory (where x equals
+//                some integer)
+//
+// Description:   This functions finds all files of the form oem*.inf
+//                in the WINDOWS INF directory.  It then searches each
+//                file to see if it contains the string SERIAL_OEMX_STRING,
+//                and if so, it removes that file.
+//
+// Return:        This function returns 0 if successful, else a value
+//                less than 0 if some unexpected error occurs.
+//
+function RemoveOemXFiles()
+NUMBER Result;
+NUMBER FileFound;
+NUMBER FileDeleted;
+NUMBER nvLineNumber;
+STRING svFileName;
+STRING svFileNameOnly;
+STRING svReturnLine;
+begin
+
+   // Find the first file of the form oem*.inf in the WINDOWS INF directory
+   Result = FindAllFiles (
+      WINDIR ^ "\\INF",    // Search in the WINDOWS INF directory
+      "oem*.inf",          // Search for files of the form oem*.inf
+      svFileName,          // Outputs full pathname of oem*.inf file if found
+      RESET                // Find first oem*.inf file
+      );
+
+   // If we found an oem*.inf file, and as long as we keep finding more...
+   while (Result = 0)
+
+      // ...See if the oem*.inf file that we found contains the string
+      // SERIAL_OEMX_STRING and delete it if it does.
+      // {
+
+         // First, call ParsePath to get the filename only from the full
+         // pathname of the oem*.inf file we found.
+         Result = ParsePath (
+            svFileNameOnly,   // String to output file name only
+            svFileName,       // Input full filename including path
+            FILENAME          // Specify that we want to output the filename
+                              // only
+            );
+
+         // If the ParsePath operation failed, we are toast, so jut return the
+         // value returned from ParsePath.
+         if (Result != 0) then
+            return Result;
+         endif;
+
+         // Now, call FileGrep to see if the oem*.inf file contains the string
+         // SERIAL_OEMX_STRING.
+         // We must save and restore the SRCTARGETDIR system
+         // variable around the call to FileGrep as well as modify the SRCDIR
+         // system variable to contain the path name where 'svFileNameOnly' is
+         // located.
+         VarSave(SRCTARGETDIR);
+         SRCDIR=WINDIR ^ "\\INF";
+         FileFound = FileGrep (
+            svFileNameOnly,   // File name
+            SERIAL_OEMX_STRING, // Search string
+            svReturnLine,     // Line of text containing the search string
+            nvLineNumber,     // Line number of text containing search string
+            RESTART           // Search for the first occurrence of search
+                              // string
+            );
+         VarRestore(SRCTARGETDIR);
+
+         // If the oem*.inf file contains the SERIAL_OEMX_STRING, i.e. FileGrep
+         // returned zero, delete the file.
+         // We must save and restore the SRCTARGETDIR system
+         // variable around the call to DeleteFile as well as modify the
+         // TARGETDIR system variable to contain the path name where
+         // 'svFileNameOnly' is located.
+         if (FileFound = 0) then
+            VarSave(SRCTARGETDIR);
+            TARGETDIR=WINDIR ^ "\\INF";
+            FileDeleted = DeleteFile (
+               svFileNameOnly // File name
+               );
+            VarRestore(SRCTARGETDIR);
+         endif;
+
+      // } End-See if the oem*.inf file that we found contains the string
+      //       SERIAL_OEMX_STRING and delete it if it does.
+
+      // Find the next oem*.inf file
+      Result = FindAllFiles (
+         WINDIR ^ "\\INF",    // Search in the WINDOWS INF directory
+         "oem*.inf",          // Search for files of the form oem*.inf
+         svFileName,          // Outputs full pathname of oem*.inf file if found
+         CONTINUE             // Find next oem*.inf file
+         );
+
+   endwhile;
+
+   // If we make it here, the function succeeded, so return 0.
+   return 0;
+
+end;
+
+
+// This function removes dlls.  It's special because DLLs cannot be removed
+// from the system if they happen to be loaded in memory.  So, it has to
+// be setup so that the next reboot removes them.
+//
+// The basic algorithm here is to see if the file exists.  If not, no worries.
+// If the file exists, we try to delete it.  If it deletes, fine, else we
+// assume that it is loaded into memory and we setup to remove it at the
+// next reboot.
+function RemoveDlls()
+NUMBER Result;
+STRING DestFile;
+begin
+
+   VarSave(SRCTARGETDIR);
+   TARGETDIR = WINSYSDIR;
+   if (FindFile(TARGETDIR, "serconf.cpl", DestFile) = 0) then
+      if (DeleteFile("serconf.cpl") < 0) then   // Assume DLL loaded!
+         RebootRequired = TRUE;
+         Result = AddProfString(WINDIR ^ "wininit.ini",
+                         "Rename",
+                         "NUL",
+                         TARGETDIR ^ "serconf.cpl");
+         if (Result != 0) then
+            SprintfBox (
+               WARNING,
+               REMOVE_OLD_WARN_TITLE_STR,
+               REMOVE_OLD_WARN_STR1,
+               REMOVE_OLD_WARN_STR2,
+               REMOVE_OLD_WARN_STR3);
+         endif;
+      endif;
+   endif;
+
+
+   VarRestore(SRCTARGETDIR);
+end;
+

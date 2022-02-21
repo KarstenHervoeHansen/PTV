@@ -1,0 +1,1049 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+F:\PTV\Pt5201\Design\DDD\SW\Master\work\peh_work\temp\xa\led_hw.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\cxa\rtxc\xa\include -I. -Ml
+                          3 ;          -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    LED_HW
+                         10 ; led_hw.c    1 /****************************************************************************/
+                         11 ; led_hw.c    2 /* MODULE:                                                                  */
+                         12 ; led_hw.c    3 /*  led_hw.c - LED driver                                                   */
+                         13 ; led_hw.c    4 /****************************************************************************/
+                         14 ; led_hw.c    5 /* FUNCTIONS:                                                               */
+                         15 ; led_hw.c    6 /*                                                                          */
+                         16 ; led_hw.c    7 /*      void LEDInit( void);                                                     
+                                                                                                                             
+                                                                                    */
+                         17 ; led_hw.c    8 /*      int LEDSet( UC LED, bool value);                                         
+                                                                                                                             
+                                                    */
+                         18 ; led_hw.c    9 /*      int TestLEDSet( UC LED, bool value);                                     
+                                                                                                                             
+                                    */
+                         19 ; led_hw.c   10 /*                                                                          */
+                         20 ; led_hw.c   11 /* TASKS:                                                                   */
+                         21 ; led_hw.c   12 /*                                                                          */
+                         22 ; led_hw.c   13 /* NOTES:                                                                   */
+                         23 ; led_hw.c   14 /*                                                                          */
+                         24 ; led_hw.c   15 /****************************************************************************/
+                         25 ; led_hw.c   16 /*
+                         26 ; led_hw.c   17  *   PTV software for PT5201    
+                         27 ; led_hw.c   18  *   Copyright (c) 
+                         28 ; led_hw.c   19  *   ProTeleVision Technologies A/S.
+                         29 ; led_hw.c   20  *   ALL RIGHTS RESERVED
+                         30 ; led_hw.c   21 */
+                         31 ; led_hw.c   22 /****************************************************************************/
+                         32 ; led_hw.c   23 #include "reg8051.h"
+                         35 ; led_hw.c   24 #include "define.h"        // Standard PTV defines
+                         38 ; led_hw.c   25 #include "led_hw.h"
+                         45 ; led_hw.c   26 
+                         46 ; led_hw.c   27 volatile UI LEDPort _at( 0x6a00C);                      // Port defined in PLD
+                         47 ; led_hw.c   28 volatile UC TestLEDPort _at( 0x6a014);  // Port defined in PLD
+                         48 ; led_hw.c   29 
+                         49 ; led_hw.c   30 static UI LEDMirror;
+                         50 ; led_hw.c   31 static UC TestLEDMirror;
+                         51 ; led_hw.c   32 static UC LEDState = NormLEDs;
+000000                   52 LED_HW_INI_FA   SEGMENT HDATA INSEGMENT INIT
+000000                   53         RSEG    LED_HW_INI_FA
+000000                   55 _LEDState:
+                         56 ; led_hw.c   33 
+                         57 ; led_hw.c   34 /**************************************************************************/
+                         58 ; led_hw.c   35 /* LEDInit                                                                       
+                                                                                                                             
+                                                                       LED_HW.C     */
+                         59 ; led_hw.c   36 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                         60 ; led_hw.c   37 /* Author:              Kim Engedahl, DEV, 000321                                
+                                                                                                                             
+                                            */
+                         61 ; led_hw.c   38 /* Revised:             000321, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                         62 ; led_hw.c   39 /*                                                                               
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                             
+                                            */
+                         63 ; led_hw.c   40 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                         64 ; led_hw.c   41 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                         65 ; led_hw.c   42 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                         66 ; led_hw.c   43 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                         67 ; led_hw.c   44 /**************************************************************************/
+                         68 ; led_hw.c   45 void LEDInit( void)
+                         69 ; led_hw.c   46 {
+000000 00                70         DB      000H
+000000                   71 LED_HW_PR       SEGMENT HCODE
+000000                   72         RSEG    LED_HW_PR
+                         73         ALIGN   1
+                         75         PUBLIC  _LEDInit
+000000                   76 _LEDInit:
+                         80 ; led_hw.c   47         LEDMirror = 0;
+000000 964842rr          82         MOV.B   ES,#SEG( _LEDMirror )
+000004 9908rrrr          83         MOV.W   R0,#SOF( _LEDMirror )
+000008 BA00              84         MOV.W   [R0],#00H
+                         85 ; led_hw.c   48         TestLEDMirror = 0;
+00000A 964842rr          87         MOV.B   ES,#SEG( _TestLEDMirror )
+00000E 9908rrrr          88         MOV.W   R0,#SOF( _TestLEDMirror )
+000012 B200              89         MOV.B   [R0],#00H
+                         90 ; led_hw.c   49 }
+000014 D680              92         RET
+                         94 ; led_hw.c   50 
+                         95 ; led_hw.c   51 /**************************************************************************/
+                         96 ; led_hw.c   52 /* LEDSet                                                                        
+                                                                                                                             
+                                                                               LED_HW.C     */
+                         97 ; led_hw.c   53 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                         98 ; led_hw.c   54 /* Author:              Kim Engedahl, DEV, 000321                                
+                                                                                                                             
+                                            */
+                         99 ; led_hw.c   55 /* Revised:             001128, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        100 ; led_hw.c   56 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        101 ; led_hw.c   57 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        102 ; led_hw.c   58 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        103 ; led_hw.c   59 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        104 ; led_hw.c   60 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        105 ; led_hw.c   61 /**************************************************************************/
+                        106 ; led_hw.c   62 int LEDSet( UI LED, bool value)
+                        107 ; led_hw.c   63 {
+                        108         ALIGN   1
+                        110         PUBLIC  _LEDSet
+000016                  111 _LEDSet:
+                        119 ; led_hw.c   64         switch ( LED)
+000016 99040001         121         CMP.W   R0,#01H
+00001A F349             122         BEQ     _3
+00001C 99040002         123         CMP.W   R0,#02H
+000020 F364             124         BEQ     _5
+000022 99040004         125         CMP.W   R0,#04H
+000026 F37F             126         BEQ     _7
+000028 99040008         127         CMP.W   R0,#08H
+                        128         BEQ     _9
+00002C F202            +128 ;       BNE     _LG_6
+00002E D50099          +128 ;       JMP.L   _9
+00002E D5009900        +128 ;       JMP.L   _9
+000032                 +128 _LG_6:
+000032 99040010         129         CMP.W   R0,#010H
+                        130         BEQ     _11
+000036 F202            +130 ;       BNE     _LG_8
+000038 D500B2          +130 ;       JMP.L   _11
+000038 D500B200        +130 ;       JMP.L   _11
+00003C                 +130 _LG_8:
+00003C 99040020         131         CMP.W   R0,#020H
+                        132         BEQ     _13
+000040 F202            +132 ;       BNE     _LG_10
+000042 D500CB          +132 ;       JMP.L   _13
+000042 D500CB00        +132 ;       JMP.L   _13
+000046                 +132 _LG_10:
+000046 99040040         133         CMP.W   R0,#040H
+                        134         BEQ     _15
+00004A F202            +134 ;       BNE     _LG_12
+00004C D500E4          +134 ;       JMP.L   _15
+00004C D500E400        +134 ;       JMP.L   _15
+000050                 +134 _LG_12:
+000050 99040080         135         CMP.W   R0,#080H
+                        136         BEQ     _17
+000054 F202            +136 ;       BNE     _LG_14
+000056 D500FD          +136 ;       JMP.L   _17
+000056 D500FD00        +136 ;       JMP.L   _17
+00005A                 +136 _LG_14:
+00005A 99040100         137         CMP.W   R0,#0100H
+                        138         BEQ     _19
+00005E F202            +138 ;       BNE     _LG_16
+000060 D50116          +138 ;       JMP.L   _19
+000060 D5011600        +138 ;       JMP.L   _19
+000064                 +138 _LG_16:
+000064 99040200         139         CMP.W   R0,#0200H
+                        140         BEQ     _21
+000068 F202            +140 ;       BNE     _LG_18
+00006A D5012F          +140 ;       JMP.L   _21
+00006A D5012F00        +140 ;       JMP.L   _21
+00006E                 +140 _LG_18:
+00006E 99040400         141         CMP.W   R0,#0400H
+                        142         BEQ     _23
+000072 F202            +142 ;       BNE     _LG_20
+000074 D50148          +142 ;       JMP.L   _23
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+000074 D5014800        +142 ;       JMP.L   _23
+000078                 +142 _LG_20:
+000078 99040800         143         CMP.W   R0,#0800H
+                        144         BEQ     _25
+00007C F202            +144 ;       BNE     _LG_22
+00007E D50161          +144 ;       JMP.L   _25
+00007E D5016100        +144 ;       JMP.L   _25
+000082                 +144 _LG_22:
+000082 99041000         145         CMP.W   R0,#01000H
+                        146         BEQ     _27
+000086 F202            +146 ;       BNE     _LG_24
+000088 D50178          +146 ;       JMP.L   _27
+000088 D5017800        +146 ;       JMP.L   _27
+00008C                 +146 _LG_24:
+00008C 99042000         147         CMP.W   R0,#02000H
+                        148         BEQ     _29
+000090 F202            +148 ;       BNE     _LG_26
+000092 D5018F          +148 ;       JMP.L   _29
+000092 D5018F00        +148 ;       JMP.L   _29
+000096                 +148 _LG_26:
+000096 99044000         149         CMP.W   R0,#04000H
+                        150         BEQ     _31
+00009A F202            +150 ;       BNE     _LG_28
+00009C D501A6          +150 ;       JMP.L   _31
+00009C D501A600        +150 ;       JMP.L   _31
+0000A0                 +150 _LG_28:
+0000A0 99048000         151         CMP.W   R0,#08000H
+                        152         BEQ     _33
+0000A4 F202            +152 ;       BNE     _LG_30
+0000A6 D501BD          +152 ;       JMP.L   _33
+0000A6 D501BD00        +152 ;       JMP.L   _33
+0000AA                 +152 _LG_30:
+                        153         BR      _66
+0000AA D501D6          +153         JMP.L   _66
+                        154 ; led_hw.c   65         {
+                        155 ; led_hw.c   66                 case BB1PALLED: 
+0000AE                  157 _3:
+                        158 ; led_hw.c   67                         if ( value)
+0000AE 6911             160         OR.W    R1,R1
+0000B0 F30E             161         BEQ     _4
+                        162 ; led_hw.c   68                                 LEDMirror |= BB1PALLED;
+0000B2 964842rr         164         MOV.B   ES,#SEG( _LEDMirror )
+0000B6 9908rrrr         165         MOV.W   R0,#SOF( _LEDMirror )
+0000BA 8A00             166         MOV.W   R0,[R0]
+0000BC 99060001         168         OR.W    R0,#01H
+0000C0 964842rr         169         MOV.B   ES,#SEG( _LEDMirror )
+0000C4 9918rrrr         170         MOV.W   R1,#SOF( _LEDMirror )
+0000C8 8A09             171         MOV.W   [R1],R0
+                        172         BR      _66
+0000CA D501C6          +172         JMP.L   _66
+0000CA D501C600        +172         JMP.L   _66
+0000CE                  173 _4:
+                        174 ; led_hw.c   69                         else
+                        175 ; led_hw.c   70                                 LEDMirror &= ~BB1PALLED;
+0000CE 964842rr         177         MOV.B   ES,#SEG( _LEDMirror )
+0000D2 9908rrrr         178         MOV.W   R0,#SOF( _LEDMirror )
+0000D6 8A00             179         MOV.W   R0,[R0]
+0000D8 9905FFFE         180         AND.W   R0,#0FFFEH
+0000DC 964842rr         181         MOV.B   ES,#SEG( _LEDMirror )
+0000E0 9918rrrr         182         MOV.W   R1,#SOF( _LEDMirror )
+0000E4 8A09             183         MOV.W   [R1],R0
+                        184 ; led_hw.c   71                         break;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        186         BR      _66
+0000E6 D501B8          +186         JMP.L   _66
+                        187 ; led_hw.c   72 
+                        188 ; led_hw.c   73                 case BB1NTSCLED:        
+0000EA                  190 _5:
+                        193 ; led_hw.c   74                         if ( value)
+0000EA 6911             195         OR.W    R1,R1
+0000EC F30E             196         BEQ     _6
+                        197 ; led_hw.c   75                                 LEDMirror |= BB1NTSCLED;
+0000EE 964842rr         199         MOV.B   ES,#SEG( _LEDMirror )
+0000F2 9908rrrr         200         MOV.W   R0,#SOF( _LEDMirror )
+0000F6 8A00             201         MOV.W   R0,[R0]
+0000F8 99060002         202         OR.W    R0,#02H
+0000FC 964842rr         203         MOV.B   ES,#SEG( _LEDMirror )
+000100 9918rrrr         204         MOV.W   R1,#SOF( _LEDMirror )
+000104 8A09             205         MOV.W   [R1],R0
+                        206         BR      _66
+000106 D501A8          +206         JMP.L   _66
+000106 D501A800        +206         JMP.L   _66
+00010A                  207 _6:
+                        208 ; led_hw.c   76                         else
+                        209 ; led_hw.c   77                                 LEDMirror &= ~BB1NTSCLED;
+00010A 964842rr         211         MOV.B   ES,#SEG( _LEDMirror )
+00010E 9908rrrr         212         MOV.W   R0,#SOF( _LEDMirror )
+000112 8A00             213         MOV.W   R0,[R0]
+000114 9905FFFD         214         AND.W   R0,#0FFFDH
+000118 964842rr         215         MOV.B   ES,#SEG( _LEDMirror )
+00011C 9918rrrr         216         MOV.W   R1,#SOF( _LEDMirror )
+000120 8A09             217         MOV.W   [R1],R0
+                        218 ; led_hw.c   78                         break;
+                        220         BR      _66
+000122 D5019A          +220         JMP.L   _66
+                        221 ; led_hw.c   79 
+                        222 ; led_hw.c   80                 case BB2PALLED: 
+000126                  224 _7:
+                        227 ; led_hw.c   81                         if ( value)
+000126 6911             229         OR.W    R1,R1
+000128 F30E             230         BEQ     _8
+                        231 ; led_hw.c   82                                 LEDMirror |= BB2PALLED;
+00012A 964842rr         233         MOV.B   ES,#SEG( _LEDMirror )
+00012E 9908rrrr         234         MOV.W   R0,#SOF( _LEDMirror )
+000132 8A00             235         MOV.W   R0,[R0]
+000134 99060004         236         OR.W    R0,#04H
+000138 964842rr         237         MOV.B   ES,#SEG( _LEDMirror )
+00013C 9918rrrr         238         MOV.W   R1,#SOF( _LEDMirror )
+000140 8A09             239         MOV.W   [R1],R0
+                        240         BR      _66
+000142 D5018A          +240         JMP.L   _66
+000142 D5018A00        +240         JMP.L   _66
+000146                  241 _8:
+                        242 ; led_hw.c   83                         else
+                        243 ; led_hw.c   84                                 LEDMirror &= ~BB2PALLED;
+000146 964842rr         245         MOV.B   ES,#SEG( _LEDMirror )
+00014A 9908rrrr         246         MOV.W   R0,#SOF( _LEDMirror )
+00014E 8A00             247         MOV.W   R0,[R0]
+000150 9905FFFB         248         AND.W   R0,#0FFFBH
+000154 964842rr         249         MOV.B   ES,#SEG( _LEDMirror )
+000158 9918rrrr         250         MOV.W   R1,#SOF( _LEDMirror )
+00015C 8A09             251         MOV.W   [R1],R0
+                        252 ; led_hw.c   85                         break;
+                        254         BR      _66
+00015E D5017C          +254         JMP.L   _66
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        255 ; led_hw.c   86 
+                        256 ; led_hw.c   87                 case BB2NTSCLED:        
+000162                  258 _9:
+                        261 ; led_hw.c   88                         if ( value)
+000162 6911             263         OR.W    R1,R1
+000164 F30E             264         BEQ     _10
+                        265 ; led_hw.c   89                                 LEDMirror |= BB2NTSCLED;
+000166 964842rr         267         MOV.B   ES,#SEG( _LEDMirror )
+00016A 9908rrrr         268         MOV.W   R0,#SOF( _LEDMirror )
+00016E 8A00             269         MOV.W   R0,[R0]
+000170 99060008         270         OR.W    R0,#08H
+000174 964842rr         271         MOV.B   ES,#SEG( _LEDMirror )
+000178 9918rrrr         272         MOV.W   R1,#SOF( _LEDMirror )
+00017C 8A09             273         MOV.W   [R1],R0
+                        274         BR      _66
+00017E D5016C          +274         JMP.L   _66
+00017E D5016C00        +274         JMP.L   _66
+000182                  275 _10:
+                        276 ; led_hw.c   90                         else
+                        277 ; led_hw.c   91                                 LEDMirror &= ~BB2NTSCLED;
+000182 964842rr         279         MOV.B   ES,#SEG( _LEDMirror )
+000186 9908rrrr         280         MOV.W   R0,#SOF( _LEDMirror )
+00018A 8A00             281         MOV.W   R0,[R0]
+00018C 9905FFF7         282         AND.W   R0,#0FFF7H
+000190 964842rr         283         MOV.B   ES,#SEG( _LEDMirror )
+000194 9918rrrr         284         MOV.W   R1,#SOF( _LEDMirror )
+000198 8A09             285         MOV.W   [R1],R0
+                        286 ; led_hw.c   92                         break;
+                        288         BR      _66
+00019A D5015E          +288         JMP.L   _66
+                        289 ; led_hw.c   93 
+                        290 ; led_hw.c   94                 case BB3PALLED: 
+00019E                  292 _11:
+                        295 ; led_hw.c   95                         if ( value)
+00019E 6911             297         OR.W    R1,R1
+0001A0 F30E             298         BEQ     _12
+                        299 ; led_hw.c   96                                 LEDMirror |= BB3PALLED;
+0001A2 964842rr         301         MOV.B   ES,#SEG( _LEDMirror )
+0001A6 9908rrrr         302         MOV.W   R0,#SOF( _LEDMirror )
+0001AA 8A00             303         MOV.W   R0,[R0]
+0001AC 99060010         304         OR.W    R0,#010H
+0001B0 964842rr         305         MOV.B   ES,#SEG( _LEDMirror )
+0001B4 9918rrrr         306         MOV.W   R1,#SOF( _LEDMirror )
+0001B8 8A09             307         MOV.W   [R1],R0
+                        308         BR      _66
+0001BA D5014E          +308         JMP.L   _66
+0001BA D5014E00        +308         JMP.L   _66
+0001BE                  309 _12:
+                        310 ; led_hw.c   97                         else
+                        311 ; led_hw.c   98                                 LEDMirror &= ~BB3PALLED;
+0001BE 964842rr         313         MOV.B   ES,#SEG( _LEDMirror )
+0001C2 9908rrrr         314         MOV.W   R0,#SOF( _LEDMirror )
+0001C6 8A00             315         MOV.W   R0,[R0]
+0001C8 9905FFEF         316         AND.W   R0,#0FFEFH
+0001CC 964842rr         317         MOV.B   ES,#SEG( _LEDMirror )
+0001D0 9918rrrr         318         MOV.W   R1,#SOF( _LEDMirror )
+0001D4 8A09             319         MOV.W   [R1],R0
+                        320 ; led_hw.c   99                         break;
+                        322         BR      _66
+0001D6 D50140          +322         JMP.L   _66
+                        323 ; led_hw.c  100 
+                        324 ; led_hw.c  101                 case BB3NTSCLED:        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+0001DA                  326 _13:
+                        329 ; led_hw.c  102                         if ( value)
+0001DA 6911             331         OR.W    R1,R1
+0001DC F30E             332         BEQ     _14
+                        333 ; led_hw.c  103                                 LEDMirror |= BB3NTSCLED;
+0001DE 964842rr         335         MOV.B   ES,#SEG( _LEDMirror )
+0001E2 9908rrrr         336         MOV.W   R0,#SOF( _LEDMirror )
+0001E6 8A00             337         MOV.W   R0,[R0]
+0001E8 99060020         338         OR.W    R0,#020H
+0001EC 964842rr         339         MOV.B   ES,#SEG( _LEDMirror )
+0001F0 9918rrrr         340         MOV.W   R1,#SOF( _LEDMirror )
+0001F4 8A09             341         MOV.W   [R1],R0
+                        342         BR      _66
+0001F6 D50130          +342         JMP.L   _66
+0001F6 D5013000        +342         JMP.L   _66
+0001FA                  343 _14:
+                        344 ; led_hw.c  104                         else
+                        345 ; led_hw.c  105                                 LEDMirror &= ~BB3NTSCLED;
+0001FA 964842rr         347         MOV.B   ES,#SEG( _LEDMirror )
+0001FE 9908rrrr         348         MOV.W   R0,#SOF( _LEDMirror )
+000202 8A00             349         MOV.W   R0,[R0]
+000204 9905FFDF         350         AND.W   R0,#0FFDFH
+000208 964842rr         351         MOV.B   ES,#SEG( _LEDMirror )
+00020C 9918rrrr         352         MOV.W   R1,#SOF( _LEDMirror )
+000210 8A09             353         MOV.W   [R1],R0
+                        354 ; led_hw.c  106                         break;
+                        356         BR      _66
+000212 D50122          +356         JMP.L   _66
+                        357 ; led_hw.c  107 
+                        358 ; led_hw.c  108                 case CBPALLED:  
+000216                  360 _15:
+                        363 ; led_hw.c  109                         if ( value)
+000216 6911             365         OR.W    R1,R1
+000218 F30E             366         BEQ     _16
+                        367 ; led_hw.c  110                                 LEDMirror |= CBPALLED;
+00021A 964842rr         369         MOV.B   ES,#SEG( _LEDMirror )
+00021E 9908rrrr         370         MOV.W   R0,#SOF( _LEDMirror )
+000222 8A00             371         MOV.W   R0,[R0]
+000224 99060040         372         OR.W    R0,#040H
+000228 964842rr         373         MOV.B   ES,#SEG( _LEDMirror )
+00022C 9918rrrr         374         MOV.W   R1,#SOF( _LEDMirror )
+000230 8A09             375         MOV.W   [R1],R0
+                        376         BR      _66
+000232 D50112          +376         JMP.L   _66
+000232 D5011200        +376         JMP.L   _66
+000236                  377 _16:
+                        378 ; led_hw.c  111                         else
+                        379 ; led_hw.c  112                                 LEDMirror &= ~CBPALLED;
+000236 964842rr         381         MOV.B   ES,#SEG( _LEDMirror )
+00023A 9908rrrr         382         MOV.W   R0,#SOF( _LEDMirror )
+00023E 8A00             383         MOV.W   R0,[R0]
+000240 9905FFBF         384         AND.W   R0,#0FFBFH
+000244 964842rr         385         MOV.B   ES,#SEG( _LEDMirror )
+000248 9918rrrr         386         MOV.W   R1,#SOF( _LEDMirror )
+00024C 8A09             387         MOV.W   [R1],R0
+                        388 ; led_hw.c  113                         break;
+                        390         BR      _66
+00024E D50104          +390         JMP.L   _66
+                        391 ; led_hw.c  114 
+                        392 ; led_hw.c  115                 case CBNTSCLED: 
+000252                  394 _17:
+                        397 ; led_hw.c  116                         if ( value)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+000252 6911             399         OR.W    R1,R1
+000254 F30E             400         BEQ     _18
+                        401 ; led_hw.c  117                                 LEDMirror |= CBNTSCLED;
+000256 964842rr         403         MOV.B   ES,#SEG( _LEDMirror )
+00025A 9908rrrr         404         MOV.W   R0,#SOF( _LEDMirror )
+00025E 8A00             405         MOV.W   R0,[R0]
+000260 99060080         406         OR.W    R0,#080H
+000264 964842rr         407         MOV.B   ES,#SEG( _LEDMirror )
+000268 9918rrrr         408         MOV.W   R1,#SOF( _LEDMirror )
+00026C 8A09             409         MOV.W   [R1],R0
+                        410         BR      _66
+00026E D500F4          +410         JMP.L   _66
+00026E D500F400        +410         JMP.L   _66
+000272                  411 _18:
+                        412 ; led_hw.c  118                         else
+                        413 ; led_hw.c  119                                 LEDMirror &= ~CBNTSCLED;
+000272 964842rr         415         MOV.B   ES,#SEG( _LEDMirror )
+000276 9908rrrr         416         MOV.W   R0,#SOF( _LEDMirror )
+00027A 8A00             417         MOV.W   R0,[R0]
+00027C 9905FF7F         418         AND.W   R0,#0FF7FH
+000280 964842rr         419         MOV.B   ES,#SEG( _LEDMirror )
+000284 9918rrrr         420         MOV.W   R1,#SOF( _LEDMirror )
+000288 8A09             421         MOV.W   [R1],R0
+                        422 ; led_hw.c  120                         break;
+                        424         BR      _66
+00028A D500E6          +424         JMP.L   _66
+                        425 ; led_hw.c  121 
+                        426 ; led_hw.c  122                 case AnalogAudioLED:    
+00028E                  428 _19:
+                        431 ; led_hw.c  123                         if ( value)
+00028E 6911             433         OR.W    R1,R1
+000290 F30E             434         BEQ     _20
+                        435 ; led_hw.c  124                                 LEDMirror |= AnalogAudioLED;
+000292 964842rr         437         MOV.B   ES,#SEG( _LEDMirror )
+000296 9908rrrr         438         MOV.W   R0,#SOF( _LEDMirror )
+00029A 8A00             439         MOV.W   R0,[R0]
+00029C 99060100         440         OR.W    R0,#0100H
+0002A0 964842rr         441         MOV.B   ES,#SEG( _LEDMirror )
+0002A4 9918rrrr         442         MOV.W   R1,#SOF( _LEDMirror )
+0002A8 8A09             443         MOV.W   [R1],R0
+                        444         BR      _66
+0002AA D500D6          +444         JMP.L   _66
+0002AA D500D600        +444         JMP.L   _66
+0002AE                  445 _20:
+                        446 ; led_hw.c  125                         else
+                        447 ; led_hw.c  126                                 LEDMirror &= ~ AnalogAudioLED;
+0002AE 964842rr         449         MOV.B   ES,#SEG( _LEDMirror )
+0002B2 9908rrrr         450         MOV.W   R0,#SOF( _LEDMirror )
+0002B6 8A00             451         MOV.W   R0,[R0]
+0002B8 9905FEFF         452         AND.W   R0,#0FEFFH
+0002BC 964842rr         453         MOV.B   ES,#SEG( _LEDMirror )
+0002C0 9918rrrr         454         MOV.W   R1,#SOF( _LEDMirror )
+0002C4 8A09             455         MOV.W   [R1],R0
+                        456 ; led_hw.c  127                         break;
+                        458         BR      _66
+0002C6 D500C8          +458         JMP.L   _66
+                        459 ; led_hw.c  128 
+                        460 ; led_hw.c  129                 case AESEBUAudioLED:    
+0002CA                  462 _21:
+                        465 ; led_hw.c  130                         if ( value)
+0002CA 6911             467         OR.W    R1,R1
+0002CC F30E             468         BEQ     _22
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        469 ; led_hw.c  131                                 LEDMirror |= AESEBUAudioLED;
+0002CE 964842rr         471         MOV.B   ES,#SEG( _LEDMirror )
+0002D2 9908rrrr         472         MOV.W   R0,#SOF( _LEDMirror )
+0002D6 8A00             473         MOV.W   R0,[R0]
+0002D8 99060200         474         OR.W    R0,#0200H
+0002DC 964842rr         475         MOV.B   ES,#SEG( _LEDMirror )
+0002E0 9918rrrr         476         MOV.W   R1,#SOF( _LEDMirror )
+0002E4 8A09             477         MOV.W   [R1],R0
+                        478         BR      _66
+0002E6 D500B8          +478         JMP.L   _66
+0002E6 D500B800        +478         JMP.L   _66
+0002EA                  479 _22:
+                        480 ; led_hw.c  132                         else
+                        481 ; led_hw.c  133                                 LEDMirror &= ~ AESEBUAudioLED;
+0002EA 964842rr         483         MOV.B   ES,#SEG( _LEDMirror )
+0002EE 9908rrrr         484         MOV.W   R0,#SOF( _LEDMirror )
+0002F2 8A00             485         MOV.W   R0,[R0]
+0002F4 9905FDFF         486         AND.W   R0,#0FDFFH
+0002F8 964842rr         487         MOV.B   ES,#SEG( _LEDMirror )
+0002FC 9918rrrr         488         MOV.W   R1,#SOF( _LEDMirror )
+000300 8A09             489         MOV.W   [R1],R0
+                        490 ; led_hw.c  134                         break;
+                        492         BR      _66
+000302 D500AA          +492         JMP.L   _66
+                        493 ; led_hw.c  135 
+                        494 ; led_hw.c  136                 case D25LED:    
+000306                  496 _23:
+                        499 ; led_hw.c  137                         if ( value)
+000306 6911             501         OR.W    R1,R1
+000308 F30E             502         BEQ     _24
+                        503 ; led_hw.c  138                                 LEDMirror |= D25LED;
+00030A 964842rr         505         MOV.B   ES,#SEG( _LEDMirror )
+00030E 9908rrrr         506         MOV.W   R0,#SOF( _LEDMirror )
+000312 8A00             507         MOV.W   R0,[R0]
+000314 99060400         508         OR.W    R0,#0400H
+000318 964842rr         509         MOV.B   ES,#SEG( _LEDMirror )
+00031C 9918rrrr         510         MOV.W   R1,#SOF( _LEDMirror )
+000320 8A09             511         MOV.W   [R1],R0
+                        512         BR      _66
+000322 D5009A          +512         JMP.L   _66
+000322 D5009A00        +512         JMP.L   _66
+000326                  513 _24:
+                        514 ; led_hw.c  139                         else
+                        515 ; led_hw.c  140                                 LEDMirror &= ~ D25LED;
+000326 964842rr         517         MOV.B   ES,#SEG( _LEDMirror )
+00032A 9908rrrr         518         MOV.W   R0,#SOF( _LEDMirror )
+00032E 8A00             519         MOV.W   R0,[R0]
+000330 9905FBFF         520         AND.W   R0,#0FBFFH
+000334 964842rr         521         MOV.B   ES,#SEG( _LEDMirror )
+000338 9918rrrr         522         MOV.W   R1,#SOF( _LEDMirror )
+00033C 8A09             523         MOV.W   [R1],R0
+                        524 ; led_hw.c  141                         break;
+                        526         BR      _66
+00033E D5008C          +526         JMP.L   _66
+                        527 ; led_hw.c  142 
+                        528 ; led_hw.c  143                 case D27LED:    
+000342                  530 _25:
+                        533 ; led_hw.c  144                         if ( value)
+000342 6911             535         OR.W    R1,R1
+000344 F30D             536         BEQ     _26
+                        537 ; led_hw.c  145                                 LEDMirror |= D27LED;
+000346 964842rr         539         MOV.B   ES,#SEG( _LEDMirror )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+00034A 9908rrrr         540         MOV.W   R0,#SOF( _LEDMirror )
+00034E 8A00             541         MOV.W   R0,[R0]
+000350 99060800         542         OR.W    R0,#0800H
+000354 964842rr         543         MOV.B   ES,#SEG( _LEDMirror )
+000358 9918rrrr         544         MOV.W   R1,#SOF( _LEDMirror )
+00035C 8A09             545         MOV.W   [R1],R0
+00035E FE7C             546         BR      _66
+00035E FE7C             546         BR      _66
+000360                  547 _26:
+                        548 ; led_hw.c  146                         else
+                        549 ; led_hw.c  147                                 LEDMirror &= ~ D27LED;
+000360 964842rr         551         MOV.B   ES,#SEG( _LEDMirror )
+000364 9908rrrr         552         MOV.W   R0,#SOF( _LEDMirror )
+000368 8A00             553         MOV.W   R0,[R0]
+00036A 9905F7FF         554         AND.W   R0,#0F7FFH
+00036E 964842rr         555         MOV.B   ES,#SEG( _LEDMirror )
+000372 9918rrrr         556         MOV.W   R1,#SOF( _LEDMirror )
+000376 8A09             557         MOV.W   [R1],R0
+                        558 ; led_hw.c  148                         break;
+000378 FE6F             560         BR      _66
+                        561 ; led_hw.c  149 
+                        562 ; led_hw.c  150                 case WordClk441LED:     
+00037A                  564 _27:
+                        567 ; led_hw.c  151                         if ( value)
+00037A 6911             569         OR.W    R1,R1
+00037C F30D             570         BEQ     _28
+                        571 ; led_hw.c  152                                 LEDMirror |= WordClk441LED;
+00037E 964842rr         573         MOV.B   ES,#SEG( _LEDMirror )
+000382 9908rrrr         574         MOV.W   R0,#SOF( _LEDMirror )
+000386 8A00             575         MOV.W   R0,[R0]
+000388 99061000         576         OR.W    R0,#01000H
+00038C 964842rr         577         MOV.B   ES,#SEG( _LEDMirror )
+000390 9918rrrr         578         MOV.W   R1,#SOF( _LEDMirror )
+000394 8A09             579         MOV.W   [R1],R0
+000396 FE60             580         BR      _66
+000396 FE60             580         BR      _66
+000398                  581 _28:
+                        582 ; led_hw.c  153                         else
+                        583 ; led_hw.c  154                                 LEDMirror &= ~ WordClk441LED;
+000398 964842rr         585         MOV.B   ES,#SEG( _LEDMirror )
+00039C 9908rrrr         586         MOV.W   R0,#SOF( _LEDMirror )
+0003A0 8A00             587         MOV.W   R0,[R0]
+0003A2 9905EFFF         588         AND.W   R0,#0EFFFH
+0003A6 964842rr         589         MOV.B   ES,#SEG( _LEDMirror )
+0003AA 9918rrrr         590         MOV.W   R1,#SOF( _LEDMirror )
+0003AE 8A09             591         MOV.W   [R1],R0
+                        592 ; led_hw.c  155                         break;
+0003B0 FE53             594         BR      _66
+                        595 ; led_hw.c  156 
+                        596 ; led_hw.c  157                 case WordClk48LED:      
+0003B2                  598 _29:
+                        601 ; led_hw.c  158                         if ( value)
+0003B2 6911             603         OR.W    R1,R1
+0003B4 F30D             604         BEQ     _30
+                        605 ; led_hw.c  159                                 LEDMirror |= WordClk48LED;
+0003B6 964842rr         607         MOV.B   ES,#SEG( _LEDMirror )
+0003BA 9908rrrr         608         MOV.W   R0,#SOF( _LEDMirror )
+0003BE 8A00             609         MOV.W   R0,[R0]
+0003C0 99062000         610         OR.W    R0,#02000H
+0003C4 964842rr         611         MOV.B   ES,#SEG( _LEDMirror )
+0003C8 9918rrrr         612         MOV.W   R1,#SOF( _LEDMirror )
+0003CC 8A09             613         MOV.W   [R1],R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+0003CE FE44             614         BR      _66
+0003CE FE44             614         BR      _66
+0003D0                  615 _30:
+                        616 ; led_hw.c  160                         else
+                        617 ; led_hw.c  161                                 LEDMirror &= ~ WordClk48LED;
+0003D0 964842rr         619         MOV.B   ES,#SEG( _LEDMirror )
+0003D4 9908rrrr         620         MOV.W   R0,#SOF( _LEDMirror )
+0003D8 8A00             621         MOV.W   R0,[R0]
+0003DA 9905DFFF         622         AND.W   R0,#0DFFFH
+0003DE 964842rr         623         MOV.B   ES,#SEG( _LEDMirror )
+0003E2 9918rrrr         624         MOV.W   R1,#SOF( _LEDMirror )
+0003E6 8A09             625         MOV.W   [R1],R0
+                        626 ; led_hw.c  162                         break;
+0003E8 FE37             628         BR      _66
+                        629 ; led_hw.c  163 
+                        630 ; led_hw.c  164                 case GenlockLED:        
+0003EA                  632 _31:
+                        635 ; led_hw.c  165                         if ( value)
+0003EA 6911             637         OR.W    R1,R1
+0003EC F30D             638         BEQ     _32
+                        639 ; led_hw.c  166                                 LEDMirror |= GenlockLED;
+0003EE 964842rr         641         MOV.B   ES,#SEG( _LEDMirror )
+0003F2 9908rrrr         642         MOV.W   R0,#SOF( _LEDMirror )
+0003F6 8A00             643         MOV.W   R0,[R0]
+0003F8 99064000         644         OR.W    R0,#04000H
+0003FC 964842rr         645         MOV.B   ES,#SEG( _LEDMirror )
+000400 9918rrrr         646         MOV.W   R1,#SOF( _LEDMirror )
+000404 8A09             647         MOV.W   [R1],R0
+000406 FE28             648         BR      _66
+000406 FE28             648         BR      _66
+000408                  649 _32:
+                        650 ; led_hw.c  167                         else
+                        651 ; led_hw.c  168                                 LEDMirror &= ~ GenlockLED;
+000408 964842rr         653         MOV.B   ES,#SEG( _LEDMirror )
+00040C 9908rrrr         654         MOV.W   R0,#SOF( _LEDMirror )
+000410 8A00             655         MOV.W   R0,[R0]
+000412 9905BFFF         656         AND.W   R0,#0BFFFH
+000416 964842rr         657         MOV.B   ES,#SEG( _LEDMirror )
+00041A 9918rrrr         658         MOV.W   R1,#SOF( _LEDMirror )
+00041E 8A09             659         MOV.W   [R1],R0
+                        660 ; led_hw.c  169                         break;
+000420 FE1B             662         BR      _66
+                        663 ; led_hw.c  170 
+                        664 ; led_hw.c  171                 case D37LED:    
+000422                  666 _33:
+                        669 ; led_hw.c  172                         if ( value)
+000422 6911             671         OR.W    R1,R1
+000424 F30D             672         BEQ     _34
+                        673 ; led_hw.c  173                                 LEDMirror |= D37LED;
+000426 964842rr         675         MOV.B   ES,#SEG( _LEDMirror )
+00042A 9908rrrr         676         MOV.W   R0,#SOF( _LEDMirror )
+00042E 8A00             677         MOV.W   R0,[R0]
+000430 99068000         678         OR.W    R0,#08000H
+000434 964842rr         679         MOV.B   ES,#SEG( _LEDMirror )
+000438 9918rrrr         680         MOV.W   R1,#SOF( _LEDMirror )
+00043C 8A09             681         MOV.W   [R1],R0
+00043E FE0C             682         BR      _66
+00043E FE0C             682         BR      _66
+000440                  683 _34:
+                        684 ; led_hw.c  174                         else
+                        685 ; led_hw.c  175                                 LEDMirror &= ~ D37LED;
+000440 964842rr         687         MOV.B   ES,#SEG( _LEDMirror )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000444 9908rrrr         688         MOV.W   R0,#SOF( _LEDMirror )
+000448 8A00             689         MOV.W   R0,[R0]
+00044A 99057FFF         690         AND.W   R0,#07FFFH
+00044E 964842rr         691         MOV.B   ES,#SEG( _LEDMirror )
+000452 9918rrrr         692         MOV.W   R1,#SOF( _LEDMirror )
+000456 8A09             693         MOV.W   [R1],R0
+                        694 ; led_hw.c  176                         break;
+                        695 ; led_hw.c  177         }
+000458                  697 _66:
+                        698 ; led_hw.c  178 
+                        699 ; led_hw.c  179         if ( LEDState == NormLEDs)
+000458 964842rr         701         MOV.B   ES,#SEG( _LEDState )
+00045C 9908rrrr         702         MOV.W   R0,#SOF( _LEDState )
+000460 8200             703         MOV.B   R0L,[R0]
+000462 F20A             704         BNE     _67
+                        705 ; led_hw.c  180                 LEDPort = LEDMirror;
+000464 964842rr         707         MOV.B   ES,#SEG( _LEDMirror )
+000468 9908rrrr         708         MOV.W   R0,#SOF( _LEDMirror )
+00046C 8A00             709         MOV.W   R0,[R0]
+00046E 96484206         710         MOV.B   ES,#SEG( _LEDPort )
+000472 9918A00C         711         MOV.W   R1,#SOF( _LEDPort )
+000476 8A09             712         MOV.W   [R1],R0
+000476 8A09             712         MOV.W   [R1],R0
+000478                  713 _67:
+                        714 ; led_hw.c  181 
+                        715 ; led_hw.c  182         return( OK);
+000478 9908FFFF         717         MOV.W   R0,#0FFFFH
+                        718 ; led_hw.c  183 }
+00047C D680             720         RET
+                        723 ; led_hw.c  184 
+                        724 ; led_hw.c  185 /**************************************************************************/
+                        725 ; led_hw.c  186 /* TestLEDSet                                                                    
+                                                                                                                             
+                                                               LED_HW.C     */
+                        726 ; led_hw.c  187 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        727 ; led_hw.c  188 /* Author:              Kim Engedahl, DEV, 000321                                
+                                                                                                                             
+                                            */
+                        728 ; led_hw.c  189 /* Revised:             000321, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        729 ; led_hw.c  190 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        730 ; led_hw.c  191 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        731 ; led_hw.c  192 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        732 ; led_hw.c  193 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        733 ; led_hw.c  194 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        734 ; led_hw.c  195 /**************************************************************************/
+                        735 ; led_hw.c  196 int TestLEDSet( UI LED, bool value)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                        736 ; led_hw.c  197 {
+                        737         ALIGN   1
+                        739         PUBLIC  _TestLEDSet
+00047E                  740 _TestLEDSet:
+                        748 ; led_hw.c  198         switch ( LED)
+00047E 99040001         750         CMP.W   R0,#01H
+000482 F304             751         BEQ     _68
+000484 99040002         752         CMP.W   R0,#02H
+000488 F31D             753         BEQ     _70
+00048A FE37             754         BR      _75
+                        755 ; led_hw.c  199         {
+                        756 ; led_hw.c  200                 case Test1LED:  
+00048C                  758 _68:
+                        759 ; led_hw.c  201                         if ( value)
+00048C 6911             761         OR.W    R1,R1
+00048E F30D             762         BEQ     _69
+                        763 ; led_hw.c  202                                 TestLEDMirror |= Test1LED;
+000490 964842rr         765         MOV.B   ES,#SEG( _TestLEDMirror )
+000494 9908rrrr         766         MOV.W   R0,#SOF( _TestLEDMirror )
+000498 8200             767         MOV.B   R0L,[R0]
+00049A 910601           769         OR.B    R0L,#01H
+00049D 964842rr         770         MOV.B   ES,#SEG( _TestLEDMirror )
+0004A1 9918rrrr         771         MOV.W   R1,#SOF( _TestLEDMirror )
+0004A5 8209             772         MOV.B   [R1],R0L
+0004A7 FE29             773         BR      _75
+0004A7 FE2900           773         BR      _75
+0004AA                  774 _69:
+                        775 ; led_hw.c  203                         else
+                        776 ; led_hw.c  204                                 TestLEDMirror &= ~Test1LED;
+0004AA 964842rr         778         MOV.B   ES,#SEG( _TestLEDMirror )
+0004AE 9908rrrr         779         MOV.W   R0,#SOF( _TestLEDMirror )
+0004B2 8200             780         MOV.B   R0L,[R0]
+0004B4 9105FE           781         AND.B   R0L,#0FEH
+0004B7 964842rr         782         MOV.B   ES,#SEG( _TestLEDMirror )
+0004BB 9918rrrr         783         MOV.W   R1,#SOF( _TestLEDMirror )
+0004BF 8209             784         MOV.B   [R1],R0L
+                        785 ; led_hw.c  205                         break;
+0004C1 FE1C             787         BR      _75
+                        788 ; led_hw.c  206 
+                        789 ; led_hw.c  207                 case Test2LED:  
+0004C4                  791 _70:
+                        794 ; led_hw.c  208                         if ( value)
+0004C4 6911             796         OR.W    R1,R1
+0004C6 F30D             797         BEQ     _71
+                        798 ; led_hw.c  209                                 TestLEDMirror |= Test2LED;
+0004C8 964842rr         800         MOV.B   ES,#SEG( _TestLEDMirror )
+0004CC 9908rrrr         801         MOV.W   R0,#SOF( _TestLEDMirror )
+0004D0 8200             802         MOV.B   R0L,[R0]
+0004D2 910602           803         OR.B    R0L,#02H
+0004D5 964842rr         804         MOV.B   ES,#SEG( _TestLEDMirror )
+0004D9 9918rrrr         805         MOV.W   R1,#SOF( _TestLEDMirror )
+0004DD 8209             806         MOV.B   [R1],R0L
+0004DF FE0D             807         BR      _75
+0004DF FE0D00           807         BR      _75
+0004E2                  808 _71:
+                        809 ; led_hw.c  210                         else
+                        810 ; led_hw.c  211                                 TestLEDMirror &= ~Test2LED;
+0004E2 964842rr         812         MOV.B   ES,#SEG( _TestLEDMirror )
+0004E6 9908rrrr         813         MOV.W   R0,#SOF( _TestLEDMirror )
+0004EA 8200             814         MOV.B   R0L,[R0]
+0004EC 9105FD           815         AND.B   R0L,#0FDH
+0004EF 964842rr         816         MOV.B   ES,#SEG( _TestLEDMirror )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+0004F3 9918rrrr         817         MOV.W   R1,#SOF( _TestLEDMirror )
+0004F7 8209             818         MOV.B   [R1],R0L
+                        819 ; led_hw.c  212                         break;
+                        820 ; led_hw.c  213         }
+0004FA                  822 _75:
+                        823 ; led_hw.c  214 
+                        824 ; led_hw.c  215         TestLEDPort = TestLEDMirror;
+0004FA 964842rr         826         MOV.B   ES,#SEG( _TestLEDMirror )
+0004FE 9908rrrr         827         MOV.W   R0,#SOF( _TestLEDMirror )
+000502 8200             828         MOV.B   R0L,[R0]
+000504 96484206         829         MOV.B   ES,#SEG( _TestLEDPort )
+000508 9918A014         830         MOV.W   R1,#SOF( _TestLEDPort )
+00050C 8209             831         MOV.B   [R1],R0L
+                        832 ; led_hw.c  216 
+                        833 ; led_hw.c  217         return( OK);
+00050E 9908FFFF         835         MOV.W   R0,#0FFFFH
+                        836 ; led_hw.c  218 }
+000512 D680             838         RET
+                        841 ; led_hw.c  219 
+                        842 ; led_hw.c  220 /**************************************************************************/
+                        843 ; led_hw.c  221 /* SystemsLEDSet                                                                 
+                                                                                                                             
+                                                       LED_HW.C     */
+                        844 ; led_hw.c  222 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        845 ; led_hw.c  223 /* Author:              Kim Engedahl, DEV, 000618                                
+                                                                                                                             
+                                            */
+                        846 ; led_hw.c  224 /* Revised:             001128, KEn, DEV                                         
+                                                                                                                             
+                                                    */
+                        847 ; led_hw.c  225 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        848 ; led_hw.c  226 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        849 ; led_hw.c  227 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        850 ; led_hw.c  228 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        851 ; led_hw.c  229 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        852 ; led_hw.c  230 /**************************************************************************/
+                        853 ; led_hw.c  231 int SystemsLEDSet( UC state, UC column)
+                        854 ; led_hw.c  232 {
+                        855         ALIGN   1
+                        857         PUBLIC  _SystemsLEDSet
+000514                  858 _SystemsLEDSet:
+                        868 ; led_hw.c  233         UI tmp;
+                        869 ; led_hw.c  234 
+                        870 ; led_hw.c  235         switch ( LEDState = state)
+000514 964842rr         872         MOV.B   ES,#SEG( _LEDState )
+000518 9928rrrr         873         MOV.W   R2,#SOF( _LEDState )
+00051C 820A             874         MOV.B   [R2],R0L
+00051E 910400           875         CMP.B   R0L,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+000521 F309             876         BEQ     _76
+000523 910401           877         CMP.B   R0L,#01H
+000526 F311             878         BEQ     _77
+000528 910403           879         CMP.B   R0L,#03H
+00052B F32F             880         BEQ     _89
+00052D 910402           881         CMP.B   R0L,#02H
+000530 F32C             882         BEQ     _89
+000532 FE31             883         BR      _92
+                        884 ; led_hw.c  236         {
+                        885 ; led_hw.c  237                 case NormLEDs:  
+000534                  887 _76:
+                        888 ; led_hw.c  238                         LEDPort = LEDMirror;                    // Back to normal
+                            
+000534 964842rr         890         MOV.B   ES,#SEG( _LEDMirror )
+000538 9908rrrr         891         MOV.W   R0,#SOF( _LEDMirror )
+00053C 8A00             892         MOV.W   R0,[R0]
+00053E 96484206         895         MOV.B   ES,#SEG( _LEDPort )
+000542 9918A00C         896         MOV.W   R1,#SOF( _LEDPort )
+000546 8A09             897         MOV.W   [R1],R0
+                        898 ; led_hw.c  239                         break;
+000548 FE26             900         BR      _92
+                        901 ; led_hw.c  240 
+                        902 ; led_hw.c  241                 case PresetLEDs:        
+00054A                  904 _77:
+                        907 ; led_hw.c  242                         switch ( column)
+00054A 911400           909         CMP.B   R0H,#00H
+00054D F30C             910         BEQ     _78
+00054F 911401           911         CMP.B   R0H,#01H
+000552 F30B             912         BEQ     _79
+000554 911402           913         CMP.B   R0H,#02H
+000557 F30B             914         BEQ     _80
+000559 911403           915         CMP.B   R0H,#03H
+00055C F30B             916         BEQ     _81
+00055E 911404           917         CMP.B   R0H,#04H
+000561 F30C             918         BEQ     _82
+000563 FE0D             919         BR      _87
+                        920 ; led_hw.c  243                         {
+                        921 ; led_hw.c  244                                 case 0:
+000566                  923 _78:
+                        924 ; led_hw.c  245                                         tmp = 0;
+000566 B910             926         MOV.W   R1,#00H
+                        929 ; led_hw.c  246                                         break;
+000568 FE0A             931         BR      _87
+                        932 ; led_hw.c  247 
+                        933 ; led_hw.c  248                                 case 1:
+00056A                  935 _79:
+                        936 ; led_hw.c  249                                         tmp = ( BB1PALLED + BB1NTSCLED);
+00056A B913             938         MOV.W   R1,#03H
+                        941 ; led_hw.c  250                                         break;
+00056C FE08             943         BR      _87
+                        944 ; led_hw.c  251 
+                        945 ; led_hw.c  252                                 case 2:
+00056E                  947 _80:
+                        948 ; led_hw.c  253                                         tmp = ( BB2PALLED + BB2NTSCLED);
+00056E 9918000C         950         MOV.W   R1,#0CH
+                        953 ; led_hw.c  254                                         break;
+000572 FE05             955         BR      _87
+                        956 ; led_hw.c  255 
+                        957 ; led_hw.c  256                                 case 3:
+000574                  959 _81:
+                        960 ; led_hw.c  257                                         tmp = ( BB3PALLED + BB3NTSCLED);
+000574 99180030         962         MOV.W   R1,#030H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                        965 ; led_hw.c  258                                         break;
+000578 FE02             967         BR      _87
+                        968 ; led_hw.c  259 
+                        969 ; led_hw.c  260                                 case 4:
+00057A                  971 _82:
+                        972 ; led_hw.c  261                                         tmp = ( CBPALLED + CBNTSCLED);
+00057A 991800C0         974         MOV.W   R1,#0C0H
+                        977 ; led_hw.c  262                                         break;
+                        978 ; led_hw.c  263                         }
+00057E                  980 _87:
+                        981 ; led_hw.c  264 
+                        982 ; led_hw.c  265                         LEDPort = tmp;
+00057E 96484206         984         MOV.B   ES,#SEG( _LEDPort )
+000582 9908A00C         985         MOV.W   R0,#SOF( _LEDPort )
+000586 8A18             986         MOV.W   [R0],R1
+                        987 ; led_hw.c  266                         break;
+000588 FE06             989         BR      _92
+                        990 ; led_hw.c  267 
+                        991 ; led_hw.c  268                 case ErrorLEDs:         
+                        992 ; led_hw.c  269                 case ResetLEDs:         
+00058A                  994 _89:
+                        995 ; led_hw.c  270                         LEDPort = 0xFFFF;
+00058A 96484206         997         MOV.B   ES,#SEG( _LEDPort )
+00058E 9908A00C         998         MOV.W   R0,#SOF( _LEDPort )
+000592 9A08FFFF         999         MOV.W   [R0],#0FFFFH
+                       1000 ; led_hw.c  271                         break;
+                       1001 ; led_hw.c  272         }
+000596                 1003 _92:
+                       1004 ; led_hw.c  273 
+                       1005 ; led_hw.c  274         return( OK);
+000596 9908FFFF        1007         MOV.W   R0,#0FFFFH
+                       1009 ; led_hw.c  275 }
+00059A D680            1011         RET
+000000                 1017 LED_HW_CLR_FA   SEGMENT HDATA INSEGMENT CLEAR
+000000                 1018         RSEG    LED_HW_CLR_FA
+000000 RESERVED        1019 _TestLEDMirror: DS      1
+000000
+06A00C                 1022         HSEG AT 06A00CH
+                       1023         PUBLIC  _LEDPort
+                       1024         ALIGN   1
+06A00C                 1025 _LEDPort:       DS      2
+   |  RESERVED             
+06A00D
+000001                 1027         RSEG    LED_HW_CLR_FA
+000001 RESERVED        1028         ALIGN   1
+000001
+000002                 1029 _LEDMirror:     DS      2
+   |  RESERVED             
+000003
+06A014                 1032         HSEG AT 06A014H
+                       1033         PUBLIC  _TestLEDPort
+06A014 RESERVED        1034 _TestLEDPort:   DS      1
+06A014
+                       1035         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1036         EXTRN   DATA(__lc_ue_xvwbuffer)

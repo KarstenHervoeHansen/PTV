@@ -1,0 +1,1 @@
+Under dette directory ligger Filer for Operating og Service manualer i oprindelig ventura format

@@ -1,0 +1,166 @@
+/***************************************************************************/
+/*	Copyright ProTeleVision Technologies A/S, BRONDBY 1999						*/
+/*	Project:		PTxxxx General PTV controller 										*/
+/* PC emulator version of the display hardware */
+/* Purpose:    Control the display hardware , a 2lines by 40 chars LCD     */
+/*             with a HD44780 (LCDII) compatible controller                */
+/*	Author:		Sten A. Andersen                                            */
+/************************/
+#include "define.h"        /* Standard PTV defines   */
+#include "Displ.h"
+#include "disp_hw.h"
+
+static char sary[8];
+
+/***************************************************************************/
+/*	InitDisplay															 	  	            */
+/* Author:		SAA                                                         */
+/*	Function:	Initialize the display controller PC/ver							*/
+/* Returns:		--																				*/
+/***************************************************************************/
+
+
+#include <stdio.h>
+#include <conio.h>
+
+DispInit() {
+/* define some box-drawing characters */
+#define xpos 10
+#define ypos 10
+#define LEFT_TOP  0xDA
+#define RIGHT_TOP 0xBF
+#define HORIZ     0xC4
+#define VERT      0xB3
+#define LEFT_BOT  0xC0
+#define RIGHT_BOT 0xD9
+#define pc_left   0xae
+#define pc_right  0xaf
+	char i, j;
+	/* draw the top of the box */
+
+	textbackground(BLUE);
+	textcolor(YELLOW);
+
+	gotoxy(xpos,ypos-4);
+	puts(" Use arrow keys and <ENTER>  to use PT5765");
+	gotoxy(xpos,ypos-3);
+	puts(" Press escape or 'Q' terminate program");
+	gotoxy(xpos,ypos);
+	textbackground(GREEN);
+	textcolor(DARKGRAY);
+    cprintf("%c",LEFT_TOP);
+	for (i=0; i<DispWidth; i++)
+	  cprintf("%c",HORIZ);
+	cprintf("%c",RIGHT_TOP);
+	gotoxy(xpos,ypos+1);
+        cprintf("%c",VERT);
+	gotoxy(xpos+DispWidth+1,ypos+1);
+        cprintf("%c",VERT);
+	gotoxy(xpos,ypos+2);
+        cprintf("%c",VERT);
+	gotoxy(xpos+DispWidth+1,ypos+2);
+	cprintf("%c",VERT);
+	gotoxy(xpos,ypos+3);
+
+	/* draw the bottom */
+	cprintf("%c",LEFT_BOT);
+	for (i=0; i<DispWidth; i++)
+	  cprintf("%c",HORIZ);
+	cprintf("%c",RIGHT_BOT);
+
+
+    /*Draw test patterns for PC charset */
+
+ //	gotoxy(xpos+1,ypos+8);
+
+ //  	for (i=128,j=0; j<64; i++,j++)
+ //	  cprintf("%c",i);
+
+ // 	gotoxy(xpos+1,ypos+9);
+ //  	for (j=0; j<64; i++,j++)
+ //	  cprintf("%c",i);
+
+ 	return 0;
+}
+
+
+int DispSetCursor(UC pos,UC line)
+{                             /* Set cursor position to specified */
+    gotoxy(pos+11,line+11);
+    return(OK);
+}
+
+int DispWrChar(char c)       /* Write 'c' on cursor position++   */
+{
+    	textbackground(GREEN);
+    	textcolor(DARKGRAY);
+
+	if (c < ' ')
+	{
+      if ((c >= 0) && (c < 8))
+      {
+         switch (sary[c])
+         {
+         case CharArrowLeft:
+            c = '<';
+            break; 
+         case CharArrowRight:
+            c = '>';
+            break; 
+         case CharArrowUp:
+            c = '^';
+            break; 
+         case CharArrowDown:
+            c = '_';
+            break; 
+         case CharArrowUpDown:
+            c = '|';
+            break; 
+         case CharIconExecute:
+            c = 'e';
+            break; 
+
+         default:
+            c='?';
+            break;
+         }
+      }
+      else 
+      {
+         c = '?';
+      }
+   }
+   cprintf("%c",c);
+   return(OK);
+}
+
+
+
+static UC CursorType;
+
+int DispCursorType(UC typ)
+{	
+	switch(typ)
+   {
+   case NO_Cursor:
+      CursorType = typ;
+   break;
+	case BLINK_Cursor:
+      CursorType = typ;
+   break;
+   case NORM_Cursor:
+      CursorType = typ;
+	break;
+   default:
+   break;
+   }
+   return(OK);
+}
+
+int DispProgramSpecial(UC Index,char sc)
+{
+   if (Index <8 )
+      sary[Index] = sc;
+   return(OK);
+}
+

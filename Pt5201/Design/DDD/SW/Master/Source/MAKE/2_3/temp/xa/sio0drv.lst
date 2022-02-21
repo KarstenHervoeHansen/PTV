@@ -1,0 +1,1407 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\2_3\temp\xa\sio0drv.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -I..\..\rtxcdef\xa
+                          3 ;          -I..\..\rtxc\xa\include -I..\..\code\include\1_1 -I..\..\app_spec\xa
+                          4 ;          -Ml -O2 -s
+                          6 $NOZPAGE
+                          7         NAME    SIO0DRV
+                         11 ; sio0drv.c    1        /************************************************************************
+                            ****/
+                         12 ; sio0drv.c    2        /* MODULE:                                                               
+                               */
+                         13 ; sio0drv.c    3        /*  sio0drv.c - seriel channel driver using UART0 and Timer2             
+                               */
+                         14 ; sio0drv.c    4        /************************************************************************
+                            ****/
+                         15 ; sio0drv.c    5        /* FUNCTIONS:                                                            
+                               */
+                         16 ; sio0drv.c    6        /*                                                                       
+                               */
+                         17 ; sio0drv.c    7        /*  void sio0_init( void);                                               
+                               */
+                         18 ; sio0drv.c    8        /*  int sio0WaitAcknowledge( int addr, char *cmdbuf)                     
+                               */
+                         19 ; sio0drv.c    9        /*  int sio0WaitAnswer( void *buf)                                       
+                               */
+                         20 ; sio0drv.c   10        /*  int sio0SndCommand( int cnt, int addr, const char *format, ...)      
+                               */
+                         21 ; sio0drv.c   11        /*  int sio0SndRequest( int cnt, int addr, char *result, \               
+                               */
+                         22 ; sio0drv.c   12        /*                                                 const char *format, ..
+                            .) */
+                         23 ; sio0drv.c   13        /*                                                                       
+                               */
+                         24 ; sio0drv.c   14        /* TASKS:                                                                
+                               */
+                         25 ; sio0drv.c   15            void sio0i( void);
+                         26 ; sio0drv.c   16            void sio0o( void);
+                         27 ; sio0drv.c   17        /*                                                                       
+                               */
+                         28 ; sio0drv.c   18        /* NOTES:                                                                
+                               */
+                         29 ; sio0drv.c   19        /*                                                                       
+                               */
+                         30 ; sio0drv.c   20        /************************************************************************
+                            ****/
+                         31 ; sio0drv.c   21        /*
+                         32 ; sio0drv.c   22         *   PTV software for PT5201    
+                         33 ; sio0drv.c   23         *   Copyright (c) 
+                         34 ; sio0drv.c   24         *   ProTeleVision Technologies A/S.
+                         35 ; sio0drv.c   25         *   ALL RIGHTS RESERVED
+                         36 ; sio0drv.c   26        */
+                         37 ; sio0drv.c   27        /************************************************************************
+                            ****/
+                         38 ; sio0drv.c   28        
+                         39 ; sio0drv.c   29        #include <stdarg.h>
+                         42 ; sio0drv.c   30        #include <stdio.h>
+                         63 ; sio0drv.c   31        #include <string.h>
+                         66 ; sio0drv.c   32        #include <periphal.h>
+                         69 ; sio0drv.c   33        #include "define.h"
+                         72 ; sio0drv.c   34        #include "crystal.h"
+                         75 ; sio0drv.c   35        #include "sio0drv.h"
+                        404 ; sio0drv.c   36        #include "eventdef.h"
+                        407 ; sio0drv.c   37        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        408 ; sio0drv.c   38        #define RxBufferLen  (unsigned char)64          //
+                        409 ; sio0drv.c   39        #define RxTimeout    (unsigned char)30       // Timeout pr. character in 
+                            milliseconds
+                        410 ; sio0drv.c   40        #define RxRetransmit (unsigned char)3        // Number of retransmission 
+                            if failure
+                        411 ; sio0drv.c   41        
+                        412 ; sio0drv.c   42        #define TIMER2_RANGE    (unsigned long)65536
+                        413 ; sio0drv.c   43        
+                        414 ; sio0drv.c   44        #define PRESCALER               (unsigned long)4        // selected also 
+                            in SCR. NOTE!!! This value 
+                        415 ; sio0drv.c   45                                                     //  MUST be the same as dein
+                            fed in start.asm
+                        416 ; sio0drv.c   46        
+                        417 ; sio0drv.c   47        #define BAUDRATE        (unsigned long)57600    // select 57600 baud
+                        418 ; sio0drv.c   48        
+                        419 ; sio0drv.c   49        #define RELOAD2      (unsigned short)(TIMER2_RANGE-(CRYSTAL/(BAUDRATE*PRE
+                            SCALER*(unsigned long)16)))
+                        420 ; sio0drv.c   50        
+                        421 ; sio0drv.c   51        #define THI2_RESET  ( RELOAD2 >> 8) & 0xFF
+                        422 ; sio0drv.c   52        #define TLOW2_RESET ( RELOAD2 & 0xFF)
+                        423 ; sio0drv.c   53        
+                        424 ; sio0drv.c   54        
+                        425 ; sio0drv.c   55        /* ==================== */
+                        426 ; sio0drv.c   56        /* S0CON - bit settings */
+                        427 ; sio0drv.c   57        /* -------------------- */
+                        428 ; sio0drv.c   58        /* UART0                */
+                        429 ; sio0drv.c   59        /* -------------------- */
+                        430 ; sio0drv.c   60        #define U0_SM0   (1 << 7)   /* allow for 8-bit UART */
+                        431 ; sio0drv.c   61        #define U0_SM1   (1 << 6)   /* allow for 8-bit UART */
+                        432 ; sio0drv.c   62        #define U0_SM2   (0 << 5)   /* set to enable multiprocessor communication
+                             */
+                        433 ; sio0drv.c   63        #define U0_REN   (1 << 4)   /* enable serial reception */
+                        434 ; sio0drv.c   64             
+                        435 ; sio0drv.c   65        #define U0_TB8   (0 << 3)   /* the 9th databit transmitted in mode 2 or 3
+                             */
+                        436 ; sio0drv.c   66        #define U0_RB8   (0 << 2)   /* the 9th databit received in mode 2 or 3 */
+                            
+                        437 ; sio0drv.c   67        
+                        438 ; sio0drv.c   68        #define U0_TI    (0 << 1)   /* set the transmit interrupt flag */
+                        439 ; sio0drv.c   69        #define U0_RI    (0 << 0)   /* set the receive interrupt flag */ 
+                        440 ; sio0drv.c   70        
+                        441 ; sio0drv.c   71        #define xS0CON (U0_SM0 | U0_SM1 | U0_SM2 | U0_REN | U0_TB8 | U0_RB8 | U0_
+                            TI | U0_RI )
+                        442 ; sio0drv.c   72        /* =================== */
+                        443 ; sio0drv.c   73        
+                        444 ; sio0drv.c   74        /* =================== */
+                        445 ; sio0drv.c   75        /* TMOD - bit settings */
+                        446 ; sio0drv.c   76        /* ------------------- */
+                        447 ; sio0drv.c   77        /* TIMER 2             */
+                        448 ; sio0drv.c   78        /* ------------------- */
+                        449 ; sio0drv.c   79        #define T2_RCLK1  (0 << 5)   /* set to use timer 2 as clock source for UA
+                            RT1,(AND select autoreload) */
+                        450 ; sio0drv.c   80        #define T2_TCLK1  (0 << 4)   /* set to use timer 2 as clock source for UA
+                            RT1,(AND select autoreload) */
+                        451 ; sio0drv.c   81        #define T2_T2OE   (0 << 1)   /* not applicable - OR in a zero (0) */
+                        452 ; sio0drv.c   82        #define T2_DCEN   (1 << 0)   /* set to count up for Timer 2 in auto reloa
+                            d mode */
+                        453 ; sio0drv.c   83        
+                        454 ; sio0drv.c   84        #define T2_TMOD   (T2_RCLK1 | T2_TCLK1 | T2_T2OE | T2_DCEN)
+                        455 ; sio0drv.c   85        
+                        456 ; sio0drv.c   86        #define xTMOD     T2_TMOD
+                        457 ; sio0drv.c   87        /* =================== */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        458 ; sio0drv.c   88        
+                        459 ; sio0drv.c   89        /* =================== */
+                        460 ; sio0drv.c   90        /* TCON - bit settings */
+                        461 ; sio0drv.c   91        /* ------------------- */
+                        462 ; sio0drv.c   92        /* TIMER 2             */
+                        463 ; sio0drv.c   93        /* ------------------- */
+                        464 ; sio0drv.c   94        #define T2_TF2    (0 << 7)   /* overflow flag - NOT cleared by hardware *
+                            /
+                        465 ; sio0drv.c   95        #define T2_EXF2   (0 << 6)   /* not applicable - OR in a zero (0) */
+                        466 ; sio0drv.c   96        #define T2_RCLK0  (1 << 5)   /* set to use timer 2 as clock source for UA
+                            RT0,(AND select autoreload) */
+                        467 ; sio0drv.c   97        #define T2_TCLK0  (1 << 4)   /* set to use timer 2 as clock source for UA
+                            RT0,(AND select autoreload) */
+                        468 ; sio0drv.c   98        #define T2_EXEN2  (0 << 3)   /* not applicable - OR in a zero (0) */
+                        469 ; sio0drv.c   99        #define T2_TR2    (0 << 2)   /* not applicable - OR in a zero (0) */
+                        470 ; sio0drv.c  100        #define T2_CT2    (0 << 1)   /* not applicable - OR in a zero (0) */
+                        471 ; sio0drv.c  101        #define T2_CPRL2  (0 << 0)   /* not applicable - OR in a zero (0) */
+                        472 ; sio0drv.c  102        
+                        473 ; sio0drv.c  103        #define T2_CON    (T2_TF2 | T2_EXF2 | T2_RCLK0| T2_TCLK0 | T2_EXEN2 | T2_
+                            TR2 | T2_CT2 | T2_CPRL2)
+                        474 ; sio0drv.c  104        
+                        475 ; sio0drv.c  105        #define xTCON     T2_CON
+                        476 ; sio0drv.c  106        /* =================== */
+                        477 ; sio0drv.c  107        
+                        478 ; sio0drv.c  108                                       
+                        479 ; sio0drv.c  109        /*
+                        480 ; sio0drv.c  110         *
+                        481 ; sio0drv.c  111         * DO NOT ALTER THE FOLLOWING VARIABLES: THEY ARE ALSO USED
+                        482 ; sio0drv.c  112         * IN ISRS.ASM
+                        483 ; sio0drv.c  113        */
+                        484 ; sio0drv.c  114        volatile _near unsigned char RxInput, RxOutput; // These are defined _nea
+                            r to minimize
+                        485 ; sio0drv.c  115        volatile unsigned char RxBuffer[RxBufferLen];   //  time used in receive 
+                            0 interrupt
+                        486 ; sio0drv.c  116        
+                        487 ; sio0drv.c  117        
+                        488 ; sio0drv.c  118        static TEvent                   *sio0iEvent, *sio0oEvent;
+                        489 ; sio0drv.c  119        static TThread          *sio0iThread, *sio0oThread;
+                        490 ; sio0drv.c  120        static TStream          *sio0iStream, *sio0oStream;
+                        491 ; sio0drv.c  121        static TResource        *sio0Res;
+                        492 ; sio0drv.c  122        
+                        493 ; sio0drv.c  123        
+                        494 ; sio0drv.c  124        /*
+                        495 ; sio0drv.c  125         *
+                        496 ; sio0drv.c  126         * interrupt service for transmit 0 (TI_0)
+                        497 ; sio0drv.c  127         *
+                        498 ; sio0drv.c  128        */
+                        499 ; sio0drv.c  129        FRAME ks_stk *intsio0o( FRAME ks_stk *frame)
+                        500 ; sio0drv.c  130        {
+000000                  501 SIO0DRV_PR      SEGMENT HCODE
+000000                  502         RSEG    SIO0DRV_PR
+                        503         ALIGN   1
+                        505         PUBLIC  _intsio0o
+000000                  506 _intsio0o:
+                        514 ; sio0drv.c  131          TI_0 = 0;
+000000 080301           516         CLR     0301H
+                        517 ; sio0drv.c  132        
+                        518 ; sio0drv.c  133          return( KS_ISRexit( frame, sio0oEvent->ID));  // wake up output task
+000003 964842rr         520         MOV.B   ES,#SEG( _sio0oEvent )
+000007 9938rrrr         521         MOV.W   R3,#SOF( _sio0oEvent )
+00000B 8B23             522         MOV.W   R2,[R3+]
+00000D 8A33             523         MOV.W   R3,[R3]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+00000F 866C42           524         MOV.B   ES,R3L
+000012 84421A           525         MOV.B   R2L,[R2+26]
+                        526         CALL    _KS_ISRexit
+000015 C4rrrrrr        +526 ;       FCALL   _KS_ISRexit
+                        528 ; sio0drv.c  134        }
+000019 D680             530         RET
+                        532 ; sio0drv.c  135        
+                        533 ; sio0drv.c  136        /*
+                        534 ; sio0drv.c  137         *
+                        535 ; sio0drv.c  138         * interrupt service for receive 0 (SWR6)
+                        536 ; sio0drv.c  139         *
+                        537 ; sio0drv.c  140        */
+                        538 ; sio0drv.c  141        FRAME ks_stk *intsio0i( FRAME ks_stk *frame)
+                        539 ; sio0drv.c  142        {
+00001B 00               540         ALIGN   1
+                        542         PUBLIC  _intsio0i
+00001C                  543 _intsio0i:
+                        549 ; sio0drv.c  143          SWR6 = 0;
+00001C 080355           551         CLR     0355H
+                        552 ; sio0drv.c  144        
+                        553 ; sio0drv.c  145          return( KS_ISRexit( frame, sio0iEvent->ID));
+00001F 964842rr         555         MOV.B   ES,#SEG( _sio0iEvent )
+000023 9938rrrr         556         MOV.W   R3,#SOF( _sio0iEvent )
+000027 8B23             557         MOV.W   R2,[R3+]
+000029 8A33             558         MOV.W   R3,[R3]
+00002B 866C42           559         MOV.B   ES,R3L
+00002E 84421A           560         MOV.B   R2L,[R2+26]
+                        561         CALL    _KS_ISRexit
+000031 C4rrrrrr        +561 ;       FCALL   _KS_ISRexit
+                        563 ; sio0drv.c  146        }
+000035 D680             565         RET
+                        567 ; sio0drv.c  147        
+                        568 ; sio0drv.c  148        
+                        569 ; sio0drv.c  149        void sio0_init( void)
+                        570 ; sio0drv.c  150        {
+000037 00               571         ALIGN   1
+                        573         PUBLIC  _sio0_init
+000038                  574 _sio0_init:
+000038 0F30             578         PUSH.W  R4, R5
+                        582 ; sio0drv.c  151          unsigned char tmp;
+                        583 ; sio0drv.c  152        
+                        584 ; sio0drv.c  153          sio0iEvent=newTEvent( 0);
+00003A B910             586         MOV.W   R1,#00H
+00003C B900             587         MOV.W   R0,#00H
+                        588         CALL    _newTEvent
+00003E C4rrrrrr        +588 ;       FCALL   _newTEvent
+000042 964842rr         589         MOV.B   ES,#SEG( _sio0iEvent )
+000046 9928rrrr         590         MOV.W   R2,#SOF( _sio0iEvent )
+00004A 8B0A             591         MOV.W   [R2+],R0
+00004C 8A1A             592         MOV.W   [R2],R1
+00004E B910             593         MOV.W   R1,#00H
+000050 B900             594         MOV.W   R0,#00H
+                        595 ; sio0drv.c  154          sio0oEvent=newTEvent( 0);
+                        597         CALL    _newTEvent
+000052 C4rrrrrr        +597 ;       FCALL   _newTEvent
+000056 964842rr         598         MOV.B   ES,#SEG( _sio0oEvent )
+00005A 9928rrrr         599         MOV.W   R2,#SOF( _sio0oEvent )
+00005E 8B0A             600         MOV.W   [R2+],R0
+000060 8A1A             601         MOV.W   [R2],R1
+                        602 ; sio0drv.c  155        
+                        603 ; sio0drv.c  156          sio0Res=newTResource( 0);
+000062 B910             605         MOV.W   R1,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+000064 B900             606         MOV.W   R0,#00H
+                        607         CALL    _newTResource
+000066 C4rrrrrr        +607 ;       FCALL   _newTResource
+00006A 964842rr         608         MOV.B   ES,#SEG( _sio0Res )
+00006E 9928rrrr         609         MOV.W   R2,#SOF( _sio0Res )
+000072 8B0A             610         MOV.W   [R2+],R0
+000074 8A1A             611         MOV.W   [R2],R1
+                        612 ; sio0drv.c  157        
+                        613 ; sio0drv.c  158          sio0iStream=newTStream( 1, 128);
+000076 B901             615         MOV.W   R0,#01H
+000078 99180080         616         MOV.W   R1,#080H
+                        617         CALL    _newTStream
+00007C C4rrrrrr        +617 ;       FCALL   _newTStream
+000080 964842rr         618         MOV.B   ES,#SEG( _sio0iStream )
+000084 9928rrrr         619         MOV.W   R2,#SOF( _sio0iStream )
+000088 8B0A             620         MOV.W   [R2+],R0
+00008A 8A1A             621         MOV.W   [R2],R1
+                        622 ; sio0drv.c  159          sio0oStream=newTStream( 2, 64);
+00008C 99180040         624         MOV.W   R1,#040H
+000090 B902             625         MOV.W   R0,#02H
+                        626         CALL    _newTStream
+000092 C4rrrrrr        +626 ;       FCALL   _newTStream
+000096 964842rr         627         MOV.B   ES,#SEG( _sio0oStream )
+00009A 9928rrrr         628         MOV.W   R2,#SOF( _sio0oStream )
+00009E 8B0A             629         MOV.W   [R2+],R0
+0000A0 8A1A             630         MOV.W   [R2],R1
+                        631 ; sio0drv.c  160        
+                        632 ; sio0drv.c  161          sio0iThread=newTThread( 2, sio0i);
+0000A2 9938rrrr         634         MOV.W   R3,#SEG( _sio0i )
+0000A6 9928rrrr         635         MOV.W   R2,#SOF( _sio0i )
+0000AA B902             636         MOV.W   R0,#02H
+                        637         CALL    _newTThread
+0000AC C4rrrrrr        +637 ;       FCALL   _newTThread
+0000B0 964842rr         638         MOV.B   ES,#SEG( _sio0iThread )
+0000B4 9928rrrr         639         MOV.W   R2,#SOF( _sio0iThread )
+0000B8 8B0A             640         MOV.W   [R2+],R0
+0000BA 8A1A             641         MOV.W   [R2],R1
+                        642 ; sio0drv.c  162          sio0oThread=newTThread( 4, sio0o);
+0000BC B904             644         MOV.W   R0,#04H
+0000BE 9938rrrr         645         MOV.W   R3,#SEG( _sio0o )
+0000C2 9928rrrr         646         MOV.W   R2,#SOF( _sio0o )
+                        647         CALL    _newTThread
+0000C6 C4rrrrrr        +647 ;       FCALL   _newTThread
+0000CA 964842rr         648         MOV.B   ES,#SEG( _sio0oThread )
+0000CE 9928rrrr         649         MOV.W   R2,#SOF( _sio0oThread )
+0000D2 8B0A             650         MOV.W   [R2+],R0
+0000D4 8A1A             651         MOV.W   [R2],R1
+                        652 ; sio0drv.c  163        
+                        653 ; sio0drv.c  164          sio0iThread->Execute( sio0iThread);
+0000D6 964842rr         655         MOV.B   ES,#SEG( _sio0iThread )
+0000DA 9918rrrr         656         MOV.W   R1,#SOF( _sio0iThread )
+0000DE 8B01             657         MOV.W   R0,[R1+]
+0000E0 8A11             658         MOV.W   R1,[R1]
+0000E2 862C42           659         MOV.B   ES,R1L
+0000E5 8C4006           660         MOV.W   R4,[R0+6]
+0000E8 8C5008           661         MOV.W   R5,[R0+8]
+0000EB C4rrrrrr         662         FCALL   __ICALL
+                        663 ; sio0drv.c  165          sio0oThread->Execute( sio0oThread);
+0000EF 964842rr         665         MOV.B   ES,#SEG( _sio0oThread )
+0000F3 9918rrrr         666         MOV.W   R1,#SOF( _sio0oThread )
+0000F7 8B01             667         MOV.W   R0,[R1+]
+0000F9 8A11             668         MOV.W   R1,[R1]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+0000FB 862C42           669         MOV.B   ES,R1L
+0000FE 8C4006           670         MOV.W   R4,[R0+6]
+000101 8C5008           671         MOV.W   R5,[R0+8]
+000104 C4rrrrrr         672         FCALL   __ICALL
+                        673 ; sio0drv.c  166        
+                        674 ; sio0drv.c  167          // S0CON - serial port 0 control register
+                        675 ; sio0drv.c  168          S0CON = xS0CON;
+000108 964820D0         677         MOV.B   0420H,#0D0H
+                        678 ; sio0drv.c  169        
+                        679 ; sio0drv.c  170          // Timer/Counter 2 Mode Control Register
+                        680 ; sio0drv.c  171          T2MOD = xTMOD;
+00010C B64119           682         MOV.B   0419H,#01H
+                        683 ; sio0drv.c  172        
+                        684 ; sio0drv.c  173          // Timer/Counter 2 Control Register
+                        685 ; sio0drv.c  174          T2CON = xTCON;
+00010F 96481830         687         MOV.B   0418H,#030H
+                        688 ; sio0drv.c  175        
+                        689 ; sio0drv.c  176          // Interrupt priority 4
+                        690 ; sio0drv.c  177          IPA4 = ( TX0INTLVL << 4) + RX0INTLVL;
+000113 9648A4BE         692         MOV.B   04A4H,#0BEH
+                        693 ; sio0drv.c  178        
+                        694 ; sio0drv.c  179          T2CAPH = THI2_RESET;
+000117 96485BFF         696         MOV.B   045BH,#0FFH
+                        697 ; sio0drv.c  180          T2CAPL = TLOW2_RESET;
+00011B 96485AF8         699         MOV.B   045AH,#0F8H
+                        700 ; sio0drv.c  181                
+                        701 ; sio0drv.c  182          RxInput = 0;                           // 
+00011F B6r0rr           703         MOV.B   _RxInput,#00H
+                        704 ; sio0drv.c  183          RxOutput = 0;
+000122 B6r0rr           706         MOV.B   _RxOutput,#00H
+                        707 ; sio0drv.c  184        
+                        708 ; sio0drv.c  185          tmp = S0BUF;           // read input to clear
+                        709 ; sio0drv.c  186          tmp = S0BUF;           // read input to clear
+                        710 ; sio0drv.c  187        
+                        711 ; sio0drv.c  188          KS_purgequeue( sio0oStream->ID);
+000125 964842rr         713         MOV.B   ES,#SEG( _sio0oStream )
+000129 9918rrrr         714         MOV.W   R1,#SOF( _sio0oStream )
+00012D 8B01             715         MOV.W   R0,[R1+]
+00012F 8A11             716         MOV.W   R1,[R1]
+000131 862C42           717         MOV.B   ES,R1L
+000134 840012           718         MOV.B   R0L,[R0+18]
+                        719         CALL    _KS_purgequeue
+000137 C4rrrrrr        +719 ;       FCALL   _KS_purgequeue
+                        720 ; sio0drv.c  189          KS_purgequeue( sio0iStream->ID);
+00013B 964842rr         722         MOV.B   ES,#SEG( _sio0iStream )
+00013F 9918rrrr         723         MOV.W   R1,#SOF( _sio0iStream )
+000143 8B01             724         MOV.W   R0,[R1+]
+000145 8A11             725         MOV.W   R1,[R1]
+000147 862C42           726         MOV.B   ES,R1L
+00014A 840012           727         MOV.B   R0L,[R0+18]
+                        728         CALL    _KS_purgequeue
+00014D C4rrrrrr        +728 ;       FCALL   _KS_purgequeue
+                        729 ; sio0drv.c  190        
+                        730 ; sio0drv.c  191          SWE |= 0x20;           // Enable SW interrupt 6
+000151 96467A20         732         OR.B    047AH,#020H
+                        733 ; sio0drv.c  192        
+                        734 ; sio0drv.c  193          TR2  = 1;              // Start Timer 2
+000155 0812C2           736         SETB    02C2H
+                        737 ; sio0drv.c  194          REN_0 = 1;             // Enable seriel reception
+000158 081304           739         SETB    0304H
+                        740 ; sio0drv.c  195        
+                        741 ; sio0drv.c  196          TI_0 = 0;              // Clear possible transmit interrupt 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+00015B 080301           743         CLR     0301H
+                        744 ; sio0drv.c  197          RI_0 = 0;              // Clear possible receive interrupt 
+00015E 080300           746         CLR     0300H
+                        747 ; sio0drv.c  198        
+                        748 ; sio0drv.c  199          ERI0 = 1;              // Receive port 0 - enabled
+000161 081338           750         SETB    0338H
+                        751 ; sio0drv.c  200          ETI0 = 1;              // Transmit port 0 - enabled
+000164 081339           753         SETB    0339H
+                        754 ; sio0drv.c  201        }
+000167 2F30             756         POP.W   R4, R5
+000169 D680             758         RET
+                        760 ; sio0drv.c  202        
+                        761 ; sio0drv.c  203        
+                        762 ; sio0drv.c  204        /* TASK */
+                        763 ; sio0drv.c  205        void sio0i( void)
+                        764 ; sio0drv.c  206        {
+00016B 00               765         ALIGN   1
+                        767         PUBLIC  _sio0i
+00016C                  768 _sio0i:
+00016C 0F30             772         PUSH.W  R4, R5
+                        774 ; sio0drv.c  207                for (;;)
+00016E                  776 _8:
+00016E                  776 _8:
+00016E                  777 _9:
+                        778 ; sio0drv.c  208          {
+                        779 ; sio0drv.c  209                sio0iEvent->Wait( sio0iEvent, 0);
+00016E 964842rr         781         MOV.B   ES,#SEG( _sio0iEvent )
+000172 9918rrrr         782         MOV.W   R1,#SOF( _sio0iEvent )
+000176 8B01             783         MOV.W   R0,[R1+]
+000178 8A11             784         MOV.W   R1,[R1]
+00017A 862C42           785         MOV.B   ES,R1L
+00017D 8C400A           786         MOV.W   R4,[R0+10]
+000180 8C500C           787         MOV.W   R5,[R0+12]
+000183 B930             788         MOV.W   R3,#00H
+000185 B920             789         MOV.W   R2,#00H
+000187 C4rrrrrr         790         FCALL   __ICALL
+                        791 ; sio0drv.c  210        
+                        792 ; sio0drv.c  211            EA = 0;
+00018B 080337           794         CLR     0337H
+                        795 ; sio0drv.c  212            RxOutput = ++RxOutput % RxBufferLen;
+00018E A6r1rr           797         ADDS.B  _RxOutput,#01H
+000191 860rrr           798         MOV.B   R0L,_RxOutput
+000194 E80140           799         DIVU.B  R0L,#040H
+000197 861rrr           800         MOV.B   _RxOutput,R0H
+                        801 ; sio0drv.c  213                EA = 1;
+00019A 081337           803         SETB    0337H
+                        804 ; sio0drv.c  214        
+                        805 ; sio0drv.c  215            sio0iStream->Put( sio0iStream, &RxBuffer[ RxOutput]);
+00019D 964842rr         807         MOV.B   ES,#SEG( _sio0iStream )
+0001A1 9918rrrr         808         MOV.W   R1,#SOF( _sio0iStream )
+0001A5 8B01             809         MOV.W   R0,[R1+]
+0001A7 8A11             810         MOV.W   R1,[R1]
+0001A9 964842rr         811         MOV.B   ES,#SEG( _sio0iStream )
+0001AD 9928rrrr         812         MOV.W   R2,#SOF( _sio0iStream )
+0001B1 8B0A             813         MOV.W   [R2+],R0
+0001B3 8A1A             814         MOV.W   [R2],R1
+0001B5 862C42           815         MOV.B   ES,R1L
+0001B8 8C400E           816         MOV.W   R4,[R0+14]
+0001BB 8C5010           817         MOV.W   R5,[R0+16]
+0001BE 860rrr           818         MOV.B   R0L,_RxOutput
+0001C1 B110             819         MOVS.B  R0H,#00H
+0001C3 B910             820         MOVS.W  R1,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+0001C5 9938rrrr         821         MOV.W   R3,#SEG( _RxBuffer )
+0001C9 9928rrrr         822         MOV.W   R2,#SOF( _RxBuffer )
+0001CD 0920             823         ADD.W   R2,R0
+0001CF 964842rr         824         MOV.B   ES,#SEG( _sio0iStream )
+0001D3 9918rrrr         825         MOV.W   R1,#SOF( _sio0iStream )
+0001D7 8B01             826         MOV.W   R0,[R1+]
+0001D9 8A11             827         MOV.W   R1,[R1]
+0001DB C4rrrrrr         828         FCALL   __ICALL
+                        829 ; sio0drv.c  216            
+                        830 ; sio0drv.c  217                        if ( RxOutput - RxInput) // If more input data
+0001DF 860rrr           832         MOV.B   R0L,_RxOutput
+0001E2 B110             833         MOVS.B  R0H,#00H
+0001E4 862rrr           834         MOV.B   R1L,_RxInput
+0001E7 B130             835         MOVS.B  R1H,#00H
+0001E9 2901             836         SUB.W   R0,R1
+0001EB 6900             837         OR.W    R0,R0
+0001ED F3C0             838         BEQ     _9
+                        839 ; sio0drv.c  218              SWR6 = 1;              //  enable SW6 interrupt again
+0001EF 081355           841         SETB    0355H
+0001F2 FEBD             843         BR      _8
+                        844 ; sio0drv.c  219          }
+                        845 ; sio0drv.c  220        }
+0001F4 2F30             847         POP.W   R4, R5
+0001F6 D680             849         RET
+                        851 ; sio0drv.c  221        
+                        852 ; sio0drv.c  222        
+                        853 ; sio0drv.c  223        /* TASK */
+                        854 ; sio0drv.c  224        void sio0o( void)
+                        855 ; sio0drv.c  225        {
+                        856         ALIGN   1
+                        858         PUBLIC  _sio0o
+0001F8                  859 _sio0o:
+0001F8 0F30             863         PUSH.W  R4, R5
+0001FA A97E             865         ADDS.W  R7,#0EH
+                        868 ; sio0drv.c  226          int ochar;
+                        869 ; sio0drv.c  227        
+                        870 ; sio0drv.c  228          for (;;)
+0001FC                  872 _10:
+                        873 ; sio0drv.c  229          {
+                        874 ; sio0drv.c  230            sio0oStream->Get( sio0oStream, &ochar);
+0001FC 964842rr         876         MOV.B   ES,#SEG( _sio0oStream )
+000200 9918rrrr         877         MOV.W   R1,#SOF( _sio0oStream )
+000204 8B01             878         MOV.W   R0,[R1+]
+000206 8A11             879         MOV.W   R1,[R1]
+000208 862C42           880         MOV.B   ES,R1L
+00020B 8C400A           881         MOV.W   R4,[R0+10]
+00020E 8C500C           882         MOV.W   R5,[R0+12]
+000211 9168rr           883         MOV.B   R3L,#SEG( __lc_bs )
+000214 7177             884         XOR.B   R3H,R3H
+000216 8927             885         MOV.W   R2,R7
+000218 C4rrrrrr         886         FCALL   __ICALL
+                        887 ; sio0drv.c  231        
+                        888 ; sio0drv.c  232            TB8_0 = ( ochar >> 8) & 0x01;
+00021C 8A07             890         MOV.W   R0,[R7]
+00021E DA08             891         ASR.W   R0,#08H
+000220 99050001         892         AND.W   R0,#01H
+000224 080000           893         CLR     R0.0
+000227 F302             894         BEQ     _11
+000229 081000           895         SETB    R0.0
+000229 081000           895         SETB    R0.0
+00022C                  896 _11:
+00022C 082000           897         MOV     C,R0.0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+00022F 083303           898         MOV     0303H,C
+                        899 ; sio0drv.c  233        
+                        900 ; sio0drv.c  234            S0BUF = ochar & 0xFF;    // Write char to port
+000232 8A07             902         MOV.W   R0,[R7]
+000234 9105FF           903         AND.B   R0L,#0FFH
+000237 860C60           904         MOV.B   0460H,R0L
+                        905 ; sio0drv.c  235            TI_0 = 0;                // Clear interrupt IMMEDIATELY to disable
+00023A 080301           907         CLR     0301H
+                        908 ; sio0drv.c  236                                     //  double buffering
+                        909 ; sio0drv.c  237        
+                        910 ; sio0drv.c  238            sio0oEvent->Wait( sio0oEvent, 0);
+00023D 964842rr         912         MOV.B   ES,#SEG( _sio0oEvent )
+000241 9918rrrr         913         MOV.W   R1,#SOF( _sio0oEvent )
+000245 8B01             914         MOV.W   R0,[R1+]
+000247 8A11             915         MOV.W   R1,[R1]
+000249 862C42           916         MOV.B   ES,R1L
+00024C 8C400A           917         MOV.W   R4,[R0+10]
+00024F 8C500C           918         MOV.W   R5,[R0+12]
+000252 B930             919         MOV.W   R3,#00H
+000254 B920             920         MOV.W   R2,#00H
+000256 C4rrrrrr         921         FCALL   __ICALL
+00025A FED0             923         BR      _10
+                        924 ; sio0drv.c  239          }
+                        925 ; sio0drv.c  240        }
+00025C A972             927         ADDS.W  R7,#02H
+00025E 2F30             929         POP.W   R4, R5
+000260 D680             931         RET
+                        933 ; sio0drv.c  241        
+                        934 ; sio0drv.c  242        /************************************************************************
+                            **/
+                        935 ; sio0drv.c  243        /* sio0WaitAcknowledge                                                   
+                                                                                                                             
+                                      SIO0DRV.C     */
+                        936 ; sio0drv.c  244        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        937 ; sio0drv.c  245        /* Author:              Kim Engedahl, DEV, 000120                        
+                                                                                                                             
+                                                    */
+                        938 ; sio0drv.c  246        /* Revised:             000409, KEn, DEV                                 
+                                                                                                                             
+                                                            */
+                        939 ; sio0drv.c  247        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                        940 ; sio0drv.c  248        /* Function:    Transmit <cmdbuf> to <addr> and wait for an acknowledge  
+                                            */
+                        941 ; sio0drv.c  249        /* Remarks:   Resource should be locked BEFORE entering this function    
+                                            */
+                        942 ; sio0drv.c  250        /* Returns:             sio0NoError, sio0TxCksumError, sio0NoAcknowledge 
+                            or                                      */
+                        943 ; sio0drv.c  251        /*            sioUnknowError.                                            
+                                                                                                                             
+                                                                    */ 
+                        944 ; sio0drv.c  252        /* Updates:             --                                               
+                                                                                                                             
+                                                                                                                    */
+                        945 ; sio0drv.c  253        /************************************************************************
+                            **/
+                        946 ; sio0drv.c  254        int sio0WaitAcknowledge( int addr, char *cmdbuf)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        947 ; sio0drv.c  255        {
+                        948         ALIGN   1
+                        950         PUBLIC  _sio0WaitAcknowledge
+000262                  951 _sio0WaitAcknowledge:
+000262 0F70             955         PUSH.W  R4, R5, R6
+000264 99720010         957         SUB.W   R7,#010H
+                        970 ; sio0drv.c  256          char *ptr;
+                        971 ; sio0drv.c  257          int tmp;
+                        972 ; sio0drv.c  258          UC checksum, retransmit = RxRetransmit;
+000268 91D803           974         MOV.B   R6H,#03H
+                        976 ; sio0drv.c  259        
+                        977 ; sio0drv.c  260          do
+00026B 99000100         979         ADD.W   R0,#0100H
+00026F 8C0F08           981         MOV.W   [R7+8],R0
+000272 8C3F0C           982         MOV.W   [R7+12],R3
+000275 8C2F0A           983         MOV.W   [R7+10],R2
+000278 99200001         984         ADD.W   R2,#01H
+00027C 8C3F06           987         MOV.W   [R7+6],R3
+00027F 8C2F04           988         MOV.W   [R7+4],R2
+00027F 8C2F04           988         MOV.W   [R7+4],R2
+000282                  989 _22:
+                        990 ; sio0drv.c  261          {
+                        991 ; sio0drv.c  262            tmp  = addr + 0x100;                // Transmit unit address
+000282 8C0708           993         MOV.W   R0,[R7+8]
+000285 8C0F0E           994         MOV.W   [R7+14],R0
+                        995 ; sio0drv.c  263            sio0oStream->Put( sio0oStream, &tmp);
+000288 964842rr         997         MOV.B   ES,#SEG( _sio0oStream )
+00028C 9918rrrr         998         MOV.W   R1,#SOF( _sio0oStream )
+000290 8B01             999         MOV.W   R0,[R1+]
+000292 8A11            1000         MOV.W   R1,[R1]
+000294 862C42          1001         MOV.B   ES,R1L
+000297 8C400E          1002         MOV.W   R4,[R0+14]
+00029A 8C5010          1003         MOV.W   R5,[R0+16]
+00029D 9168rr          1004         MOV.B   R3L,#SEG( __lc_bs )
+0002A0 7177            1005         XOR.B   R3H,R3H
+0002A2 40270E          1006         LEA     R2,R7+14
+0002A5 C4rrrrrr        1007         FCALL   __ICALL
+                       1008 ; sio0drv.c  264        
+                       1009 ; sio0drv.c  265            checksum = 0;
+0002A9 91C800          1011         MOV.B   R6L,#00H
+                       1013 ; sio0drv.c  266            ptr = cmdbuf;
+                       1014 ; sio0drv.c  267        
+                       1015 ; sio0drv.c  268            while ( tmp = *ptr++)
+0002AC 8C170C          1017         MOV.W   R1,[R7+12]
+0002AF 8C070A          1018         MOV.W   R0,[R7+10]
+0002B2 862C42          1019         MOV.B   ES,R1L
+0002B5 8200            1020         MOV.B   R0L,[R0]
+0002B7 9019            1021         SEXT.B  R0H
+0002B9 8C0F0E          1022         MOV.W   [R7+14],R0
+0002BC 8C3706          1023         MOV.W   R3,[R7+6]
+0002BF 8C2704          1024         MOV.W   R2,[R7+4]
+0002C2 8C3F02          1026         MOV.W   [R7+2],R3
+0002C5 8A2F            1027         MOV.W   [R7],R2
+0002C7 6900            1030         OR.W    R0,R0
+0002C9 F325            1031         BEQ     _24
+0002C9 F32500          1031         BEQ     _24
+0002CC                 1032 _23:
+                       1033 ; sio0drv.c  269                        {
+                       1034 ; sio0drv.c  270              sio0oStream->Put( sio0oStream, &tmp);
+0002CC 964842rr        1036         MOV.B   ES,#SEG( _sio0oStream )
+0002D0 9918rrrr        1037         MOV.W   R1,#SOF( _sio0oStream )
+0002D4 8B01            1038         MOV.W   R0,[R1+]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+0002D6 8A11            1039         MOV.W   R1,[R1]
+0002D8 862C42          1040         MOV.B   ES,R1L
+0002DB 8C400E          1041         MOV.W   R4,[R0+14]
+0002DE 8C5010          1042         MOV.W   R5,[R0+16]
+0002E1 9168rr          1043         MOV.B   R3L,#SEG( __lc_bs )
+0002E4 7177            1044         XOR.B   R3H,R3H
+0002E6 40270E          1045         LEA     R2,R7+14
+0002E9 C4rrrrrr        1046         FCALL   __ICALL
+                       1047 ; sio0drv.c  271        
+                       1048 ; sio0drv.c  272              checksum += tmp;
+0002ED 8C070E          1050         MOV.W   R0,[R7+14]
+0002F0 01C0            1051         ADD.B   R6L,R0L
+0002F2 8C1702          1055         MOV.W   R1,[R7+2]
+0002F5 8A07            1056         MOV.W   R0,[R7]
+0002F7 862C42          1057         MOV.B   ES,R1L
+0002FA 8200            1058         MOV.B   R0L,[R0]
+0002FC 9019            1059         SEXT.B  R0H
+0002FE 8C0F0E          1060         MOV.W   [R7+14],R0
+000301 8C3702          1061         MOV.W   R3,[R7+2]
+000304 8A27            1062         MOV.W   R2,[R7]
+000306 99200001        1063         ADD.W   R2,#01H
+00030A 8C3F02          1067         MOV.W   [R7+2],R3
+00030D 8A2F            1068         MOV.W   [R7],R2
+00030F 6900            1070         OR.W    R0,R0
+000311 F2DD            1071         BNE     _23
+                       1072 ; sio0drv.c  273            }
+000314                 1074 _24:
+                       1075 ; sio0drv.c  274        
+                       1076 ; sio0drv.c  275            tmp = checksum & 0x7F;              // Transmit checksum
+000314 91C57F          1078         AND.B   R6L,#07FH
+000317 810C            1080         MOV.B   R0L,R6L
+000319 B110            1081         MOVS.B  R0H,#00H
+00031B 8C0F0E          1082         MOV.W   [R7+14],R0
+                       1083 ; sio0drv.c  276            sio0oStream->Put( sio0oStream, &tmp);
+00031E 964842rr        1085         MOV.B   ES,#SEG( _sio0oStream )
+000322 9918rrrr        1086         MOV.W   R1,#SOF( _sio0oStream )
+000326 8B01            1087         MOV.W   R0,[R1+]
+000328 8A11            1088         MOV.W   R1,[R1]
+00032A 862C42          1089         MOV.B   ES,R1L
+00032D 8C400E          1090         MOV.W   R4,[R0+14]
+000330 8C5010          1091         MOV.W   R5,[R0+16]
+000333 9168rr          1092         MOV.B   R3L,#SEG( __lc_bs )
+000336 7177            1093         XOR.B   R3H,R3H
+000338 40270E          1094         LEA     R2,R7+14
+00033B C4rrrrrr        1095         FCALL   __ICALL
+                       1096 ; sio0drv.c  277        
+                       1097 ; sio0drv.c  278                                      // Wait for unit to acknowledge
+                       1098 ; sio0drv.c  279            if ( KS_dequeuet( sio0iStream->ID, &tmp, RxTimeout/CLKTICK) == RC_GOO
+                            D)
+00033F 964842rr        1100         MOV.B   ES,#SEG( _sio0iStream )
+000343 9918rrrr        1101         MOV.W   R1,#SOF( _sio0iStream )
+000347 8B01            1102         MOV.W   R0,[R1+]
+000349 8A11            1103         MOV.W   R1,[R1]
+00034B 862C42          1104         MOV.B   ES,R1L
+00034E 840012          1105         MOV.B   R0L,[R0+18]
+000351 B913            1106         MOV.W   R1,#03H
+000353 9168rr          1107         MOV.B   R3L,#SEG( __lc_bs )
+000356 7177            1108         XOR.B   R3H,R3H
+000358 40270E          1109         LEA     R2,R7+14
+                       1110         CALL    _KS_dequeuet
+00035B C4rrrrrr       +1110 ;       FCALL   _KS_dequeuet
+00035F 6900            1111         OR.W    R0,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000361 F212            1112         BNE     _28
+                       1113 ; sio0drv.c  280            {
+                       1114 ; sio0drv.c  281              switch ( tmp)
+000363 9C740E0080      1116         CMP.W   [R7+14],#080H
+000368 F305            1117         BEQ     _25
+00036A 9C740E0081      1118         CMP.W   [R7+14],#081H
+00036F F305            1119         BEQ     _26
+000371 FE07            1120         BR      _27
+                       1121 ; sio0drv.c  282                                {
+                       1122 ; sio0drv.c  283                case 0x80:
+000374                 1124 _25:
+                       1125 ; sio0drv.c  284                  return( OK);
+000374 9908FFFF        1127         MOV.W   R0,#0FFFFH
+000378 FE0E            1128         BR      _31
+                       1129 ; sio0drv.c  285        
+                       1130 ; sio0drv.c  286                case 0x81:
+00037A                 1132 _26:
+                       1133 ; sio0drv.c  287                  return( EventSIO0TxCksumErr);
+00037A 99080D4A        1135         MOV.W   R0,#0D4AH
+00037E FE0B            1136         BR      _31
+                       1137 ; sio0drv.c  288        
+                       1138 ; sio0drv.c  289                default:
+000380                 1140 _27:
+                       1141 ; sio0drv.c  290                  return( EventSIO0Error);
+000380 99080D48        1143         MOV.W   R0,#0D48H
+000384 FE08            1144         BR      _31
+                       1145 ; sio0drv.c  291                                }
+                       1146 ; sio0drv.c  292            }
+000386                 1148 _28:
+                       1153 ; sio0drv.c  293          } while ( retransmit--);
+000386 810D            1155         MOV.B   R0L,R6H
+000388 A1DF            1158         ADDS.B  R6H,#0FH
+00038A 6100            1161         OR.B    R0L,R0L
+                       1162         BNE     _22
+00038C F302           +1162 ;       BEQ     _LG_14
+00038E D5FF79         +1162 ;       JMP.L   _22
+00038E D5FF7900       +1162 ;       JMP.L   _22
+000392                +1162 _LG_14:
+                       1163 ; sio0drv.c  294        
+                       1164 ; sio0drv.c  295          return( EventSIO0NoAck);
+000392 99080D49        1166         MOV.W   R0,#0D49H
+                       1167 ; sio0drv.c  296        }                                                                        
+                                    
+000396                 1169 _31:
+000396 99700010        1170         ADD.W   R7,#010H
+00039A 2F70            1172         POP.W   R4, R5, R6
+00039C D680            1174         RET
+                       1179 ; sio0drv.c  297        
+                       1180 ; sio0drv.c  298        /************************************************************************
+                            **/
+                       1181 ; sio0drv.c  299        /* sio0WaitAnswer                                                        
+                                                                                                                             
+                                                            SIO0DRV.C       */
+                       1182 ; sio0drv.c  300        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                       1183 ; sio0drv.c  301        /* Author:              Kim Engedahl, DEV, 000119                        
+                                                                                                                             
+                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                       1184 ; sio0drv.c  302        /* Revised:             000409, KEn, DEV                                 
+                                                                                                                             
+                                                            */
+                       1185 ; sio0drv.c  303        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                       1186 ; sio0drv.c  304        /* Function:    Wait for an answer                                       
+                                                                                                                             
+                                                            */
+                       1187 ; sio0drv.c  305        /* Remarks:   Resource should be locked BEFORE entering this function    
+                                            */
+                       1188 ; sio0drv.c  306        /* Returns:             sio0Noerror, sio0RxTimeout, sio0CksumError       
+                                                                                            */
+                       1189 ; sio0drv.c  307        /* Updates:             --                                               
+                                                                                                                             
+                                                                                                                    */
+                       1190 ; sio0drv.c  308        /************************************************************************
+                            **/
+                       1191 ; sio0drv.c  309        int sio0WaitAnswer( void *buf)
+                       1192 ; sio0drv.c  310        {
+                       1193         ALIGN   1
+                       1195         PUBLIC  _sio0WaitAnswer
+00039E                 1196 _sio0WaitAnswer:
+00039E 0F70            1200         PUSH.W  R4, R5, R6
+0003A0 A97E            1202         ADDS.W  R7,#0EH
+                       1211 ; sio0drv.c  311          int  timeout;
+                       1212 ; sio0drv.c  312          char tmp, next = TRUE;
+0003A2 91C8FF          1214         MOV.B   R6L,#0FFH
+                       1218 ; sio0drv.c  313          UC checksum = 0;
+0003A5 91D800          1220         MOV.B   R6H,#00H
+                       1224 ; sio0drv.c  314          char *ptr = buf;
+0003A8 8951            1226         MOV.W   R5,R1
+0003AA 8940            1227         MOV.W   R4,R0
+                       1229 ; sio0drv.c  315        
+                       1230 ; sio0drv.c  316          do
+0003AC                 1232 _32:
+                       1233 ; sio0drv.c  317          {
+                       1234 ; sio0drv.c  318            if (( timeout = KS_dequeuet( sio0iStream->ID, &tmp, RxTimeout/CLKTICK
+                            )) == RC_GOOD)
+0003AC 964842rr        1236         MOV.B   ES,#SEG( _sio0iStream )
+0003B0 9918rrrr        1237         MOV.W   R1,#SOF( _sio0iStream )
+0003B4 8B01            1238         MOV.W   R0,[R1+]
+0003B6 8A11            1239         MOV.W   R1,[R1]
+0003B8 862C42          1241         MOV.B   ES,R1L
+0003BB 840012          1242         MOV.B   R0L,[R0+18]
+0003BE 9168rr          1243         MOV.B   R3L,#SEG( __lc_bs )
+0003C1 7177            1244         XOR.B   R3H,R3H
+0003C3 8927            1245         MOV.W   R2,R7
+0003C5 B913            1246         MOV.W   R1,#03H
+                       1247         CALL    _KS_dequeuet
+0003C7 C4rrrrrr       +1247 ;       FCALL   _KS_dequeuet
+0003CB 8910            1248         MOV.W   R1,R0
+0003CD F219            1249         BNE     _40
+                       1250 ; sio0drv.c  319            {
+                       1251 ; sio0drv.c  320              checksum += tmp;
+0003CF 02D7            1253         ADD.B   R6H,[R7]
+                       1256 ; sio0drv.c  321                                *ptr++ = tmp;
+0003D1 8227            1258         MOV.B   R1L,[R7]
+0003D3 86AC42          1259         MOV.B   ES,R5L
+0003D6 822C            1260         MOV.B   [R4],R1L
+0003D8 99400001        1261         ADD.W   R4,#01H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+                       1264 ; sio0drv.c  322              
+                       1265 ; sio0drv.c  323              switch ( tmp)
+0003DC 92740A          1267         CMP.B   [R7],#0AH
+0003DF F30E            1268         BEQ     _38
+0003E1 92740D          1269         CMP.B   [R7],#0DH
+0003E4 F30B            1270         BEQ     _38
+0003E6 92743B          1271         CMP.B   [R7],#03BH
+0003E9 F309            1272         BEQ     _38
+0003EB 927421          1273         CMP.B   [R7],#021H
+0003EE F306            1274         BEQ     _38
+0003F0 92743F          1275         CMP.B   [R7],#03FH
+0003F3 F304            1276         BEQ     _38
+0003F5 927424          1277         CMP.B   [R7],#024H
+0003F8 F301            1278         BEQ     _38
+0003FA FE02            1279         BR      _40
+                       1280 ; sio0drv.c  324              {
+                       1281 ; sio0drv.c  325                                  case 0x0A:
+                       1282 ; sio0drv.c  326                                  case 0x0D:
+                       1283 ; sio0drv.c  327                                case ';':
+                       1284 ; sio0drv.c  328                                  case '!':
+                       1285 ; sio0drv.c  329                                  case '?':
+                       1286 ; sio0drv.c  330                                  case '$':
+0003FC                 1288 _38:
+                       1289 ; sio0drv.c  331                                                next = FALSE;
+0003FC 91C800          1291         MOV.B   R6L,#00H
+                       1294 ; sio0drv.c  332                                    break;
+                       1295 ; sio0drv.c  333        
+                       1296 ; sio0drv.c  334                          default:
+                       1297 ; sio0drv.c  335                                    break;
+                       1298 ; sio0drv.c  336                                }
+                       1299 ; sio0drv.c  337                        } 
+000400                 1301 _40:
+                       1302 ; sio0drv.c  338          } while ( next && ( timeout != RC_TIMEOUT));
+000400 61CC            1304         OR.B    R6L,R6L
+000402 F303            1305         BEQ     _41
+000404 99040005        1306         CMP.W   R0,#05H
+000408 F2D1            1307         BNE     _32
+000408 F2D1            1307         BNE     _32
+00040A                 1308 _41:
+                       1309 ; sio0drv.c  339        
+                       1310 ; sio0drv.c  340          if ( timeout != RC_TIMEOUT) {
+00040A 99040005        1312         CMP.W   R0,#05H
+00040E F325            1313         BEQ     _44
+                       1314 ; sio0drv.c  341        
+                       1315 ; sio0drv.c  342            *(--ptr) = 0;                                               // Remove
+                             delimiter
+000410 99420001        1317         SUB.W   R4,#01H
+000414 86AC42          1319         MOV.B   ES,R5L
+000417 B240            1320         MOV.B   [R4],#00H
+                       1321 ; sio0drv.c  343        
+                       1322 ; sio0drv.c  344                                      // Wait for checksum
+                       1323 ; sio0drv.c  345            if ( KS_dequeuet( sio0iStream->ID, &tmp, RxTimeout/CLKTICK) == RC_GOO
+                            D)
+000419 964842rr        1325         MOV.B   ES,#SEG( _sio0iStream )
+00041D 9918rrrr        1326         MOV.W   R1,#SOF( _sio0iStream )
+000421 8B01            1327         MOV.W   R0,[R1+]
+000423 8A11            1328         MOV.W   R1,[R1]
+000425 862C42          1329         MOV.B   ES,R1L
+000428 840012          1330         MOV.B   R0L,[R0+18]
+00042B 9168rr          1331         MOV.B   R3L,#SEG( __lc_bs )
+00042E 7177            1332         XOR.B   R3H,R3H
+000430 8927            1333         MOV.W   R2,R7
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+000432 B913            1334         MOV.W   R1,#03H
+                       1335         CALL    _KS_dequeuet
+000434 C4rrrrrr       +1335 ;       FCALL   _KS_dequeuet
+000438 6900            1336         OR.W    R0,R0
+00043A F20F            1337         BNE     _44
+                       1338 ; sio0drv.c  346            {
+                       1339 ; sio0drv.c  347              if ( tmp - ( checksum & 0x7F))
+00043C 8207            1341         MOV.B   R0L,[R7]
+00043E 9019            1342         SEXT.B  R0H
+000440 91D57F          1343         AND.B   R6H,#07FH
+000443 81CD            1345         MOV.B   R6L,R6H
+000445 B1D0            1346         MOVS.B  R6H,#00H
+000447 2906            1348         SUB.W   R0,R6
+000449 6900            1349         OR.W    R0,R0
+00044B F304            1350         BEQ     _42
+                       1351 ; sio0drv.c  348                                  return( EventSIO0RxCksumErr);
+00044D 99080D4B        1353         MOV.W   R0,#0D4BH
+000451 FE06            1354         BR      _46
+000451 FE0600          1354         BR      _46
+000454                 1355 _42:
+                       1356 ; sio0drv.c  349        
+                       1357 ; sio0drv.c  350              return( OK);
+000454 9908FFFF        1359         MOV.W   R0,#0FFFFH
+000458 FE02            1360         BR      _46
+                       1361 ; sio0drv.c  351            }
+                       1362 ; sio0drv.c  352          }
+00045A                 1364 _44:
+                       1365 ; sio0drv.c  353                                     
+                       1366 ; sio0drv.c  354          return( EventSIO0RxTimeout);
+00045A 99080D4C        1368         MOV.W   R0,#0D4CH
+                       1369 ; sio0drv.c  355        }                                                                        
+                                    
+00045E                 1371 _46:
+00045E A972            1372         ADDS.W  R7,#02H
+000460 2F70            1374         POP.W   R4, R5, R6
+000462 D680            1376         RET
+                       1378 ; sio0drv.c  356        
+                       1379 ; sio0drv.c  357        /************************************************************************
+                            **/
+                       1380 ; sio0drv.c  358        /* sio0SndCommand                                                        
+                                                                                                                             
+                                                             SIO0DRV.C      */
+                       1381 ; sio0drv.c  359        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                       1382 ; sio0drv.c  360        /* Author:              Kim Engedahl, DEV, 000119                        
+                                                                                                                             
+                                                    */
+                       1383 ; sio0drv.c  361        /* Revised:             000404, KEn, DEV                                 
+                                                                                                                             
+                                                            */
+                       1384 ; sio0drv.c  362        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                       1385 ; sio0drv.c  363        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                       1386 ; sio0drv.c  364        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                       1387 ; sio0drv.c  365        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                       1388 ; sio0drv.c  366        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                       1389 ; sio0drv.c  367        /************************************************************************
+                            **/
+                       1390 ; sio0drv.c  368        int sio0SndCommand( int cnt, int addr, const char *format, ...)
+                       1391 ; sio0drv.c  369        {
+                       1392         ALIGN   1
+                       1394         PUBLIC  _sio0SndCommand
+000464                 1395 _sio0SndCommand:
+000464 0F70            1399         PUSH.W  R4, R5, R6
+000466 9972000A        1401         SUB.W   R7,#0AH
+00046A 8C1F04          1405         MOV.W   [R7+4],R1
+00046D 8960            1408         MOV.W   R6,R0
+                       1419 ; sio0drv.c  370          va_list va_ptr;
+                       1420 ; sio0drv.c  371          char *buf;
+                       1421 ; sio0drv.c  372          int ret;
+                       1422 ; sio0drv.c  373        
+                       1423 ; sio0drv.c  374          sio0Res->Lock( sio0Res);
+00046F 964842rr        1425         MOV.B   ES,#SEG( _sio0Res )
+000473 9918rrrr        1426         MOV.W   R1,#SOF( _sio0Res )
+000477 8B01            1427         MOV.W   R0,[R1+]
+000479 8A11            1428         MOV.W   R1,[R1]
+00047B 862C42          1429         MOV.B   ES,R1L
+00047E 8C400A          1430         MOV.W   R4,[R0+10]
+000481 8C500C          1431         MOV.W   R5,[R0+12]
+000484 C4rrrrrr        1432         FCALL   __ICALL
+                       1433 ; sio0drv.c  375        
+                       1434 ; sio0drv.c  376          buf = new( cnt+16);
+000488 99600010        1436         ADD.W   R6,#010H
+00048C 8906            1438         MOV.W   R0,R6
+00048E 9819            1439         SEXT.W  R1
+                       1440         CALL    _new
+000490 C4rrrrrr       +1440 ;       FCALL   _new
+                       1442 ; sio0drv.c  377        
+                       1443 ; sio0drv.c  378          va_start( va_ptr, format);
+000494 9168rr          1445         MOV.B   R3L,#SEG( __lc_bs )
+000497 7177            1446         XOR.B   R3H,R3H
+000499 402718          1447         LEA     R2,R7+24
+00049C 8C3F08          1448         MOV.W   [R7+8],R3
+00049F 8C2F06          1449         MOV.W   [R7+6],R2
+                       1450 ; sio0drv.c  379          ret = vsprintf( buf, format, va_ptr);
+0004A2 8C3716          1452         MOV.W   R3,[R7+22]
+0004A5 8C2714          1453         MOV.W   R2,[R7+20]
+0004A8 91A8rr          1454         MOV.B   R5L,#SEG( __lc_bs )
+0004AB 71BB            1455         XOR.B   R5H,R5H
+0004AD 404706          1456         LEA     R4,R7+6
+0004B0 0F30            1457         PUSH.W  R4, R5
+0004B2 8C1F06          1459         MOV.W   [R7+6],R1
+0004B5 8C0F04          1460         MOV.W   [R7+4],R0
+                       1465         CALL    _vsprintf
+0004B8 C4rrrrrr       +1465 ;       FCALL   _vsprintf
+0004BC A974            1466         ADDS.W  R7,#04H
+                       1471 ; sio0drv.c  380          va_end( va_ptr);
+0004BE BC7008          1473         MOV.W   [R7+8],#00H
+0004C1 BC7006          1474         MOV.W   [R7+6],#00H
+                       1475 ; sio0drv.c  381        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+                       1476 ; sio0drv.c  382          if (( ret == EOF) || ( ret > cnt+16))
+0004C4 9904FFFF        1478         CMP.W   R0,#0FFFFH
+0004C8 F302            1479         BEQ     _49
+0004CA 4906            1480         CMP.W   R0,R6
+0004CC FD14            1481         BLE     _50
+0004CC FD14            1481         BLE     _50
+0004CE                 1482 _49:
+                       1483 ; sio0drv.c  383          {
+                       1484 ; sio0drv.c  384                  sio0Res->Unlock( sio0Res);
+0004CE 964842rr        1486         MOV.B   ES,#SEG( _sio0Res )
+0004D2 9918rrrr        1487         MOV.W   R1,#SOF( _sio0Res )
+0004D6 8B01            1488         MOV.W   R0,[R1+]
+0004D8 8A11            1489         MOV.W   R1,[R1]
+0004DA 862C42          1491         MOV.B   ES,R1L
+0004DD 8C400E          1492         MOV.W   R4,[R0+14]
+0004E0 8C5010          1493         MOV.W   R5,[R0+16]
+0004E3 C4rrrrrr        1494         FCALL   __ICALL
+                       1495 ; sio0drv.c  385        
+                       1496 ; sio0drv.c  386            delete( buf);
+0004E7 8C1702          1498         MOV.W   R1,[R7+2]
+0004EA 8A07            1499         MOV.W   R0,[R7]
+                       1500         CALL    _delete
+0004EC C4rrrrrr       +1500 ;       FCALL   _delete
+                       1504 ; sio0drv.c  387        
+                       1505 ; sio0drv.c  388            return( EOF);                                  // EOF is -1
+0004F0 9908FFFF        1507         MOV.W   R0,#0FFFFH
+0004F4 FE19            1508         BR      _51
+                       1509 ; sio0drv.c  389          }
+0004F6                 1511 _50:
+0004F6 8C3702          1515         MOV.W   R3,[R7+2]
+0004F9 8A27            1516         MOV.W   R2,[R7]
+                       1519 ; sio0drv.c  390        
+                       1520 ; sio0drv.c  391          ret = sio0WaitAcknowledge( addr, buf);
+0004FB 8C0704          1522         MOV.W   R0,[R7+4]
+0004FE C5FEB1          1523         CALL    _sio0WaitAcknowledge
+000501 8960            1529         MOV.W   R6,R0
+                       1531 ; sio0drv.c  392        
+                       1532 ; sio0drv.c  393          delete( buf);
+000503 8C1702          1534         MOV.W   R1,[R7+2]
+000506 8A07            1535         MOV.W   R0,[R7]
+                       1536         CALL    _delete
+000508 C4rrrrrr       +1536 ;       FCALL   _delete
+                       1540 ; sio0drv.c  394        
+                       1541 ; sio0drv.c  395          sio0Res->Unlock( sio0Res);
+00050C 964842rr        1543         MOV.B   ES,#SEG( _sio0Res )
+000510 9918rrrr        1544         MOV.W   R1,#SOF( _sio0Res )
+000514 8B01            1545         MOV.W   R0,[R1+]
+000516 8A11            1546         MOV.W   R1,[R1]
+000518 862C42          1547         MOV.B   ES,R1L
+00051B 8C400E          1548         MOV.W   R4,[R0+14]
+00051E 8C5010          1549         MOV.W   R5,[R0+16]
+000521 C4rrrrrr        1550         FCALL   __ICALL
+                       1551 ; sio0drv.c  396        
+                       1552 ; sio0drv.c  397          return( ret);
+000525 8906            1554         MOV.W   R0,R6
+                       1557 ; sio0drv.c  398        }
+000528                 1559 _51:
+000528 9970000A        1560         ADD.W   R7,#0AH
+00052C 2F70            1562         POP.W   R4, R5, R6
+00052E D680            1564         RET
+                       1567 ; sio0drv.c  399        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+                       1568 ; sio0drv.c  400        /************************************************************************
+                            **/
+                       1569 ; sio0drv.c  401        /* sio0SndRequest                                                        
+                                                                                                                             
+                                                            SIO0DRV.C       */
+                       1570 ; sio0drv.c  402        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                       1571 ; sio0drv.c  403        /* Author:              Kim Engedahl, DEV, 000119                        
+                                                                                                                             
+                                                    */
+                       1572 ; sio0drv.c  404        /* Revised:             000404, KEn, DEV                                 
+                                                                                                                             
+                                                            */
+                       1573 ; sio0drv.c  405        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                       1574 ; sio0drv.c  406        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                       1575 ; sio0drv.c  407        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                       1576 ; sio0drv.c  408        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                       1577 ; sio0drv.c  409        /* Updates:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                       1578 ; sio0drv.c  410        /************************************************************************
+                            ***/
+                       1579 ; sio0drv.c  411        int sio0SndRequest( int cnt, int addr, char *result, const char *format, 
+                            ...)
+                       1580 ; sio0drv.c  412        {
+                       1581         ALIGN   1
+                       1583         PUBLIC  _sio0SndRequest
+000530                 1584 _sio0SndRequest:
+000530 0F70            1588         PUSH.W  R4, R5, R6
+000532 9972000E        1590         SUB.W   R7,#0EH
+000536 8C3F06          1595         MOV.W   [R7+6],R3
+000539 8C2F04          1596         MOV.W   [R7+4],R2
+00053C 8C1F08          1599         MOV.W   [R7+8],R1
+00053F 8960            1602         MOV.W   R6,R0
+                       1614 ; sio0drv.c  413          va_list va_ptr;
+                       1615 ; sio0drv.c  414          char *buf;
+                       1616 ; sio0drv.c  415          int ret;
+                       1617 ; sio0drv.c  416        
+                       1618 ; sio0drv.c  417          sio0Res->Lock( sio0Res);
+000541 964842rr        1620         MOV.B   ES,#SEG( _sio0Res )
+000545 9918rrrr        1621         MOV.W   R1,#SOF( _sio0Res )
+000549 8B01            1622         MOV.W   R0,[R1+]
+00054B 8A11            1623         MOV.W   R1,[R1]
+00054D 862C42          1624         MOV.B   ES,R1L
+000550 8C400A          1625         MOV.W   R4,[R0+10]
+000553 8C500C          1626         MOV.W   R5,[R0+12]
+000556 C4rrrrrr        1627         FCALL   __ICALL
+                       1628 ; sio0drv.c  418        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+                       1629 ; sio0drv.c  419          buf = new( cnt+16);
+00055A 99600010        1631         ADD.W   R6,#010H
+00055E 8906            1633         MOV.W   R0,R6
+000560 9819            1634         SEXT.W  R1
+                       1635         CALL    _new
+000562 C4rrrrrr       +1635 ;       FCALL   _new
+                       1637 ; sio0drv.c  420        
+                       1638 ; sio0drv.c  421          va_start( va_ptr, format);
+000566 9168rr          1640         MOV.B   R3L,#SEG( __lc_bs )
+000569 7177            1641         XOR.B   R3H,R3H
+00056B 40271C          1642         LEA     R2,R7+28
+00056E 8C3F0C          1643         MOV.W   [R7+12],R3
+000571 8C2F0A          1644         MOV.W   [R7+10],R2
+                       1645 ; sio0drv.c  422          ret = vsprintf( buf, format, va_ptr);
+000574 8C371A          1647         MOV.W   R3,[R7+26]
+000577 8C2718          1648         MOV.W   R2,[R7+24]
+00057A 91A8rr          1649         MOV.B   R5L,#SEG( __lc_bs )
+00057D 71BB            1650         XOR.B   R5H,R5H
+00057F 40470A          1651         LEA     R4,R7+10
+000582 0F30            1652         PUSH.W  R4, R5
+000584 8C1F06          1654         MOV.W   [R7+6],R1
+000587 8C0F04          1655         MOV.W   [R7+4],R0
+                       1660         CALL    _vsprintf
+00058A C4rrrrrr       +1660 ;       FCALL   _vsprintf
+00058E A974            1661         ADDS.W  R7,#04H
+                       1666 ; sio0drv.c  423          va_end( va_ptr);
+000590 BC700C          1668         MOV.W   [R7+12],#00H
+000593 BC700A          1669         MOV.W   [R7+10],#00H
+                       1670 ; sio0drv.c  424        
+                       1671 ; sio0drv.c  425          if (( ret == EOF) || ( ret > cnt+16))
+000596 9904FFFF        1673         CMP.W   R0,#0FFFFH
+00059A F302            1674         BEQ     _54
+00059C 4906            1675         CMP.W   R0,R6
+00059E FD14            1676         BLE     _55
+00059E FD14            1676         BLE     _55
+0005A0                 1677 _54:
+                       1678 ; sio0drv.c  426          {
+                       1679 ; sio0drv.c  427                  sio0Res->Unlock( sio0Res);
+0005A0 964842rr        1681         MOV.B   ES,#SEG( _sio0Res )
+0005A4 9918rrrr        1682         MOV.W   R1,#SOF( _sio0Res )
+0005A8 8B01            1683         MOV.W   R0,[R1+]
+0005AA 8A11            1684         MOV.W   R1,[R1]
+0005AC 862C42          1686         MOV.B   ES,R1L
+0005AF 8C400E          1687         MOV.W   R4,[R0+14]
+0005B2 8C5010          1688         MOV.W   R5,[R0+16]
+0005B5 C4rrrrrr        1689         FCALL   __ICALL
+                       1690 ; sio0drv.c  428        
+                       1691 ; sio0drv.c  429            delete( buf);
+0005B9 8C1702          1693         MOV.W   R1,[R7+2]
+0005BC 8A07            1694         MOV.W   R0,[R7]
+                       1695         CALL    _delete
+0005BE C4rrrrrr       +1695 ;       FCALL   _delete
+                       1699 ; sio0drv.c  430        
+                       1700 ; sio0drv.c  431            return( EOF);                                  // EOF is -1
+0005C2 9908FFFF        1702         MOV.W   R0,#0FFFFH
+0005C6 FE32            1703         BR      _57
+                       1704 ; sio0drv.c  432          }
+0005C8                 1706 _55:
+0005C8 8C3702          1712         MOV.W   R3,[R7+2]
+0005CB 8A27            1713         MOV.W   R2,[R7]
+                       1716 ; sio0drv.c  433        
+                       1717 ; sio0drv.c  434          ret = sio0WaitAcknowledge( addr, buf);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+0005CD 8C0708          1719         MOV.W   R0,[R7+8]
+0005D0 C5FE48          1720         CALL    _sio0WaitAcknowledge
+                       1726 ; sio0drv.c  435        
+                       1727 ; sio0drv.c  436          delete( buf);
+0005D3 8C1702          1729         MOV.W   R1,[R7+2]
+0005D6 8A07            1730         MOV.W   R0,[R7]
+                       1731         CALL    _delete
+0005D8 C4rrrrrr       +1731 ;       FCALL   _delete
+                       1735 ; sio0drv.c  437        
+                       1736 ; sio0drv.c  438          buf = new( 50);
+0005DC B910            1738         MOV.W   R1,#00H
+0005DE 99080032        1739         MOV.W   R0,#032H
+                       1740         CALL    _new
+0005E2 C4rrrrrr       +1740 ;       FCALL   _new
+0005E6 8951            1741         MOV.W   R5,R1
+0005E8 8940            1742         MOV.W   R4,R0
+                       1744 ; sio0drv.c  439        
+                       1745 ; sio0drv.c  440          if (( ret = sio0WaitAnswer( buf)) == OK)
+0005EA 8915            1747         MOV.W   R1,R5
+0005EC 8904            1748         MOV.W   R0,R4
+0005EE C5FED7          1751         CALL    _sio0WaitAnswer
+0005F1 8960            1754         MOV.W   R6,R0
+0005F3 9964FFFF        1756         CMP.W   R6,#0FFFFH
+0005F7 F208            1757         BNE     _56
+0005F9 8935            1758         MOV.W   R3,R5
+0005FB 8924            1759         MOV.W   R2,R4
+                       1762 ; sio0drv.c  441                        strcpy( result, buf);
+0005FD 8C1706          1764         MOV.W   R1,[R7+6]
+000600 8C0704          1765         MOV.W   R0,[R7+4]
+                       1766         CALL    _strcpy
+000603 C4rrrrrr       +1766 ;       FCALL   _strcpy
+000608                 1772 _56:
+                       1773 ; sio0drv.c  442        
+                       1774 ; sio0drv.c  443          delete( buf);
+000608 8915            1776         MOV.W   R1,R5
+00060A 8904            1777         MOV.W   R0,R4
+                       1778         CALL    _delete
+00060C C4rrrrrr       +1778 ;       FCALL   _delete
+                       1782 ; sio0drv.c  444        
+                       1783 ; sio0drv.c  445          sio0Res->Unlock( sio0Res);
+000610 964842rr        1785         MOV.B   ES,#SEG( _sio0Res )
+000614 9918rrrr        1786         MOV.W   R1,#SOF( _sio0Res )
+000618 8B01            1787         MOV.W   R0,[R1+]
+00061A 8A11            1788         MOV.W   R1,[R1]
+00061C 862C42          1789         MOV.B   ES,R1L
+00061F 8C400E          1790         MOV.W   R4,[R0+14]
+000622 8C5010          1791         MOV.W   R5,[R0+16]
+000625 C4rrrrrr        1792         FCALL   __ICALL
+                       1793 ; sio0drv.c  446        
+                       1794 ; sio0drv.c  447          return( ret);
+000629 8906            1796         MOV.W   R0,R6
+                       1799 ; sio0drv.c  448        }
+00062C                 1801 _57:
+00062C 9970000E        1802         ADD.W   R7,#0EH
+000630 2F70            1804         POP.W   R4, R5, R6
+000632 D680            1806         RET
+                       1809 ; sio0drv.c  449        
+                       1810 ; sio0drv.c  450        
+                       1811 ; sio0drv.c  451        
+                       1812 ; sio0drv.c  452        
+000000                 1816 SIO0DRV_CLR_FA  SEGMENT HDATA INSEGMENT CLEAR
+000000                 1817         RSEG    SIO0DRV_CLR_FA
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+                       1818         ALIGN   1
+000000                 1819 _sio0iEvent:    DS      4
+   |  RESERVED             
+000003
+                       1823         ALIGN   1
+000004                 1824 _sio0oStream:   DS      4
+   |  RESERVED             
+000007
+                       1827         EXTRN   HCODE(_KS_dequeuet)
+                       1830         EXTRN   HCODE(_newTStream)
+                       1833         EXTRN   HCODE(_KS_ISRexit)
+                       1837         PUBLIC  _RxBuffer
+000008                 1838 _RxBuffer:      DS      64
+   |  RESERVED             
+000047
+                       1842         ALIGN   1
+000048                 1843 _sio0Res:       DS      4
+   |  RESERVED             
+00004B
+                       1846         EXTRN   HCODE(_vsprintf)
+                       1849         EXTRN   HCODE(_delete)
+                       1852         EXTRN   HCODE(_strcpy)
+                       1855         EXTRN   HCODE(_KS_purgequeue)
+                       1858         EXTRN   HCODE(_newTResource)
+000000                 1861 SIO0DRV_CLR_NE@DS       SEGMENT DATA JOIN CLEAR
+000000                 1862         RSEG    SIO0DRV_CLR_NE@DS
+                       1863         PUBLIC  _RxOutput
+000000 RESERVED        1864 _RxOutput:      DS      1
+000000
+                       1865         EXTRN   HCODE(__ICALL)
+00004C                 1867         RSEG    SIO0DRV_CLR_FA
+                       1868         ALIGN   1
+00004C                 1869 _sio0oEvent:    DS      4
+   |  RESERVED             
+00004F
+                       1872         EXTRN   HCODE(_new)
+                       1873         EXTRN   IDATA(__lc_bs)
+                       1877         ALIGN   1
+000050                 1878 _sio0iThread:   DS      4
+   |  RESERVED             
+000053
+                       1884         EXTRN   HCODE(_newTThread)
+                       1887         EXTRN   HCODE(_newTEvent)
+                       1889         ALIGN   1
+000054                 1890 _sio0oThread:   DS      4
+   |  RESERVED             
+000057
+000001                 1893         RSEG    SIO0DRV_CLR_NE@DS
+                       1894         PUBLIC  _RxInput
+000001 RESERVED        1895 _RxInput:       DS      1
+000001
+000058                 1897         RSEG    SIO0DRV_CLR_FA
+                       1898         ALIGN   1
+000058                 1899 _sio0iStream:   DS      4
+   |  RESERVED             
+00005B
+                       1900         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1901         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1902         CALLS   'intsio0o', 'KS_ISRexit'
+                       1903         CALLS   'intsio0i', 'KS_ISRexit'
+                       1904         CALLS   'sio0_init', 'newTEvent'
+                       1905         CALLS   'sio0_init', 'newTResource'
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+                       1906         CALLS   'sio0_init', 'newTStream'
+                       1907         CALLS   'sio0_init', 'newTThread'
+                       1908         CALLS   'sio0_init', 'KS_purgequeue'
+                       1909         CALLS   'sio0WaitAcknowledge', 'KS_dequeuet'
+                       1910         CALLS   'sio0WaitAnswer', 'KS_dequeuet'
+                       1911         CALLS   'sio0SndCommand', 'new'
+                       1912         CALLS   'sio0SndCommand', 'vsprintf'
+                       1913         CALLS   'sio0SndCommand', 'delete'
+                       1914         CALLS   'sio0SndCommand', 'sio0WaitAcknowledge'
+                       1915         CALLS   'sio0SndCommand', 'delete'
+                       1916         CALLS   'sio0SndRequest', 'new'
+                       1917         CALLS   'sio0SndRequest', 'vsprintf'
+                       1918         CALLS   'sio0SndRequest', 'delete'
+                       1919         CALLS   'sio0SndRequest', 'sio0WaitAcknowledge'
+                       1920         CALLS   'sio0SndRequest', 'delete'
+                       1921         CALLS   'sio0SndRequest', 'new'
+                       1922         CALLS   'sio0SndRequest', 'sio0WaitAnswer'
+                       1923         CALLS   'sio0SndRequest', 'strcpy'
+                       1924         CALLS   'sio0SndRequest', 'delete'

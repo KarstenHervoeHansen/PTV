@@ -1,0 +1,445 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\BootLoader\Source\work\loader.src
+ADDR   CODE            LINE SOURCELINE
+                          2 ; options: -IC:\cxa\include -Ml -Cxag3 -Sd -A1 -O1 -DWritableSector=14
+                          3 ;          -DBootProgram=0 -g
+                          5 $NOZPAGE
+                          6         NAME    LOADER
+000000                   19 LOADER_RO       SEGMENT HCODE ROMDATA
+000000                   20         RSEG    LOADER_RO
+                         24         PUBLIC  __LO_EnteringLoaderTxt
+000000                   25 __LO_EnteringLoaderTxt:
+000000 454E544552494E    26         DB      045H,04EH,054H,045H,052H,049H,04EH,047H,020H,04CH,04FH,041H
+       47204C4F41           
+00000C 44455220535441    27         DB      044H,045H,052H,020H,053H,054H,041H,054H,045H,00DH,00AH,000H
+       54450D0A00           
+                         30         PUBLIC  __LO_LeavingLoaderTxt
+000018                   31 __LO_LeavingLoaderTxt:
+000018 4C454156494E47    32         DB      04CH,045H,041H,056H,049H,04EH,047H,020H,04CH,04FH,041H,044H
+       204C4F4144           
+000024 45522053544154    33         DB      045H,052H,020H,053H,054H,041H,054H,045H,00DH,00AH,000H
+       450D0A00             
+                         36         PUBLIC  __LO_CharNotValidTxt
+00002F                   37 __LO_CharNotValidTxt:
+00002F 43484152204E4F    38         DB      043H,048H,041H,052H,020H,04EH,04FH,054H,020H,056H,041H,04CH
+       542056414C           
+00003B 49440D0A00        39         DB      049H,044H,00DH,00AH,000H
+                         42         PUBLIC  __LO_RecLengthErrorTxt
+000040                   43 __LO_RecLengthErrorTxt:
+000040 524543204C454E    44         DB      052H,045H,043H,020H,04CH,045H,04EH,047H,054H,048H,020H,045H
+       4754482045           
+00004C 52524F520D0A00    45         DB      052H,052H,04FH,052H,00DH,00AH,000H
+                         48         PUBLIC  __LO_RecTypeErrorTxt
+000053                   49 __LO_RecTypeErrorTxt:
+000053 52454320545950    50         DB      052H,045H,043H,020H,054H,059H,050H,045H,020H,045H,052H,052H
+       4520455252           
+00005F 4F520D0A00        51         DB      04FH,052H,00DH,00AH,000H
+                         54         PUBLIC  __LO_ChecksumErrorTxt
+000064                   55 __LO_ChecksumErrorTxt:
+000064 434845434B5355    56         DB      043H,048H,045H,043H,04BH,053H,055H,04DH,020H,045H,052H,052H
+       4D20455252           
+000070 4F520D0A00        57         DB      04FH,052H,00DH,00AH,000H
+000000                   58 LOADER_PR       SEGMENT HCODE
+000000                   59         RSEG    LOADER_PR
+                         60         ALIGN   1
+                         62         PUBLIC  _IntelLoader
+000000                   63 _IntelLoader:
+000000 0F30              67         PUSH.W  R4, R5
+000002 91043A            76         CMP.B   R0L,#03AH
+000005 F20E              77         BNE     _3
+000007 B6r0rr            79         MOV.B   _Checksum,#00H
+00000A B6r0rr            80         MOV.B   _CharCnt,#00H
+00000D B6r0rr            81         MOV.B   _ByteCnt,#00H
+000010 B6r0rr            83         MOV.B   _RecLength,#00H
+000013 B6r0rr            84         MOV.B   _RecByte,#00H
+000016 BEr0rr            85         MOV.W   _RecWord,#00H
+000019 B6r1rr            87         MOV.B   _State,#01H
+00001C 910805            89         MOV.B   R0L,#05H
+                         90         BR      _58
+00001F D5015B           +90         JMP.L   _58
+000022                   92 _3:
+000022 91A800            94         MOV.B   R5L,#00H
+000025 910461            97         CMP.B   R0L,#061H
+000028 FB03              98         BLT     _4
+00002A 910466            99         CMP.B   R0L,#066H
+00002D FD0E             100         BLE     _7
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+00002D FD0E00           100         BLE     _7
+000030                  101 _4:
+000030 910441           102         CMP.B   R0L,#041H
+000033 FB03             103         BLT     _5
+000035 910446           104         CMP.B   R0L,#046H
+000038 FD08             105         BLE     _7
+000038 FD08             105         BLE     _7
+00003A                  106 _5:
+00003A 910430           107         CMP.B   R0L,#030H
+                        108         BLT     _56
+00003D FA02            +108 ;       BGE     _LG_10
+00003F D50146          +108 ;       JMP.L   _56
+00003F D50146          +108 ;       JMP.L   _56
+000042                 +108 _LG_10:
+000042 910439           109         CMP.B   R0L,#039H
+                        110         BGT     _56
+000045 FD02            +110 ;       BLE     _LG_12
+000047 D50142          +110 ;       JMP.L   _56
+000047 D50142          +110 ;       JMP.L   _56
+00004A                 +110 _LG_12:
+00004A                 +110 _LG_12:
+00004A                  111 _7:
+00004A 910430           113         CMP.B   R0L,#030H
+00004D FB06             114         BLT     _9
+00004F 910439           115         CMP.B   R0L,#039H
+000052 FC03             116         BGT     _9
+000054 910230           118         SUB.B   R0L,#030H
+000057 FE16             120         BR      _10
+000057 FE1600           120         BR      _10
+00005A                  121 _9:
+00005A 910461           124         CMP.B   R0L,#061H
+00005D FB03             125         BLT     _71
+00005F B911             126         MOVS.W  R1,#01H
+000061 FE02             127         BR      _73
+000061 FE0200           127         BR      _73
+000064                  128 _71:
+000064 B910             129         MOVS.W  R1,#00H
+000064 B910             129         MOVS.W  R1,#00H
+000066                  130 _73:
+000066 6911             131         OR.W    R1,R1
+000068 F307             132         BEQ     _59
+00006A 91047A           133         CMP.B   R0L,#07AH
+00006D FC03             134         BGT     _74
+00006F B911             135         MOVS.W  R1,#01H
+000071 FE02             136         BR      _76
+000071 FE0200           136         BR      _76
+000074                  137 _74:
+000074 B910             138         MOVS.W  R1,#00H
+000074 B910             138         MOVS.W  R1,#00H
+000076                  139 _76:
+000076 6911             140         OR.W    R1,R1
+000076 6911             140         OR.W    R1,R1
+000078                  141 _59:
+000078 F303             142         BEQ     _60
+00007A 9105DF           143         AND.B   R0L,#0DFH
+00007D FE01             144         BR      _61
+00007D FE0100           144         BR      _61
+000080                  145 _60:
+000080                  145 _60:
+000080                  146 _61:
+000080 910237           147         SUB.B   R0L,#037H
+000084                  149 _10:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000084 861rrr           151         MOV.B   R0H,_CharCnt
+000087 A6r1rr           152         ADDS.B  _CharCnt,#01H
+00008A 911501           153         AND.B   R0H,#01H
+00008D F204             154         BNE     _11
+00008F 860rrr           156         MOV.B   _RecByte,R0L
+                        157         BR      _56
+000092 D5011D          +157         JMP.L   _56
+000092 D5011D00        +157         JMP.L   _56
+000096                  158 _11:
+000096 861rrr           162         MOV.B   R0H,_RecByte
+000099 D114             163         ASL.B   R0H,#04H
+00009B 861rrr           164         MOV.B   _RecByte,R0H
+00009E 060rrr           166         ADD.B   _RecByte,R0L
+0000A1 862rrr           168         MOV.B   R1L,_RecByte
+0000A4 062rrr           169         ADD.B   _Checksum,R1L
+0000A7 96r4rr01         171         CMP.B   _State,#01H
+0000AB F31C             172         BEQ     _12
+0000AD 96r4rr02         173         CMP.B   _State,#02H
+0000B1 F321             174         BEQ     _13
+0000B3 96r4rr03         175         CMP.B   _State,#03H
+0000B7 F333             176         BEQ     _14
+0000B9 96r4rr04         177         CMP.B   _State,#04H
+                        178         BEQ     _25
+0000BD F202            +178 ;       BNE     _LG_34
+0000BF D5008E          +178 ;       JMP.L   _25
+0000BF D5008E          +178 ;       JMP.L   _25
+0000C2                 +178 _LG_34:
+0000C2 96r4rr06         179         CMP.B   _State,#06H
+                        180         BEQ     _30
+0000C6 F202            +180 ;       BNE     _LG_36
+0000C8 D500CD          +180 ;       JMP.L   _30
+0000C8 D500CD00        +180 ;       JMP.L   _30
+0000CC                 +180 _LG_36:
+0000CC 96r4rr05         181         CMP.B   _State,#05H
+                        182         BEQ     _31
+0000D0 F202            +182 ;       BNE     _LG_38
+0000D2 D500D9          +182 ;       JMP.L   _31
+0000D2 D500D900        +182 ;       JMP.L   _31
+0000D6                 +182 _LG_38:
+0000D6 96r4rr07         183         CMP.B   _State,#07H
+                        184         BEQ     _32
+0000DA F202            +184 ;       BNE     _LG_40
+0000DC D500F2          +184 ;       JMP.L   _32
+0000DC D500F200        +184 ;       JMP.L   _32
+0000E0                 +184 _LG_40:
+                        185         BR      _56
+0000E0 D500F6          +185         JMP.L   _56
+0000E4                  187 _12:
+0000E4 862rrr           188         MOV.B   _RecByte,R1L
+0000E7 97rrrrrr         190         MOV.B   _RecLength,_RecByte
+0000EB B6r0rr           192         MOV.B   _ByteCnt,#00H
+0000EE A6r1rr           194         ADDS.B  _State,#01H
+                        196         BR      _56
+0000F1 D500ED          +196         JMP.L   _56
+0000F4                  198 _13:
+0000F4 8E0rrr           200         MOV.W   R0,_RecWord
+0000F7 D908             202         ASL.W   R0,#08H
+0000F9 8E0rrr           203         MOV.W   _RecWord,R0
+0000FC 862rrr           205         MOV.B   _RecByte,R1L
+0000FF 860rrr           206         MOV.B   R0L,_RecByte
+000102 B110             207         MOVS.B  R0H,#00H
+000104 0E0rrr           208         ADD.W   _RecWord,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+000107 A6r1rr           210         ADDS.B  _ByteCnt,#01H
+00010A 96r4rr02         211         CMP.B   _ByteCnt,#02H
+                        212         BNE     _56
+00010E F302            +212 ;       BEQ     _LG_42
+000110 D500DE          +212 ;       JMP.L   _56
+000110 D500DE00        +212 ;       JMP.L   _56
+000114                 +212 _LG_42:
+000114 B6r0rr           214         MOV.B   _ByteCnt,#00H
+000117 A6r1rr           216         ADDS.B  _State,#01H
+                        218         BR      _56
+00011A D500D9          +218         JMP.L   _56
+00011E                  220 _14:
+00011E 862rrr           221         MOV.B   _RecByte,R1L
+000121 96r4rr00         223         CMP.B   _RecByte,#00H
+000125 F30B             224         BEQ     _15
+000127 96r4rr01         225         CMP.B   _RecByte,#01H
+00012B F335             226         BEQ     _18
+00012D 96r4rr04         227         CMP.B   _RecByte,#04H
+000131 F33B             228         BEQ     _20
+000133 96r4rr05         229         CMP.B   _RecByte,#05H
+000137 F344             230         BEQ     _22
+000139 FE4F             231         BR      _24
+00013C                  233 _15:
+00013C 9Er5rr0000       235         AND.W   _LoadAddress,#00H
+000141 9Er5rr000F       236         AND.W   _LoadAddress+2,#0FH
+000146 8E0rrr           238         MOV.W   R0,_RecWord
+000149 B910             239         MOVS.W  R1,#00H
+00014B 0E0rrr           240         ADD.W   _LoadAddress,R0
+00014E 1E1rrr           241         ADDC.W  _LoadAddress+2,R1
+000151 8E1rrr           243         MOV.W   R1,_LoadAddress+2
+000154 8E0rrr           244         MOV.W   R0,_LoadAddress
+000157 99050001         245         AND.W   R0,#01H
+00015B 99150000         246         AND.W   R1,#00H
+00015F 6910             247         OR.W    R1,R0
+000161 F314             248         BEQ     _16
+000163 9Er2rr0001       250         SUB.W   _LoadAddress,#01H
+000168 9Er3rr0000       251         SUBB.W  _LoadAddress+2,#00H
+00016D 8E1rrr           252         MOV.W   R1,_LoadAddress+2
+000170 8E0rrr           253         MOV.W   R0,_LoadAddress
+000173 8E1rrr           254         MOV.W   _LoadAddress+2,R1
+000176 8E0rrr           255         MOV.W   _LoadAddress,R0
+                        256         CALL    _flash_read_word
+000179 C4rrrrrr        +256 ;       FCALL   _flash_read_word
+00017D 990500FF         257         AND.W   R0,#0FFH
+000181 8E0rrr           258         MOV.W   _RecWord,R0
+000184 B6r1rr           260         MOV.B   _ByteCnt,#01H
+000187 FE04             262         BR      _17
+000187 FE0400           262         BR      _17
+00018A                  263 _16:
+00018A B6r0rr           265         MOV.B   _ByteCnt,#00H
+00018D BEr0rr           266         MOV.W   _RecWord,#00H
+00018D BEr0rr           266         MOV.W   _RecWord,#00H
+000190                  267 _17:
+000190 B6r4rr           269         MOV.B   _State,#04H
+                        271         BR      _56
+000193 D5009C          +271         JMP.L   _56
+000196                  273 _18:
+000196 860rrr           275         MOV.B   R0L,_RecLength
+000199 F204             276         BNE     _19
+00019B B6r7rr           278         MOV.B   _State,#07H
+                        279         BR      _56
+00019E D50097          +279         JMP.L   _56
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+00019E D5009700        +279         JMP.L   _56
+0001A2                  280 _19:
+0001A2 91A802           282         MOV.B   R5L,#02H
+                        286         BR      _56
+0001A5 D50093          +286         JMP.L   _56
+0001A8                  288 _20:
+0001A8 96r4rr02         290         CMP.B   _RecLength,#02H
+0001AC F206             291         BNE     _21
+0001AE B6r5rr           293         MOV.B   _State,#05H
+0001B1 B6r0rr           295         MOV.B   _ByteCnt,#00H
+0001B4 BEr0rr           296         MOV.W   _RecWord,#00H
+                        298         BR      _56
+0001B7 D5008A          +298         JMP.L   _56
+0001B7 D5008A          +298         JMP.L   _56
+0001BA                  299 _21:
+0001BA 91A802           301         MOV.B   R5L,#02H
+                        305         BR      _56
+0001BD D50087          +305         JMP.L   _56
+0001C0                  307 _22:
+0001C0 96r4rr02         309         CMP.B   _RecLength,#02H
+0001C4 F206             310         BNE     _23
+0001C6 97rrrrrr         312         MOV.B   _State,_Checksum
+0001CA B6r0rr           314         MOV.B   _ByteCnt,#00H
+0001CD BEr0rr           315         MOV.W   _RecWord,#00H
+0001D0 FE7E             317         BR      _56
+0001D0 FE7E             317         BR      _56
+0001D2                  318 _23:
+0001D2 91A802           320         MOV.B   R5L,#02H
+0001D5 FE7C             324         BR      _56
+0001D8                  326 _24:
+0001D8 91A803           328         MOV.B   R5L,#03H
+0001DB FE79             332         BR      _56
+0001DE                  334 _25:
+0001DE 860rrr           336         MOV.B   R0L,_ByteCnt
+0001E1 A101             337         ADDS.B  R0L,#01H
+0001E3 860rrr           338         MOV.B   _ByteCnt,R0L
+0001E6 96r4rr02         339         CMP.B   _ByteCnt,#02H
+0001EA F206             340         BNE     _26
+0001EC 860rrr           342         MOV.B   R0L,_RecByte
+0001EF B110             343         MOVS.B  R0H,#00H
+0001F1 D908             344         ASL.W   R0,#08H
+0001F3 0E0rrr           345         ADD.W   _RecWord,R0
+0001F6 FE04             346         BR      _27
+0001F6 FE04             346         BR      _27
+0001F8                  347 _26:
+0001F8 860rrr           349         MOV.B   R0L,_RecByte
+0001FB B110             350         MOVS.B  R0H,#00H
+0001FD 8E0rrr           351         MOV.W   _RecWord,R0
+0001FD 8E0rrr           351         MOV.W   _RecWord,R0
+000200                  352 _27:
+000200 A6rFrr           354         ADDS.B  _RecLength,#0FH
+000203 860rrr           355         MOV.B   R0L,_RecLength
+000206 F317             356         BEQ     _28
+000208 96r4rr02         358         CMP.B   _ByteCnt,#02H
+00020C F260             359         BNE     _56
+00020E 8E1rrr           361         MOV.W   R1,_LoadAddress+2
+000211 8E0rrr           362         MOV.W   R0,_LoadAddress
+000214 8E2rrr           363         MOV.W   R2,_RecWord
+                        364         CALL    _flash_write_word
+000217 C4rrrrrr        +364 ;       FCALL   _flash_write_word
+00021B 9Er0rr0002       366         ADD.W   _LoadAddress,#02H
+000220 9Er1rr0000       367         ADDC.W  _LoadAddress+2,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+000225 B6r0rr           369         MOV.B   _ByteCnt,#00H
+000228 BEr0rr           370         MOV.W   _RecWord,#00H
+00022B 860rrr           372         MOV.B   R0L,_RecLength
+00022E F24F             373         BNE     _56
+000230 B6r7rr           375         MOV.B   _State,#07H
+000233 FE4D             377         BR      _56
+000233 FE4D00           377         BR      _56
+000236                  378 _28:
+000236 96r4rr01         380         CMP.B   _ByteCnt,#01H
+00023A F20B             381         BNE     _29
+00023C 8E4rrr           383         MOV.W   R4,_RecWord
+00023F 8E1rrr           384         MOV.W   R1,_LoadAddress+2
+000242 8E0rrr           385         MOV.W   R0,_LoadAddress
+                        386         CALL    _flash_read_word
+000245 C4rrrrrr        +386 ;       FCALL   _flash_read_word
+000249 9905FF00         387         AND.W   R0,#0FF00H
+00024D 0940             388         ADD.W   R4,R0
+00024F 8E4rrr           389         MOV.W   _RecWord,R4
+00024F 8E4rrr           389         MOV.W   _RecWord,R4
+000252                  390 _29:
+000252 8E1rrr           392         MOV.W   R1,_LoadAddress+2
+000255 8E0rrr           393         MOV.W   R0,_LoadAddress
+000258 8E2rrr           394         MOV.W   R2,_RecWord
+                        395         CALL    _flash_write_word
+00025B C4rrrrrr        +395 ;       FCALL   _flash_write_word
+00025F B6r7rr           397         MOV.B   _State,#07H
+000262 FE35             399         BR      _56
+000264                  401 _30:
+000264 8E0rrr           403         MOV.W   R0,_RecWord
+000267 D908             404         ASL.W   R0,#08H
+000269 8E0rrr           405         MOV.W   _RecWord,R0
+00026C 860rrr           407         MOV.B   R0L,_RecByte
+00026F B110             408         MOVS.B  R0H,#00H
+000271 0E0rrr           409         ADD.W   _RecWord,R0
+000274 A6r1rr           411         ADDS.B  _ByteCnt,#01H
+000277 96r4rr02         412         CMP.B   _ByteCnt,#02H
+00027B F229             413         BNE     _56
+00027D B6r0rr           415         MOV.B   _ByteCnt,#00H
+000280 B6r7rr           417         MOV.B   _State,#07H
+000283 FE25             419         BR      _56
+000286                  421 _31:
+000286 8E0rrr           423         MOV.W   R0,_RecWord
+000289 D908             424         ASL.W   R0,#08H
+00028B 8E0rrr           425         MOV.W   _RecWord,R0
+00028E 860rrr           427         MOV.B   R0L,_RecByte
+000291 B110             428         MOVS.B  R0H,#00H
+000293 0E0rrr           429         ADD.W   _RecWord,R0
+000296 A6r1rr           431         ADDS.B  _ByteCnt,#01H
+000299 96r4rr02         432         CMP.B   _ByteCnt,#02H
+00029D F218             433         BNE     _56
+00029F 9Er5rr0000       435         AND.W   _LoadAddress+2,#00H
+0002A4 8E0rrr           437         MOV.W   R0,_RecWord
+0002A7 B910             438         MOVS.W  R1,#00H
+0002A9 DD10             439         ASL.D   R0,#010H
+0002AB 99050000         440         AND.W   R0,#00H
+0002AF 9915000F         441         AND.W   R1,#0FH
+0002B3 0E0rrr           442         ADD.W   _LoadAddress,R0
+0002B6 1E1rrr           443         ADDC.W  _LoadAddress+2,R1
+0002B9 B6r0rr           445         MOV.B   _ByteCnt,#00H
+0002BC B6r7rr           447         MOV.B   _State,#07H
+0002BF FE07             449         BR      _56
+0002C2                  451 _32:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+0002C2 B6r0rr           453         MOV.B   _State,#00H
+0002C5 860rrr           455         MOV.B   R0L,_Checksum
+0002C8 F302             456         BEQ     _56
+0002CA 91A804           458         MOV.B   R5L,#04H
+0002CE                  462 _56:
+0002CE 810A             464         MOV.B   R0L,R5L
+0002D0 61AA             465         OR.B    R5L,R5L
+0002D2 F302             468         BEQ     _57
+0002D4 B6r0rr           470         MOV.B   _State,#00H
+0002D4 B6r0rr00         470         MOV.B   _State,#00H
+0002D8                  471 _57:
+0002D8                  473 _58:
+0002D8 2F30             474         POP.W   R4, R5
+0002DA D680             476         RET
+000000                  482 LOADER_CLR_NE@DS        SEGMENT DATA JOIN CLEAR
+000000                  483         RSEG    LOADER_CLR_NE@DS
+000000 RESERVED         484 _RecLength:     DS      1
+000000
+000001 RESERVED         486 _ByteCnt:       DS      1
+000001
+000002 RESERVED         488 _Checksum:      DS      1
+000002
+                        491         EXTRN   HCODE(_flash_read_word)
+000003 RESERVED         493 _CharCnt:       DS      1
+000003
+                        495         ALIGN   1
+000004                  496 _LoadAddress:   DS      4
+   |  RESERVED             
+000007
+000008 RESERVED         498 _RecByte:       DS      1
+000008
+                        501         EXTRN   HCODE(_flash_write_word)
+000009 RESERVED         503         ALIGN   1
+000009
+00000A                  504 _RecWord:       DS      2
+   |  RESERVED             
+00000B
+00000C RESERVED         506 _State: DS      1
+00000C
+                        507         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        508         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        509         CALLS   'IntelLoader', 'flash_read_word'
+                        510         CALLS   'IntelLoader', 'flash_write_word'
+                        511         CALLS   'IntelLoader', 'flash_read_word'
+                        512         CALLS   'IntelLoader', 'flash_write_word'

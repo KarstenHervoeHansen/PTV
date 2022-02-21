@@ -1,0 +1,212 @@
+@REM This file has been converted using KONV1125.
+@REM This file has been converted using KONV1125.
+ECHO OFF
+REM Generating the corner circles for the Philips test pattern.
+REM PM5655 NTSC
+REM -----------------------------------------------------------
+REM
+REM Author:         J›rgen parbst
+REM
+REM First created:  01/01/95
+REM
+REM -----------------------------------------------------------
+
+IF "%1"=="" GOTO LABEL1
+SET C= %1
+:LABEL1
+IF "%2"=="" GOTO LABEL2
+SET C=%C% %2
+:LABEL2
+
+
+
+ECHO Generating picture in upper left corner !
+ECHO -----------------------------------------
+ECHO.
+
+ ECHO Adding wedges !
+ ECHO.
+  square FL=38.0 LL=144.0 FS=169.714 LS=264.000 A1=0%C%
+  hwedge CY=91.5 FS=173.985 LS=216.032 FVR=100 LVR=300 WOW=5 A1=700%C%
+  hwedge CY=91.5 FS=216.032 LS=258.079 FVR=400 LVR=200 WOW=7 A1=700%C%
+  vwedge CX=216.032 FL=40.5 LL=91.5 FHR=100 LHR=300 WOW=5 A1=700%C%
+  vwedge CX=216.032 FL=91.5 LL=142.5 FHR=400 LHR=200 WOW=7 A1=700%C%
+  ocircle CX=216.032 CY=91.5 FL=38.0 LL=144.0 FS=169.714 LS=264.000 RAD=51.000 A1=336%C%
+  icircle CX=216.032 CY=91.5 RAD=17.000 A1=0%C%
+
+ ECHO Adding circle markers !
+ ECHO.
+  circle CX=216.032 CY=91.5 W=210 RAD=28.333 FA=288.899 LA=341.101 A1=700%C%
+  circle CX=216.032 CY=91.5 W=210 RAD=39.667 FA=106.997 LA=163.003 A1=700%C%
+
+ ECHO Adding dot markers !
+ ECHO.
+  line FL=51.0 LL=52.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=63.0 LL=64.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=119.0 LL=120.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=131.0 LL=132.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=183.329 LS=183.329 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=192.673 LS=192.673 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=239.391 LS=239.391 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=248.735 LS=248.735 W=200 A1=0%C%
+
+ ECHO Adding numbers !
+ ECHO.
+  square FL=60.0 LL=71.0 FS=184.800 LS=198.943 A1=0 FR=200 LR=200%C%
+  number CX=188.571 CY=66.0 W=180 NC=1 A1=700%C%
+  number CX=196.114 CY=66.0 W=180 NC=5 A1=700%C%
+  square FL=106.0 LL=117.0 FS=226.286 LS=241.371 A1=0 FR=200 LR=200%C%
+  number CX=231.000 CY=111.5 W=180 NC=3 A1=700%C%
+  number CX=238.543 CY=111.5 W=180 NC=0 A1=700%C%
+
+ ECHO Adding circles !
+ ECHO.
+  circle CX=216.032 CY=91.5 W=200 RAD=51.000 A1=700%C%
+  circle CX=216.032 CY=91.5 W=118.306 RAD=9.240 A1=700%C%
+  circle CX=216.032 CY=91.5 W=118.306 RAD=13.120 A1=700%C%
+  circle CX=216.032 CY=91.5 W=118.306 RAD=17.000 A1=700%C%
+
+
+
+ECHO Generating picture in upper right corner !
+ECHO ------------------------------------------
+ECHO.
+
+ ECHO Adding wedges !
+ ECHO.
+  square FL=38.0 LL=144.0 FS=702.429 LS=796.714 A1=0%C%
+  hwedge CY=91.5 FS=706.578 LS=748.624 FVR=200 LVR=400 WOW=7 A1=700%C%
+  hwedge CY=91.5 FS=748.624 LS=790.671 FVR=300 LVR=100 WOW=5 A1=700%C%
+  vwedge CX=748.624 FL=40.5 LL=91.5 FHR=100 LHR=300 WOW=5 A1=700%C%
+  vwedge CX=748.624 FL=91.5 LL=142.5 FHR=400 LHR=200 WOW=7 A1=700%C%
+  ocircle CX=748.624 CY=91.5 FL=38.0 LL=144.0 FS=702.429 LS=796.714 RAD=51.000 A1=336%C%
+  icircle CX=748.624 CY=91.5 RAD=17.000 A1=0%C%
+
+ ECHO Adding circle markers !
+ ECHO.
+  circle CX=748.624 CY=91.5 W=210 RAD=39.667 FA=16.997 LA=73.003 A1=700%C%
+  circle CX=748.624 CY=91.5 W=210 RAD=28.333 FA=198.899 LA=251.101 A1=700%C%
+
+ ECHO Adding dot markers !
+ ECHO.
+  line FL=51.0 LL=52.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=63.0 LL=64.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=119.0 LL=120.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=131.0 LL=132.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=715.921 LS=715.921 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=725.265 LS=725.265 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=771.984 LS=771.984 W=200 A1=0%C%
+  line FL=90.0 LL=93.0 FS=781.327 LS=781.327 W=200 A1=0%C%
+
+ ECHO Adding numbers !
+ ECHO.
+ square FL=60.0 LL=71.0 FS=763.243 LS=776.443 A1=0 FR=200 LR=200%C%
+ number CX=766.072 CY=66.0 W=180 NC=1 A1=700%C%
+ number CX=773.614 CY=66.0 W=180 NC=5 A1=700%C%
+ square FL=106.0 LL=117.0 FS=723.172 LS=738.257 A1=0 FR=200 LR=200%C%
+ number CX=726.943 CY=111.5 W=180 NC=3 A1=700%C%
+ number CX=734.486 CY=111.5 W=180 NC=0 A1=700%C%
+
+ ECHO Adding circles !
+ ECHO.
+  circle CX=748.624 CY=91.5 W=200 RAD=51.000 A1=700%C%
+  circle CX=748.624 CY=91.5 W=118.306 RAD=9.240 A1=700%C%
+  circle CX=748.624 CY=91.5 W=118.306 RAD=13.120 A1=700%C%
+  circle CX=748.624 CY=91.5 W=118.306 RAD=17.000 A1=700%C%
+
+
+ECHO Generating picture in lower left corner !
+ECHO -----------------------------------------
+ECHO.
+
+ ECHO Adding wedges !
+ ECHO.
+  square FL=344.0 LL=450.0 FS=169.714 LS=264.000 A1=0%C%
+  hwedge CY=397.5 FS=173.985 LS=216.032 FVR=100 LVR=300 WOW=5 A1=700%C%
+  hwedge CY=397.5 FS=216.032 LS=258.079 FVR=400 LVR=200 WOW=7 A1=700%C%
+  vwedge CX=216.032 FL=346.5 LL=397.5 FHR=200 LHR=400 WOW=7 A1=700%C%
+  vwedge CX=216.032 FL=397.5 LL=448.5 FHR=300 LHR=100 WOW=5 A1=700%C%
+  ocircle CX=216.032 CY=397.5 FL=344.0 LL=450.0 FS=169.714 LS=264.000 RAD=51.000 A1=336%C%
+  icircle CX=216.032 CY=397.5 RAD=17.000 A1=0%C%
+
+ ECHO Adding circle markers !
+ ECHO.
+  circle CX=216.032 CY=397.5 W=210 RAD=39.667 FA=196.997 LA=253.003 A1=700%C%
+  circle CX=216.032 CY=397.5 W=210 RAD=28.333 FA=18.899 LA=71.101 A1=700%C%
+
+ ECHO Adding dot markers !
+ ECHO.
+  line FL=357.0 LL=358.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=369.0 LL=370.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=425.0 LL=426.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=437.0 LL=438.0 FS=216.032 LS=216.032 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=183.329 LS=183.329 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=192.673 LS=192.673 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=239.391 LS=239.391 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=248.735 LS=248.735 W=200 A1=0%C%
+
+ ECHO Adding numbers !
+ ECHO.
+  square FL=420.0 LL=431.0 FS=185.271 LS=199.886 A1=0 FR=200 LR=200%C%
+  number CX=188.571 CY=425.5 W=180 NC=1 A1=700%C%
+  number CX=196.114 CY=425.5 W=180 NC=5 A1=700%C%
+  square FL=372.0 LL=383.0 FS=226.757 LS=239.957 A1=0 FR=200 LR=200%C%
+  number CX=231.000 CY=377.5 W=180 NC=3 A1=700%C%
+  number CX=238.543 CY=377.5 W=180 NC=0 A1=700%C%
+
+ ECHO Adding circles !
+ ECHO.
+  circle CX=216.032 CY=397.5 W=200 RAD=51.000 A1=700%C%
+  circle CX=216.032 CY=397.5 W=118.306 RAD=9.240 A1=700%C%
+  circle CX=216.032 CY=397.5 W=118.306 RAD=13.120 A1=700%C%
+  circle CX=216.032 CY=397.5 W=118.306 RAD=17.000 A1=700%C%
+
+
+
+ECHO Generating picture in lower right corner !
+ECHO ------------------------------------------
+ECHO.
+
+ ECHO Adding wedges !
+ ECHO.
+  square FL=344.0 LL=450.0 FS=702.429 LS=796.714 A1=0%C%
+  hwedge CY=397.5 FS=706.578 LS=748.624 FVR=200 LVR=400 WOW=7 A1=700%C%
+  hwedge CY=397.5 FS=748.624 LS=790.671 FVR=300 LVR=100 WOW=5 A1=700%C%
+  vwedge CX=748.624 FL=346.5 LL=397.5 FHR=200 LHR=400 WOW=7 A1=700%C%
+  vwedge CX=748.624 FL=397.5 LL=448.5 FHR=300 LHR=100 WOW=5 A1=700%C%
+  ocircle CX=748.624 CY=397.5 FL=344.0 LL=450.0 FS=702.429 LS=796.714 RAD=51.000 A1=336%C%
+  icircle CX=748.624 CY=397.5 RAD=17.000 A1=0%C%
+
+ ECHO Adding circle markers !
+ ECHO.
+  circle CX=748.624 CY=397.5 W=210 RAD=39.667 FA=286.997 LA=343.003 A1=700%C%
+  circle CX=748.624 CY=397.5 W=210 RAD=28.333 FA=108.899 LA=161.101 A1=700%C%
+
+ ECHO Adding dot markers !
+ ECHO.
+  line FL=357.0 LL=358.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=369.0 LL=370.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=425.0 LL=426.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=437.0 LL=438.0 FS=748.624 LS=748.624 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=715.921 LS=715.921 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=725.265 LS=725.265 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=771.984 LS=771.984 W=200 A1=0%C%
+  line FL=396.0 LL=399.0 FS=781.327 LS=781.327 W=200 A1=0%C%
+
+ ECHO Adding numbers !
+ ECHO.
+  square FL=420.0 LL=431.0 FS=763.243 LS=776.443 A1=0 FR=200 LR=200%C%
+  number CX=766.072 CY=425.5 W=180 NC=1 A1=700%C%
+  number CX=773.614 CY=425.5 W=180 NC=5 A1=700%C%
+  square FL=372.0 LL=383.0 FS=723.643 LS=738.257 A1=0 FR=200 LR=200%C%
+  number CX=726.943 CY=377.5 W=180 NC=3 A1=700%C%
+  number CX=734.486 CY=377.5 W=180 NC=0 A1=700%C%
+
+ ECHO Adding circles !
+ ECHO.
+  circle CX=748.624 CY=397.5 W=200 RAD=51.000 A1=700%C%
+  circle CX=748.624 CY=397.5 W=118.306 RAD=9.240 A1=700%C%
+  circle CX=748.624 CY=397.5 W=118.306 RAD=13.120 A1=700%C%
+  circle CX=748.624 CY=397.5 W=118.306 RAD=17.000 A1=700%C%
+                                                               	
+

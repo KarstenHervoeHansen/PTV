@@ -1,0 +1,54 @@
+%
+Title           PT5220 PPS PHASE DETEKTOR
+Pattern          
+Revision        0
+Author          SNJ
+Company         PTV
+Date            990416
+%
+
+TITLE "PPSPHD00";
+
+constant cmax = 1729;
+
+SUBDESIGN PPSPHD00
+(	
+
+CLOCK			:	INPUT;
+PPS				:	INPUT;
+PPS_HREF		:	INPUT;
+COUNT[7..0]		:	OUTPUT;
+	
+)
+	
+VARIABLE
+
+PPS_D1		:	DFF;
+PPS_D2		:	DFF;
+FLAG		:	DFF;
+STOP		:	DFF;
+COUNT[7..0]	:	DFF;
+
+BEGIN
+
+PPS_D[2..1].clk=clock;
+FLAG.clk=clock;
+STOP.clk=CLOCK;
+COUNT[].clk=CLOCK;
+
+
+PPS_D1=PPS;
+PPS_D2=PPS_D1;
+FLAG= PPS_D1 & !PPS_D2;
+STOP= !FLAG & (STOP # PPS_HREF # ( COUNT[]==254 ) ); 
+
+IF FLAG THEN
+  COUNT[]=0;
+ELSIF STOP  THEN
+  COUNT[]=COUNT[];
+ELSE
+  COUNT[]=COUNT[]+1;
+END IF; 
+
+END;
+

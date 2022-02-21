@@ -1,0 +1,32 @@
+SUBDESIGN klikcnt
+(
+	clk1,clk,ad1,ad0,syssel:	INPUT;
+	klik1,klik2ud:				OUTPUT;
+)
+VARIABLE
+	d[4..0]:                	DFF;
+	klik1,klik2:				DFFE;
+
+BEGIN
+	klik1.clk	= clk1;   %klik-afkoder EBU klik%
+	klik1.clrn	= !((d[]==19 & !syssel) # (d[]==20 & syssel));
+	klik1.ena	= ((d[]==12) & (ad0 # ad1));
+	klik1.d		= VCC;
+
+	klik2.clk	= clk1;   %klik-afkoder BBC-klik%
+	klik2.clrn	= !((d[]==6 & !syssel) # (d[]==4 & syssel));
+	klik2.ena	= ((d[]==19 & !syssel # d[]==20 & syssel)
+				  & (ad0 & !ad1));
+	klik2.d		= VCC;
+
+	klik2ud     = klik1 & (!ad0 & ad1) # klik2 & (ad0 & !ad1);
+
+	d[].clk		= clk;    %Field-tæller%
+
+	IF (d[].q==24 & !syssel) # (d[].q==29 & syssel) THEN
+	  d[].d  =0;
+	 ELSE
+	  d[].d	 = d[].q+1;
+	END IF;
+END;
+

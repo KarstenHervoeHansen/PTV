@@ -1,0 +1,416 @@
+
+	@ECHO OFF
+	REM Generating FUBK 16x9 test pattern for the PT5210-30 PAL-G version
+	REM ------------------------------------------------------------
+	REM
+	REM Author:         J›rgen Parbst
+	REM
+	REM First created:  06/09/93
+	REM
+	REM New update:     13/01/94  Adding pattern.
+	REM New update:     07/04/94  flyter pattern 4 linjer op.
+	REM New update:     07/10/97  CBAR er flyttet 1 sampel.
+	REM update	:   98/01/26. ’ndret sample freq. 13.5 MHz
+	REM
+	REM ------------------------------------------------------------
+
+	IF "%1"=="" GOTO LABEL1
+	SET C= %1
+	:LABEL1
+	IF "%2"=="" GOTO LABEL2
+	SET C=%C% %2
+	:LABEL2
+
+
+	CLS
+	 ECHO --- FUBK 16x9 TEST PATTERN ---
+	 ECHO --- Processing line %1 to %2 ---
+	 ECHO.
+
+	 ECHO Listing lines !
+	 ECHO.
+	 REM ---------------------------------------------------------------
+	 REM ------------------------ FIELD 1 AND 2 ------------------------
+	 REM ---------------------------------------------------------------
+	 REM Number  1 is line  23 field 1 (half line).
+	 REM Number  2 is line 336 field 2 of active picture.
+	 REM Number  3 is line  24 field 1 of active picture.
+	 REM Number  4 is line 337 field 2 of active picture.
+	 REM Number  5 is line  25 field 1 of active picture.
+	 REM          .
+	 REM          .
+	 REM          .
+	 REM Number  572 is line 621 field 2 of active picture.
+	 REM Number  573 is line 309 field 1 of active picture.
+	 REM Number  574 is line 622 field 2 of active picture (no burst).
+	 REM Number  575 is line 310 field 1 of active picture (no burst).
+	 REM Number  576 is line 623 field 2 (half line).
+	 REM ---------------------------------------------------------------
+	 REM ------------------------ FIELD 3 AND 4 ------------------------
+	 REM ---------------------------------------------------------------
+	 REM Number  577 is line  23 field 1 (half line).
+	 REM Number  578 is line 336 field 2 of active picture.
+	 REM Number  579 is line  24 field 1 of active picture.
+	 REM Number  580 is line 337 field 2 of active picture.
+	 REM Number  581 is line  25 field 1 of active picture.
+	 REM ---------------------------------------------------------------
+
+
+
+ ECHO --- INITIALIZING BUFFERS ---
+ ECHO.
+ ECHO Storing aspect ratio !
+ ECHO.
+  dataset AspectRatio=1.7777777777777778
+ ECHO.
+ ECHO Erasing buffer files !
+ ECHO.
+  square FL=1.0 LL=576.0 FS=1.000 LS=1024.000 A1=0 A2=0 A3=0%C%
+
+ ECHO Adding background !
+ ECHO.
+  square FL=1.0 LL=576.0 FS=141.750 LS=843.750 A1=175 FR=200 LR=200%C%
+
+ ECHO Adding date-box background !
+ ECHO.
+  square FL=489 LL=526 FS=199.741 LS=346.246 A1=35.16 FR=0 LR=0%C%
+  square FL=489 LL=526 FS=639.255 LS=785.759 A1=35.16 FR=0 LR=0%C%
+
+ ECHO Adding horizontal grid !
+ ECHO.
+  square FL=7.0 LL=8.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=47.0 LL=48.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=87.0 LL=88.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=127.0 LL=128.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=167.0 LL=168.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=207.0 LL=208.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=247.0 LL=248.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=287.0 LL=288.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=327.0 LL=328.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=367.0 LL=368.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=407.0 LL=408.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=447.0 LL=448.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=487.0 LL=488.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=527.0 LL=528.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=567.0 LL=568.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+
+ ECHO Adding vertical grid !
+ ECHO.
+  pulse FL=2.0 LL=576.0 CX=163.115 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=199.741 W=200 A1=700%C%
+  pulse FL=2.0 LL=486.0 CX=236.368 W=200 A1=700%C%
+  pulse FL=529.0 LL=576.0 CX=236.368 W=200 A1=700%C%
+  pulse FL=2.0 LL=486.0 CX=309.626 W=200 A1=700%C%
+  pulse FL=529.0 LL=576.0 CX=309.626 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=346.246 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=382.872 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=419.498 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=456.124 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=492.750 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=529.376 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=566.002 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=602.628 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=639.255 W=200 A1=700%C%
+  pulse FL=1.0 LL=486.0 CX=675.881 W=200 A1=700%C%
+  pulse FL=529.0 LL=575.0 CX=675.881 W=200 A1=700%C%
+  pulse FL=1.0 LL=486.0 CX=749.133 W=200 A1=700%C%
+  pulse FL=529.0 LL=575.0 CX=749.133 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=785.759 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=822.385 W=200 A1=700%C%
+
+ ECHO Adding colour bar block !
+ ECHO.
+  square FL=89.0 LL=207.0 FS=273 LS=331.137 A1=525%C%
+  square FL=89.0 LL=207.0 FS=327.933 LS=384.423 A1=464.800 FR=200%C%
+  square FL=89.0 LL=207.0 FS=327.933 LS=384.423 A2=-229.264 A3=52.508 FR=275%C%
+  square FL=89.0 LL=207.0 FS=382.872 LS=441.515 A1=368.200 FR=200%C%
+  square FL=89.0 LL=207.0 FS=382.872 LS=441.515 A2=77.457 A3=-322.632 FR=275%C%
+  square FL=89.0 LL=207.0 FS=437.811 LS=494.802 A1=308 FR=200%C%
+  square FL=89.0 LL=207.0 FS=437.811 LS=494.802 A2=-151.757 A3=-270.429 FR=275%C%
+  square FL=89.0 LL=207.0 FS=492.750 LS=551.894 A1=216.300 FR=200%C%
+  square FL=89.0 LL=207.0 FS=492.750 LS=551.894 A2=151.757 A3=270.429 FR=275%C%
+  square FL=89.0 LL=207.0 FS=547.689 LS=605.181 A1=156.800 FR=200%C%
+  square FL=89.0 LL=207.0 FS=547.689 LS=605.181 A2=-77.457 A3=322.632 FR=275%C%
+  square FL=89.0 LL=207.0 FS=602.629 LS=662.273 A1=59.850 FR=200%C%
+  square FL=89.0 LL=207.0 FS=602.629 LS=662.273 A2=229.264 A3=-52.508 FR=275%C%
+  square FL=89.0 LL=207.0 FS=657.568 LS=712 A1=0 FR=200%C%
+  square FL=89.0 LL=207.0 FS=657.568 LS=712 A2=0 A3=0 FR=275 LR=275%C%
+
+ ECHO Adding grey scale block !
+ ECHO.
+  square FL=208.0 LL=286.0 FS=273 LS=365.392 A1=0%C%
+  square FL=208.0 LL=286.0 FS=360.896 LS=452.934 A1=175 FR=200%C%
+  square FL=208.0 LL=286.0 FS=448.799 LS=540.476 A1=350 FR=200%C%
+  square FL=208.0 LL=286.0 FS=536.701 LS=628.018 A1=525 FR=200%C%
+  square FL=208.0 LL=286.0 FS=624.604 LS=712 A1=700 FR=200%C%
+
+ ECHO Adding hvid/sort/hvid block !
+ ECHO.
+  square FL=289.0 LL=327.0 FS=273 LS=365.392 A1=700%C%
+  square FL=289.0 LL=327.0 FS=360.896 LS=628.018 A1=0 FR=200%C%
+  square FL=289.0 LL=327.0 FS=624.604 LS=712 A1=700 FR=200%C%
+
+ ECHO Adding multi burst block !
+ ECHO.
+  square FL=328.0 LL=367.0 FS=273 LS=327.330 A1=700%C%
+  square FL=328.0 LL=367.0 FS=325.644 LS=712 A1=350 FR=200%C%
+  hsweep FL=328.0 LL=367.0 FS=335.093 LS=402.594 FF=1 LF=1 A1=350 FR=200 LR=200%C%
+  hsweep FL=328.0 LL=367.0 FS=412.044 LS=479.544 FF=2 LF=2 A1=350 FR=200 LR=200%C%
+  hsweep FL=328.0 LL=367.0 FS=506.543 LS=574.044 FF=3 LF=3 A1=350 FR=200 LR=200%C%
+  square FL=328.0 LL=367.0 FS=583.493 LS=692.257 A1=350 FR=200 LR=200%C%
+  square FL=328.0 LL=367.0 FS=583.493 LS=692.257 A2=-289.821 A3=196.224 FR=275 LR=275%C%
+
+ ECHO Adding center krys !
+ ECHO.
+  pulse FL=208.0 LL=368.0 CX=492.750 W=200 A1=700%C%
+
+ ECHO Adding hvid block !
+ ECHO.
+  square FL=368.0 LL=407.0 FS=273 LS=712 A1=700%C%
+
+ ECHO Adding trapez !
+ ECHO.
+  trapez FL=368.0 LL=407.0 TFS=486 TLS=499.500 BFS=486 BLS=488.700 A1=0 FR=200 LR=180%C%
+
+ ECHO Adding antipal field 1/2 !
+ ECHO.
+  square FL=408.0 LL=486.0 FS=566.002 LS=712 A1=262.5%C%
+  square FL=408.0 LL=408.0 FS=566.002 LS=639.255 A2=0 A3=262.5%C%
+  squarehl FL=409.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=262.5%C%
+  squarehl FL=410.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=-262.5%C%
+  squarehl FL=411.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=-262.5%C%
+  squarehl FL=412.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=262.5%C%
+  square FL=408.0 LL=408.0 FS=639.255 LS=712 A2=-262.5 A3=0%C%
+  squarehl FL=409.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=-262.5 A3=0%C%
+  squarehl FL=410.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=262.5 A3=0%C%
+  squarehl FL=411.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=262.5 A3=0%C%
+  squarehl FL=412.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=-262.5 A3=0%C%
+
+ ECHO Adding chroma rampe +-BAV !
+ ECHO.
+  square FL=408.0 LL=448.0 FS=273 LS=346.246 A1=262.5%C%
+  square FL=408.0 LL=448.0 FS=273 LS=346.246 A3=262.5 FR=275%C%
+  hramp FL=408.0 LL=448.0 FS=346.246 LS=566.002 FA1=262.5 LA1=0 FR=200%C%
+  hramp FL=408.0 LL=448.0 FS=346.246 LS=566.002 FA3=262.5 LA3=0 FR=275%C%
+
+ ECHO Adding chroma rampe +BAU !
+ ECHO.
+  square FL=449.0 LL=486.0 FS=273 LS=346.246 A1=262.5%C%
+  square FL=449.0 LL=486.0 FS=273 LS=346.246 A2=262.5 FR=275%C%
+  hramp FL=449.0 LL=486.0 FS=346.246 LS=566.002 FA1=262.5 LA1=0 FR=200%C%
+  hramp FL=449.0 LL=486.0 FS=346.246 LS=566.002 FA2=262.5 LA2=0 FR=275%C%
+  pulse FL=408.0 LL=486.0 CX=566.002 W=200 A1=0%C%
+  pulse FL=408.0 LL=486.0 CX=566.002 W=275 A2=0 A3=0%C%
+  pulse FL=408.0 LL=486.0 CX=639.255 W=200 A1=0%C%
+  pulse FL=408.0 LL=486.0 CX=639.255 W=275 A2=0 A3=0%C%
+  pulse FL=2.0 LL=486.0 CX=272.994 W=200 A1=700%C%
+  pulse FL=529.0 LL=576.0 CX=272.994 W=200 A1=700%C%
+  pulse FL=2.0 LL=486.0 CX=272.994 W=275 A2=0 A3=0%C%
+  pulse FL=529.0 LL=576.0 CX=272.994 W=275 A2=0 A3=0%C%
+  pulse FL=2.0 LL=486.0 CX=712.507 W=200 A1=700%C%
+  pulse FL=529.0 LL=575.0 CX=712.507 W=200 A1=700%C%
+  pulse FL=1.0 LL=486.0 CX=712.507 W=275 A2=0 A3=0%C%
+  pulse FL=529.0 LL=575.0 CX=712.507 W=275 A2=0 A3=0%C%
+
+ ECHO Adding cirkel !
+ ECHO.
+  circle CX=492.750 CY=287.5 RAD=268.000 W=200 A1=700%C%
+  circle CX=492.750 CY=287.5 RAD=268.000 W=200 A2=0%C%
+  circle CX=492.750 CY=287.5 RAD=268.000 W=200 A3=0%C%
+
+ ECHO Adding flanke !
+ ECHO.
+  flank FL=1.0 LL=1.0 FS=137.944 LS=572.4 LR=200 C1=1%C%
+  flank FL=1.0 LL=1.0 FS=137.944 LS=572.4 LR=200 C2=1 C3=1%C%
+  flank FL=576.0 LL=576.0 FS=409.725 LS=847.556 FR=200 C1=1%C%
+  flank FL=576.0 LL=576.0 FS=409.725 LS=847.556 FR=200 C2=1 C3=1%C%
+
+
+ ECHO --- STORING FIELD 1 AND 2 ---
+ ECHO.
+ ECHO Storing buffers in channels !
+ ECHO.
+  convert FL=1.0 LL=576.0 FS=1.000 LS=1024.000 C=1%C%
+  convert FL=1.0 LL=576.0 FS=1.000 LS=1024.000 C=2%C%
+  convert FL=1.0 LL=576.0 FS=1.000 LS=1024.000 C=3%C%
+
+
+ ECHO --- GENERATING ELEMENTS FOR FIELD 3 AND 4 ---
+ ECHO.
+
+
+ ECHO.
+ ECHO Erasing buffer files !
+ ECHO.
+  square FL=1.0 LL=576.0 FS=1.000 LS=1024.000 A1=0 A2=0 A3=0%C%
+
+
+ ECHO Adding background !
+ ECHO.
+  square FL=1.0 LL=576.0 FS=141.750 LS=843.750 A1=175 FR=200 LR=200%C%
+
+ ECHO Adding date-box background !
+ ECHO.
+  square FL=489 LL=526 FS=199.741 LS=346.246 A1=35.16 FR=0 LR=0%C%
+  square FL=489 LL=526 FS=639.255 LS=785.759 A1=35.16 FR=0 LR=0%C%
+
+
+ ECHO Adding horizontal grid !
+ ECHO.
+  square FL=7.0 LL=8.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=47.0 LL=48.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=87.0 LL=88.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=127.0 LL=128.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=167.0 LL=168.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=207.0 LL=208.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=247.0 LL=248.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=287.0 LL=288.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=327.0 LL=328.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=367.0 LL=368.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=407.0 LL=408.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=447.0 LL=448.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=487.0 LL=488.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=527.0 LL=528.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+  square FL=567.0 LL=568.0 FS=141.750 LS=843.750 A1=700 FR=200 LR=200%C%
+
+ ECHO Adding vertical grid !
+ ECHO.
+  pulse FL=2.0 LL=576.0 CX=163.115 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=199.741 W=200 A1=700%C%
+  pulse FL=2.0 LL=486.0 CX=236.368 W=200 A1=700%C%
+  pulse FL=529.0 LL=576.0 CX=236.368 W=200 A1=700%C%
+  pulse FL=2.0 LL=486.0 CX=309.626 W=200 A1=700%C%
+  pulse FL=529.0 LL=576.0 CX=309.626 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=346.246 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=382.872 W=200 A1=700%C%
+  pulse FL=2.0 LL=576.0 CX=419.498 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=456.124 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=492.750 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=529.376 W=200 A1=700%C%
+  pulse FL=2.0 LL=575.0 CX=566.002 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=602.628 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=639.255 W=200 A1=700%C%
+  pulse FL=1.0 LL=486.0 CX=675.881 W=200 A1=700%C%
+  pulse FL=529.0 LL=575.0 CX=675.881 W=200 A1=700%C%
+  pulse FL=1.0 LL=486.0 CX=749.133 W=200 A1=700%C%
+  pulse FL=529.0 LL=575.0 CX=749.133 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=785.759 W=200 A1=700%C%
+  pulse FL=1.0 LL=575.0 CX=822.385 W=200 A1=700%C%
+
+ ECHO Adding colour bar block !
+ ECHO.
+  square FL=89.0 LL=207.0 FS=273 LS=331.137 A1=525%C%
+  square FL=89.0 LL=207.0 FS=327.933 LS=384.423 A1=464.800 FR=200%C%
+  square FL=89.0 LL=207.0 FS=327.933 LS=384.423 A2=-229.264 A3=52.508 FR=275%C%
+  square FL=89.0 LL=207.0 FS=382.872 LS=441.515 A1=368.200 FR=200%C%
+  square FL=89.0 LL=207.0 FS=382.872 LS=441.515 A2=77.457 A3=-322.632 FR=275%C%
+  square FL=89.0 LL=207.0 FS=437.811 LS=494.802 A1=308 FR=200%C%
+  square FL=89.0 LL=207.0 FS=437.811 LS=494.802 A2=-151.757 A3=-270.429 FR=275%C%
+  square FL=89.0 LL=207.0 FS=492.750 LS=551.894 A1=216.300 FR=200%C%
+  square FL=89.0 LL=207.0 FS=492.750 LS=551.894 A2=151.757 A3=270.429 FR=275%C%
+  square FL=89.0 LL=207.0 FS=547.689 LS=605.181 A1=156.800 FR=200%C%
+  square FL=89.0 LL=207.0 FS=547.689 LS=605.181 A2=-77.457 A3=322.632 FR=275%C%
+  square FL=89.0 LL=207.0 FS=602.629 LS=662.273 A1=59.850 FR=200%C%
+  square FL=89.0 LL=207.0 FS=602.629 LS=662.273 A2=229.264 A3=-52.508 FR=275%C%
+  square FL=89.0 LL=207.0 FS=657.568 LS=712 A1=0 FR=200%C%
+  square FL=89.0 LL=207.0 FS=657.568 LS=712 A2=0 A3=0 FR=275 LR=275%C%
+
+ ECHO Adding grey scale block !
+ ECHO.
+  square FL=208.0 LL=286.0 FS=273 LS=365.392 A1=0%C%
+  square FL=208.0 LL=286.0 FS=360.896 LS=452.934 A1=175 FR=200%C%
+  square FL=208.0 LL=286.0 FS=448.799 LS=540.476 A1=350 FR=200%C%
+  square FL=208.0 LL=286.0 FS=536.701 LS=628.018 A1=525 FR=200%C%
+  square FL=208.0 LL=286.0 FS=624.604 LS=712 A1=700 FR=200%C%
+
+ ECHO Adding hvid/sort/hvid block !
+ ECHO.
+  square FL=289.0 LL=327.0 FS=273 LS=365.392 A1=700%C%
+  square FL=289.0 LL=327.0 FS=360.896 LS=628.018 A1=0 FR=200%C%
+  square FL=289.0 LL=327.0 FS=624.604 LS=712 A1=700 FR=200%C%
+
+ ECHO Adding multi burst block !
+ ECHO.
+  square FL=328.0 LL=367.0 FS=273 LS=327.330 A1=700%C%
+  square FL=328.0 LL=367.0 FS=325.644 LS=712 A1=350 FR=200%C%
+  hsweep FL=328.0 LL=367.0 FS=335.093 LS=402.594 FF=1 LF=1 A1=350 FR=200 LR=200%C%
+  hsweep FL=328.0 LL=367.0 FS=412.044 LS=479.544 FF=2 LF=2 A1=350 FR=200 LR=200%C%
+  hsweep FL=328.0 LL=367.0 FS=506.543 LS=574.044 FF=3 LF=3 A1=350 FR=200 LR=200%C%
+  square FL=328.0 LL=367.0 FS=583.493 LS=692.257 A1=350 FR=200 LR=200%C%
+  square FL=328.0 LL=367.0 FS=583.493 LS=692.257 A2=-289.821 A3=196.224 FR=275 LR=275%C%
+
+ ECHO Adding center krys !
+ ECHO.
+  pulse FL=208.0 LL=368.0 CX=492.750 W=200 A1=700%C%
+
+ ECHO Adding hvid block !
+ ECHO.
+  square FL=368.0 LL=407.0 FS=273 LS=712 A1=700%C%
+
+ ECHO Adding trapez !
+ ECHO.
+  trapez FL=368.0 LL=407.0 TFS=486 TLS=499.500 BFS=486 BLS=488.700 A1=0 FR=200 LR=180%C%
+
+ ECHO Adding antipal field 3/4 !
+ ECHO.
+  square FL=408.0 LL=486.0 FS=566.002 LS=712 A1=262.5%C%
+  square FL=408.0 LL=408.0 FS=566.002 LS=639.255 A2=0 A3=-262.5%C%
+  squarehl FL=409.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=-262.5%C%
+  squarehl FL=410.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=262.5%C%
+  squarehl FL=411.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=262.5%C%
+  squarehl FL=412.0 LL=486.0 FS=566.002 LS=639.255 ONL=2 OFFL=2 A2=0 A3=-262.5%C%
+  square FL=408.0 LL=408.0 FS=639.255 LS=712 A2=262.5 A3=0%C%
+  squarehl FL=409.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=262.5 A3=0%C%
+  squarehl FL=410.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=-262.5 A3=0%C%
+  squarehl FL=411.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=-262.5 A3=0%C%
+  squarehl FL=412.0 LL=486.0 FS=639.255 LS=712 ONL=2 OFFL=2 A2=262.5 A3=0%C%
+
+
+ ECHO Adding chroma rampe +-BAV !
+ ECHO.
+  square FL=408.0 LL=448.0 FS=273 LS=346.246 A1=262.5%C%
+  square FL=408.0 LL=448.0 FS=273 LS=346.246 A3=262.5 FR=275%C%
+  hramp FL=408.0 LL=448.0 FS=346.246 LS=566.002 FA1=262.5 LA1=0 FR=200%C%
+  hramp FL=408.0 LL=448.0 FS=346.246 LS=566.002 FA3=262.5 LA3=0 FR=275%C%
+
+ ECHO Adding chroma rampe +BAU !
+ ECHO.
+  square FL=449.0 LL=486.0 FS=273 LS=346.246 A1=262.5%C%
+  square FL=449.0 LL=486.0 FS=273 LS=346.246 A2=262.5 FR=275%C%
+  hramp FL=449.0 LL=486.0 FS=346.246 LS=566.002 FA1=262.5 LA1=0 FR=200%C%
+  hramp FL=449.0 LL=486.0 FS=346.246 LS=566.002 FA2=262.5 LA2=0 FR=275%C%
+  pulse FL=408.0 LL=486.0 CX=566.002 W=200 A1=0%C%
+  pulse FL=408.0 LL=486.0 CX=566.002 W=275 A2=0 A3=0%C%
+  pulse FL=408.0 LL=486.0 CX=639.255 W=200 A1=0%C%
+  pulse FL=408.0 LL=486.0 CX=639.255 W=275 A2=0 A3=0%C%
+  pulse FL=2.0 LL=486.0 CX=272.994 W=200 A1=700%C%
+  pulse FL=529.0 LL=576.0 CX=272.994 W=200 A1=700%C%
+  pulse FL=2.0 LL=486.0 CX=272.994 W=275 A2=0 A3=0%C%
+  pulse FL=529.0 LL=576.0 CX=272.994 W=275 A2=0 A3=0%C%
+  pulse FL=2.0 LL=486.0 CX=712.507 W=200 A1=700%C%
+  pulse FL=529.0 LL=575.0 CX=712.507 W=200 A1=700%C%
+  pulse FL=1.0 LL=486.0 CX=712.507 W=275 A2=0 A3=0%C%
+  pulse FL=529.0 LL=575.0 CX=712.507 W=275 A2=0 A3=0%C%
+
+ ECHO Adding cirkel !
+ ECHO.
+  circle CX=492.750 CY=287.5 RAD=268.000 W=200 A1=700%C%
+  circle CX=492.750 CY=287.5 RAD=268.000 W=200 A2=0%C%
+  circle CX=492.750 CY=287.5 RAD=268.000 W=200 A3=0%C%
+
+ ECHO Adding flanke !
+ ECHO.
+  flank FL=1.0 LL=1.0 FS=137.944 LS=572.4 LR=200 C1=1%C%
+  flank FL=1.0 LL=1.0 FS=137.944 LS=572.4 LR=200 C2=1 C3=1%C%
+  flank FL=576.0 LL=576.0 FS=409.725 LS=847.556 FR=200 C1=1%C%
+  flank FL=576.0 LL=576.0 FS=409.725 LS=847.556 FR=200 C2=1 C3=1%C%
+
+ ECHO --- STORING FIELD 3 AND 4 ---
+ ECHO.
+ ECHO Storing buffers in channels !
+ ECHO.
+  convert FL=1.0 LL=576.0 FS=1.000 LS=1024.000 C=1 AIP=576%C%
+  convert FL=1.0 LL=576.0 FS=1.000 LS=1024.000 C=2 AIP=576%C%
+  convert FL=1.0 LL=576.0 FS=1.000 LS=1024.000 C=3 AIP=576%C%
+
+

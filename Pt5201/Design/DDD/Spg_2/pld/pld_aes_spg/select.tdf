@@ -1,0 +1,249 @@
+SUBDESIGN SELECT
+% 
+Audio selector logic for PT5201
+000106 PF
+%
+
+(
+AESCOUNT[14..0],
+ANCOUNT[9..0],
+AUDIO_SELECT[8..0],
+AUDIO_LEVEL[4..0],
+GL1,
+ANGL1,
+PS[1..0]                -- PROM type selection: 3:   11 => 2x4Mbit or 2x8Mbit   
+                        --                      2:   10 => 1x8Mbit on FLA_CS1 (FLA_CS2 not mounted)
+                        --                      1,0: 01/00 => not used
+
+                        : input;
+
+GL_PER_1SEC,
+SYNC_OFF,
+AU_ADDR[19..0],         -- 20 bit addr bus -> 1Mbyte
+FLA_CS1,
+FLA_CS2,
+SEL441,
+BLOCK[1..0],
+AES_ON,
+AN_ON
+
+                        : output;
+)
+
+
+
+begin
+
+CASE AUDIO_SELECT[3..0] IS
+-- AES Audio  48kHz -------------------------------------------
+ WHEN 0 =>                    -- 500Hz AES FS=48k
+	AU_ADDR[18..15] = B"0000";
+	AU_ADDR[14..12] = AUDIO_LEVEL[2..0];
+	AU_ADDR[11..0] = AESCOUNT[11..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit or 2x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	if AUDIO_SELECT[8] == VCC then
+	  GL_PER_1SEC = VCC;      -- 1 sec
+	 else
+	  GL_PER_1SEC = GND;      -- 3 sec (factory reset value)
+	end if;
+	SYNC_OFF = GND;
+	BLOCK[1..0] = B"00";    -- N=1  192x1=192 samples
+	SEL441 = GND;
+	AES_ON = VCC;
+	AN_ON = GND;           -- no output from analog-audio
+
+ WHEN 1 =>                    -- 1000Hz no click AES FS=48k
+	AU_ADDR[18..16] = B"000";
+	AU_ADDR[15] = VCC;
+	AU_ADDR[14..12] = AUDIO_LEVEL[2..0];
+	AU_ADDR[11..0] = AESCOUNT[11..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit or 2x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = GND;
+	SYNC_OFF = GND;
+	BLOCK[1..0] = B"00";    -- N=1  192x1=192 samples
+	SEL441 = GND;
+	AES_ON = VCC;
+	AN_ON = GND;          -- no output from analog-audio
+
+ WHEN 2 =>                    -- 1000Hz with click AES FS=48k
+	AU_ADDR[18..17] = B"00";
+	AU_ADDR[16] = GL1;
+	AU_ADDR[15] = !GL1;
+	AU_ADDR[14..12] = AUDIO_LEVEL[2..0];
+	AU_ADDR[11..0] = AESCOUNT[11..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit or 2x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = AUDIO_SELECT[8];
+	SYNC_OFF = GND;
+	BLOCK[1..0] = B"00";    -- N=1  192x1=192 samples
+	SEL441 = GND;
+	AES_ON = VCC;
+	AN_ON = GND;          -- no output from analog-audio
+
+ WHEN 3 =>                    -- 8000Hz no click AES FS=48k
+	AU_ADDR[18..15] = B"0011";
+	AU_ADDR[14..12] = AUDIO_LEVEL[2..0];
+	AU_ADDR[11..0] = AESCOUNT[11..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit or 2x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = GND;
+	BLOCK[1..0] = B"00";    -- N=1  192x1=192 samples
+	SEL441 = GND;
+	AES_ON = VCC;
+	AN_ON = GND;          -- no output from analog-audio
+
+-- AES Audio  44.1kHz -----------------------------------------
+ WHEN 4 =>                    -- 500Hz AES FS=44.1k
+	AU_ADDR[18] = GND;
+	AU_ADDR[17..15] = AUDIO_LEVEL[2..0];
+	AU_ADDR[14..0] = AESCOUNT[14..0];
+	FLA_CS1 = VCC;          -- select PROM as 2x4Mbit or 2x8Mbit
+	FLA_CS2 = GND;
+	case PS[] is
+	 when 3 => 
+		FLA_CS1 = VCC;      -- select PROM as 2x4Mbit or 2x8Mbit
+		FLA_CS2 = GND;
+		AU_ADDR[19] = GND;
+	 when 2 => 
+		FLA_CS1 = GND;      -- select PROM as 1x8Mbit
+		FLA_CS2 = VCC;
+		AU_ADDR[19] = VCC;
+	end case;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = VCC;         -- no lock between audio and video when FS=44.1kHz
+	BLOCK[1..0] = B"10";    -- N=6  192x6=1152 samples
+	SEL441 = VCC;
+	AES_ON = VCC;
+	AN_ON = GND;            -- no output from analog-audio
+
+ WHEN 5 =>                    -- 1000Hz no click AES FS=44.1k
+	AU_ADDR[18..17] = B"10";
+	AU_ADDR[16..14] = AUDIO_LEVEL[2..0];
+	AU_ADDR[13..0] = AESCOUNT[13..0];
+	FLA_CS1 = VCC;          -- select PROM as 2x4Mbit or 2x8Mbit
+	FLA_CS2 = GND;
+	case PS[] is
+	 when 3 => 
+		FLA_CS1 = VCC;      -- select PROM as 2x4Mbit or 2x8Mbit
+		FLA_CS2 = GND;
+		AU_ADDR[19] = GND;
+	 when 2 => 
+		FLA_CS1 = GND;      -- select PROM as 1x8Mbit
+		FLA_CS2 = VCC;
+		AU_ADDR[19] = VCC;
+	end case;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"01";    -- N=3  192x3=576 samples
+	SEL441 = VCC;
+	AES_ON = VCC;
+	AN_ON = GND;            -- no output from analog-audio
+
+ WHEN 6 =>                    -- 1000Hz with click AES FS=44.1k
+	AU_ADDR[18] = VCC;
+	AU_ADDR[17] = ANGL1;
+	AU_ADDR[16..14] = AUDIO_LEVEL[2..0];
+	AU_ADDR[13..0] = AESCOUNT[13..0];
+	case PS[] is
+	 when 3 => 
+		FLA_CS1 = VCC;          -- select PROM as 2x4Mbit or 2x8Mbit
+		FLA_CS2 = GND;
+		AU_ADDR[19] = GND;
+	 when 2 => 
+		FLA_CS1 = GND;          -- select PROM as 1x8Mbit
+		FLA_CS2 = VCC;
+		AU_ADDR[19] = VCC;   -- select PROM as 1x8Mbit
+	end case;
+	GL_PER_1SEC = AUDIO_SELECT[8];
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"01";    -- N=3  192x3=576 samples
+	SEL441 = VCC;
+	AES_ON = VCC;
+	AN_ON = GND;          -- no output from analog-audio
+
+ WHEN 7 =>                    -- 8000Hz no click AES FS=44.1k
+	AU_ADDR[18..15] = B"0100";
+	AU_ADDR[14..12] = AUDIO_LEVEL[2..0];
+	AU_ADDR[11..0] = AESCOUNT[11..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit, 2x8Mbit or 1x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"00";    -- N=1  192x1=192 samples
+	SEL441 = VCC;
+	AES_ON = VCC;
+	AN_ON = GND;          -- no output from analog-audio
+
+-- Analog Audio -----------------------------------------------
+ WHEN 8 =>                    -- 500Hz analog
+	AU_ADDR[18..15] = B"1000";
+	AU_ADDR[14..10] = AUDIO_LEVEL[4..0];
+	AU_ADDR[9..0] = ANCOUNT[9..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit, 2x8Mbit or 1x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"00";    -- not used in analog audio
+	SEL441 = GND;
+	AES_ON = GND;          -- no output from AES-audio
+	AN_ON = VCC;
+
+ WHEN 9 =>                    -- 1000Hz analog no click
+	AU_ADDR[18..15] = B"1001";
+	AU_ADDR[14..10] = AUDIO_LEVEL[4..0];
+	AU_ADDR[9..0] = ANCOUNT[9..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit, 2x8Mbit or 1x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"00";    -- not used in analog audio
+	SEL441 = GND;
+	AES_ON = GND;          -- no output from AES-audio
+	AN_ON = VCC;
+
+ WHEN 10 =>                    -- 1000Hz analog with click
+	AU_ADDR[18..17] = B"10";
+	AU_ADDR[16] = ANGL1;
+	AU_ADDR[15] = !ANGL1;
+	AU_ADDR[14..10] = AUDIO_LEVEL[4..0];
+	AU_ADDR[9..0] = ANCOUNT[9..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit, 2x8Mbit or 1x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = AUDIO_SELECT[8];
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"00";    -- not used in analog audio
+	SEL441 = GND;
+	AES_ON = GND;          -- no output from AES-audio
+	AN_ON = VCC;
+
+ WHEN 11 =>                    -- 8000Hz analog no click
+	AU_ADDR[18..15] = B"1011";
+	AU_ADDR[14..10] = AUDIO_LEVEL[4..0];
+	AU_ADDR[9..0] = ANCOUNT[9..0];
+	FLA_CS1 = GND;          -- select PROM as 2x4Mbit, 2x8Mbit or 1x8Mbit
+	FLA_CS2 = VCC;
+	AU_ADDR[19] = GND;
+	GL_PER_1SEC = GND;      -- not used
+	SYNC_OFF = VCC;
+	BLOCK[1..0] = B"00";    -- not used in analog audio
+	SEL441 = GND;
+	AES_ON = GND;          -- no output from AES-audio
+	AN_ON = VCC;
+
+END CASE;
+
+
+
+end;
+

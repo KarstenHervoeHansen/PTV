@@ -1,0 +1,649 @@
+; isrs.asm - assembly interrupt service routines for 8051XA peripherals
+;
+; RTXC    Version 3.2
+; Copyright (c) 1986-1997.
+; Embedded System Products, Inc.
+; ALL RIGHTS RESERVED
+;
+; Modified by KEN-PTV 28/01-00
+;  Application code used throughout this module
+; Modified by TK-PTV 22/20-99
+;  No conditional code, all interrupts are coded. Enable them
+;  through respestive call.
+;===============================================================================
+$                      
+# 1 "..\..\rtxc\xa\include/rtxcopts.inc"
+; rtxcopts.inc - RTXC assembly options 8051XA
+
+;
+;   RTXC    
+;   Copyright (c) 
+;   Embedded System Products, Inc.
+;   ALL RIGHTS RESERVED
+;
+;============================================================================
+
+;-------------------------------------
+; KERNEL priority level
+;    NOTE: RTXCINTLVL must match level in RTXCOPTS.H
+;-------------------------------------
+RTXCINTLVL    equ   0Dh
+
+;-------------------------------------
+; KERNEL Trap number
+;    NOTE:
+;-------------------------------------
+RTXC_TRAPNUM  equ    0h
+
+;-------------------------------------
+; RTXC stack size
+;    NOTE: RTXCSTKSZ must match definition in RTXCOPTS.H
+;-------------------------------------
+RTXCSTKSZ    equ   256; can be changed as needed, min = approx 256 bytes
+
+;-------------------------------------
+; Nulltask's stack size
+;-------------------------------------
+NULLSTKSZ    equ   128; Size of null stack, min = 128
+
+;===========================================================================
+; This switch is to define 12 bytes of kernel data into the first 1k bytes
+; of RAM.  Having this switch defined to _near allows the kernel to execute
+; considerably faster at a minimal cost. If this data is not desired to be
+; in the 1k bytes, then define CORE_IRAMDATA to zero (0).
+;                1 = YES,  0 = NO
+;---------------------------------------------------------------------------
+
+;===========================================================================
+
+;===========================================================================
+; This allows the kernel in the LARGE memory model to access the stacks as
+; 16 bit data.
+;
+;NOTE1: This switch must match the setting of the switch of the same name
+;       in the RTXCOPTS.H module.
+;
+;NOTE2: This switch is supported only in the Tasking LARGE memory model.
+;                1 = YES,  0 = NO
+;---------------------------------------------------------------------------
+
+;===========================================================================
+
+;****************************************************************************
+; Do not modify anything below this line
+;---------------------------------------------------------------------------
+
+   
+   
+   
+   
+       
+       
+	   
+       
+   
+   
+   
+
+# 96 "..\..\rtxc\xa\include/rtxcopts.inc"
+
+;===========================================================================
+; The SYSMODE switch should always be defined and equal to 0x080.
+; This defines the system mode.  User mode is not supported by RTXC.
+;---------------------------------------------------------------------------
+SYSMODE  equ 080h
+;===========================================================================
+
+; end of rtxcopts.inc
+# 15 "..\..\code\init\xa\1_0\isrs.asm"
+$                  
+# 1 "..\..\rtxc\xa\include/isrs.inc"
+; isrs.inc - 8051XA peripheral options
+
+;
+;   RTXCio
+;   Copyright (c) 
+;   Embedded System Products, Inc.
+;   ALL RIGHTS RESERVED
+;
+
+;
+; CLOCK support
+;
+         ; 1=clk supported in application
+
+  ; end of CLK
+# 38 "..\..\rtxc\xa\include/isrs.inc"
+
+;=============================================================================
+; serial support
+;
+         ; 1=serial supported in application
+
+
+       ; 1=Serial I/O 0 supported in application
+       ; 1=Serial I/O 1 supported in application
+
+
+;
+; receive 0 and transmit 0 priority levels, must match level in PERIPHAL.H
+;
+RX0INTLVL  EQU  0Eh     ; receive interrupt level
+                        ; (User may change interrupt level at which
+                        ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+TX0INTLVL  EQU  0Bh     ; transmit interrupt level
+                        ; (User may change interrupt level at which
+                        ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+  ; end if SIO_0
+
+
+;
+; receive 1 and transmit 1 priority levels, must match level in PERIPHAL.H
+;
+RX1INTLVL  EQU  0Ah     ; receive interrupt level
+                        ; (User may change interrupt level at which
+                        ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+TX1INTLVL  EQU  09h     ; transmit interrupt level
+                        ; (User may change interrupt level at which
+                        ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+  ; end if SIO_1
+  ; end if SIO
+# 72 "..\..\rtxc\xa\include/isrs.inc"
+
+;=============================================================================
+; external interrupt
+;
+      ; 1=external interrupt 0 supported in application
+      ; 1=external interrupt 1 supported in application
+
+
+;
+; external interrupt 0, must match level in PERIPHAL.H
+;
+EX0INTLVL  EQU  0Fh     ; external interrupt 0 level
+
+  ; end if EXINT0
+# 86 "..\..\rtxc\xa\include/isrs.inc"
+
+
+;
+; external interrupt 1, must match level in PERIPHAL.H
+;
+EX1INTLVL  EQU  0Fh     ; external interrupt 1 level
+
+  ; end if EXINT1
+# 94 "..\..\rtxc\xa\include/isrs.inc"
+
+; end of isrs.inc
+# 16 "..\..\code\init\xa\1_0\isrs.asm"
+
+; claim the peripheral's interrupt vector
+; the next line after the vector claim must
+; be the first instruction of the interrupt service routine
+;
+CSEG AT 084H
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvctimer0
+CSEG AT 08CH
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvctimer1
+CSEG AT 090H
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvctimer2
+
+CSEG AT 0A4H
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvcsio0o
+CSEG AT 0A0H
+DW	((SYSMODE+RX0INTLVL) SHL 8), isvcsio0i
+
+CSEG AT 0ACH
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvcsio1o
+CSEG AT 0A8H
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvcsio1i
+
+CSEG AT 080H
+DW	((SYSMODE+EX0INTLVL) SHL 8), isvcex0
+CSEG AT 088H
+DW	((SYSMODE+EX1INTLVL) SHL 8), isvcex1
+
+CSEG AT 0114H
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvcswr6
+
+CSEG AT 0118H
+DW	((SYSMODE+RTXCINTLVL) SHL 8), isvcswr7
+
+
+    ISRS_CODE SEGMENT HCODE 
+	RSEG ISRS_CODE
+
+$                      
+# 1 "..\..\rtxc\xa\include/saveregs.inc"
+; saveregs.inc - RTXC interrupt save register macro 8051XA
+
+;
+;   RTXC    
+;   Copyright (c) 
+;   Embedded System Products, Inc.
+;   ALL RIGHTS RESERVED
+;
+
+$ GEN
+
+saveregs MACRO
+    ; save register set on the interrupted's frame or stack
+    ; R6 first, R0 last
+    push      R6,R5,R4,R3,R2,R1,R0
+
+    ; load and save the segment select and data segment
+    ; registers in the interrupted's frame.
+    mov.b     R6L,SSEL
+    mov.b     R6H,DS
+    push      R6
+
+    mov.b     SSEL,#7Fh
+
+# 27 "..\..\rtxc\xa\include/saveregs.inc"
+    mov.b     DS,#0
+
+    ; store the Extra and Code Segment registers in the interrupted's frame
+    mov.b     R6L,ES
+    mov.b     R6H,CS
+    push      R6
+
+    ; pass the frame pointer or stack pointer as an argument to the kernel
+
+    mov.b     R1L, DS
+    xor.b     R1H, R1H
+
+# 39 "..\..\rtxc\xa\include/saveregs.inc"
+    mov.w     R0,R7
+
+    ; compare the interrupt level count to zero (0) to determine stack usage
+     ; declared as type DATA
+    cmp.b     _isrcnt,#0             ;if nesting level != 0
+   ; end of if CORE_IRAMDATA
+# 55 "..\..\rtxc\xa\include/saveregs.inc"
+
+    bne       ^noswitch              ; don't switch, use current stack
+    mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+
+^noswitch:
+    ; increment the interrupt level count by one.
+     ; declared as type DATA
+    adds.b    _isrcnt,#1h
+  ; end of if CORE_IRAMDATA
+# 66 "..\..\rtxc\xa\include/saveregs.inc"
+
+    ENDM
+
+; end of saveregs.inc
+# 54 "..\..\code\init\xa\1_0\isrs.asm"
+
+	EXTRN HDATA ( _rtxcstak)
+	EXTRN DATA ( _isrcnt)
+	EXTRN DATA ( _intlvl)
+	EXTRN HCODE ( isrexit)
+
+	EXTRN BIT ( _UnitPgmMode)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; serial 0 interrupt service                               ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	EXTRN HCODE ( _intsio0o)
+	EXTRN DATA ( _RxOutput)
+	EXTRN DATA ( _RxInput)
+	EXTRN HDATA( _RxBuffer)
+
+	public isvcsio0o
+isvcsio0o:
+
+	jnb				_UnitPgmMode, isvcsio0o_
+	clr				TI_0
+	reti
+
+isvcsio0o_:
+	; save the world of the interrupted
+	saveregs
+
+	; set PSWH to the priority of the interrupt
+	mov.b			PSWH, #SYSMODE+TX0INTLVL
+
+	; call interrupt handler
+	FCALL 		_intsio0o
+
+	; goto isr exit code
+	FJMP 			isrexit
+						
+
+	public	isvcsio0i
+isvcsio0i:
+
+	jnb				_UnitPgmMode, isvcsio0i_
+	push			R1
+
+	clr				RI_0
+	mov				R1L, S0BUF
+
+	mov				S1BUF, R1L
+	clr				TI_1
+
+	pop				R1
+	reti	
+
+isvcsio0i_:
+	; save register set on the interrupted's frame or stack
+	; R1 first, R0 last
+	push			R1, R0
+
+	; store the Segment SELect register and the Extra Segment
+	; register in the interrupted's frame
+	mov.b			R1L, SSEL
+	mov.b			R1H, ES
+	push			R1
+
+	clr				RI_0
+
+	mov.b			R0L, _RxOutput        
+	sub.b			R0L, _RxInput
+	or.b			R0L, R0L
+
+	bne				isvcsio0i_1
+	setb			SWR6
+
+isvcsio0i_1:
+	adds.b		_RxInput, #01H
+	mov.b			R0L, _RxInput
+	divu.b		R0L, #040H
+	mov.b			_RxInput, R0H
+	mov.b			R0L, R0H
+	movs.b		R0H, #00H
+
+	mov.b			R1L, S0BUF
+
+	setb			R0SEG
+	mov.b			ES, #SEG( _RxBuffer)
+	mov.b			[R0+SOF( _RxBuffer)], r1l
+
+	; restore the Extra Segment and the Segment SELect register
+	; off the stack.
+	pop				R1
+	mov.b			ES, R1H
+	mov.b 		SSEL, R1L
+
+	; restore the register set
+	pop				R0, R1
+
+	;return from interrupt
+	reti
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; serial 1 interrupt service                               ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	EXTRN HCODE ( _int232o)
+	EXTRN HCODE ( _int232i)
+
+  public isvcsio1o
+isvcsio1o:
+
+	jnb				_UnitPgmMode, isvcsio1o_
+	clr				TI_1
+	reti
+
+isvcsio1o_:
+  ; save the world of the interrupted
+  saveregs
+
+	; set PSWH to the priority of the interrupt
+  mov.b			PSWH, #SYSMODE+TX1INTLVL
+
+  ; call interrupt handler
+  FCALL 		_int232o
+						
+	; goto isr exit code
+  FJMP 			isrexit
+
+
+	public isvcsio1i
+isvcsio1i:
+
+	jnb				_UnitPgmMode, isvcsio1i_
+	push			R0
+
+	clr				RI_1
+	mov				R0L, S1BUF
+
+	cjne			R0L, #03H, isvcsio1i_nores
+	reset
+	jmp				$
+
+isvcsio1i_nores:
+	mov				S0BUF, R0L
+	clr				TI_0
+
+	pop				R0
+	reti	
+
+isvcsio1i_:
+   ; save the world of the interrupted
+   saveregs
+
+   ; set PSWH to the priority of the interrupt
+   mov.b     PSWH, #SYSMODE+RX1INTLVL
+
+   ; call interrupt handler
+   FCALL 		_int232i
+
+   ; goto isr exit code
+   FJMP 		isrexit
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; clk interrupt service                                    ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	public isvctimer0
+isvctimer0:
+	; push/save all registers being used here
+	; perform private interrupt operations here
+	; pop/restore all registers being used here
+
+	; DO NOT USE! USED AS COUNTER FOR COLORBAR GENERATOR
+	reti
+
+	public isvctimer1
+isvctimer1:
+	; push/save all registers being used here
+	; perform private interrupt operations here
+	; pop/restore all registers being used here
+
+	; DO NOT USE! USED AS BAUD RATE GENERATOR FOR SIO1
+	reti
+
+	public isvctimer2
+isvctimer2:
+	; push/save all registers being used here
+	; perform private interrupt operations here
+	; pop/restore all registers being used here
+
+	; DO NOT USE! USED AS BAUD RATE GENERATOR FOR SIO0
+	reti
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; ext0 interrupt service                                   ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	EXTRN HCODE ( _CBLineInterrupt)
+	EXTRN DATA ( _TimeTickCounter)
+	EXTRN DATA ( _LineOffset)
+
+	public		isvcex0
+isvcex0:
+	; save register set on the interrupted's frame or stack
+	; R6 first, R0 last
+
+	push			R6, R5, R4, R3, R2, R1, R0
+
+	; load and save the segment select and data segment
+	; registers in the interrupted's frame.
+	mov.b			R6L, SSEL
+	mov.b			R6H, DS
+	push			R6
+
+	; store the Extra and Code Segment registers in the interrupted's frame
+	mov.b			R6L, ES
+	mov.b			R6H, CS
+	push			R6
+ 
+	; perform private interrupt operations here
+	mov				R6, _TimeTickCounter
+
+	djnz			R6, isvcex0_lbl1
+
+	mov				R6, #0125		;reload time tick counter (PAL)
+	setb			SWR7				;Time for time tick
+
+isvcex0_lbl1:
+	mov				_TimeTickCounter, R6
+
+	JBC				IE1, LoadFieldTimer
+
+	FCALL 		_CBLineInterrupt
+
+	; restore the Extra and Code Segment registers off the stack.
+	pop				R6
+	mov.b			CS, R6H
+	mov.b			ES, R6L
+
+	; restore the Data Segment and Segment SELect register off the stack.
+	pop				R6
+	mov.b			DS, R6H
+	mov.b			SSEL, R6L
+
+	; restore the register set
+	pop				R0, R1, R2, R3, R4, R5, R6
+
+	;return from interrupt
+	reti
+
+LoadFieldTimer:
+	mov				R6, _LineOffset
+
+	mov.b			TH0, R6H
+	mov.b			TL0, R6L
+
+	FCALL 		_CBLineInterrupt
+
+	; restore the Extra and Code Segment registers off the stack.
+	pop				R6
+	mov.b			CS, R6H
+	mov.b			ES, R6L
+
+	; restore the Data Segment and Segment SELect register off the stack.
+	pop				R6
+	mov.b			DS, R6H
+	mov.b			SSEL, R6L
+
+	; restore the register set
+	pop				R0, R1, R2, R3, R4, R5, R6
+	;return from interrupt
+	reti
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; ext1 interrupt service                                   ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	public isvcex1
+isvcex1:
+	; save register set on the interrupted's frame or stack
+  ; R6 first, R0 last
+
+  push			R6, R5, R4, R3, R2, R1, R0
+
+  ; load and save the segment select and data segment
+  ; registers in the interrupted's frame.
+  mov.b 		R6L, SSEL
+  mov.b			R6H, DS
+  push			R6
+
+  ; store the Extra and Code Segment registers in the interrupted's frame
+  mov.b			R6L, ES
+  mov.b			R6H, CS
+  push			R6
+
+  ; perform private interrupt operations here
+
+  ; restore the Extra and Code Segment registers off the stack.
+  pop 			R6
+  mov.b			CS, R6H
+  mov.b			ES, R6L
+
+  ; restore the Data Segment and Segment SELect register off the stack.
+  pop  			R6
+  mov.b			DS, R6H
+  mov.b			SSEL, R6L
+
+  ; restore the register set
+  pop 			R0, R1, R2, R3, R4, R5, R6
+
+  ;return from interrupt
+  reti
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; SWR6 interrupt service                                   ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	EXTRN HCODE ( _intsio0i)
+
+	public isvcswr6
+isvcswr6:
+	; save the world of the interrupted
+	saveregs
+
+	; set PSWH to the priority of the interrupt
+	mov.b		PSWH, #SYSMODE+6
+
+	; call interrupt handler
+	FCALL 		_intsio0i
+
+  ; goto isr exit code
+  FJMP 		isrexit
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                          ;
+; SWR7 interrupt service                                   ;
+;                                                          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	EXTRN HCODE ( _ticktimer)
+
+	public isvcswr7
+isvcswr7:
+  ; save the world of the interrupted
+  saveregs
+
+  ; set PSWH to the priority of the interrupt
+  mov.b		PSWH, #SYSMODE+7
+
+  ; call interrupt handler
+  FCALL 		_ticktimer
+
+	; goto isr exit code
+  FJMP 		isrexit
+
+; end of isrs.asm

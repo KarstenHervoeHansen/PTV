@@ -1,0 +1,85 @@
+%INCLUDE "lpm_counter.inc";
+	hcounter: lpm_counter WITH (LPM_WIDTH=10, LPM_SVALUE=0);%
+SUBDESIGN lcntranl
+(
+	clk,preset,syssel,d[9..0],s1,s0	: input;
+	burst,h[9..0],upint,noth4,hload		: output;
+)
+
+VARIABLE
+	h[9..0],hclr:    		DFF;
+	hload:					DFF;
+	upint,burst:			DFFE;
+
+BEGIN
+	upint.clk	= clk;	%processor-interrupt%
+	upint.d		= VCC; 
+	upint.ena	= (h[9..0] == 0);
+	upint.clrn	= !(h[9..0] == 32);
+
+	burst.clk	= clk;	%fjerner burst i linier hvor s1 er høj%
+	burst.d		= VCC; 
+	burst.ena	= ((h[9..0] == 108) & s1 # 
+				    (h[9..0] == 160) & (!s1 & s0) #
+					(h[9..0] == 1023) & (s1 & !s0));
+	burst.clrn	= !(h[9..0] == 160 # h[9..0] == 896 # h[9..0] == 863);
+
+	hload.clk	= clk;	%load-pulse til adressedekoder%
+	hload.d		= (h[9..0]==0);
+
+	hclr.clk	= clk;  %buffer til preset flag%
+	hclr.d		= preset & !(s1 # s0);
+
+	h[9..0].clk	= clk;  %Linietæller-clock%
+
+	IF hclr.q==1 THEN 
+		h[9..0].d = d[9..0];
+	   ELSIF (h[9..0].q == 863)  THEN
+		h[].d=0;	
+	   ELSIF	%NTSC-tælling%
+		(h[9..0].q == 857) & (syssel==1) THEN
+		h[9..0].d = 0;
+	   ELSIF	%Linie 23%
+		(h[9..0].q == 543) & ((!s1 & s0)==1) THEN
+		h[9..0].d = 864;
+	   ELSIF	%Retur i linie 23%
+		(h[9..0].q == 927) %& ((!s1 & s0)==1)% THEN
+		h[9..0].d = 608;
+	   ELSIF	%Linie 623%	
+		(h[9..0].q == 383) & ((s1 & !s0)==1) THEN
+		h[9..0].d = 928;
+	   ELSIF	%Retur i linie 623%
+		(h[9..0].q == 1023) %& ((!s1 & s0)==1)% THEN
+		h[9..0].d = 480;
+	   ELSE
+		h[9..0].d = h[9..0].q+1;
+	END IF;
+	
+	noth4	= !h4;
+END;
+
+
+%VARIABLE
+	hclr, hclra,hclrb:		dff;
+
+	BEGIN
+	hclr.clk		= clk;
+	hclr.d			= !preset;
+	hclr.clrn		= hclrb.q;
+
+	hclra.clk		= clk;
+	hclra.d			= preset;
+
+	hclrb.clk		= clk;
+	hclrb.d			= hclra.q;
+	
+	hcounter.clock	= clk;
+	hcounter.sload	= hclr.q;
+	hcounter.sset	= clear & !hclr.q;
+	hcounter.data[]	= d[];
+	h[]				= hcounter.q[];
+	ctest			= hclr.q;
+	noth4			= !h4;
+END;%
+ 
+

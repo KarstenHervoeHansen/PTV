@@ -1,0 +1,1 @@
+chantif2 FL=1 LL=576 FS=130 LS=849 M=2 LOF=56

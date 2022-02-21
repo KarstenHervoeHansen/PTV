@@ -1,0 +1,1767 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\1_1\temp\xa\rs232.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -I..\..\rtxcdef\xa
+                          3 ;          -I..\..\rtxc\xa\include -I..\..\code\include\1_0 -I..\..\app_spec\xa
+                          4 ;          -Ml -O2 -s
+                          6 $NOZPAGE
+                          7         NAME    RS232
+                         11 ; rs232.c     1 /****************************************************************************/
+                         12 ; rs232.c     2 /* MODULE:                                                                  */
+                         13 ; rs232.c     3 /*   rs232.c - RS232 channel driver using UART1 and Timer1                  */
+                         14 ; rs232.c     4 /****************************************************************************/
+                         15 ; rs232.c     5 /* FUNCTIONS:                                                               */
+                         16 ; rs232.c     6 /*                                                                          */
+                         17 ; rs232.c     7 /*                                                                          */
+                         18 ; rs232.c     8 /* TASKS:                                                                   */
+                         19 ; rs232.c     9     void rs232i(void);
+                         20 ; rs232.c    10     void rs232o(void);
+                         21 ; rs232.c    11 /*                                                                          */
+                         22 ; rs232.c    12 /* NOTES:                                                                   */
+                         23 ; rs232.c    13 /*  000405: Increased input stream from 128 to 512                               
+                                                                     */
+                         24 ; rs232.c    14 /*  000403: Error in rs232printf(): buf was NOT deleted return with error.       
+                            */
+                         25 ; rs232.c    15 /*                                                                          */
+                         26 ; rs232.c    16 /****************************************************************************/
+                         27 ; rs232.c    17 /*
+                         28 ; rs232.c    18  *   PTV software for PT5201    
+                         29 ; rs232.c    19  *   Copyright (c) 
+                         30 ; rs232.c    20  *   ProTeleVision Technologies A/S.
+                         31 ; rs232.c    21  *   ALL RIGHTS RESERVED
+                         32 ; rs232.c    22 */
+                         33 ; rs232.c    23 /****************************************************************************/
+                         34 ; rs232.c    24 
+                         35 ; rs232.c    25 #include <stdarg.h>
+                         38 ; rs232.c    26 #include <stdio.h>
+                         59 ; rs232.c    27 #include <periphal.h>
+                         62 ; rs232.c    28 #include "crystal.h"
+                         65 ; rs232.c    29 #include "rs232.h"
+                        394 ; rs232.c    30 
+                        395 ; rs232.c    31 
+                        396 ; rs232.c    32 #define TIMER1_RANGE  (unsigned long)65536     /* UART mode 2 using Timer 1 */
+                        397 ; rs232.c    33 
+                        398 ; rs232.c    34 #define PRESCALER       (unsigned long)4     /* selected also in SCR */
+                        399 ; rs232.c    35 
+                        400 ; rs232.c    36 #define BAUDRATE     (unsigned long)9600     /* select  9600 baud */
+                        401 ; rs232.c    37 
+                        402 ; rs232.c    38 #define RELOAD1 (unsigned short)(TIMER1_RANGE-(CRYSTAL/(BAUDRATE*PRESCALER*(unsig
+                            ned long)16)))
+                        403 ; rs232.c    39 #define THI1_RESET (RELOAD1 >> 8) & 0xFF
+                        404 ; rs232.c    40 #define TLOW1_RESET (RELOAD1 & 0xFF)
+                        405 ; rs232.c    41 
+                        406 ; rs232.c    42 /* =================== */
+                        407 ; rs232.c    43 /* S1CON - bit settings */
+                        408 ; rs232.c    44 /* ------------------- */
+                        409 ; rs232.c    45 /* TIMER 0             */
+                        410 ; rs232.c    46 /* ------------------- */
+                        411 ; rs232.c    47 #define U1_SM0   (0 << 7)    /* allow for 8-bit UART */
+                        412 ; rs232.c    48 #define U1_SM1   (1 << 6)    /* allow for 8-bit UART */
+                        413 ; rs232.c    49 #define U1_SM2   (0 << 5)    /* allow for 8-bit UART */
+                        414 ; rs232.c    50 #define U1_REN_0 (0 << 4)    /* enable serial reception */
+                        415 ; rs232.c    51      
+                        416 ; rs232.c    52 #define U1_TB8_0 (0 << 3)    /* clear to disallow 9 bit data */
+                        417 ; rs232.c    53 #define U1_RB8_0 (0 << 2)    /* clear to disallow 9 bit data */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        418 ; rs232.c    54      
+                        419 ; rs232.c    55 #define U1_TI_0  (0 << 1)   /* the transmit interrupt flag */
+                        420 ; rs232.c    56 #define U1_RI_0  (0 << 0)   /* the receive interrupt flag */ 
+                        421 ; rs232.c    57 
+                        422 ; rs232.c    58 #define xS1CON (U1_SM0 | U1_SM1 | U1_SM2 | U1_REN_0 | U1_TB8_0 | U1_RB8_0 | U1_TI
+                            _0 | U1_RI_0 )
+                        423 ; rs232.c    59 /* =================== */
+                        424 ; rs232.c    60 
+                        425 ; rs232.c    61 /* =================== */
+                        426 ; rs232.c    62 /* TMOD - bit settings */
+                        427 ; rs232.c    63 /* ------------------- */
+                        428 ; rs232.c    64 /* TIMER 0             */
+                        429 ; rs232.c    65 /* ------------------- */
+                        430 ; rs232.c    66 #define T0_GATE (0 << 3)   /* not applicable - OR in a zero (0) */
+                        431 ; rs232.c    67 #define T0_CT   (0 << 2)   /* not applicable - OR in a zero (0) */
+                        432 ; rs232.c    68 #define T0_M1   (0 << 1)   /* not applicable - OR in a zero (0) */
+                        433 ; rs232.c    69 #define T0_M0   (0 << 0)   /* not applicable - OR in a zero (0) */
+                        434 ; rs232.c    70 
+                        435 ; rs232.c    71 #define T0_TMOD  (T0_GATE | T0_CT | T0_M1 | T0_M0)
+                        436 ; rs232.c    72 
+                        437 ; rs232.c    73 /* ------------------- */
+                        438 ; rs232.c    74 /* TIMER 1             */
+                        439 ; rs232.c    75 /* ------------------- */
+                        440 ; rs232.c    76 #define T1_GATE (0 << 7)   /* disable gate control */
+                        441 ; rs232.c    77 #define T1_CT   (0 << 6)   /* cleared for timer operation */
+                        442 ; rs232.c    78 #define T1_M1   (0 << 5)   /* 16-bit auto-reload */
+                        443 ; rs232.c    79 #define T1_M0   (0 << 4)   /* 16-bit auto-reload */
+                        444 ; rs232.c    80 
+                        445 ; rs232.c    81 #define T1_TMOD  (T1_GATE | T1_CT | T1_M1 | T1_M0)
+                        446 ; rs232.c    82 
+                        447 ; rs232.c    83 #define xTMOD  (T0_TMOD | T1_TMOD)
+                        448 ; rs232.c    84 /* =================== */
+                        449 ; rs232.c    85 
+                        450 ; rs232.c    86 /* =================== */
+                        451 ; rs232.c    87 /* TCON - bit settings */
+                        452 ; rs232.c    88 /* ------------------- */
+                        453 ; rs232.c    89 /* TIMER 0             */
+                        454 ; rs232.c    90 /* ------------------- */
+                        455 ; rs232.c    91 #define T0_TF0  (0 << 5)   /* not applicable - OR in a zero (0) */
+                        456 ; rs232.c    92 #define T0_TR0  (0 << 4)   /* not applicable - OR in a zero (0) */
+                        457 ; rs232.c    93 #define T0_IE0  (0 << 1)   /* not applicable - OR in a zero (0) */
+                        458 ; rs232.c    94 #define T0_IT0  (0 << 0)   /* not applicable - OR in a zero (0) */
+                        459 ; rs232.c    95 
+                        460 ; rs232.c    96 #define T0_CON (T0_TF0 | T0_TR0 | T0_IE0 | T0_IT0)
+                        461 ; rs232.c    97 
+                        462 ; rs232.c    98 /* ------------------- */
+                        463 ; rs232.c    99 /* TIMER 1             */
+                        464 ; rs232.c   100 /* ------------------- */
+                        465 ; rs232.c   101 #define T1_TF1  (0 << 7)   /* overflow flag - manipulated by hardware */
+                        466 ; rs232.c   102 #define T1_TR1  (1 << 6)   /* run control bit - enabled */
+                        467 ; rs232.c   103 #define T1_IE1  (0 << 3)   /* interrupt edge flag - enabled */
+                        468 ; rs232.c   104 #define T1_IT1  (0 << 2)   /* interrupt type control bit - disabled */
+                        469 ; rs232.c   105 
+                        470 ; rs232.c   106 #define T1_CON (T1_TF1 | T1_TR1 | T1_IE1 | T1_IT1)
+                        471 ; rs232.c   107 
+                        472 ; rs232.c   108 #define xTCON (T0_CON | T1_CON)
+                        473 ; rs232.c   109 /* =================== */
+                        474 ; rs232.c   110 
+                        475 ; rs232.c   111 
+                        476 ; rs232.c   112 static union
+                        477 ; rs232.c   113 {
+                        478 ; rs232.c   114         struct
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        479 ; rs232.c   115         {
+                        480 ; rs232.c   116         unsigned RI:1;
+                        481 ; rs232.c   117         unsigned TI:1;
+                        482 ; rs232.c   118         unsigned RB8:1;
+                        483 ; rs232.c   119         unsigned TB8:1;
+                        484 ; rs232.c   120         signed Enable:1;
+                        485 ; rs232.c   121         unsigned Multi:1;
+                        486 ; rs232.c   122         unsigned Mode:2;
+                        487 ; rs232.c   123         }Bits;
+                        488 ; rs232.c   124         unsigned char Byte;
+                        489 ; rs232.c   125 }_S1CON;
+                        490 ; rs232.c   126 
+                        491 ; rs232.c   127 
+                        492 ; rs232.c   128 static union
+                        493 ; rs232.c   129 {
+                        494 ; rs232.c   130         struct
+                        495 ; rs232.c   131         {
+                        496 ; rs232.c   132         unsigned EnableInt:1;
+                        497 ; rs232.c   133         unsigned OverFlowErr:1;
+                        498 ; rs232.c   134         unsigned BreakInt:1;
+                        499 ; rs232.c   135         unsigned FramingErr:1;
+                        500 ; rs232.c   136         unsigned :4;
+                        501 ; rs232.c   137         }Bits;
+                        502 ; rs232.c   138         char Byte;
+                        503 ; rs232.c   139 }_S1STAT;
+                        504 ; rs232.c   140 
+                        505 ; rs232.c   141 
+                        506 ; rs232.c   142 static union
+                        507 ; rs232.c   143 {
+                        508 ; rs232.c   144         struct
+                        509 ; rs232.c   145         {
+                        510 ; rs232.c   146         unsigned DataBits:2;
+                        511 ; rs232.c   147         unsigned StopBits:1;
+                        512 ; rs232.c   148         unsigned Parity:2;
+                        513 ; rs232.c   149         unsigned HandShk:2;
+                        514 ; rs232.c   150         }Bits;
+                        515 ; rs232.c   151         char Byte;
+                        516 ; rs232.c   152 }LCR;
+                        517 ; rs232.c   153 
+                        518 ; rs232.c   154 
+                        519 ; rs232.c   155 
+                        520 ; rs232.c   156 static unsigned char ichar[2]; /* input char */
+                        521 ; rs232.c   157 
+                        522 ; rs232.c   158 static TEvent                   *rs232iEvent, *rs232oEvent;
+                        523 ; rs232.c   159 static TThread          *rs232iThread, *rs232oThread;
+                        524 ; rs232.c   160 static TResource        *rs232oRes;
+                        525 ; rs232.c   161 static TStream          *rs232iStream, *rs232oStream;
+                        526 ; rs232.c   162 
+                        527 ; rs232.c   163 /*#define CalcParity \ 
+                        528 ; rs232.c   164         #pragma asm \ 
+                        529 ; rs232.c   165         PUSH    R4L \ 
+                        530 ; rs232.c   166         MOV.B   R4L,_par \ 
+                        531 ; rs232.c   167         MOV.B   _par,PSW51 \ 
+                        532 ; rs232.c   168         AND.B   _par,#0FH \ 
+                        533 ; rs232.c   169         POP     R4L \ 
+                        534 ; rs232.c   170         #pragma endasm
+                        535 ; rs232.c   171   */
+                        536 ; rs232.c   172 //#define EvenParity(Bte) par=(Bte); CalcParity par==1 ? 1 : 0  
+                        537 ; rs232.c   173 
+                        538 ; rs232.c   174 //#define OddParity(Byte) par=(Byte); CalcParity (par)==0 ? 1 : 0       
+                        539 ; rs232.c   175 
+                        540 ; rs232.c   176 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        541 ; rs232.c   177 //static unsigned char par;
+                        542 ; rs232.c   178 
+                        543 ; rs232.c   179 char CheckParity(unsigned char Byte)
+                        544 ; rs232.c   180 {
+000000                  545 RS232_PR        SEGMENT HCODE
+000000                  546         RSEG    RS232_PR
+                        547         ALIGN   1
+                        549         PUBLIC  _CheckParity
+000000                  550 _CheckParity:
+000000 4701             556         PUSH    R4L 
+000002 8180             557         MOV.B   R4L,R0L 
+000004 860402           558         MOV.B   R0L,PSW51 
+000007 910501           559         AND.B   R0L,#01H 
+00000A 6701             560         POP     R4L 
+                        561 ; rs232.c   181         #pragma asm_noflush 
+                        562 ; rs232.c   182         PUSH    R4L 
+                        563 ; rs232.c   183         MOV.B   R4L,R0L 
+                        564 ; rs232.c   184         MOV.B   R0L,PSW51 
+                        565 ; rs232.c   185         AND.B   R0L,#01H 
+                        566 ; rs232.c   186         POP     R4L 
+                        567 ; rs232.c   187         #pragma endasm
+                        568 ; rs232.c   188         return(Byte);
+                        569 ; rs232.c   189 }       
+00000C D680             571         RET
+                        574 ; rs232.c   190 
+                        575 ; rs232.c   191 
+                        576 ; rs232.c   192 _inline void SetOutputChar(char Ch)
+                        577 ; rs232.c   193 {
+                        578 ; rs232.c   194  if(LCR.Bits.Parity)              // if parity
+                        579 ; rs232.c   195  {
+                        580 ; rs232.c   196   TB8_1=CheckParity(Ch);          // TB8_1 = parity
+                        581 ; rs232.c   197   if(LCR.Bits.Parity==1)          // if odd parity
+                        582 ; rs232.c   198    TB8_1=~TB8_1;                  // invert parity bit
+                        583 ; rs232.c   199   if (LCR.Bits.DataBits==2)       // if 7 data-bits
+                        584 ; rs232.c   200    if (TB8_1)                     // if parity bit
+                        585 ; rs232.c   201     Ch|=0x80;                     //  set parity bit
+                        586 ; rs232.c   202    else                           // else
+                        587 ; rs232.c   203     Ch&=0x7F;                     //  clear parity bit
+                        588 ; rs232.c   204  }
+                        589 ; rs232.c   205  else
+                        590 ; rs232.c   206  {
+                        591 ; rs232.c   207   if (LCR.Bits.DataBits==2)       // if 7 data-bits
+                        592 ; rs232.c   208    Ch|=0x80;                      //  set extra stop bit
+                        593 ; rs232.c   209  }
+                        594 ; rs232.c   210 }       
+                        595 ; rs232.c   211 
+                        596 ; rs232.c   212 
+                        597 ; rs232.c   213 _inline void SetInputChar(register unsigned char* Ch0,register unsigned char* Ch1
+                            )
+                        598 ; rs232.c   214 {
+                        599 ; rs232.c   215  if (LCR.Bits.DataBits==3)        // if 8 databits
+                        600 ; rs232.c   216   *Ch1=RB8_1;                     //  get parity bit
+                        601 ; rs232.c   217  else                             // else
+                        602 ; rs232.c   218  {
+                        603 ; rs232.c   219   *((int*)Ch0) <<= 1;             //  shift parity bit to Ch+1
+                        604 ; rs232.c   220   *Ch0 >>= 1;                     //  shift back
+                        605 ; rs232.c   221 //  *Ch &= 0x7F;
+                        606 ; rs232.c   222  }
+                        607 ; rs232.c   223  if(LCR.Bits.Parity==3)           // if even parity
+                        608 ; rs232.c   224  {
+                        609 ; rs232.c   225   *Ch1 ^= CheckParity(*Ch0);      //  Ch+1 = Ch+1 XOR Parity
+                        610 ; rs232.c   226  }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        611 ; rs232.c   227  else if(LCR.Bits.Parity==1)      // else if odd parity
+                        612 ; rs232.c   228   *Ch1 ^= (~CheckParity(*Ch0)) & 0x01;  //  Ch+1 = Ch+1 XOR NOT(Parity)
+                        613 ; rs232.c   229  else                             // else
+                        614 ; rs232.c   230   *Ch1 = 0;                       //  Ch+1 = 0  
+                        615 ; rs232.c   231 }
+                        616 ; rs232.c   232 
+                        617 ; rs232.c   233 
+                        618 ; rs232.c   234 
+                        619 ; rs232.c   235 /*
+                        620 ; rs232.c   236  *
+                        621 ; rs232.c   237  * interrupt service for transmit 0
+                        622 ; rs232.c   238  *
+                        623 ; rs232.c   239 */
+                        624 ; rs232.c   240 FRAME ks_stk *int232o(FRAME ks_stk * frame)
+                        625 ; rs232.c   241 {
+                        626         ALIGN   1
+                        628         PUBLIC  _int232o
+00000E                  629 _int232o:
+                        637 ; rs232.c   242    TI_1 = 0;
+00000E 080321           639         CLR     0321H
+                        640 ; rs232.c   243    return(KS_ISRexit(frame, rs232oEvent->ID)); /* wake out output task */
+000011 964842rr         642         MOV.B   ES,#SEG( _rs232oEvent )
+000015 9938rrrr         643         MOV.W   R3,#SOF( _rs232oEvent )
+000019 8B23             644         MOV.W   R2,[R3+]
+00001B 8A33             645         MOV.W   R3,[R3]
+00001D 866C42           646         MOV.B   ES,R3L
+000020 84421A           647         MOV.B   R2L,[R2+26]
+                        648         CALL    _KS_ISRexit
+000023 C4rrrrrr        +648 ;       FCALL   _KS_ISRexit
+                        650 ; rs232.c   244 }
+000027 D680             652         RET
+                        654 ; rs232.c   245 
+                        655 ; rs232.c   246 
+                        656 ; rs232.c   247 /*
+                        657 ; rs232.c   248  *
+                        658 ; rs232.c   249  * interrupt service for receive 0
+                        659 ; rs232.c   250  *
+                        660 ; rs232.c   251 */
+                        661 ; rs232.c   252 FRAME ks_stk *int232i(FRAME ks_stk * frame)
+                        662 ; rs232.c   253 {
+000029 00               663         ALIGN   1
+                        665         PUBLIC  _int232i
+00002A                  666 _int232i:
+00002A 0F10             670         PUSH.W  R4
+00002C A97C             672         ADDS.W  R7,#0CH
+00002E 8C1F02           675         MOV.W   [R7+2],R1
+000031 8A0F             676         MOV.W   [R7],R0
+                        686 ; rs232.c   254 
+                        687 ; rs232.c   255    register unsigned char* Ch0=&ichar[0];
+                        688 ; rs232.c   256    register unsigned char* Ch1=&ichar[1];
+                        689 ; rs232.c   257 
+                        690 ; rs232.c   258    RI_1 = 0;
+000033 080320           692         CLR     0320H
+                        693 ; rs232.c   259 
+                        694 ; rs232.c   260    *Ch0 = S1BUF;
+000036 964842rr         696         MOV.B   ES,#SEG( _ichar )
+00003A 9908rrrr         697         MOV.W   R0,#SOF( _ichar )
+00003E A00464           698         MOV.B   [R0],0464H
+                        699 ; rs232.c   261 
+                        700 ; rs232.c   262    if (*Ch1=(S1STAT & 0x0E) <ERR_OVERFLOW)       // if no errors
+000041 860425           702         MOV.B   R0L,0425H
+000044 91050E           703         AND.B   R0L,#0EH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+000047 910402           704         CMP.B   R0L,#02H
+00004A F002             705         BCC     _28
+00004C B101             706         MOVS.B  R0L,#01H
+00004E FE01             707         BR      _30
+00004E FE01             707         BR      _30
+000050                  708 _28:
+000050 B100             709         MOVS.B  R0L,#00H
+000050 B100             709         MOVS.B  R0L,#00H
+000052                  710 _30:
+000052 964842rr         711         MOV.B   ES,#SEG( _ichar+1 )
+000056 9918rrrr         712         MOV.W   R1,#SOF( _ichar+1 )
+00005A 8209             713         MOV.B   [R1],R0L
+00005C 6100             714         OR.B    R0L,R0L
+00005E F36E             715         BEQ     _27
+                        716 ; rs232.c   263    {
+                        717 ; rs232.c   264     SetInputChar(Ch0,Ch1);
+000060 964842rr         719         MOV.B   ES,#SEG( _LCR )
+000064 9908rrrr         720         MOV.W   R0,#SOF( _LCR )
+000068 8A00             721         MOV.W   R0,[R0]
+00006A 99050003         722         AND.W   R0,#03H
+00006E 99040003         723         CMP.W   R0,#03H
+000072 F20B             724         BNE     _21
+000074 97A32202         725         JNB     0322H,_32
+000078 B101             726         MOVS.B  R0L,#01H
+00007A FE01             727         BR      _33
+00007A FE01             727         BR      _33
+00007C                  728 _32:
+00007C B100             729         MOVS.B  R0L,#00H
+00007C B100             729         MOVS.B  R0L,#00H
+00007E                  730 _33:
+00007E 964842rr         731         MOV.B   ES,#SEG( _ichar+1 )
+000082 9918rrrr         732         MOV.W   R1,#SOF( _ichar+1 )
+000086 8209             733         MOV.B   [R1],R0L
+000088 FE16             734         BR      _22
+000088 FE16             734         BR      _22
+00008A                  735 _21:
+00008A 964842rr         736         MOV.B   ES,#SEG( _ichar )
+00008E 9908rrrr         737         MOV.W   R0,#SOF( _ichar )
+000092 8A00             738         MOV.W   R0,[R0]
+000094 D901             739         ASL.W   R0,#01H
+000096 964842rr         740         MOV.B   ES,#SEG( _ichar )
+00009A 9918rrrr         741         MOV.W   R1,#SOF( _ichar )
+00009E 8A09             742         MOV.W   [R1],R0
+0000A0 964842rr         743         MOV.B   ES,#SEG( _ichar )
+0000A4 9908rrrr         744         MOV.W   R0,#SOF( _ichar )
+0000A8 8200             745         MOV.B   R0L,[R0]
+0000AA D001             746         LSR.B   R0L,#01H
+0000AC 964842rr         747         MOV.B   ES,#SEG( _ichar )
+0000B0 9918rrrr         748         MOV.W   R1,#SOF( _ichar )
+0000B4 8209             749         MOV.B   [R1],R0L
+0000B4 8209             749         MOV.B   [R1],R0L
+0000B6                  750 _22:
+0000B6 964842rr         751         MOV.B   ES,#SEG( _LCR )
+0000BA 9908rrrr         752         MOV.W   R0,#SOF( _LCR )
+0000BE 8A00             753         MOV.W   R0,[R0]
+0000C0 D803             754         LSR.W   R0,#03H
+0000C2 99050003         755         AND.W   R0,#03H
+0000C6 99040003         756         CMP.W   R0,#03H
+0000CA F213             757         BNE     _23
+0000CC 964842rr         758         MOV.B   ES,#SEG( _ichar+1 )
+0000D0 9908rrrr         759         MOV.W   R0,#SOF( _ichar+1 )
+0000D4 8280             760         MOV.B   R4L,[R0]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+0000D6 964842rr         761         MOV.B   ES,#SEG( _ichar )
+0000DA 9908rrrr         762         MOV.W   R0,#SOF( _ichar )
+0000DE 8200             763         MOV.B   R0L,[R0]
+0000E0 C5FF8F           764         CALL    _CheckParity
+0000E3 7108             765         XOR.B   R0L,R4L
+0000E5 964842rr         766         MOV.B   ES,#SEG( _ichar+1 )
+0000E9 9918rrrr         767         MOV.W   R1,#SOF( _ichar+1 )
+0000ED 8209             768         MOV.B   [R1],R0L
+0000EF FE26             769         BR      _27
+0000EF FE2600           769         BR      _27
+0000F2                  770 _23:
+0000F2 964842rr         771         MOV.B   ES,#SEG( _LCR )
+0000F6 9908rrrr         772         MOV.W   R0,#SOF( _LCR )
+0000FA 8A00             773         MOV.W   R0,[R0]
+0000FC D803             774         LSR.W   R0,#03H
+0000FE 99050003         775         AND.W   R0,#03H
+000102 99040001         776         CMP.W   R0,#01H
+000106 F215             777         BNE     _24
+000108 964842rr         778         MOV.B   ES,#SEG( _ichar+1 )
+00010C 9908rrrr         779         MOV.W   R0,#SOF( _ichar+1 )
+000110 8280             780         MOV.B   R4L,[R0]
+000112 964842rr         781         MOV.B   ES,#SEG( _ichar )
+000116 9908rrrr         782         MOV.W   R0,#SOF( _ichar )
+00011A 8200             783         MOV.B   R0L,[R0]
+00011C C5FF71           784         CALL    _CheckParity
+00011F 900A             785         CPL.B   R0L
+000121 910501           786         AND.B   R0L,#01H
+000124 7180             787         XOR.B   R4L,R0L
+000126 964842rr         788         MOV.B   ES,#SEG( _ichar+1 )
+00012A 9908rrrr         789         MOV.W   R0,#SOF( _ichar+1 )
+00012E 8288             790         MOV.B   [R0],R4L
+000130 FE05             791         BR      _27
+000130 FE05             791         BR      _27
+000132                  792 _24:
+000132 964842rr         793         MOV.B   ES,#SEG( _ichar+1 )
+000136 9908rrrr         794         MOV.W   R0,#SOF( _ichar+1 )
+00013A B200             795         MOV.B   [R0],#00H
+                        796 ; rs232.c   265    }
+00013C                  798 _27:
+                        799 ; rs232.c   266    S1STAT = _S1STAT.Byte;         // clear status byte
+00013C 964842rr         801         MOV.B   ES,#SEG( __S1STAT )
+000140 9908rrrr         802         MOV.W   R0,#SOF( __S1STAT )
+000144 8200             803         MOV.B   R0L,[R0]
+000146 860C25           804         MOV.B   0425H,R0L
+                        805 ; rs232.c   267    return(KS_ISRexit(frame, rs232iEvent->ID)); /* wake out input task */
+000149 964842rr         807         MOV.B   ES,#SEG( _rs232iEvent )
+00014D 9938rrrr         808         MOV.W   R3,#SOF( _rs232iEvent )
+000151 8B23             809         MOV.W   R2,[R3+]
+000153 8A33             810         MOV.W   R3,[R3]
+000155 866C42           811         MOV.B   ES,R3L
+000158 84421A           812         MOV.B   R2L,[R2+26]
+00015B 8C1702           813         MOV.W   R1,[R7+2]
+00015E 8A07             814         MOV.W   R0,[R7]
+                        815         CALL    _KS_ISRexit
+000160 C4rrrrrr        +815 ;       FCALL   _KS_ISRexit
+                        819 ; rs232.c   268 }
+000164 A974             821         ADDS.W  R7,#04H
+000166 2F10             823         POP.W   R4
+000168 D680             825         RET
+                        827 ; rs232.c   269 
+                        828 ; rs232.c   270 
+                        829 ; rs232.c   271 static unsigned char junk;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        830 ; rs232.c   272 
+                        831 ; rs232.c   273 void rs232_init(void)
+                        832 ; rs232.c   274 {
+                        833         ALIGN   1
+                        835         PUBLIC  _rs232_init
+00016A                  836 _rs232_init:
+00016A 0F30             840         PUSH.W  R4, R5
+                        842 ; rs232.c   275 
+                        843 ; rs232.c   276   rs232iEvent=newTEvent(0);
+00016C B910             845         MOV.W   R1,#00H
+00016E B900             846         MOV.W   R0,#00H
+                        847         CALL    _newTEvent
+000170 C4rrrrrr        +847 ;       FCALL   _newTEvent
+000174 964842rr         848         MOV.B   ES,#SEG( _rs232iEvent )
+000178 9928rrrr         849         MOV.W   R2,#SOF( _rs232iEvent )
+00017C 8B0A             850         MOV.W   [R2+],R0
+00017E 8A1A             851         MOV.W   [R2],R1
+000180 B910             852         MOV.W   R1,#00H
+000182 B900             853         MOV.W   R0,#00H
+                        854 ; rs232.c   277   rs232oEvent=newTEvent(0);
+                        856         CALL    _newTEvent
+000184 C4rrrrrr        +856 ;       FCALL   _newTEvent
+000188 964842rr         857         MOV.B   ES,#SEG( _rs232oEvent )
+00018C 9928rrrr         858         MOV.W   R2,#SOF( _rs232oEvent )
+000190 8B0A             859         MOV.W   [R2+],R0
+000192 8A1A             860         MOV.W   [R2],R1
+                        861 ; rs232.c   278 
+                        862 ; rs232.c   279   rs232oRes=newTResource(0);
+000194 B910             864         MOV.W   R1,#00H
+000196 B900             865         MOV.W   R0,#00H
+                        866         CALL    _newTResource
+000198 C4rrrrrr        +866 ;       FCALL   _newTResource
+00019C 964842rr         867         MOV.B   ES,#SEG( _rs232oRes )
+0001A0 9928rrrr         868         MOV.W   R2,#SOF( _rs232oRes )
+0001A4 8B0A             869         MOV.W   [R2+],R0
+0001A6 8A1A             870         MOV.W   [R2],R1
+                        871 ; rs232.c   280 
+                        872 ; rs232.c   281   rs232iStream=newTStream(2,512);
+0001A8 B902             874         MOV.W   R0,#02H
+0001AA 99180200         875         MOV.W   R1,#0200H
+                        876         CALL    _newTStream
+0001AE C4rrrrrr        +876 ;       FCALL   _newTStream
+0001B2 964842rr         877         MOV.B   ES,#SEG( _rs232iStream )
+0001B6 9928rrrr         878         MOV.W   R2,#SOF( _rs232iStream )
+0001BA 8B0A             879         MOV.W   [R2+],R0
+0001BC 8A1A             880         MOV.W   [R2],R1
+                        881 ; rs232.c   282   rs232oStream=newTStream(1,64);
+0001BE 99180040         883         MOV.W   R1,#040H
+0001C2 B901             884         MOV.W   R0,#01H
+                        885         CALL    _newTStream
+0001C4 C4rrrrrr        +885 ;       FCALL   _newTStream
+0001C8 964842rr         886         MOV.B   ES,#SEG( _rs232oStream )
+0001CC 9928rrrr         887         MOV.W   R2,#SOF( _rs232oStream )
+0001D0 8B0A             888         MOV.W   [R2+],R0
+0001D2 8A1A             889         MOV.W   [R2],R1
+                        890 ; rs232.c   283 
+                        891 ; rs232.c   284   rs232iThread=newTThread(1,rs232i); 
+0001D4 9938rrrr         893         MOV.W   R3,#SEG( _rs232i )
+0001D8 9928rrrr         894         MOV.W   R2,#SOF( _rs232i )
+0001DC B901             895         MOV.W   R0,#01H
+                        896         CALL    _newTThread
+0001DE C4rrrrrr        +896 ;       FCALL   _newTThread
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+0001E2 964842rr         897         MOV.B   ES,#SEG( _rs232iThread )
+0001E6 9928rrrr         898         MOV.W   R2,#SOF( _rs232iThread )
+0001EA 8B0A             899         MOV.W   [R2+],R0
+0001EC 8A1A             900         MOV.W   [R2],R1
+                        901 ; rs232.c   285   rs232oThread=newTThread(3,rs232o);          // CHG. 2 to 3 KEN 270100
+0001EE B903             903         MOV.W   R0,#03H
+0001F0 9938rrrr         904         MOV.W   R3,#SEG( _rs232o )
+0001F4 9928rrrr         905         MOV.W   R2,#SOF( _rs232o )
+                        906         CALL    _newTThread
+0001F8 C4rrrrrr        +906 ;       FCALL   _newTThread
+0001FC 964842rr         907         MOV.B   ES,#SEG( _rs232oThread )
+000200 9928rrrr         908         MOV.W   R2,#SOF( _rs232oThread )
+000204 8B0A             909         MOV.W   [R2+],R0
+000206 8A1A             910         MOV.W   [R2],R1
+                        911 ; rs232.c   286 
+                        912 ; rs232.c   287   rs232iThread->Execute(rs232iThread);
+000208 964842rr         914         MOV.B   ES,#SEG( _rs232iThread )
+00020C 9918rrrr         915         MOV.W   R1,#SOF( _rs232iThread )
+000210 8B01             916         MOV.W   R0,[R1+]
+000212 8A11             917         MOV.W   R1,[R1]
+000214 862C42           918         MOV.B   ES,R1L
+000217 8C4006           919         MOV.W   R4,[R0+6]
+00021A 8C5008           920         MOV.W   R5,[R0+8]
+00021D C4rrrrrr         921         FCALL   __ICALL
+                        922 ; rs232.c   288   rs232oThread->Execute(rs232oThread);
+000221 964842rr         924         MOV.B   ES,#SEG( _rs232oThread )
+000225 9918rrrr         925         MOV.W   R1,#SOF( _rs232oThread )
+000229 8B01             926         MOV.W   R0,[R1+]
+00022B 8A11             927         MOV.W   R1,[R1]
+00022D 862C42           928         MOV.B   ES,R1L
+000230 8C4006           929         MOV.W   R4,[R0+6]
+000233 8C5008           930         MOV.W   R5,[R0+8]
+000236 C4rrrrrr         931         FCALL   __ICALL
+                        932 ; rs232.c   289 
+                        933 ; rs232.c   290 
+                        934 ; rs232.c   291   /* IEL - Interrupt Enable Register */
+                        935 ; rs232.c   292   ET1 = 0;    /* Timer 1 enable bit  - disnabled */
+00023A 080333           937         CLR     0333H
+                        938 ; rs232.c   293 
+                        939 ; rs232.c   294   /* S1CON - serial port 1 control register */
+                        940 ; rs232.c   295   S1CON = _S1CON.Byte = xS1CON;
+00023D 964842rr         942         MOV.B   ES,#SEG( __S1CON )
+000241 9908rrrr         943         MOV.W   R0,#SOF( __S1CON )
+000245 920840           944         MOV.B   [R0],#040H
+000248 96482440         945         MOV.B   0424H,#040H
+                        946 ; rs232.c   296 
+                        947 ; rs232.c   297   /* S1STAT - serial port 1 control/status register */
+                        948 ; rs232.c   298   _S1STAT.Byte=0x01;
+00024C 964842rr         950         MOV.B   ES,#SEG( __S1STAT )
+000250 9908rrrr         951         MOV.W   R0,#SOF( __S1STAT )
+000254 B201             952         MOV.B   [R0],#01H
+                        953 ; rs232.c   299   S1STAT = _S1STAT.Byte;
+000256 B64125           955         MOV.B   0425H,#01H
+                        956 ; rs232.c   300   
+                        957 ; rs232.c   301   /* Timer/Counter Mode Control Register */
+                        958 ; rs232.c   302   TMOD &= 0x0F;   /* clear timer1 settings */
+000259 96455C0F         960         AND.B   045CH,#0FH
+                        961 ; rs232.c   303   TMOD |= xTMOD;
+                        962 ; rs232.c   304   
+                        963 ; rs232.c   305   /* Timer/Counter Control Register */
+                        964 ; rs232.c   306   TCON &= 0x3F;   /* clear timer1 settings */
+00025D 9645103F         966         AND.B   0410H,#03FH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        967 ; rs232.c   307   TCON |= xTCON;
+000261 96461040         969         OR.B    0410H,#040H
+                        970 ; rs232.c   308 
+                        971 ; rs232.c   309   /* Interrupt priority 5 */
+                        972 ; rs232.c   310   IPA5 = (TX1INTLVL<<4) + RX1INTLVL;
+000265 9648A59A         974         MOV.B   04A5H,#09AH
+                        975 ; rs232.c   311 
+                        976 ; rs232.c   312   rs232Setup(9600,8,'N','N');   
+000269 B910             978         MOV.W   R1,#00H
+00026B 99082580         979         MOV.W   R0,#02580H
+00026F 914808           980         MOV.B   R2L,#08H
+000272 91684E           981         MOV.B   R3L,#04EH
+000275 8156             982         MOV.B   R2H,R3L
+000277 C50118           983         CALL    _rs232Setup
+                        984 ; rs232.c   313 
+                        985 ; rs232.c   314 
+                        986 ; rs232.c   315   junk = S1BUF; /* read input to clear */
+00027A 964842rr         988         MOV.B   ES,#SEG( _junk )
+00027E 9908rrrr         989         MOV.W   R0,#SOF( _junk )
+000282 A00464           990         MOV.B   [R0],0464H
+                        991 ; rs232.c   316   junk = S1BUF; /* read input to clear */
+000285 964842rr         993         MOV.B   ES,#SEG( _junk )
+000289 9908rrrr         994         MOV.W   R0,#SOF( _junk )
+00028D A00464           995         MOV.B   [R0],0464H
+                        996 ; rs232.c   317 
+                        997 ; rs232.c   318 }
+000290 2F30             999         POP.W   R4, R5
+000292 D680            1001         RET
+                       1003 ; rs232.c   319 
+                       1004 ; rs232.c   320 
+                       1005 ; rs232.c   321 void rs232_stop(void)
+                       1006 ; rs232.c   322 {
+                       1007         ALIGN   1
+                       1009         PUBLIC  _rs232_stop
+000294                 1010 _rs232_stop:
+                       1014 ; rs232.c   323 }
+000294 D680            1016         RET
+                       1022 ; rs232.c   324 
+                       1023 ; rs232.c   325 
+                       1024 ; rs232.c   326 
+                       1025 ; rs232.c   327  static bool echo=false;
+000000                 1026 RS232_INI_FA    SEGMENT HDATA INSEGMENT INIT
+000000                 1027         RSEG    RS232_INI_FA
+                       1029         ALIGN   1
+                       1030 ; rs232.c   328 
+                       1031 ; rs232.c   329 
+                       1032 ; rs232.c   330 /* TASK */
+                       1033 ; rs232.c   331 void rs232i(void)
+                       1034 ; rs232.c   332 {
+000000 0000            1035 _echo:  DW      00000H
+000296                 1036         RSEG    RS232_PR
+                       1037         ALIGN   1
+                       1039         PUBLIC  _rs232i
+000296                 1040 _rs232i:
+000296 0F30            1044         PUSH.W  R4, R5
+                       1046 ; rs232.c   333   for (;;)
+000298                 1048 _38:
+000298                 1048 _38:
+000298                 1049 _39:
+000298                 1049 _39:
+000298                 1050 _40:
+                       1051 ; rs232.c   334   {
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                       1052 ; rs232.c   335     rs232iEvent->Wait(rs232iEvent,0);
+000298 964842rr        1054         MOV.B   ES,#SEG( _rs232iEvent )
+00029C 9918rrrr        1055         MOV.W   R1,#SOF( _rs232iEvent )
+0002A0 8B01            1056         MOV.W   R0,[R1+]
+0002A2 8A11            1057         MOV.W   R1,[R1]
+0002A4 862C42          1058         MOV.B   ES,R1L
+0002A7 8C400A          1059         MOV.W   R4,[R0+10]
+0002AA 8C500C          1060         MOV.W   R5,[R0+12]
+0002AD B930            1061         MOV.W   R3,#00H
+0002AF B920            1062         MOV.W   R2,#00H
+0002B1 C4rrrrrr        1063         FCALL   __ICALL
+                       1064 ; rs232.c   336 
+                       1065 ; rs232.c   337     if (ichar[0]=='\r')
+0002B5 964842rr        1067         MOV.B   ES,#SEG( _ichar )
+0002B9 9908rrrr        1068         MOV.W   R0,#SOF( _ichar )
+0002BD 8200            1069         MOV.B   R0L,[R0]
+0002BF 91040D          1070         CMP.B   R0L,#0DH
+0002C2 F206            1071         BNE     _41
+                       1072 ; rs232.c   338            ichar[0]='\n';
+0002C4 964842rr        1074         MOV.B   ES,#SEG( _ichar )
+0002C8 9908rrrr        1075         MOV.W   R0,#SOF( _ichar )
+0002CC 92080A          1076         MOV.B   [R0],#0AH
+0002CC 92080A00        1076         MOV.B   [R0],#0AH
+0002D0                 1077 _41:
+                       1078 ; rs232.c   339 
+                       1079 ; rs232.c   340     if (ichar[0]=='@')
+0002D0 964842rr        1081         MOV.B   ES,#SEG( _ichar )
+0002D4 9908rrrr        1082         MOV.W   R0,#SOF( _ichar )
+0002D8 8200            1083         MOV.B   R0L,[R0]
+0002DA 910440          1084         CMP.B   R0L,#040H
+0002DD F21F            1085         BNE     _43
+                       1086 ; rs232.c   341     {
+                       1087 ; rs232.c   342       if (echo)
+0002DF 964842rr        1089         MOV.B   ES,#SEG( _echo )
+0002E3 9908rrrr        1090         MOV.W   R0,#SOF( _echo )
+0002E7 8A00            1091         MOV.W   R0,[R0]
+0002E9 F30C            1092         BEQ     _42
+                       1093 ; rs232.c   343       {
+                       1094 ; rs232.c   344         echo=false;
+0002EB 964842rr        1096         MOV.B   ES,#SEG( _echo )
+0002EF 9908rrrr        1097         MOV.W   R0,#SOF( _echo )
+0002F3 BA00            1098         MOV.W   [R0],#00H
+                       1099 ; rs232.c   345         rs232puts("Echo OFF.\r\n");
+0002F5 9918rrrr        1101         MOV.W   R1,#SEG( _36 )
+0002F9 9908rrrr        1102         MOV.W   R0,#SOF( _36 )
+0002FD C5020A          1103         CALL    _rs232puts
+                       1104 ; rs232.c   346       }
+000300 FECB            1106         BR      _40
+000300 FECB            1106         BR      _40
+000302                 1107 _42:
+                       1108 ; rs232.c   347       else
+                       1109 ; rs232.c   348       {
+                       1110 ; rs232.c   349        echo=true;
+000302 964842rr        1112         MOV.B   ES,#SEG( _echo )
+000306 9908rrrr        1113         MOV.W   R0,#SOF( _echo )
+00030A 9A08FFFF        1114         MOV.W   [R0],#0FFFFH
+                       1115 ; rs232.c   350         rs232puts("Echo ON.\n");
+00030E 9918rrrr        1117         MOV.W   R1,#SEG( _37 )
+000312 9908rrrr        1118         MOV.W   R0,#SOF( _37 )
+000316 C501FE          1119         CALL    _rs232puts
+                       1120 ; rs232.c   351       }
+                       1121 ; rs232.c   352     }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000319 FEBF            1123         BR      _39
+000319 FEBF00          1123         BR      _39
+00031C                 1124 _43:
+                       1125 ; rs232.c   353     else
+                       1126 ; rs232.c   354     {
+                       1127 ; rs232.c   355       if (echo)
+00031C 964842rr        1129         MOV.B   ES,#SEG( _echo )
+000320 9908rrrr        1130         MOV.W   R0,#SOF( _echo )
+000324 8A00            1131         MOV.W   R0,[R0]
+000326 F307            1132         BEQ     _44
+                       1133 ; rs232.c   356       {
+                       1134 ; rs232.c   357         rs232putchar(ichar[0]);
+000328 964842rr        1136         MOV.B   ES,#SEG( _ichar )
+00032C 9908rrrr        1137         MOV.W   R0,#SOF( _ichar )
+000330 8200            1138         MOV.B   R0L,[R0]
+000332 C501BF          1139         CALL    _rs232putchar
+                       1140 ; rs232.c   358       }
+000336                 1142 _44:
+                       1143 ; rs232.c   359 
+                       1144 ; rs232.c   360       rs232iStream->Put(rs232iStream,&ichar);
+000336 964842rr        1146         MOV.B   ES,#SEG( _rs232iStream )
+00033A 9918rrrr        1147         MOV.W   R1,#SOF( _rs232iStream )
+00033E 8B01            1148         MOV.W   R0,[R1+]
+000340 8A11            1149         MOV.W   R1,[R1]
+000342 862C42          1150         MOV.B   ES,R1L
+000345 8C400E          1151         MOV.W   R4,[R0+14]
+000348 8C5010          1152         MOV.W   R5,[R0+16]
+00034B 9938rrrr        1153         MOV.W   R3,#SEG( _ichar )
+00034F 9928rrrr        1154         MOV.W   R2,#SOF( _ichar )
+000353 C4rrrrrr        1155         FCALL   __ICALL
+000357 FEA0            1157         BR      _38
+                       1158 ; rs232.c   361     }
+                       1159 ; rs232.c   362   }
+                       1160 ; rs232.c   363 }
+000359 2F30            1162         POP.W   R4, R5
+00035B D680            1164         RET
+                       1166 ; rs232.c   364 
+                       1167 ; rs232.c   365 
+                       1168 ; rs232.c   366 
+                       1169 ; rs232.c   367 /* TASK */
+                       1170 ; rs232.c   368 void rs232o(void)
+                       1171 ; rs232.c   369 {
+00035D 00              1172         ALIGN   1
+                       1174         PUBLIC  _rs232o
+00035E                 1175 _rs232o:
+00035E 0F30            1179         PUSH.W  R4, R5
+000360 A97E            1181         ADDS.W  R7,#0EH
+                       1184 ; rs232.c   370   char ochar; /* output char */
+                       1185 ; rs232.c   371 
+                       1186 ; rs232.c   372   for (;;)
+000362                 1188 _56:
+                       1189 ; rs232.c   373   {
+                       1190 ; rs232.c   374     rs232oStream->Get(rs232oStream,&ochar);
+000362 964842rr        1192         MOV.B   ES,#SEG( _rs232oStream )
+000366 9918rrrr        1193         MOV.W   R1,#SOF( _rs232oStream )
+00036A 8B01            1194         MOV.W   R0,[R1+]
+00036C 8A11            1195         MOV.W   R1,[R1]
+00036E 862C42          1196         MOV.B   ES,R1L
+000371 8C400A          1197         MOV.W   R4,[R0+10]
+000374 8C500C          1198         MOV.W   R5,[R0+12]
+000377 9168rr          1199         MOV.B   R3L,#SEG( __lc_bs )
+00037A 7177            1200         XOR.B   R3H,R3H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+00037C 8927            1201         MOV.W   R2,R7
+00037E C4rrrrrr        1202         FCALL   __ICALL
+                       1203 ; rs232.c   375 
+                       1204 ; rs232.c   376     if ((ochar == '\n') && (echo))
+000382 92740A          1206         CMP.B   [R7],#0AH
+000385 F24A            1207         BNE     _61
+000387 964842rr        1208         MOV.B   ES,#SEG( _echo )
+00038B 9908rrrr        1209         MOV.W   R0,#SOF( _echo )
+00038F 8A00            1210         MOV.W   R0,[R0]
+000391 F344            1211         BEQ     _61
+                       1212 ; rs232.c   377     {
+                       1213 ; rs232.c   378       SetOutputChar('\r');
+000393 964842rr        1215         MOV.B   ES,#SEG( _LCR )
+000397 9908rrrr        1216         MOV.W   R0,#SOF( _LCR )
+00039B 8A00            1217         MOV.W   R0,[R0]
+00039D D803            1218         LSR.W   R0,#03H
+00039F 99050003        1219         AND.W   R0,#03H
+0003A3 F329            1220         BEQ     _59
+0003A5 91080D          1221         MOV.B   R0L,#0DH
+0003A8 C5FE2B          1222         CALL    _CheckParity
+0003AB 6100            1223         OR.B    R0L,R0L
+0003AD 080000          1224         CLR     R0.0
+0003B0 F302            1225         BEQ     _66
+0003B2 081000          1226         SETB    R0.0
+0003B2 08100000        1226         SETB    R0.0
+0003B6                 1227 _66:
+0003B6 082000          1228         MOV     C,R0.0
+0003B9 083323          1229         MOV     0323H,C
+0003BC 964842rr        1230         MOV.B   ES,#SEG( _LCR )
+0003C0 9908rrrr        1231         MOV.W   R0,#SOF( _LCR )
+0003C4 8A00            1232         MOV.W   R0,[R0]
+0003C6 D803            1233         LSR.W   R0,#03H
+0003C8 99050003        1234         AND.W   R0,#03H
+0003CC 99040001        1235         CMP.W   R0,#01H
+0003D0 F208            1236         BNE     _57
+0003D2 082323          1237         MOV     C,0323H
+0003D5 96470080        1238         XOR.B   PSWL,#080H
+0003D9 083000          1239         MOV     R0.0,C
+0003DC 082000          1240         MOV     C,R0.0
+0003DF 083323          1241         MOV     0323H,C
+0003DF 083323          1241         MOV     0323H,C
+0003E2                 1242 _57:
+0003E2 964842rr        1243         MOV.B   ES,#SEG( _LCR )
+0003E6 9908rrrr        1244         MOV.W   R0,#SOF( _LCR )
+0003EA 8A00            1245         MOV.W   R0,[R0]
+0003EC 99050003        1246         AND.W   R0,#03H
+0003F0 99040002        1247         CMP.W   R0,#02H
+0003F4 F200            1248         BNE     _59
+0003F4 F200            1248         BNE     _59
+0003F6                 1249 _59:
+                       1250 ; rs232.c   379       S1BUF = '\r'; 
+0003F6 9648640D        1252         MOV.B   0464H,#0DH
+                       1253 ; rs232.c   380    TI_1 = 0;
+0003FA 080321          1255         CLR     0321H
+                       1256 ; rs232.c   381            rs232oEvent->Wait(rs232oEvent,0);
+0003FD 964842rr        1258         MOV.B   ES,#SEG( _rs232oEvent )
+000401 9918rrrr        1259         MOV.W   R1,#SOF( _rs232oEvent )
+000405 8B01            1260         MOV.W   R0,[R1+]
+000407 8A11            1261         MOV.W   R1,[R1]
+000409 862C42          1262         MOV.B   ES,R1L
+00040C 8C400A          1263         MOV.W   R4,[R0+10]
+00040F 8C500C          1264         MOV.W   R5,[R0+12]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+000412 B930            1265         MOV.W   R3,#00H
+000414 B920            1266         MOV.W   R2,#00H
+000416 C4rrrrrr        1267         FCALL   __ICALL
+                       1268 ; rs232.c   382     }
+00041A                 1270 _61:
+                       1271 ; rs232.c   383 
+                       1272 ; rs232.c   384     SetOutputChar(ochar);
+00041A 8207            1274         MOV.B   R0L,[R7]
+00041C 964842rr        1275         MOV.B   ES,#SEG( _LCR )
+000420 9918rrrr        1276         MOV.W   R1,#SOF( _LCR )
+000424 8A11            1277         MOV.W   R1,[R1]
+000426 D813            1278         LSR.W   R1,#03H
+000428 99150003        1279         AND.W   R1,#03H
+00042C F327            1280         BEQ     _64
+00042E C5FDE8          1281         CALL    _CheckParity
+000431 6100            1282         OR.B    R0L,R0L
+000433 080000          1283         CLR     R0.0
+000436 F302            1284         BEQ     _69
+000438 081000          1285         SETB    R0.0
+000438 08100000        1285         SETB    R0.0
+00043C                 1286 _69:
+00043C 082000          1287         MOV     C,R0.0
+00043F 083323          1288         MOV     0323H,C
+000442 964842rr        1289         MOV.B   ES,#SEG( _LCR )
+000446 9908rrrr        1290         MOV.W   R0,#SOF( _LCR )
+00044A 8A00            1291         MOV.W   R0,[R0]
+00044C D803            1292         LSR.W   R0,#03H
+00044E 99050003        1293         AND.W   R0,#03H
+000452 99040001        1294         CMP.W   R0,#01H
+000456 F208            1295         BNE     _62
+000458 082323          1296         MOV     C,0323H
+00045B 96470080        1297         XOR.B   PSWL,#080H
+00045F 083000          1298         MOV     R0.0,C
+000462 082000          1299         MOV     C,R0.0
+000465 083323          1300         MOV     0323H,C
+000465 083323          1300         MOV     0323H,C
+000468                 1301 _62:
+000468 964842rr        1302         MOV.B   ES,#SEG( _LCR )
+00046C 9908rrrr        1303         MOV.W   R0,#SOF( _LCR )
+000470 8A00            1304         MOV.W   R0,[R0]
+000472 99050003        1305         AND.W   R0,#03H
+000476 99040002        1306         CMP.W   R0,#02H
+00047A F200            1307         BNE     _64
+00047A F200            1307         BNE     _64
+00047C                 1308 _64:
+                       1309 ; rs232.c   385 
+                       1310 ; rs232.c   386     S1BUF = ochar; /* write char to port */
+00047C 8207            1312         MOV.B   R0L,[R7]
+00047E 860C64          1313         MOV.B   0464H,R0L
+                       1314 ; rs232.c   387    TI_1 = 0;
+000481 080321          1316         CLR     0321H
+                       1317 ; rs232.c   388 
+                       1318 ; rs232.c   389     rs232oEvent->Wait(rs232oEvent,0);
+000484 964842rr        1320         MOV.B   ES,#SEG( _rs232oEvent )
+000488 9918rrrr        1321         MOV.W   R1,#SOF( _rs232oEvent )
+00048C 8B01            1322         MOV.W   R0,[R1+]
+00048E 8A11            1323         MOV.W   R1,[R1]
+000490 862C42          1324         MOV.B   ES,R1L
+000493 8C400A          1325         MOV.W   R4,[R0+10]
+000496 8C500C          1326         MOV.W   R5,[R0+12]
+000499 B930            1327         MOV.W   R3,#00H
+00049B B920            1328         MOV.W   R2,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+00049D C4rrrrrr        1329         FCALL   __ICALL
+                       1331         BR      _56
+0004A1 D5FF5F         +1331         JMP.L   _56
+                       1332 ; rs232.c   390   }
+                       1333 ; rs232.c   391 }
+0004A4 A972            1335         ADDS.W  R7,#02H
+0004A6 2F30            1337         POP.W   R4, R5
+0004A8 D680            1339         RET
+                       1341 ; rs232.c   392 
+                       1342 ; rs232.c   393 
+                       1343 ; rs232.c   394 int rs232Setup(unsigned long Baud, unsigned char Data, unsigned char Parity, unsi
+                            gned char Hndshk)
+                       1344 ; rs232.c   395 {
+                       1345         ALIGN   1
+                       1347         PUBLIC  _rs232Setup
+0004AA                 1348 _rs232Setup:
+0004AA 0F70            1352         PUSH.W  R4, R5, R6
+0004AC 99720018        1354         SUB.W   R7,#018H
+0004B0 846F10          1360         MOV.B   [R7+16],R3L
+0004B3 845F12          1363         MOV.B   [R7+18],R2H
+0004B6 844F14          1366         MOV.B   [R7+20],R2L
+                       1378 ; rs232.c   396   union
+                       1379 ; rs232.c   397   {
+                       1380 ; rs232.c   398     unsigned int  Int;
+                       1381 ; rs232.c   399          unsigned char Byte[2];
+                       1382 ; rs232.c   400   }BaudRate;
+                       1383 ; rs232.c   401 
+                       1384 ; rs232.c   402   BaudRate.Int=(unsigned short)(TIMER1_RANGE-(CRYSTAL/(Baud*PRESCALER*(unsigned l
+                            ong)16)));
+0004B9 9C780E40F0      1386         MOV.W   [R7+14],#040F0H
+0004BE BC700C          1387         MOV.W   [R7+12],#00H
+0004C1 BC700A          1388         MOV.W   [R7+10],#00H
+0004C4 BC7008          1389         MOV.W   [R7+8],#00H
+0004C7 9C7806417C      1390         MOV.W   [R7+6],#0417CH
+0004CC 9C78042000      1391         MOV.W   [R7+4],#02000H
+0004D1 BC7002          1392         MOV.W   [R7+2],#00H
+0004D4 BA70            1393         MOV.W   [R7],#00H
+0004D6 DD06            1394         ASL.D   R0,#06H
+0004D8 C4rrrrrr        1396         FCALL   __UL2DPF
+0004DC 8967            1397         MOV.W   R6,R7
+0004DE C4rrrrrr        1398         FCALL   __DIVR_DPF
+0004E2 406708          1399         LEA     R6,R7+8
+0004E5 C4rrrrrr        1400         FCALL   __SUBR_DPF
+0004E9 C4rrrrrr        1401         FCALL   __DPF2US
+0004ED 8C0F16          1402         MOV.W   [R7+22],R0
+                       1403 ; rs232.c   403 
+                       1404 ; rs232.c   404   switch ( Parity)
+0004F0 840712          1406         MOV.B   R0L,[R7+18]
+0004F3 91044E          1407         CMP.B   R0L,#04EH
+0004F6 F309            1408         BEQ     _98
+0004F8 91044F          1409         CMP.B   R0L,#04FH
+0004FB F307            1410         BEQ     _98
+0004FD 910445          1411         CMP.B   R0L,#045H
+000500 F304            1412         BEQ     _98
+000502 FE00            1413         BR      _95
+                       1416 ; rs232.c   405   {
+                       1417 ; rs232.c   406     case 'N':
+                       1418 ; rs232.c   407            Parity = 0;
+                       1419 ; rs232.c   408            break;
+                       1420 ; rs232.c   409 
+                       1421 ; rs232.c   410          case 'O':
+                       1422 ; rs232.c   411            Parity = 1;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                       1423 ; rs232.c   412            break;
+                       1424 ; rs232.c   413 
+                       1425 ; rs232.c   414          case 'E':
+                       1426 ; rs232.c   415            Parity = 3;
+                       1427 ; rs232.c   416            break;
+                       1428 ; rs232.c   417 
+                       1429 ; rs232.c   418          default:
+000504                 1431 _95:
+                       1432 ; rs232.c   419       return( 0);
+000504 B900            1434         MOV.W   R0,#00H
+                       1436         BR      _113
+000506 D500D1         +1436         JMP.L   _113
+                       1437 ; rs232.c   420   }
+00050A                 1439 _98:
+                       1444 ; rs232.c   421 
+                       1445 ; rs232.c   422   switch ( Hndshk)
+00050A 9474104E        1447         CMP.B   [R7+16],#04EH
+00050E F310            1448         BEQ     _102
+000510 94741058        1449         CMP.B   [R7+16],#058H
+000514 F304            1450         BEQ     _99
+000516 94741048        1451         CMP.B   [R7+16],#048H
+00051A F304            1452         BEQ     _100
+00051C FE06            1453         BR      _101
+                       1454 ; rs232.c   423   {
+                       1455 ; rs232.c   424     case 'N':
+                       1456 ; rs232.c   425            Parity = 0;
+                       1457 ; rs232.c   426            break;
+                       1458 ; rs232.c   427 
+                       1459 ; rs232.c   428          case 'X':
+00051E                 1461 _99:
+                       1462 ; rs232.c   429            Parity = 1;
+00051E 915801          1464         MOV.B   R2H,#01H
+                       1466 ; rs232.c   430            break;
+000521 FE09            1468         BR      _104
+                       1469 ; rs232.c   431 
+                       1470 ; rs232.c   432          case 'H':
+000524                 1472 _100:
+                       1473 ; rs232.c   433            Parity = 2;
+000524 915802          1475         MOV.B   R2H,#02H
+                       1478 ; rs232.c   434            break;
+000527 FE06            1480         BR      _104
+                       1481 ; rs232.c   435 
+                       1482 ; rs232.c   436          default:
+00052A                 1484 _101:
+                       1485 ; rs232.c   437       return( 0);
+00052A B900            1487         MOV.W   R0,#00H
+                       1488         BR      _113
+00052C D500BE         +1488         JMP.L   _113
+000530                 1490 _102:
+000530 915800          1496         MOV.B   R2H,#00H
+                       1499 ; rs232.c   438   }
+000534                 1501 _104:
+                       1502 ; rs232.c   439 
+                       1503 ; rs232.c   440   if ( Data == 7)
+000534 94741407        1505         CMP.B   [R7+20],#07H
+000538 F211            1506         BNE     _105
+                       1507 ; rs232.c   441     LCR.Bits.DataBits = 2;
+00053A B902            1509         MOV.W   R0,#02H
+00053C 99050003        1510         AND.W   R0,#03H
+000540 964842rr        1511         MOV.B   ES,#SEG( _LCR )
+000544 9918rrrr        1512         MOV.W   R1,#SOF( _LCR )
+000548 8A11            1513         MOV.W   R1,[R1]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+00054A 9915FFFC        1514         AND.W   R1,#0FFFCH
+00054E 6901            1515         OR.W    R0,R1
+000550 964842rr        1516         MOV.B   ES,#SEG( _LCR )
+000554 9918rrrr        1517         MOV.W   R1,#SOF( _LCR )
+000558 8A09            1518         MOV.W   [R1],R0
+00055A FE17            1519         BR      _107
+00055A FE17            1519         BR      _107
+00055C                 1520 _105:
+                       1523 ; rs232.c   442   else if ( Data == 8)
+00055C 840714          1525         MOV.B   R0L,[R7+20]
+00055F 910408          1526         CMP.B   R0L,#08H
+000562 F303            1529         BEQ     _106
+                       1530 ; rs232.c   443     LCR.Bits.DataBits = 3;
+                       1531 ; rs232.c   444   else
+                       1532 ; rs232.c   445     return( 0);
+000564 B900            1534         MOV.W   R0,#00H
+                       1536         BR      _113
+000566 D500A1         +1536         JMP.L   _113
+00056A                 1538 _106:
+00056A B903            1543         MOV.W   R0,#03H
+00056C 99050003        1544         AND.W   R0,#03H
+000570 964842rr        1545         MOV.B   ES,#SEG( _LCR )
+000574 9918rrrr        1546         MOV.W   R1,#SOF( _LCR )
+000578 8A11            1547         MOV.W   R1,[R1]
+00057A 9915FFFC        1548         AND.W   R1,#0FFFCH
+00057E 6901            1549         OR.W    R0,R1
+000580 964842rr        1550         MOV.B   ES,#SEG( _LCR )
+000584 9918rrrr        1551         MOV.W   R1,#SOF( _LCR )
+000588 8A09            1552         MOV.W   [R1],R0
+00058A                 1554 _107:
+                       1555 ; rs232.c   446 
+                       1556 ; rs232.c   447   LCR.Bits.Parity = Parity;
+00058A 8145            1558         MOV.B   R2L,R2H
+00058C B150            1559         MOVS.B  R2H,#00H
+00058E 99250003        1561         AND.W   R2,#03H
+000592 D923            1562         ASL.W   R2,#03H
+000594 964842rr        1563         MOV.B   ES,#SEG( _LCR )
+000598 9908rrrr        1564         MOV.W   R0,#SOF( _LCR )
+00059C 8A00            1565         MOV.W   R0,[R0]
+00059E 9905FFE7        1566         AND.W   R0,#0FFE7H
+0005A2 6920            1567         OR.W    R2,R0
+0005A4 964842rr        1568         MOV.B   ES,#SEG( _LCR )
+0005A8 9908rrrr        1569         MOV.W   R0,#SOF( _LCR )
+0005AC 8A28            1570         MOV.W   [R0],R2
+                       1571 ; rs232.c   448   LCR.Bits.HandShk = Hndshk;
+0005AE 840710          1573         MOV.B   R0L,[R7+16]
+0005B1 B110            1574         MOVS.B  R0H,#00H
+0005B3 99050003        1578         AND.W   R0,#03H
+0005B7 D905            1579         ASL.W   R0,#05H
+0005B9 964842rr        1580         MOV.B   ES,#SEG( _LCR )
+0005BD 9918rrrr        1581         MOV.W   R1,#SOF( _LCR )
+0005C1 8A11            1582         MOV.W   R1,[R1]
+0005C3 9915FF9F        1583         AND.W   R1,#0FF9FH
+0005C7 6901            1584         OR.W    R0,R1
+0005C9 964842rr        1585         MOV.B   ES,#SEG( _LCR )
+0005CD 9918rrrr        1586         MOV.W   R1,#SOF( _LCR )
+0005D1 8A09            1587         MOV.W   [R1],R0
+                       1588 ; rs232.c   449 
+                       1589 ; rs232.c   450   ETI1 = 0;   // transmit port 1 - disabled
+0005D3 08033B          1591         CLR     033BH
+                       1592 ; rs232.c   451   ERI1 = 0;   // receive port 1 - disabled
+0005D6 08033A          1594         CLR     033AH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+                       1595 ; rs232.c   452   REN_1= 0;
+0005D9 080324          1597         CLR     0324H
+                       1598 ; rs232.c   453   TR1  = 0;
+0005DC 080286          1600         CLR     0286H
+                       1601 ; rs232.c   454 
+                       1602 ; rs232.c   455   TL1 = RTL1 = BaudRate.Byte[0];  // Timer/Counter 1
+0005DF 840716          1604         MOV.B   R0L,[R7+22]
+0005E2 860C56          1605         MOV.B   0456H,R0L
+0005E5 97445256        1606         MOV.B   0452H,0456H
+                       1607 ; rs232.c   456   TH1 = RTH1 = BaudRate.Byte[1];
+0005E9 840717          1609         MOV.B   R0L,[R7+23]
+0005EC 860C57          1610         MOV.B   0457H,R0L
+0005EF 97445357        1611         MOV.B   0453H,0457H
+                       1612 ; rs232.c   457 
+                       1613 ; rs232.c   458         if (( LCR.Bits.DataBits == 2) || ( LCR.Bits.Parity == 0))     // if datab
+                            its==7 || parity==None
+0005F3 964842rr        1615         MOV.B   ES,#SEG( _LCR )
+0005F7 9908rrrr        1616         MOV.W   R0,#SOF( _LCR )
+0005FB 8A00            1617         MOV.W   R0,[R0]
+0005FD 99050003        1618         AND.W   R0,#03H
+000601 99040002        1619         CMP.W   R0,#02H
+000605 F30A            1620         BEQ     _108
+000607 964842rr        1621         MOV.B   ES,#SEG( _LCR )
+00060B 9908rrrr        1622         MOV.W   R0,#SOF( _LCR )
+00060F 8A00            1623         MOV.W   R0,[R0]
+000611 D803            1624         LSR.W   R0,#03H
+000613 99050003        1625         AND.W   R0,#03H
+000617 F213            1626         BNE     _109
+000617 F21300          1626         BNE     _109
+00061A                 1627 _108:
+                       1628 ; rs232.c   459                 _S1CON.Bits.Mode = 1;       //  8 bit serial mode
+00061A B901            1630         MOV.W   R0,#01H
+00061C 99050003        1631         AND.W   R0,#03H
+000620 D906            1632         ASL.W   R0,#06H
+000622 964842rr        1633         MOV.B   ES,#SEG( __S1CON )
+000626 9918rrrr        1634         MOV.W   R1,#SOF( __S1CON )
+00062A 8A11            1635         MOV.W   R1,[R1]
+00062C 9915FF3F        1636         AND.W   R1,#0FF3FH
+000630 6901            1637         OR.W    R0,R1
+000632 964842rr        1638         MOV.B   ES,#SEG( __S1CON )
+000636 9918rrrr        1639         MOV.W   R1,#SOF( __S1CON )
+00063A 8A09            1640         MOV.W   [R1],R0
+00063C FE11            1641         BR      _110
+00063C FE11            1641         BR      _110
+00063E                 1642 _109:
+                       1643 ; rs232.c   460         else                                                 // else
+                       1644 ; rs232.c   461                 _S1CON.Bits.Mode = 3;       //  9 bit serial mode
+00063E B903            1646         MOV.W   R0,#03H
+000640 99050003        1647         AND.W   R0,#03H
+000644 D906            1648         ASL.W   R0,#06H
+000646 964842rr        1649         MOV.B   ES,#SEG( __S1CON )
+00064A 9918rrrr        1650         MOV.W   R1,#SOF( __S1CON )
+00064E 8A11            1651         MOV.W   R1,[R1]
+000650 9915FF3F        1652         AND.W   R1,#0FF3FH
+000654 6901            1653         OR.W    R0,R1
+000656 964842rr        1654         MOV.B   ES,#SEG( __S1CON )
+00065A 9918rrrr        1655         MOV.W   R1,#SOF( __S1CON )
+00065E 8A09            1656         MOV.W   [R1],R0
+00065E 8A09            1656         MOV.W   [R1],R0
+000660                 1657 _110:
+                       1658 ; rs232.c   462         S1CON = _S1CON.Byte;              // write S1CON register
+000660 964842rr        1660         MOV.B   ES,#SEG( __S1CON )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+000664 9908rrrr        1661         MOV.W   R0,#SOF( __S1CON )
+000668 8200            1662         MOV.B   R0L,[R0]
+00066A 860C24          1663         MOV.B   0424H,R0L
+                       1664 ; rs232.c   463 
+                       1665 ; rs232.c   464         KS_purgequeue(rs232oStream->ID);
+00066D 964842rr        1667         MOV.B   ES,#SEG( _rs232oStream )
+000671 9918rrrr        1668         MOV.W   R1,#SOF( _rs232oStream )
+000675 8B01            1669         MOV.W   R0,[R1+]
+000677 8A11            1670         MOV.W   R1,[R1]
+000679 862C42          1671         MOV.B   ES,R1L
+00067C 840012          1672         MOV.B   R0L,[R0+18]
+                       1673         CALL    _KS_purgequeue
+00067F C4rrrrrr       +1673 ;       FCALL   _KS_purgequeue
+                       1674 ; rs232.c   465         KS_purgequeue(rs232iStream->ID);
+000683 964842rr        1676         MOV.B   ES,#SEG( _rs232iStream )
+000687 9918rrrr        1677         MOV.W   R1,#SOF( _rs232iStream )
+00068B 8B01            1678         MOV.W   R0,[R1+]
+00068D 8A11            1679         MOV.W   R1,[R1]
+00068F 862C42          1680         MOV.B   ES,R1L
+000692 840012          1681         MOV.B   R0L,[R0+18]
+                       1682         CALL    _KS_purgequeue
+000695 C4rrrrrr       +1682 ;       FCALL   _KS_purgequeue
+                       1683 ; rs232.c   466 
+                       1684 ; rs232.c   467         TR1  = 1;
+000699 081286          1686         SETB    0286H
+                       1687 ; rs232.c   468         REN_1= 1;
+00069C 081324          1689         SETB    0324H
+                       1690 ; rs232.c   469         ERI1 = 1;   // receive port 1 - enabled
+00069F 08133A          1692         SETB    033AH
+                       1693 ; rs232.c   470         ETI1 = 1;   // transmit port 1 - enabled
+0006A2 08133B          1695         SETB    033BH
+                       1696 ; rs232.c   471 
+                       1697 ; rs232.c   472         return(-1);
+0006A5 9908FFFF        1699         MOV.W   R0,#0FFFFH
+                       1700 ; rs232.c   473 }
+0006AA                 1702 _113:
+0006AA 99700018        1703         ADD.W   R7,#018H
+0006AE 2F70            1705         POP.W   R4, R5, R6
+0006B0 D680            1707         RET
+                       1709 ; rs232.c   474 
+                       1710 ; rs232.c   475 
+                       1711 ; rs232.c   476 
+                       1712 ; rs232.c   477 int rs232putchar(unsigned char ch)
+                       1713 ; rs232.c   478 {
+                       1714         ALIGN   1
+                       1716         PUBLIC  _rs232putchar
+0006B2                 1717 _rs232putchar:
+0006B2 0F30            1721         PUSH.W  R4, R5
+0006B4 A97E            1723         ADDS.W  R7,#0EH
+0006B6 820F            1727         MOV.B   [R7],R0L
+                       1728 ; rs232.c   479         rs232oRes->Lock( rs232oRes);
+0006B8 964842rr        1730         MOV.B   ES,#SEG( _rs232oRes )
+0006BC 9918rrrr        1731         MOV.W   R1,#SOF( _rs232oRes )
+0006C0 8B01            1732         MOV.W   R0,[R1+]
+0006C2 8A11            1733         MOV.W   R1,[R1]
+0006C4 862C42          1734         MOV.B   ES,R1L
+0006C7 8C400A          1735         MOV.W   R4,[R0+10]
+0006CA 8C500C          1736         MOV.W   R5,[R0+12]
+0006CD C4rrrrrr        1737         FCALL   __ICALL
+                       1738 ; rs232.c   480         rs232oStream->Put( rs232oStream, &ch);
+0006D1 964842rr        1740         MOV.B   ES,#SEG( _rs232oStream )
+0006D5 9918rrrr        1741         MOV.W   R1,#SOF( _rs232oStream )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+0006D9 8B01            1742         MOV.W   R0,[R1+]
+0006DB 8A11            1743         MOV.W   R1,[R1]
+0006DD 862C42          1744         MOV.B   ES,R1L
+0006E0 8C400E          1745         MOV.W   R4,[R0+14]
+0006E3 8C5010          1746         MOV.W   R5,[R0+16]
+0006E6 9168rr          1747         MOV.B   R3L,#SEG( __lc_bs )
+0006E9 7177            1748         XOR.B   R3H,R3H
+0006EB 8927            1749         MOV.W   R2,R7
+0006ED C4rrrrrr        1750         FCALL   __ICALL
+                       1751 ; rs232.c   481         rs232oRes->Unlock( rs232oRes);
+0006F1 964842rr        1753         MOV.B   ES,#SEG( _rs232oRes )
+0006F5 9918rrrr        1754         MOV.W   R1,#SOF( _rs232oRes )
+0006F9 8B01            1755         MOV.W   R0,[R1+]
+0006FB 8A11            1756         MOV.W   R1,[R1]
+0006FD 862C42          1757         MOV.B   ES,R1L
+000700 8C400E          1758         MOV.W   R4,[R0+14]
+000703 8C5010          1759         MOV.W   R5,[R0+16]
+000706 C4rrrrrr        1760         FCALL   __ICALL
+                       1762 ; rs232.c   482 
+                       1763 ; rs232.c   483         return( ch);
+00070A 8207            1765         MOV.B   R0L,[R7]
+00070C B110            1766         MOVS.B  R0H,#00H
+                       1770 ; rs232.c   484 }        
+00070E A972            1772         ADDS.W  R7,#02H
+000710 2F30            1774         POP.W   R4, R5
+000712 D680            1776         RET
+                       1778 ; rs232.c   485 
+                       1779 ; rs232.c   486 
+                       1780 ; rs232.c   487 
+                       1781 ; rs232.c   488 int rs232puts( char* str)
+                       1782 ; rs232.c   489 {
+                       1783         ALIGN   1
+                       1785         PUBLIC  _rs232puts
+000714                 1786 _rs232puts:
+000714 0F30            1790         PUSH.W  R4, R5
+000716 A978            1792         ADDS.W  R7,#08H
+                       1798 ; rs232.c   490   char* s = str;
+000718 8C1F06          1800         MOV.W   [R7+6],R1
+00071B 8C0F04          1801         MOV.W   [R7+4],R0
+00071E 8C1F02          1802         MOV.W   [R7+2],R1
+000721 8A0F            1803         MOV.W   [R7],R0
+                       1804 ; rs232.c   491  
+                       1805 ; rs232.c   492   rs232oRes->Lock( rs232oRes);
+000723 964842rr        1807         MOV.B   ES,#SEG( _rs232oRes )
+000727 9918rrrr        1808         MOV.W   R1,#SOF( _rs232oRes )
+00072B 8B01            1809         MOV.W   R0,[R1+]
+00072D 8A11            1810         MOV.W   R1,[R1]
+00072F 862C42          1811         MOV.B   ES,R1L
+000732 8C400A          1812         MOV.W   R4,[R0+10]
+000735 8C500C          1813         MOV.W   R5,[R0+12]
+000738 C4rrrrrr        1814         FCALL   __ICALL
+                       1815 ; rs232.c   493 
+                       1816 ; rs232.c   494   while( *str)
+00073C 8C1706          1818         MOV.W   R1,[R7+6]
+00073F 8C0704          1819         MOV.W   R0,[R7+4]
+000742 862C42          1820         MOV.B   ES,R1L
+000745 8200            1821         MOV.B   R0L,[R0]
+000747 F31C            1822         BEQ     _118
+000747 F31C00          1822         BEQ     _118
+00074A                 1823 _117:
+                       1824 ; rs232.c   495   {
+                       1825 ; rs232.c   496     rs232oStream->Put( rs232oStream, str);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+00074A 964842rr        1827         MOV.B   ES,#SEG( _rs232oStream )
+00074E 9918rrrr        1828         MOV.W   R1,#SOF( _rs232oStream )
+000752 8B01            1829         MOV.W   R0,[R1+]
+000754 8A11            1830         MOV.W   R1,[R1]
+000756 862C42          1831         MOV.B   ES,R1L
+000759 8C400E          1832         MOV.W   R4,[R0+14]
+00075C 8C5010          1833         MOV.W   R5,[R0+16]
+00075F 8C3706          1834         MOV.W   R3,[R7+6]
+000762 8C2704          1835         MOV.W   R2,[R7+4]
+000765 C4rrrrrr        1836         FCALL   __ICALL
+                       1837 ; rs232.c   497     str++;
+000769 8C1706          1839         MOV.W   R1,[R7+6]
+00076C 8C0704          1840         MOV.W   R0,[R7+4]
+00076F 99000001        1841         ADD.W   R0,#01H
+000773 8C1F06          1843         MOV.W   [R7+6],R1
+000776 8C0F04          1844         MOV.W   [R7+4],R0
+000779 862C42          1845         MOV.B   ES,R1L
+00077C 8200            1846         MOV.B   R0L,[R0]
+00077E F2E5            1847         BNE     _117
+                       1848 ; rs232.c   498   }
+000780                 1850 _118:
+                       1851 ; rs232.c   499 
+                       1852 ; rs232.c   500   rs232oRes->Unlock( rs232oRes);
+000780 964842rr        1854         MOV.B   ES,#SEG( _rs232oRes )
+000784 9918rrrr        1855         MOV.W   R1,#SOF( _rs232oRes )
+000788 8B01            1856         MOV.W   R0,[R1+]
+00078A 8A11            1857         MOV.W   R1,[R1]
+00078C 862C42          1858         MOV.B   ES,R1L
+00078F 8C400E          1859         MOV.W   R4,[R0+14]
+000792 8C5010          1860         MOV.W   R5,[R0+16]
+000795 C4rrrrrr        1861         FCALL   __ICALL
+                       1862 ; rs232.c   501 
+                       1863 ; rs232.c   502   return( str-s);
+000799 8C1706          1865         MOV.W   R1,[R7+6]
+00079C 8C0704          1866         MOV.W   R0,[R7+4]
+00079F 8C3702          1867         MOV.W   R3,[R7+2]
+0007A2 8A27            1868         MOV.W   R2,[R7]
+0007A4 2902            1869         SUB.W   R0,R2
+0007A6 3913            1870         SUBB.W  R1,R3
+                       1871 ; rs232.c   503 }       
+0007A8 99700008        1873         ADD.W   R7,#08H
+0007AC 2F30            1875         POP.W   R4, R5
+0007AE D680            1877         RET
+                       1879 ; rs232.c   504 
+                       1880 ; rs232.c   505 int rs232printf( int cnt, const char* format, ...)
+                       1881 ; rs232.c   506 {
+                       1882         ALIGN   1
+                       1884         PUBLIC  _rs232printf
+0007B0                 1885 _rs232printf:
+0007B0 0F70            1889         PUSH.W  R4, R5, R6
+0007B2 9972000C        1891         SUB.W   R7,#0CH
+0007B6 8960            1894         MOV.W   R6,R0
+                       1906 ; rs232.c   507   va_list ptr;
+                       1907 ; rs232.c   508   char *buf, *tmpbuf;
+                       1908 ; rs232.c   509   int ret;
+                       1909 ; rs232.c   510 
+                       1910 ; rs232.c   511         if ( rs232oRes && rs232oStream)
+0007B8 964842rr        1912         MOV.B   ES,#SEG( _rs232oRes )
+0007BC 9938rrrr        1913         MOV.W   R3,#SOF( _rs232oRes )
+0007C0 8B23            1914         MOV.W   R2,[R3+]
+0007C2 8A33            1915         MOV.W   R3,[R3]
+0007C4 8913            1916         MOV.W   R1,R3
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+0007C6 8902            1917         MOV.W   R0,R2
+0007C8 6932            1918         OR.W    R3,R2
+                       1919         BEQ     _124
+0007CA F202           +1919 ;       BNE     _LG_64
+0007CC D50082         +1919 ;       JMP.L   _124
+0007CC D5008200       +1919 ;       JMP.L   _124
+0007D0                +1919 _LG_64:
+0007D0 964842rr        1920         MOV.B   ES,#SEG( _rs232oStream )
+0007D4 9938rrrr        1921         MOV.W   R3,#SOF( _rs232oStream )
+0007D8 8B23            1922         MOV.W   R2,[R3+]
+0007DA 8A33            1923         MOV.W   R3,[R3]
+0007DC 6932            1924         OR.W    R3,R2
+0007DE F379            1925         BEQ     _124
+                       1926 ; rs232.c   512         {
+                       1927 ; rs232.c   513                 rs232oRes->Lock( rs232oRes);
+0007E0 862C42          1929         MOV.B   ES,R1L
+0007E3 8C400A          1930         MOV.W   R4,[R0+10]
+0007E6 8C500C          1931         MOV.W   R5,[R0+12]
+0007E9 C4rrrrrr        1932         FCALL   __ICALL
+                       1933 ; rs232.c   514 
+                       1934 ; rs232.c   515         tmpbuf = buf = new( cnt+16);    
+0007ED 99600010        1936         ADD.W   R6,#010H
+0007F1 8906            1938         MOV.W   R0,R6
+0007F3 9819            1939         SEXT.W  R1
+                       1940         CALL    _new
+0007F5 C4rrrrrr       +1940 ;       FCALL   _new
+0007F9 8C1F02          1942         MOV.W   [R7+2],R1
+0007FC 8A0F            1943         MOV.W   [R7],R0
+                       1944 ; rs232.c   516 
+                       1945 ; rs232.c   517         va_start( ptr, format);
+0007FE 9168rr          1947         MOV.B   R3L,#SEG( __lc_bs )
+000801 7177            1948         XOR.B   R3H,R3H
+000803 40271A          1949         LEA     R2,R7+26
+000806 8C3F0A          1950         MOV.W   [R7+10],R3
+000809 8C2F08          1951         MOV.W   [R7+8],R2
+                       1952 ; rs232.c   518         ret = vsprintf( buf, format, ptr);
+00080C 8C3718          1954         MOV.W   R3,[R7+24]
+00080F 8C2716          1955         MOV.W   R2,[R7+22]
+000812 91A8rr          1956         MOV.B   R5L,#SEG( __lc_bs )
+000815 71BB            1957         XOR.B   R5H,R5H
+000817 404708          1958         LEA     R4,R7+8
+00081A 0F30            1959         PUSH.W  R4, R5
+00081C 8C1F0A          1961         MOV.W   [R7+10],R1
+00081F 8C0F08          1962         MOV.W   [R7+8],R0
+                       1967         CALL    _vsprintf
+000822 C4rrrrrr       +1967 ;       FCALL   _vsprintf
+000826 A974            1968         ADDS.W  R7,#04H
+                       1973 ; rs232.c   519         va_end( ptr);
+000828 BC700A          1975         MOV.W   [R7+10],#00H
+00082B BC7008          1976         MOV.W   [R7+8],#00H
+                       1977 ; rs232.c   520 
+                       1978 ; rs232.c   521         if (( ret == EOF) || ( ret > cnt+16))   // KEn 000403
+00082E 9904FFFF        1980         CMP.W   R0,#0FFFFH
+000832 F302            1981         BEQ     _119
+000834 4906            1982         CMP.W   R0,R6
+000836 FD15            1983         BLE     _120
+000836 FD15            1983         BLE     _120
+000838                 1984 _119:
+                       1985 ; rs232.c   522                 {
+                       1986 ; rs232.c   523                         delete( tmpbuf);
+000838 8C1706          1988         MOV.W   R1,[R7+6]
+00083B 8C0704          1989         MOV.W   R0,[R7+4]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  23
+
+ADDR   CODE            LINE SOURCELINE
+                       1990         CALL    _delete
+00083E C4rrrrrr       +1990 ;       FCALL   _delete
+                       1995 ; rs232.c   524 
+                       1996 ; rs232.c   525                         rs232oRes->Unlock( rs232oRes);
+000842 964842rr        1998         MOV.B   ES,#SEG( _rs232oRes )
+000846 9918rrrr        1999         MOV.W   R1,#SOF( _rs232oRes )
+00084A 8B01            2000         MOV.W   R0,[R1+]
+00084C 8A11            2001         MOV.W   R1,[R1]
+00084E 862C42          2002         MOV.B   ES,R1L
+000851 8C400E          2003         MOV.W   R4,[R0+14]
+000854 8C5010          2004         MOV.W   R5,[R0+16]
+000857 C4rrrrrr        2005         FCALL   __ICALL
+                       2006 ; rs232.c   526 
+                       2007 ; rs232.c   527                         return( EOF);
+00085B 9908FFFF        2009         MOV.W   R0,#0FFFFH
+00085F FE5E            2010         BR      _126
+                       2011 ; rs232.c   528                 }                                                                
+                                                                    // End KEn 000403
+000862                 2013 _120:
+                       2015 ; rs232.c   529 
+                       2016 ; rs232.c   530         for ( ret = 0 ; ret <= cnt, *buf > 0; ret++, buf++)
+000862 B960            2018         MOV.W   R6,#00H
+000864 8C1706          2020         MOV.W   R1,[R7+6]
+000867 8C0704          2021         MOV.W   R0,[R7+4]
+00086A 862C42          2022         MOV.B   ES,R1L
+00086D 920400          2023         CMP.B   [R0],#00H
+000870 FD1D            2024         BLE     _122
+000870 FD1D            2024         BLE     _122
+000872                 2025 _121:
+                       2026 ; rs232.c   531         rs232oStream->Put( rs232oStream, buf);
+000872 964842rr        2028         MOV.B   ES,#SEG( _rs232oStream )
+000876 9918rrrr        2029         MOV.W   R1,#SOF( _rs232oStream )
+00087A 8B01            2030         MOV.W   R0,[R1+]
+00087C 8A11            2031         MOV.W   R1,[R1]
+00087E 862C42          2032         MOV.B   ES,R1L
+000881 8C400E          2033         MOV.W   R4,[R0+14]
+000884 8C5010          2034         MOV.W   R5,[R0+16]
+000887 8C3706          2035         MOV.W   R3,[R7+6]
+00088A 8C2704          2036         MOV.W   R2,[R7+4]
+00088D C4rrrrrr        2039         FCALL   __ICALL
+000891 A961            2043         ADDS.W  R6,#01H
+000893 8C1706          2046         MOV.W   R1,[R7+6]
+000896 8C0704          2047         MOV.W   R0,[R7+4]
+000899 99000001        2048         ADD.W   R0,#01H
+00089D 8C1F06          2053         MOV.W   [R7+6],R1
+0008A0 8C0F04          2054         MOV.W   [R7+4],R0
+0008A3 862C42          2055         MOV.B   ES,R1L
+0008A6 920400          2056         CMP.B   [R0],#00H
+0008A9 FCE4            2059         BGT     _121
+0008AC                 2061 _122:
+                       2062 ; rs232.c   532 
+                       2063 ; rs232.c   533                 delete( tmpbuf);
+0008AC 8C1702          2065         MOV.W   R1,[R7+2]
+0008AF 8A07            2066         MOV.W   R0,[R7]
+                       2067         CALL    _delete
+0008B1 C4rrrrrr       +2067 ;       FCALL   _delete
+                       2068 ; rs232.c   534         rs232oRes->Unlock( rs232oRes);
+0008B5 964842rr        2070         MOV.B   ES,#SEG( _rs232oRes )
+0008B9 9918rrrr        2071         MOV.W   R1,#SOF( _rs232oRes )
+0008BD 8B01            2072         MOV.W   R0,[R1+]
+0008BF 8A11            2073         MOV.W   R1,[R1]
+0008C1 862C42          2074         MOV.B   ES,R1L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  24
+
+ADDR   CODE            LINE SOURCELINE
+0008C4 8C400E          2075         MOV.W   R4,[R0+14]
+0008C7 8C5010          2076         MOV.W   R5,[R0+16]
+0008CA C4rrrrrr        2077         FCALL   __ICALL
+                       2078 ; rs232.c   535 
+                       2079 ; rs232.c   536         return( ret);
+0008CE 8906            2081         MOV.W   R0,R6
+0008D0 FE25            2084         BR      _126
+                       2085 ; rs232.c   537         }
+0008D2                 2087 _124:
+                       2089 ; rs232.c   538         else
+                       2090 ; rs232.c   539         {
+                       2091 ; rs232.c   540         buf = new( cnt+16);     
+0008D2 99600010        2093         ADD.W   R6,#010H
+0008D6 8906            2095         MOV.W   R0,R6
+0008D8 9819            2096         SEXT.W  R1
+                       2098         CALL    _new
+0008DA C4rrrrrr       +2098 ;       FCALL   _new
+0008DE 8951            2099         MOV.W   R5,R1
+0008E0 8940            2100         MOV.W   R4,R0
+                       2103 ; rs232.c   541 
+                       2104 ; rs232.c   542         va_start( ptr, format);
+0008E2 9128rr          2106         MOV.B   R1L,#SEG( __lc_bs )
+0008E5 7133            2107         XOR.B   R1H,R1H
+0008E7 40071A          2108         LEA     R0,R7+26
+0008EA 8C1F0A          2109         MOV.W   [R7+10],R1
+0008ED 8C0F08          2110         MOV.W   [R7+8],R0
+                       2111 ; rs232.c   543         ret = vsprintf( buf, format, ptr);
+0008F0 8C3718          2113         MOV.W   R3,[R7+24]
+0008F3 8C2716          2114         MOV.W   R2,[R7+22]
+0008F6 9128rr          2115         MOV.B   R1L,#SEG( __lc_bs )
+0008F9 7133            2116         XOR.B   R1H,R1H
+0008FB 400708          2117         LEA     R0,R7+8
+0008FE 0F03            2118         PUSH.W  R0, R1
+000900 8915            2120         MOV.W   R1,R5
+000902 8904            2121         MOV.W   R0,R4
+                       2124         CALL    _vsprintf
+000904 C4rrrrrr       +2124 ;       FCALL   _vsprintf
+000908 A974            2125         ADDS.W  R7,#04H
+                       2129 ; rs232.c   544         va_end( ptr);
+00090A BC700A          2131         MOV.W   [R7+10],#00H
+00090D BC7008          2132         MOV.W   [R7+8],#00H
+                       2133 ; rs232.c   545 
+                       2134 ; rs232.c   546         delete( buf);
+000910 8915            2136         MOV.W   R1,R5
+000912 8904            2137         MOV.W   R0,R4
+                       2138         CALL    _delete
+000914 C4rrrrrr       +2138 ;       FCALL   _delete
+                       2142 ; rs232.c   547 
+                       2143 ; rs232.c   548         return( EOF);
+000918 9908FFFF        2145         MOV.W   R0,#0FFFFH
+                       2146 ; rs232.c   549         }
+                       2147 ; rs232.c   550 }        
+00091C                 2149 _126:
+00091C 9970000C        2150         ADD.W   R7,#0CH
+000920 2F70            2152         POP.W   R4, R5, R6
+000922 D680            2154         RET
+                       2156 ; rs232.c   551 
+                       2157 ; rs232.c   552 
+                       2158 ; rs232.c   553 
+                       2159 ; rs232.c   554 static char LastError;
+                       2160 ; rs232.c   555 
+                       2161 ; rs232.c   556 
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  25
+
+ADDR   CODE            LINE SOURCELINE
+                       2162 ; rs232.c   557 int rs232getchar(void)
+                       2163 ; rs232.c   558 {
+                       2164         ALIGN   1
+                       2166         PUBLIC  _rs232getchar
+000924                 2167 _rs232getchar:
+000924 0F30            2171         PUSH.W  R4, R5
+000926 A97E            2173         ADDS.W  R7,#0EH
+                       2177 ; rs232.c   559   char dummy[2];
+                       2178 ; rs232.c   560 
+                       2179 ; rs232.c   561   if ( rs232iStream)
+000928 964842rr        2181         MOV.B   ES,#SEG( _rs232iStream )
+00092C 9938rrrr        2182         MOV.W   R3,#SOF( _rs232iStream )
+000930 8B23            2183         MOV.W   R2,[R3+]
+000932 8A33            2184         MOV.W   R3,[R3]
+000934 8913            2185         MOV.W   R1,R3
+000936 8902            2186         MOV.W   R0,R2
+000938 6932            2187         OR.W    R3,R2
+00093A F315            2188         BEQ     _132
+                       2189 ; rs232.c   562   {
+                       2190 ; rs232.c   563     rs232iStream->Get( rs232iStream, &dummy);
+00093C 862C42          2192         MOV.B   ES,R1L
+00093F 8C400A          2193         MOV.W   R4,[R0+10]
+000942 8C500C          2194         MOV.W   R5,[R0+12]
+000945 9168rr          2195         MOV.B   R3L,#SEG( __lc_bs )
+000948 7177            2196         XOR.B   R3H,R3H
+00094A 8927            2197         MOV.W   R2,R7
+00094C C4rrrrrr        2198         FCALL   __ICALL
+                       2199 ; rs232.c   564 
+                       2200 ; rs232.c   565     if ( dummy[1])
+000950 840701          2202         MOV.B   R0L,[R7+1]
+000953 F306            2203         BEQ     _131
+                       2204 ; rs232.c   566            LastError = dummy[1];
+000955 964842rr        2206         MOV.B   ES,#SEG( _LastError )
+000959 9918rrrr        2207         MOV.W   R1,#SOF( _LastError )
+00095D 8209            2208         MOV.B   [R1],R0L
+00095D 820900          2208         MOV.B   [R1],R0L
+000960                 2209 _131:
+                       2210 ; rs232.c   567 
+                       2211 ; rs232.c   568     return( dummy[0]);
+000960 8207            2213         MOV.B   R0L,[R7]
+000962 9019            2214         SEXT.B  R0H
+000964 FE02            2215         BR      _133
+                       2216 ; rs232.c   569   }
+000966                 2218 _132:
+                       2219 ; rs232.c   570   else
+                       2220 ; rs232.c   571   {
+                       2221 ; rs232.c   572     return( -1);
+000966 9908FFFF        2223         MOV.W   R0,#0FFFFH
+                       2224 ; rs232.c   573   }
+                       2225 ; rs232.c   574 }
+00096A                 2227 _133:
+00096A A972            2228         ADDS.W  R7,#02H
+00096C 2F30            2230         POP.W   R4, R5
+00096E D680            2232         RET
+                       2234 ; rs232.c   575 
+                       2235 ; rs232.c   576 
+                       2236 ; rs232.c   577 
+                       2237 ; rs232.c   578 
+                       2238 ; rs232.c   579 int rs232GetLastError( void)
+                       2239 ; rs232.c   580 {
+                       2240         ALIGN   1
+                       2242         PUBLIC  _rs232GetLastError
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  26
+
+ADDR   CODE            LINE SOURCELINE
+000970                 2243 _rs232GetLastError:
+                       2249 ; rs232.c   581   char LE = LastError;
+000970 964842rr        2251         MOV.B   ES,#SEG( _LastError )
+000974 9908rrrr        2252         MOV.W   R0,#SOF( _LastError )
+000978 8200            2253         MOV.B   R0L,[R0]
+                       2256 ; rs232.c   582 
+                       2257 ; rs232.c   583   LastError = 0;
+00097A 964842rr        2259         MOV.B   ES,#SEG( _LastError )
+00097E 9918rrrr        2260         MOV.W   R1,#SOF( _LastError )
+000982 B210            2261         MOV.B   [R1],#00H
+                       2262 ; rs232.c   584 
+                       2263 ; rs232.c   585   return( LE);
+000984 8100            2265         MOV.B   R0L,R0L
+000986 9019            2266         SEXT.B  R0H
+                       2267 ; rs232.c   586 }
+000988 D680            2269         RET
+                       2277         EXTRN   HCODE(_newTStream)
+000000                 2279 RS232_CLR_FA    SEGMENT HDATA INSEGMENT CLEAR
+000000                 2280         RSEG    RS232_CLR_FA
+000000 RESERVED        2281 _LastError:     DS      1
+000000
+                       2284         EXTRN   HCODE(_KS_ISRexit)
+000001 RESERVED        2288         ALIGN   1
+000001
+000002                 2289 _rs232iThread:  DS      4
+   |  RESERVED             
+000005
+                       2290         EXTRN   HCODE(__DIVR_DPF)
+                       2292         ALIGN   1
+000006                 2293 _rs232oThread:  DS      4
+   |  RESERVED             
+000009
+                       2296         EXTRN   HCODE(_vsprintf)
+                       2297         EXTRN   HCODE(__SUBR_DPF)
+                       2317         ALIGN   1
+00000A                 2318 __S1CON:        DS      2
+   |  RESERVED             
+00000B
+                       2321         EXTRN   HCODE(_delete)
+                       2323         ALIGN   1
+00000C                 2324 _rs232oEvent:   DS      4
+   |  RESERVED             
+00000F
+                       2327         EXTRN   HCODE(_KS_purgequeue)
+                       2332         EXTRN   HCODE(_newTResource)
+000002                 2333         RSEG    RS232_INI_FA
+000002 4563686F204F4E  2334 _37:    DB      045H,063H,068H,06FH,020H,04FH,04EH,02EH,00AH,000H
+       2E0A00               
+000010                 2336         RSEG    RS232_CLR_FA
+000010                 2337 _ichar: DS      2
+   |  RESERVED             
+000011
+000012 RESERVED        2339 _junk:  DS      1
+000012
+000013 RESERVED        2341         ALIGN   1
+000013
+000014                 2342 _rs232iEvent:   DS      4
+   |  RESERVED             
+000017
+                       2343         EXTRN   HCODE(__DPF2US)
+                       2357         ALIGN   1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  27
+
+ADDR   CODE            LINE SOURCELINE
+000018                 2358 _LCR:   DS      2
+   |  RESERVED             
+000019
+                       2372         ALIGN   1
+00001A                 2373 __S1STAT:       DS      2
+   |  RESERVED             
+00001B
+                       2374         EXTRN   HCODE(__ICALL)
+                       2376         ALIGN   1
+00001C                 2377 _rs232iStream:  DS      4
+   |  RESERVED             
+00001F
+                       2380         EXTRN   HCODE(_new)
+                       2381         EXTRN   IDATA(__lc_bs)
+                       2382         EXTRN   HCODE(__UL2DPF)
+                       2384         ALIGN   1
+000020                 2385 _rs232oRes:     DS      4
+   |  RESERVED             
+000023
+                       2391         EXTRN   HCODE(_newTThread)
+                       2394         EXTRN   HCODE(_newTEvent)
+                       2396         ALIGN   1
+000024                 2397 _rs232oStream:  DS      4
+   |  RESERVED             
+000027
+00000C                 2398         RSEG    RS232_INI_FA
+00000C 4563686F204F46  2399 _36:    DB      045H,063H,068H,06FH,020H,04FH,046H,046H,02EH,00DH,00AH,000H
+       462E0D0A00           
+                       2400         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       2401         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       2402         CALLS   'int232o', 'KS_ISRexit'
+                       2403         CALLS   'int232i', 'CheckParity'
+                       2404         CALLS   'int232i', 'KS_ISRexit'
+                       2405         CALLS   'rs232_init', 'newTEvent'
+                       2406         CALLS   'rs232_init', 'newTResource'
+                       2407         CALLS   'rs232_init', 'newTStream'
+                       2408         CALLS   'rs232_init', 'newTThread'
+                       2409         CALLS   'rs232_init', 'rs232Setup'
+                       2410         CALLS   'rs232i', 'rs232puts'
+                       2411         CALLS   'rs232i', 'rs232putchar'
+                       2412         CALLS   'rs232o', 'CheckParity'
+                       2413         CALLS   'rs232Setup', 'KS_purgequeue'
+                       2414         CALLS   'rs232printf', 'new'
+                       2415         CALLS   'rs232printf', 'vsprintf'
+                       2416         CALLS   'rs232printf', 'delete'
+                       2417         CALLS   'rs232printf', 'new'
+                       2418         CALLS   'rs232printf', 'vsprintf'
+                       2419         CALLS   'rs232printf', 'delete'

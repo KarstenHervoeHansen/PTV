@@ -1,0 +1,124 @@
+CONSTANT TIM = 300;
+SUBDESIGN AVSYNC
+% 
+Audio-video sync logic for AES generator
+990115 PF
+%
+(
+
+CLK27M,                        -- 27MHz master clock
+F8_G,                          -- video G-sync signal
+FF_M,                          -- video M-sync signal
+XZPRE,                         -- AES preamble pulse
+NTSC_PHASE,                    -- phase lock select (1=NTSC  0=PAL)
+WCLK_SEL,                      -- word clock output select
+TIMING[9..0]                   -- timing of aes-signal (0 -> 20.4us)
+                        : input;
+
+XX, YY,                        -- test/debug signal outputs
+AUD_RESET,                     -- async reset of aes-counter
+VIDLOCK,                       -- audio-video lock flag (1=locked  0=unlocked)
+LOCK_LED                       -- audio-video lock LED
+                        : output;
+
+)
+variable
+p_count[9..0]           : dffe;
+m_count[2..0]           : dff;
+resff,
+q3ff,
+q4ff                    : dff;
+phff,
+q1ff,
+q2ff,
+audlockff               : dffe;
+
+M10,
+T,
+CHECK,
+Mres
+                : node;
+
+begin
+p_count[].clk = CLK27M;                       -- phase counter
+p_count[].clrn = resff;                       -- asynchronous reset
+p_count[].ena = !(p_count[8] & p_count[9]);   -- enable control of counter
+p_count[] = p_count[] +1;
+
+
+m_count[].clk = FF_M;                -- NTSC 5 frame counter
+Mres = m_count[] == 4;
+M10 = m_count[] == 0;
+if MRes then
+  m_count[].d = B"0";
+ else
+  m_count[] = m_count[] + 1;
+end if;	
+
+
+phff.clk = CLK27M;                           -- M phase flip-flop
+phff.d = !XZPRE;
+phff.ena = CHECK;
+phff.clrn = M10;
+
+resff.clk = CLK27M;
+if NTSC_PHASE == VCC then
+  resff.d = M10;
+ else
+  resff.d = F8_G;
+end if;
+
+q1ff.clk = CLK27M;
+q1ff.d = T;
+q1ff.ena = q2ff;
+
+q2ff.clk = CLK27M;
+q2ff.d = phff;
+q2ff.ena = !q2ff;
+q2ff.clrn = !q3ff;
+
+q3ff.clk = CLK27M;
+q3ff.d = q1ff;
+
+q4ff.clk = CLK27M;
+q4ff.d = T;
+
+audlockff.clk = CLK27M;
+audlockff.ena = CHECK;
+audlockff.d = XZPRE;
+VIDLOCK = audlockff;
+LOCK_LED = !audlockff;
+
+
+if NTSC_PHASE == VCC then
+  AUD_RESET = q1ff & !WCLK_SEL;
+ else
+  AUD_RESET = q4ff & !WCLK_SEL;
+end if;
+
+
+if NTSC_PHASE == VCC then
+  CHECK = ((TIM + 10) == p_count[]);
+ else
+  CHECK = ((TIM + 9) == p_count[]);
+end if;
+
+T = TIM == p_count[];
+
+if NTSC_PHASE == VCC then
+  XX = M10;
+ else
+  XX = F8_G;
+end if;
+
+YY = CHECK;
+
+
+end;
+
+
+
+
+
+
+

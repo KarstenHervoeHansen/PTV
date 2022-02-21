@@ -1,0 +1,1105 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+F:\PTV\Pt5201\Design\DDD\SW\Master\work\peh_work\temp\xa\bb.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\cxa\rtxc\xa\include -I. -Ml
+                          3 ;          -O2 -s
+                          5 $NOZPAGE
+                          6         NAME    BB
+                         10 ; bb.c        1 /****************************************************************************/
+                         11 ; bb.c        2 /* MODULE:                                                                  */
+                         12 ; bb.c        3 /*  bb.c - Black burst generators                                           */
+                         13 ; bb.c        4 /****************************************************************************/
+                         14 ; bb.c        5 /* FUNCTIONS:                                                               */
+                         15 ; bb.c        6 /*                                                                          */
+                         16 ; bb.c        7 /*      void BBDefaults( void)                                                   
+                                                                                                                             
+                                                                            */      
+                         17 ; bb.c        8 /*      int BBInit( void)                                                        
+                                                                                                                             
+                                                                                                    */      
+                         18 ; bb.c        9 /*      int BBVersion( char *result)                                             
+                                                                                                                             
+                                                            */      
+                         19 ; bb.c       10 /*      int BBUpdate( void)                                                      
+                                                                                                                             
+                                                                                            */
+                         20 ; bb.c       11 /*      int SetBBSystem( int output, int system)                                 
+                                                                                                                            *
+                            /
+                         21 ; bb.c       12 /*      int SetBBDelay( int output, UL delay)                                    
+                                                                                                                             
+                                    */
+                         22 ; bb.c       13 /*      int SetBBScHPhase( int output, int schphase)                             
+                                                                                                            */
+                         23 ; bb.c       14 /*                                                                          */
+                         24 ; bb.c       15 /* TASKS:                                                                   */
+                         25 ; bb.c       16 /*                                                                          */
+                         26 ; bb.c       17 /* NOTES:                                                                   */
+                         27 ; bb.c       18 /*                                                                          */
+                         28 ; bb.c       19 /****************************************************************************/
+                         29 ; bb.c       20 /*
+                         30 ; bb.c       21  *   PTV software for PT5201    
+                         31 ; bb.c       22  *   Copyright (c) 
+                         32 ; bb.c       23  *   ProTeleVision Technologies A/S.
+                         33 ; bb.c       24  *   ALL RIGHTS RESERVED
+                         34 ; bb.c       25 */
+                         35 ; bb.c       26 /****************************************************************************/
+                         36 ; bb.c       27 #include <string.h>
+                         40 ; bb.c       28 
+                         41 ; bb.c       29 #include "reg8051.h"
+                         44 ; bb.c       30 #include "define.h"        // Standard PTV defines
+                         47 ; bb.c       31 #include "bb.h"
+                         55 ; bb.c       32 #include "tables.h"
+                         58 ; bb.c       33 #include "led_hw.h"
+                         65 ; bb.c       34 #include "sio0drv.h"
+                        398 ; bb.c       35 #include "instru.h"
+                        496 ; bb.c       36 
+                        497 ; bb.c       37 code char BBOutputCmd[3] = { 'H', 'J', 'K' };
+000000                  498 BB_RO   SEGMENT HCODE ROMDATA
+000000                  499         RSEG    BB_RO
+                        503         PUBLIC  _BBOutputCmd
+000000                  504 _BBOutputCmd:
+                        505 ; bb.c       38 code char BBSystemCmd[4] = { 'G', 'K', 'M', 'L' };
+000000 484A4B           506         DB      048H,04AH,04BH
+                        510         PUBLIC  _BBSystemCmd
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+000003                  511 _BBSystemCmd:
+                        512 ; bb.c       39 
+                        513 ; bb.c       40 BBObject BBSetup[NoOfBBOutputs];
+                        514 ; bb.c       41 
+                        515 ; bb.c       42 volatile int BBControlPort _at(0x70008);                // Port defined in SPG/AU
+                            DIO PLD
+                        516 ; bb.c       43 
+                        517 ; bb.c       44 /**************************************************************************/
+                        518 ; bb.c       45 /* BBDefaults                                                                    
+                                                                                                                             
+                                                            CBAR.C  */
+                        519 ; bb.c       46 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        520 ; bb.c       47 /* Author:       Kim Engedahl, DEV, 000606                                       
+                                                                                                                             
+                                    */
+                        521 ; bb.c       48 /* Revised:      000617, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        522 ; bb.c       49 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        523 ; bb.c       50 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        524 ; bb.c       51 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        525 ; bb.c       52 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        526 ; bb.c       53 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        527 ; bb.c       54 /**************************************************************************/
+                        528 ; bb.c       55 void BBDefaults( void)
+                        529 ; bb.c       56 {
+000003 474B4D4C         530         DB      047H,04BH,04DH,04CH
+000000                  531 BB_PR   SEGMENT HCODE
+000000                  532         RSEG    BB_PR
+                        533         ALIGN   1
+                        535         PUBLIC  _BBDefaults
+000000                  536 _BBDefaults:
+000000 0F30             540         PUSH.W  R4, R5
+                        544 ; bb.c       57         int i;
+                        545 ; bb.c       58 
+                        546 ; bb.c       59         for ( i = BBOutput1; i <= BBOutput3; i++)
+000002 B930             548         MOV.W   R3,#00H
+000004                  550 _3:
+                        551 ; bb.c       60         {
+                        552 ; bb.c       61                 Settings.BBSetup[i].System = BBSetup[i].System = Calibration.Rese
+                            tSystem;
+000004 964842rr         554         MOV.B   ES,#SEG( _Calibration+97 )
+000008 9908rrrr         555         MOV.W   R0,#SOF( _Calibration+97 )
+00000C 8200             556         MOV.B   R0L,[R0]
+00000E 8923             557         MOV.W   R2,R3
+000010 D923             558         ASL.W   R2,#03H
+000012 8942             559         MOV.W   R4,R2
+000014 B950             560         MOVS.W  R5,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000016 964842rr         561         MOV.B   ES,#SEG( _BBSetup )
+00001A 850Crrrr         562         MOV.B   [R4+SOF( _BBSetup )],R0L
+00001E 964842rr         563         MOV.B   ES,#SEG( _Settings+8 )
+000022 850Crrrr         564         MOV.B   [R4+SOF( _Settings+8 )],R0L
+                        565 ; bb.c       62                 Settings.BBSetup[i].Delay = BBSetup[i].Delay = 0;
+000026 8902             567         MOV.W   R0,R2
+000028 B910             568         MOVS.W  R1,#00H
+00002A 964842rr         569         MOV.B   ES,#SEG( _BBSetup+2 )
+00002E BD00rrrr         570         MOV.W   [R0+SOF( _BBSetup+2 )],#00H
+000032 BD00rrrr         571         MOV.W   [R0+SOF( _BBSetup+4 )],#00H
+000036 964842rr         572         MOV.B   ES,#SEG( _Settings+10 )
+00003A BD00rrrr         573         MOV.W   [R0+SOF( _Settings+10 )],#00H
+00003E BD00rrrr         574         MOV.W   [R0+SOF( _Settings+12 )],#00H
+                        575 ; bb.c       63                 Settings.BBSetup[i].ScHPhase = BBSetup[i].ScHPhase = 0;
+000042 8902             577         MOV.W   R0,R2
+000044 B910             578         MOVS.W  R1,#00H
+000046 964842rr         579         MOV.B   ES,#SEG( _BBSetup+6 )
+00004A BD00rrrr         580         MOV.W   [R0+SOF( _BBSetup+6 )],#00H
+00004E 964842rr         581         MOV.B   ES,#SEG( _Settings+14 )
+000052 BD00rrrr         582         MOV.W   [R0+SOF( _Settings+14 )],#00H
+000056 A931             584         ADDS.W  R3,#01H
+000058 99340002         587         CMP.W   R3,#02H
+00005C FDD3             588         BLE     _3
+                        589 ; bb.c       64         }
+                        590 ; bb.c       65 
+                        591 ; bb.c       66         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+00005E 9918rrrr         593         MOV.W   R1,#SEG( _Settings )
+000062 9908rrrr         594         MOV.W   R0,#SOF( _Settings )
+000066 964842rr         595         MOV.B   ES,#SEG( _SettingsPtr )
+00006A 9928rrrr         596         MOV.W   R2,#SOF( _SettingsPtr )
+00006E 8A22             597         MOV.W   R2,[R2]
+000070 9938004A         598         MOV.W   R3,#04AH
+                        600         CALL    _NV_Store
+000074 C4rrrrrr        +600 ;       FCALL   _NV_Store
+                        601 ; bb.c       67 }
+000078 2F30             603         POP.W   R4, R5
+00007A D680             605         RET
+                        607 ; bb.c       68 
+                        608 ; bb.c       69 /**************************************************************************/
+                        609 ; bb.c       70 /* BBInit                                                                        
+                                                                                                                             
+                                                                                   BB.C     */
+                        610 ; bb.c       71 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        611 ; bb.c       72 /* Author:       Kim Engedahl, DEV, 000402                                       
+                                                                                                                             
+                                    */
+                        612 ; bb.c       73 /* Revised:      000914, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        613 ; bb.c       74 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        614 ; bb.c       75 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        615 ; bb.c       76 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        616 ; bb.c       77 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        617 ; bb.c       78 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        618 ; bb.c       79 /**************************************************************************/
+                        619 ; bb.c       80 int BBInit( void)
+                        620 ; bb.c       81 {
+                        621         ALIGN   1
+                        623         PUBLIC  _BBInit
+00007C                  624 _BBInit:
+00007C 0F70             628         PUSH.W  R4, R5, R6
+00007E 9972000C         630         SUB.W   R7,#0CH
+                        642 ; bb.c       82         char cmd;
+                        643 ; bb.c       83         int i;
+                        644 ; bb.c       84 
+                        645 ; bb.c       85         for ( i = BBOutput1; i <= BBOutput3; i++)
+000082 B920             647         MOV.W   R2,#00H
+000084 9918rrrr         648         MOV.W   R1,#SEG( _BBOutputCmd )
+000088 9908rrrr         649         MOV.W   R0,#SOF( _BBOutputCmd )
+00008C                  651 _12:
+                        652 ; bb.c       86         {
+                        653 ; bb.c       87                 cmd = BBOutputCmd[i];
+00008C 8C1F08           655         MOV.W   [R7+8],R1
+00008F 8C0F06           656         MOV.W   [R7+6],R0
+000092 862C43           657         MOV.B   CS,R1L
+000095 8020             658         MOVC.B  R1L,[R0+]
+                        662 ; bb.c       88 
+                        663 ; bb.c       89                 sio0SndCommand( 20, BB_V24_address, "%cX%lu;", cmd, Calibration.B
+                            BCalibration[i].PhaseG);
+000097 81C2             665         MOV.B   R6L,R1L
+000099 90D9             666         SEXT.B  R6H
+00009B 99080014         667         MOV.W   R0,#014H
+00009F 8C2F0A           668         MOV.W   [R7+10],R2
+0000A2 E402             669         MULU.W  R0,R2
+0000A4 8940             670         MOV.W   R4,R0
+0000A6 B910             671         MOVS.W  R1,#00H
+0000A8 8C1F02           673         MOV.W   [R7+2],R1
+0000AB 8A0F             674         MOV.W   [R7],R0
+0000AD 964842rr         675         MOV.B   ES,#SEG( _Calibration+142 )
+0000B1 8D10rrrr         676         MOV.W   R1,[R0+SOF( _Calibration+144 )]
+0000B5 8D00rrrr         677         MOV.W   R0,[R0+SOF( _Calibration+142 )]
+0000B9 0F03             678         PUSH.W  R0, R1
+0000BB 8906             680         MOV.W   R0,R6
+0000BD 0F01             681         PUSH.W  R0
+0000BF 9918rrrr         683         MOV.W   R1,#SEG( _5 )
+0000C3 9908rrrr         684         MOV.W   R0,#SOF( _5 )
+0000C7 0F03             685         PUSH.W  R0, R1
+0000C9 99180034         687         MOV.W   R1,#034H
+0000CD 99080014         688         MOV.W   R0,#014H
+                        689         CALL    _sio0SndCommand
+0000D1 C4rrrrrr        +689 ;       FCALL   _sio0SndCommand
+0000D5 9970000A         690         ADD.W   R7,#0AH
+                        692 ; bb.c       90                 sio0SndCommand( 20, BB_V24_address, "%cT%u;", cmd, Calibration.BB
+                            Calibration[i].ScHPhaseG);
+0000D9 8C4F04           694         MOV.W   [R7+4],R4
+0000DC B950             695         MOVS.W  R5,#00H
+0000DE 964842rr         696         MOV.B   ES,#SEG( _Calibration+146 )
+0000E2 8D04rrrr         697         MOV.W   R0,[R4+SOF( _Calibration+146 )]
+0000E6 0F01             698         PUSH.W  R0
+0000E8 8906             700         MOV.W   R0,R6
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+0000EA 0F01             701         PUSH.W  R0
+0000EC 9918rrrr         703         MOV.W   R1,#SEG( _6 )
+0000F0 9908rrrr         704         MOV.W   R0,#SOF( _6 )
+0000F4 0F03             705         PUSH.W  R0, R1
+0000F6 99180034         707         MOV.W   R1,#034H
+0000FA 99080014         708         MOV.W   R0,#014H
+                        709         CALL    _sio0SndCommand
+0000FE C4rrrrrr        +709 ;       FCALL   _sio0SndCommand
+000102 99700008         710         ADD.W   R7,#08H
+                        712 ; bb.c       91 
+                        713 ; bb.c       92                 sio0SndCommand( 20, BB_V24_address, "%cY%lu;", cmd, Calibration.B
+                            BCalibration[i].PhaseM);
+000106 8C1702           715         MOV.W   R1,[R7+2]
+000109 8A07             716         MOV.W   R0,[R7]
+00010B 964842rr         717         MOV.B   ES,#SEG( _Calibration+148 )
+00010F 8D10rrrr         718         MOV.W   R1,[R0+SOF( _Calibration+150 )]
+000113 8D00rrrr         719         MOV.W   R0,[R0+SOF( _Calibration+148 )]
+000117 0F03             720         PUSH.W  R0, R1
+000119 8906             722         MOV.W   R0,R6
+00011B 0F01             723         PUSH.W  R0
+00011D 9918rrrr         725         MOV.W   R1,#SEG( _7 )
+000121 9908rrrr         726         MOV.W   R0,#SOF( _7 )
+000125 0F03             727         PUSH.W  R0, R1
+000127 99180034         729         MOV.W   R1,#034H
+00012B 99080014         730         MOV.W   R0,#014H
+                        731         CALL    _sio0SndCommand
+00012F C4rrrrrr        +731 ;       FCALL   _sio0SndCommand
+000133 9970000A         732         ADD.W   R7,#0AH
+                        734 ; bb.c       93                 sio0SndCommand( 20, BB_V24_address, "%cU%u;", cmd, Calibration.BB
+                            Calibration[i].ScHPhaseM);
+000137 964842rr         736         MOV.B   ES,#SEG( _Calibration+152 )
+00013B 8D04rrrr         737         MOV.W   R0,[R4+SOF( _Calibration+152 )]
+00013F 0F01             738         PUSH.W  R0
+000141 8906             740         MOV.W   R0,R6
+000143 0F01             741         PUSH.W  R0
+000145 9918rrrr         743         MOV.W   R1,#SEG( _8 )
+000149 9908rrrr         744         MOV.W   R0,#SOF( _8 )
+00014D 0F03             745         PUSH.W  R0, R1
+00014F 99180034         747         MOV.W   R1,#034H
+000153 99080014         748         MOV.W   R0,#014H
+                        749         CALL    _sio0SndCommand
+000157 C4rrrrrr        +749 ;       FCALL   _sio0SndCommand
+00015B 99700008         750         ADD.W   R7,#08H
+                        752 ; bb.c       94 
+                        753 ; bb.c       95                 sio0SndCommand( 20, BB_V24_address, "%cE%u;", cmd, Calibration.BB
+                            Calibration[i].DACGain);
+00015F 8C0704           755         MOV.W   R0,[R7+4]
+000162 8940             756         MOV.W   R4,R0
+000164 B950             757         MOVS.W  R5,#00H
+000166 964842rr         758         MOV.B   ES,#SEG( _Calibration+154 )
+00016A 8504rrrr         759         MOV.B   R0L,[R4+SOF( _Calibration+154 )]
+00016E B110             760         MOVS.B  R0H,#00H
+000170 0F01             761         PUSH.W  R0
+000172 8906             763         MOV.W   R0,R6
+000174 0F01             764         PUSH.W  R0
+000176 9918rrrr         766         MOV.W   R1,#SEG( _9 )
+00017A 9908rrrr         767         MOV.W   R0,#SOF( _9 )
+00017E 0F03             768         PUSH.W  R0, R1
+000180 99180034         770         MOV.W   R1,#034H
+000184 99080014         771         MOV.W   R0,#014H
+                        772         CALL    _sio0SndCommand
+000188 C4rrrrrr        +772 ;       FCALL   _sio0SndCommand
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+00018C 99700008         773         ADD.W   R7,#08H
+                        775 ; bb.c       96                 sio0SndCommand( 20, BB_V24_address, "%cC%u;", cmd, Calibration.BB
+                            Calibration[i].DACOffset);
+000190 964842rr         777         MOV.B   ES,#SEG( _Calibration+155 )
+000194 8504rrrr         778         MOV.B   R0L,[R4+SOF( _Calibration+155 )]
+000198 B110             779         MOVS.B  R0H,#00H
+00019A 0F01             780         PUSH.W  R0
+00019C 8906             782         MOV.W   R0,R6
+00019E 0F01             783         PUSH.W  R0
+0001A0 9918rrrr         785         MOV.W   R1,#SEG( _10 )
+0001A4 9908rrrr         786         MOV.W   R0,#SOF( _10 )
+0001A8 0F03             787         PUSH.W  R0, R1
+0001AA 99180034         789         MOV.W   R1,#034H
+0001AE 99080014         790         MOV.W   R0,#014H
+                        791         CALL    _sio0SndCommand
+0001B2 C4rrrrrr        +791 ;       FCALL   _sio0SndCommand
+0001B6 99700008         792         ADD.W   R7,#08H
+                        794 ; bb.c       97                 sio0SndCommand( 20, BB_V24_address, "%cD%u;", cmd, Calibration.BB
+                            Calibration[i].DACLevel);
+0001BA 964842rr         796         MOV.B   ES,#SEG( _Calibration+156 )
+0001BE 8504rrrr         797         MOV.B   R0L,[R4+SOF( _Calibration+156 )]
+0001C2 B110             798         MOVS.B  R0H,#00H
+0001C4 0F01             799         PUSH.W  R0
+0001C6 0F40             801         PUSH.W  R6
+0001C8 9918rrrr         803         MOV.W   R1,#SEG( _11 )
+0001CC 9908rrrr         804         MOV.W   R0,#SOF( _11 )
+0001D0 0F03             805         PUSH.W  R0, R1
+0001D2 99080014         807         MOV.W   R0,#014H
+0001D6 99180034         808         MOV.W   R1,#034H
+                        809         CALL    _sio0SndCommand
+0001DA C4rrrrrr        +809 ;       FCALL   _sio0SndCommand
+0001DE 99700008         810         ADD.W   R7,#08H
+                        812 ; bb.c       98 
+                        813 ; bb.c       99                 BBSetup[i].System = Settings.BBSetup[i].System;
+0001E2 8C270A           815         MOV.W   R2,[R7+10]
+0001E5 D923             816         ASL.W   R2,#03H
+0001E7 8902             817         MOV.W   R0,R2
+0001E9 B910             818         MOVS.W  R1,#00H
+0001EB 964842rr         819         MOV.B   ES,#SEG( _Settings+8 )
+0001EF 8560rrrr         820         MOV.B   R3L,[R0+SOF( _Settings+8 )]
+0001F3 964842rr         821         MOV.B   ES,#SEG( _BBSetup )
+0001F7 8568rrrr         822         MOV.B   [R0+SOF( _BBSetup )],R3L
+                        823 ; bb.c      100                 BBSetup[i].Delay = Settings.BBSetup[i].Delay;
+0001FB 8902             825         MOV.W   R0,R2
+0001FD B910             826         MOVS.W  R1,#00H
+0001FF 964842rr         827         MOV.B   ES,#SEG( _Settings+10 )
+000203 8D40rrrr         828         MOV.W   R4,[R0+SOF( _Settings+10 )]
+000207 8D50rrrr         829         MOV.W   R5,[R0+SOF( _Settings+12 )]
+00020B 964842rr         830         MOV.B   ES,#SEG( _BBSetup+2 )
+00020F 8D48rrrr         831         MOV.W   [R0+SOF( _BBSetup+2 )],R4
+000213 8D58rrrr         832         MOV.W   [R0+SOF( _BBSetup+4 )],R5
+                        833 ; bb.c      101                 BBSetup[i].ScHPhase = Settings.BBSetup[i].ScHPhase;
+000217 8902             835         MOV.W   R0,R2
+000219 B910             836         MOVS.W  R1,#00H
+00021B 964842rr         837         MOV.B   ES,#SEG( _Settings+14 )
+00021F 8D20rrrr         838         MOV.W   R2,[R0+SOF( _Settings+14 )]
+000223 964842rr         839         MOV.B   ES,#SEG( _BBSetup+6 )
+000227 8D28rrrr         840         MOV.W   [R0+SOF( _BBSetup+6 )],R2
+00022B 8C1708           842         MOV.W   R1,[R7+8]
+00022E 8C0706           843         MOV.W   R0,[R7+6]
+000231 99000001         844         ADD.W   R0,#01H
+000235 99110000         845         ADDC.W  R1,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+000239 8C270A           850         MOV.W   R2,[R7+10]
+00023C A921             851         ADDS.W  R2,#01H
+00023E 9914rrrr         852         CMP.W   R1,#SEG( _BBOutputCmd+3 )
+000242 F202             853         BNE     _14
+000244 9904rrrr         854         CMP.W   R0,#SOF( _BBOutputCmd+3 )
+000244 9904rrrr         854         CMP.W   R0,#SOF( _BBOutputCmd+3 )
+000248                  855 _14:
+                        856         BCS     _12
+000248 F002            +856 ;       BCC     _LG_4
+00024A D5FF20          +856 ;       JMP.L   _12
+00024A D5FF2000        +856 ;       JMP.L   _12
+00024E                 +856 _LG_4:
+                        857 ; bb.c      102         }
+                        858 ; bb.c      103 
+                        859 ; bb.c      104         return( 0);
+00024E B900             861         MOV.W   R0,#00H
+                        863 ; bb.c      105 }
+000250 9970000C         865         ADD.W   R7,#0CH
+000254 2F70             867         POP.W   R4, R5, R6
+000256 D680             869         RET
+                        871 ; bb.c      106 
+                        872 ; bb.c      107 /**************************************************************************/
+                        873 ; bb.c      108 /* BBVersion                                                                     
+                                                                                                                             
+                                                                   BB.C     */
+                        874 ; bb.c      109 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        875 ; bb.c      110 /* Author:       Kim Engedahl, DEV, 000504                                       
+                                                                                                                             
+                                    */
+                        876 ; bb.c      111 /* Revised:      000604, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        877 ; bb.c      112 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        878 ; bb.c      113 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        879 ; bb.c      114 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        880 ; bb.c      115 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        881 ; bb.c      116 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        882 ; bb.c      117 /**************************************************************************/
+                        883 ; bb.c      118 int BBVersion( char *result)
+                        884 ; bb.c      119 {
+                        885         ALIGN   1
+                        887         PUBLIC  _BBVersion
+000258                  888 _BBVersion:
+                        894 ; bb.c      120         return( sio0SndRequest( 12, BB_V24_address, result, "HI?"));
+000258 9938rrrr         896         MOV.W   R3,#SEG( _15 )
+00025C 9928rrrr         897         MOV.W   R2,#SOF( _15 )
+000260 0F0C             898         PUSH.W  R2, R3
+000262 8931             900         MOV.W   R3,R1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+000264 8920             901         MOV.W   R2,R0
+000266 9908000C         902         MOV.W   R0,#0CH
+00026A 99180034         903         MOV.W   R1,#034H
+                        904         CALL    _sio0SndRequest
+00026E C4rrrrrr        +904 ;       FCALL   _sio0SndRequest
+000272 A974             905         ADDS.W  R7,#04H
+                        910 ; bb.c      121 }
+000274 D680             912         RET
+                        914 ; bb.c      122 
+                        915 ; bb.c      123 /**************************************************************************/
+                        916 ; bb.c      124 /* BBUpdate                                                                      
+                                                                                                                             
+                                                                           BB.C     */
+                        917 ; bb.c      125 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        918 ; bb.c      126 /* Author:       Kim Engedahl, DEV, 000413                                       
+                                                                                                                             
+                                    */
+                        919 ; bb.c      127 /* Revised:      000606, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        920 ; bb.c      128 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        921 ; bb.c      129 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                        922 ; bb.c      130 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        923 ; bb.c      131 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        924 ; bb.c      132 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                        925 ; bb.c      133 /**************************************************************************/
+                        926 ; bb.c      134 int BBUpdate( void)
+                        927 ; bb.c      135 {
+                        928         ALIGN   1
+                        930         PUBLIC  _BBUpdate
+000276                  931 _BBUpdate:
+000276 0F30             935         PUSH.W  R4, R5
+                        939 ; bb.c      136         int i;
+                        940 ; bb.c      137 
+                        941 ; bb.c      138         for ( i = BBOutput1; i <= BBOutput3; i++)
+000278 B940             943         MOV.W   R4,#00H
+00027A                  945 _16:
+                        946 ; bb.c      139         {
+                        947 ; bb.c      140                 SetBBSystem( i, BBSetup[i].System);                     // SetBBS
+                            ystem ALSO sets the delay
+00027A 8954             949         MOV.W   R5,R4
+00027C D953             950         ASL.W   R5,#03H
+00027E 8905             951         MOV.W   R0,R5
+000280 B910             952         MOVS.W  R1,#00H
+000282 964842rr         953         MOV.B   ES,#SEG( _BBSetup )
+000286 8500rrrr         954         MOV.B   R0L,[R0+SOF( _BBSetup )]
+00028A 8120             955         MOV.B   R1L,R0L
+00028C B130             956         MOVS.B  R1H,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+00028E 8904             957         MOV.W   R0,R4
+000290 C50011           960         CALL    _SetBBSystem
+                        963 ; bb.c      141                 SetBBScHPhase( i, BBSetup[i].ScHPhase);
+000293 8905             965         MOV.W   R0,R5
+000295 B910             966         MOVS.W  R1,#00H
+000297 964842rr         967         MOV.B   ES,#SEG( _BBSetup+6 )
+00029B 8D10rrrr         968         MOV.W   R1,[R0+SOF( _BBSetup+6 )]
+00029F 8904             969         MOV.W   R0,R4
+0002A1 C50118           972         CALL    _SetBBScHPhase
+0002A4 A941             976         ADDS.W  R4,#01H
+0002A6 99440002         979         CMP.W   R4,#02H
+0002AA FDE7             980         BLE     _16
+                        981 ; bb.c      142         }
+                        982 ; bb.c      143 
+                        983 ; bb.c      144         return( OK);
+0002AC 9908FFFF         985         MOV.W   R0,#0FFFFH
+                        986 ; bb.c      145 }
+0002B0 2F30             988         POP.W   R4, R5
+0002B2 D680             990         RET
+                        993 ; bb.c      146 
+                        994 ; bb.c      147 /**************************************************************************/
+                        995 ; bb.c      148 /* SetBBSystem                                                                   
+                                                                                                                             
+                                                           BB.C     */
+                        996 ; bb.c      149 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                        997 ; bb.c      150 /* Author:       Kim Engedahl, DEV, 000331                                       
+                                                                                                                             
+                                    */
+                        998 ; bb.c      151 /* Revised:      000731, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                        999 ; bb.c      152 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1000 ; bb.c      153 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1001 ; bb.c      154 /* Remarks:      Due to an errorneous BB SW the ScHPhase MUST be transmitted    *
+                            /
+                       1002 ; bb.c      155 /*                                       when changing system.                   
+                                                                                                                             
+                                                                    */
+                       1003 ; bb.c      156 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1004 ; bb.c      157 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1005 ; bb.c      158 /**************************************************************************/
+                       1006 ; bb.c      159 int SetBBSystem( int output, int system)
+                       1007 ; bb.c      160 {
+                       1008         ALIGN   1
+                       1010         PUBLIC  _SetBBSystem
+0002B4                 1011 _SetBBSystem:
+0002B4 0F70            1015         PUSH.W  R4, R5, R6
+0002B6 A978            1017         ADDS.W  R7,#08H
+                       1029 ; bb.c      161         UI PALLED, NTSCLED;
+                       1030 ; bb.c      162         long tmp;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                       1031 ; bb.c      163 
+                       1032 ; bb.c      164         Settings.ActivePreset = 0;
+0002B8 964842rr        1034         MOV.B   ES,#SEG( _Settings )
+0002BC 9928rrrr        1035         MOV.W   R2,#SOF( _Settings )
+0002C0 BA20            1036         MOV.W   [R2],#00H
+                       1037 ; bb.c      165 
+                       1038 ; bb.c      166         Settings.BBSetup[output].System = BBSetup[output].System = system;
+0002C2 8921            1040         MOV.W   R2,R1
+0002C4 8C2F06          1041         MOV.W   [R7+6],R2
+0002C7 8960            1044         MOV.W   R6,R0
+0002C9 8956            1045         MOV.W   R5,R6
+0002CB D963            1046         ASL.W   R6,#03H
+0002CD 8906            1049         MOV.W   R0,R6
+0002CF B910            1050         MOVS.W  R1,#00H
+0002D1 964842rr        1051         MOV.B   ES,#SEG( _BBSetup )
+0002D5 8548rrrr        1052         MOV.B   [R0+SOF( _BBSetup )],R2L
+0002D9 964842rr        1053         MOV.B   ES,#SEG( _Settings+8 )
+0002DD 8548rrrr        1054         MOV.B   [R0+SOF( _Settings+8 )],R2L
+                       1055 ; bb.c      167         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+0002E1 9918rrrr        1057         MOV.W   R1,#SEG( _Settings )
+0002E5 9908rrrr        1058         MOV.W   R0,#SOF( _Settings )
+0002E9 964842rr        1059         MOV.B   ES,#SEG( _SettingsPtr )
+0002ED 9928rrrr        1060         MOV.W   R2,#SOF( _SettingsPtr )
+0002F1 8A22            1061         MOV.W   R2,[R2]
+0002F3 9938004A        1062         MOV.W   R3,#04AH
+                       1063         CALL    _NV_Store
+0002F7 C4rrrrrr       +1063 ;       FCALL   _NV_Store
+                       1064 ; bb.c      168 
+                       1065 ; bb.c      169         if ( output == BBOutput1)
+0002FB 6955            1067         OR.W    R5,R5
+0002FD F204            1068         BNE     _20
+                       1069 ; bb.c      170         {
+                       1070 ; bb.c      171                 PALLED = BB1PALLED;
+0002FF B901            1072         MOV.W   R0,#01H
+                       1074 ; bb.c      172                 NTSCLED = BB1NTSCLED;
+000301 B942            1076         MOV.W   R4,#02H
+                       1078 ; bb.c      173         }
+000303 FE0C            1080         BR      _23
+000303 FE0C00          1080         BR      _23
+000306                 1081 _20:
+                       1082 ; bb.c      174         else
+                       1083 ; bb.c      175         {
+                       1084 ; bb.c      176                 if ( output == BBOutput2)
+000306 99540001        1086         CMP.W   R5,#01H
+00030A F204            1087         BNE     _21
+                       1088 ; bb.c      177                 {
+                       1089 ; bb.c      178                         PALLED = BB2PALLED;
+00030C B904            1091         MOV.W   R0,#04H
+                       1094 ; bb.c      179                         NTSCLED = BB2NTSCLED;
+00030E 99480008        1096         MOV.W   R4,#08H
+                       1099 ; bb.c      180                 }
+000312 FE04            1101         BR      _23
+000312 FE04            1101         BR      _23
+000314                 1102 _21:
+                       1103 ; bb.c      181                 else
+                       1104 ; bb.c      182                 {
+                       1105 ; bb.c      183                         PALLED = BB3PALLED;
+000314 99080010        1107         MOV.W   R0,#010H
+                       1110 ; bb.c      184                         NTSCLED = BB3NTSCLED;
+000318 99480020        1112         MOV.W   R4,#020H
+                       1115 ; bb.c      185                 }
+                       1116 ; bb.c      186         }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+00031C                 1118 _23:
+                       1119 ; bb.c      187 
+                       1120 ; bb.c      188         LEDSet( PALLED, system < NTSC_US);
+00031C 9C74060002      1122         CMP.W   [R7+6],#02H
+000321 FA03            1123         BGE     _26
+000323 B911            1124         MOVS.W  R1,#01H
+000325 FE02            1125         BR      _28
+000325 FE0200          1125         BR      _28
+000328                 1126 _26:
+000328 B910            1127         MOVS.W  R1,#00H
+000328 B910            1127         MOVS.W  R1,#00H
+00032A                 1128 _28:
+                       1129         CALL    _LEDSet
+00032A C4rrrrrr       +1129 ;       FCALL   _LEDSet
+                       1131 ; bb.c      189         LEDSet( NTSCLED, system >= NTSC_US);
+00032E 9C74060002      1133         CMP.W   [R7+6],#02H
+000333 FB03            1134         BLT     _29
+000335 B911            1135         MOVS.W  R1,#01H
+000337 FE02            1136         BR      _31
+000337 FE0200          1136         BR      _31
+00033A                 1137 _29:
+00033A B910            1138         MOVS.W  R1,#00H
+00033A B910            1138         MOVS.W  R1,#00H
+00033C                 1139 _31:
+00033C 8904            1140         MOV.W   R0,R4
+                       1141         CALL    _LEDSet
+00033E C4rrrrrr       +1141 ;       FCALL   _LEDSet
+                       1145 ; bb.c      190 
+                       1146 ; bb.c      191         sio0SndCommand( 20, BB_V24_address, "%c%c%lu;", BBOutputCmd[output],
+                       1147 ; bb.c      192                                                 BBSystemCmd[system], BBSetup[outp
+                            ut].Delay);
+000342 99080014        1149         MOV.W   R0,#014H
+000346 8925            1150         MOV.W   R2,R5
+000348 9839            1151         SEXT.W  R3
+00034A 9958rrrr        1152         MOV.W   R5,#SEG( _BBOutputCmd )
+00034E 9948rrrr        1153         MOV.W   R4,#SOF( _BBOutputCmd )
+000352 0942            1154         ADD.W   R4,R2
+000354 1953            1155         ADDC.W  R5,R3
+000356 8C5F04          1157         MOV.W   [R7+4],R5
+000359 8C4F02          1158         MOV.W   [R7+2],R4
+00035C 86AC43          1159         MOV.B   CS,R5L
+00035F 80A4            1160         MOVC.B  R5L,[R4+]
+000361 90B9            1161         SEXT.B  R5H
+000363 8A5F            1162         MOV.W   [R7],R5
+000365 8C1706          1163         MOV.W   R1,[R7+6]
+000368 8941            1164         MOV.W   R4,R1
+00036A 9859            1165         SEXT.W  R5
+00036C 9938rrrr        1168         MOV.W   R3,#SEG( _BBSystemCmd )
+000370 9928rrrr        1169         MOV.W   R2,#SOF( _BBSystemCmd )
+000374 0924            1170         ADD.W   R2,R4
+000376 1935            1171         ADDC.W  R3,R5
+000378 866C43          1172         MOV.B   CS,R3L
+00037B 8062            1173         MOVC.B  R3L,[R2+]
+00037D 9079            1174         SEXT.B  R3H
+00037F 8946            1175         MOV.W   R4,R6
+000381 B950            1176         MOVS.W  R5,#00H
+000383 964842rr        1177         MOV.B   ES,#SEG( _BBSetup+2 )
+000387 8D54rrrr        1178         MOV.W   R5,[R4+SOF( _BBSetup+4 )]
+00038B 8D44rrrr        1179         MOV.W   R4,[R4+SOF( _BBSetup+2 )]
+00038F 0F30            1180         PUSH.W  R4, R5
+000391 0F08            1182         PUSH.W  R3
+000393 8C1706          1184         MOV.W   R1,[R7+6]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000396 0F02            1186         PUSH.W  R1
+000398 9938rrrr        1188         MOV.W   R3,#SEG( _18 )
+00039C 9928rrrr        1189         MOV.W   R2,#SOF( _18 )
+0003A0 0F0C            1190         PUSH.W  R2, R3
+0003A2 99180034        1192         MOV.W   R1,#034H
+                       1193         CALL    _sio0SndCommand
+0003A6 C4rrrrrr       +1193 ;       FCALL   _sio0SndCommand
+0003AA 9970000C        1194         ADD.W   R7,#0CH
+                       1196 ; bb.c      193 
+                       1197 ; bb.c      194         tmp = BBSetup[output].ScHPhase;
+0003AE 8906            1199         MOV.W   R0,R6
+0003B0 B910            1200         MOVS.W  R1,#00H
+0003B2 964842rr        1201         MOV.B   ES,#SEG( _BBSetup+6 )
+0003B6 8D00rrrr        1202         MOV.W   R0,[R0+SOF( _BBSetup+6 )]
+0003BA 9819            1203         SEXT.W  R1
+0003BC 8931            1204         MOV.W   R3,R1
+0003BE 8920            1205         MOV.W   R2,R0
+                       1207 ; bb.c      195 
+                       1208 ; bb.c      196         if ( tmp < 0)                                                            
+                                                            // -1 deg equ. 359 deg a.s.f.
+0003C0 99140000        1210         CMP.W   R1,#00H
+0003C4 FC0A            1211         BGT     _24
+0003C6 FB03            1212         BLT     _32
+0003C8 99040000        1213         CMP.W   R0,#00H
+0003CC F006            1214         BCC     _24
+0003CC F006            1214         BCC     _24
+0003CE                 1215 _32:
+                       1216 ; bb.c      197                 tmp += 360;
+0003CE 99000168        1218         ADD.W   R0,#0168H
+0003D2 99110000        1219         ADDC.W  R1,#00H
+0003D6 8931            1220         MOV.W   R3,R1
+0003D8 8920            1221         MOV.W   R2,R0
+0003DA                 1224 _24:
+                       1225 ; bb.c      198 
+                       1226 ; bb.c      199         tmp *= 2048;
+0003DA 8913            1228         MOV.W   R1,R3
+0003DC 8902            1229         MOV.W   R0,R2
+0003DE DD0B            1230         ASL.D   R0,#0BH
+                       1235 ; bb.c      200         tmp /= 360;                                                              
+                                                                    // tmp = ( ScHPhase*2048)/360;
+0003E0 B930            1237         MOV.W   R3,#00H
+0003E2 99280168        1238         MOV.W   R2,#0168H
+0003E6 C4rrrrrr        1239         FCALL   __SDIVL
+0003EA 8931            1241         MOV.W   R3,R1
+0003EC 8920            1242         MOV.W   R2,R0
+                       1244 ; bb.c      201                                                                                  
+                                                            
+                       1245 ; bb.c      202         return( sio0SndCommand( 12, BB_V24_address, "%cH%u;",
+                       1246 ; bb.c      203                                                  BBOutputCmd[output], ( int) tmp)
+                            );
+0003EE 9908000C        1248         MOV.W   R0,#0CH
+0003F2 8C5704          1249         MOV.W   R5,[R7+4]
+0003F5 8C4702          1250         MOV.W   R4,[R7+2]
+0003F8 86AC43          1251         MOV.B   CS,R5L
+0003FB 80A4            1252         MOVC.B  R5L,[R4+]
+0003FD 90B9            1253         SEXT.B  R5H
+0003FF 0F04            1255         PUSH.W  R2
+000401 0F20            1257         PUSH.W  R5
+000403 9938rrrr        1259         MOV.W   R3,#SEG( _19 )
+000407 9928rrrr        1260         MOV.W   R2,#SOF( _19 )
+00040B 0F0C            1261         PUSH.W  R2, R3
+00040D 99180034        1263         MOV.W   R1,#034H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                       1264         CALL    _sio0SndCommand
+000411 C4rrrrrr       +1264 ;       FCALL   _sio0SndCommand
+000415 99700008        1265         ADD.W   R7,#08H
+                       1267 ; bb.c      204 }
+000419 99700008        1269         ADD.W   R7,#08H
+00041D 2F70            1271         POP.W   R4, R5, R6
+00041F D680            1273         RET
+                       1275 ; bb.c      205 
+                       1276 ; bb.c      206 /**************************************************************************/
+                       1277 ; bb.c      207 /* SetBBDelay                                                                    
+                                                                                                                             
+                                                                         BB.C       */
+                       1278 ; bb.c      208 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1279 ; bb.c      209 /* Author:       Kim Engedahl, DEV, 000331                                       
+                                                                                                                             
+                                    */
+                       1280 ; bb.c      210 /* Revised:      000731, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1281 ; bb.c      211 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1282 ; bb.c      212 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1283 ; bb.c      213 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1284 ; bb.c      214 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1285 ; bb.c      215 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1286 ; bb.c      216 /**************************************************************************/
+                       1287 ; bb.c      217 int SetBBDelay( int output, UL delay)
+                       1288 ; bb.c      218 {
+000421 00              1289         ALIGN   1
+                       1291         PUBLIC  _SetBBDelay
+000422                 1292 _SetBBDelay:
+000422 0F70            1296         PUSH.W  R4, R5, R6
+000424 A97E            1298         ADDS.W  R7,#0EH
+                       1304 ; bb.c      219         Settings.ActivePreset = 0;
+000426 964842rr        1306         MOV.B   ES,#SEG( _Settings )
+00042A 9918rrrr        1307         MOV.W   R1,#SOF( _Settings )
+00042E BA10            1308         MOV.W   [R1],#00H
+                       1309 ; bb.c      220 
+                       1310 ; bb.c      221         Settings.BBSetup[output].Delay = BBSetup[output].Delay = delay;
+000430 8960            1312         MOV.W   R6,R0
+000432 8946            1313         MOV.W   R4,R6
+000434 D963            1314         ASL.W   R6,#03H
+000436 8906            1317         MOV.W   R0,R6
+000438 B910            1318         MOVS.W  R1,#00H
+00043A 964842rr        1319         MOV.B   ES,#SEG( _BBSetup+2 )
+00043E 8D28rrrr        1320         MOV.W   [R0+SOF( _BBSetup+2 )],R2
+000442 8D38rrrr        1321         MOV.W   [R0+SOF( _BBSetup+4 )],R3
+000446 0F0C            1322         PUSH.W  R2, R3
+000448 964842rr        1324         MOV.B   ES,#SEG( _Settings+10 )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+00044C 8D28rrrr        1325         MOV.W   [R0+SOF( _Settings+10 )],R2
+000450 8D38rrrr        1326         MOV.W   [R0+SOF( _Settings+12 )],R3
+                       1328 ; bb.c      222         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+000454 9918rrrr        1330         MOV.W   R1,#SEG( _Settings )
+000458 9908rrrr        1331         MOV.W   R0,#SOF( _Settings )
+00045C 964842rr        1332         MOV.B   ES,#SEG( _SettingsPtr )
+000460 9928rrrr        1333         MOV.W   R2,#SOF( _SettingsPtr )
+000464 8A22            1334         MOV.W   R2,[R2]
+000466 9938004A        1335         MOV.W   R3,#04AH
+                       1336         CALL    _NV_Store
+00046A C4rrrrrr       +1336 ;       FCALL   _NV_Store
+                       1337 ; bb.c      223 
+                       1338 ; bb.c      224         return( sio0SndCommand( 20, BB_V24_address, "%c%c%lu;", BBOutputCmd[outpu
+                            t],
+                       1339 ; bb.c      225                                                 BBSystemCmd[BBSetup[output].Syste
+                            m], delay));
+00046E 99080014        1341         MOV.W   R0,#014H
+000472 99180034        1342         MOV.W   R1,#034H
+000476 8944            1343         MOV.W   R4,R4
+000478 9859            1344         SEXT.W  R5
+00047A 9938rrrr        1346         MOV.W   R3,#SEG( _BBOutputCmd )
+00047E 9928rrrr        1347         MOV.W   R2,#SOF( _BBOutputCmd )
+000482 0924            1348         ADD.W   R2,R4
+000484 1935            1349         ADDC.W  R3,R5
+000486 866C43          1350         MOV.B   CS,R3L
+000489 8062            1351         MOVC.B  R3L,[R2+]
+00048B 9079            1352         SEXT.B  R3H
+00048D 8C3F04          1353         MOV.W   [R7+4],R3
+000490 8926            1354         MOV.W   R2,R6
+000492 B930            1355         MOVS.W  R3,#00H
+000494 964842rr        1356         MOV.B   ES,#SEG( _BBSetup )
+000498 8542rrrr        1357         MOV.B   R2L,[R2+SOF( _BBSetup )]
+00049C 8184            1358         MOV.B   R4L,R2L
+00049E B190            1359         MOVS.B  R4H,#00H
+0004A0 B950            1360         MOVS.W  R5,#00H
+0004A2 9938rrrr        1361         MOV.W   R3,#SEG( _BBSystemCmd )
+0004A6 9928rrrr        1362         MOV.W   R2,#SOF( _BBSystemCmd )
+0004AA 0924            1363         ADD.W   R2,R4
+0004AC 1935            1364         ADDC.W  R3,R5
+0004AE 866C43          1365         MOV.B   CS,R3L
+0004B1 8062            1366         MOVC.B  R3L,[R2+]
+0004B3 9079            1367         SEXT.B  R3H
+0004B5 0F08            1368         PUSH.W  R3
+0004B7 8C2706          1370         MOV.W   R2,[R7+6]
+0004BA 0F04            1371         PUSH.W  R2
+0004BC 9938rrrr        1373         MOV.W   R3,#SEG( _18 )
+0004C0 9928rrrr        1374         MOV.W   R2,#SOF( _18 )
+0004C4 0F0C            1375         PUSH.W  R2, R3
+                       1377         CALL    _sio0SndCommand
+0004C6 C4rrrrrr       +1377 ;       FCALL   _sio0SndCommand
+0004CA 9970000C        1378         ADD.W   R7,#0CH
+                       1380 ; bb.c      226 }
+0004CE A972            1382         ADDS.W  R7,#02H
+0004D0 2F70            1384         POP.W   R4, R5, R6
+0004D2 D680            1386         RET
+                       1388 ; bb.c      227 
+                       1389 ; bb.c      228 /**************************************************************************/
+                       1390 ; bb.c      229 /* SetBBScHPhase                                                                 
+                                                                                                                             
+                                                                       BB.C */
+                       1391 ; bb.c      230 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+                                            */
+                       1392 ; bb.c      231 /* Author:       Kim Engedahl, DEV, 000331                                       
+                                                                                                                             
+                                    */
+                       1393 ; bb.c      232 /* Revised:      000731, KEn, DEV                                                
+                                                                                                                             
+                                            */
+                       1394 ; bb.c      233 /*                                                                               
+                                                                                                                             
+                                                                                                                             
+                                            */
+                       1395 ; bb.c      234 /* Function:                                                                     
+                                                                                                                             
+                                                                                                    */
+                       1396 ; bb.c      235 /* Remarks:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1397 ; bb.c      236 /* Returns:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1398 ; bb.c      237 /* Updates:                                                                      
+                                                                                                                             
+                                                                                                                    */
+                       1399 ; bb.c      238 /**************************************************************************/
+                       1400 ; bb.c      239 int SetBBScHPhase( int output, int schphase)
+                       1401 ; bb.c      240 {
+                       1402         ALIGN   1
+                       1404         PUBLIC  _SetBBScHPhase
+0004D4                 1405 _SetBBScHPhase:
+0004D4 0F70            1409         PUSH.W  R4, R5, R6
+0004D6 A97A            1411         ADDS.W  R7,#0AH
+                       1419 ; bb.c      241         long tmp = ( long) schphase;
+0004D8 8C1F04          1421         MOV.W   [R7+4],R1
+0004DB 8941            1422         MOV.W   R4,R1
+0004DD 9859            1423         SEXT.W  R5
+0004DF 8C5F02          1426         MOV.W   [R7+2],R5
+0004E2 8A4F            1427         MOV.W   [R7],R4
+                       1429 ; bb.c      242 
+                       1430 ; bb.c      243         Settings.ActivePreset = 0;
+0004E4 964842rr        1432         MOV.B   ES,#SEG( _Settings )
+0004E8 9918rrrr        1433         MOV.W   R1,#SOF( _Settings )
+0004EC BA10            1434         MOV.W   [R1],#00H
+                       1435 ; bb.c      244 
+                       1436 ; bb.c      245         Settings.BBSetup[output].ScHPhase = BBSetup[output].ScHPhase = schphase;
+0004EE 8960            1438         MOV.W   R6,R0
+0004F0 D903            1439         ASL.W   R0,#03H
+0004F2 B910            1442         MOVS.W  R1,#00H
+0004F4 8C2704          1443         MOV.W   R2,[R7+4]
+0004F7 964842rr        1444         MOV.B   ES,#SEG( _BBSetup+6 )
+0004FB 8D28rrrr        1445         MOV.W   [R0+SOF( _BBSetup+6 )],R2
+0004FF 8C2704          1446         MOV.W   R2,[R7+4]
+000502 964842rr        1447         MOV.B   ES,#SEG( _Settings+14 )
+000506 8D28rrrr        1448         MOV.W   [R0+SOF( _Settings+14 )],R2
+                       1449 ; bb.c      246         NV_Store( &Settings, SettingsPtr, sizeof( Settings));
+00050A 9918rrrr        1451         MOV.W   R1,#SEG( _Settings )
+00050E 9908rrrr        1452         MOV.W   R0,#SOF( _Settings )
+000512 964842rr        1453         MOV.B   ES,#SEG( _SettingsPtr )
+000516 9928rrrr        1454         MOV.W   R2,#SOF( _SettingsPtr )
+00051A 8A22            1455         MOV.W   R2,[R2]
+00051C 9938004A        1456         MOV.W   R3,#04AH
+                       1457         CALL    _NV_Store
+000520 C4rrrrrr       +1457 ;       FCALL   _NV_Store
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                       1458 ; bb.c      247 
+                       1459 ; bb.c      248         if ( schphase < 0)                                                       
+                                    // -1 deg equ. 359 deg a.s.f.
+000524 8C0704          1461         MOV.W   R0,[R7+4]
+000527 99040000        1462         CMP.W   R0,#00H
+00052B FA07            1465         BGE     _33
+                       1466 ; bb.c      249                 tmp += 360;
+00052D 99400168        1468         ADD.W   R4,#0168H
+000531 99510000        1469         ADDC.W  R5,#00H
+000535 8C5F02          1470         MOV.W   [R7+2],R5
+000538 8A4F            1471         MOV.W   [R7],R4
+00053A                 1474 _33:
+                       1475 ; bb.c      250 
+                       1476 ; bb.c      251         tmp *= 2048;
+00053A 8C1702          1478         MOV.W   R1,[R7+2]
+00053D 8A07            1479         MOV.W   R0,[R7]
+00053F DD0B            1480         ASL.D   R0,#0BH
+                       1486 ; bb.c      252         tmp /= 360;                                                              
+                                                            // tmp = ( ScHPhase*2048)/360;
+000541 B930            1488         MOV.W   R3,#00H
+000543 99280168        1489         MOV.W   R2,#0168H
+000547 C4rrrrrr        1490         FCALL   __SDIVL
+00054B 8C1F04          1492         MOV.W   [R7+4],R1
+00054E 8C0F02          1493         MOV.W   [R7+2],R0
+                       1495 ; bb.c      253                                                                                  
+                                                            
+                       1496 ; bb.c      254         return( sio0SndCommand( 12, BB_V24_address, "%cH%u;",
+                       1497 ; bb.c      255                                                  BBOutputCmd[output], ( int) tmp)
+                            );
+000551 9908000C        1499         MOV.W   R0,#0CH
+000555 99180034        1500         MOV.W   R1,#034H
+000559 8946            1501         MOV.W   R4,R6
+00055B 9859            1502         SEXT.W  R5
+00055D 9938rrrr        1503         MOV.W   R3,#SEG( _BBOutputCmd )
+000561 9928rrrr        1504         MOV.W   R2,#SOF( _BBOutputCmd )
+000565 0924            1505         ADD.W   R2,R4
+000567 1935            1506         ADDC.W  R3,R5
+000569 866C43          1507         MOV.B   CS,R3L
+00056C 8062            1508         MOVC.B  R3L,[R2+]
+00056E 9079            1509         SEXT.B  R3H
+000570 8C5704          1510         MOV.W   R5,[R7+4]
+000573 8C4702          1511         MOV.W   R4,[R7+2]
+000576 0F10            1515         PUSH.W  R4
+000578 0F08            1517         PUSH.W  R3
+00057A 9938rrrr        1519         MOV.W   R3,#SEG( _19 )
+00057E 9928rrrr        1520         MOV.W   R2,#SOF( _19 )
+000582 0F0C            1521         PUSH.W  R2, R3
+                       1523         CALL    _sio0SndCommand
+000584 C4rrrrrr       +1523 ;       FCALL   _sio0SndCommand
+000588 99700008        1524         ADD.W   R7,#08H
+                       1526 ; bb.c      256 }
+00058C A976            1528         ADDS.W  R7,#06H
+00058E 2F70            1530         POP.W   R4, R5, R6
+000590 D680            1532         RET
+                       1535 ; bb.c      257 
+000000                 1538 BB_INI_FA       SEGMENT HDATA INSEGMENT INIT
+000000                 1539         RSEG    BB_INI_FA
+000000 25632563256C75  1540 _18:    DB      025H,063H,025H,063H,025H,06CH,075H,03BH,000H
+       3B00                 
+                       1543         EXTRN   HCODE(_sio0SndCommand)
+000009 256358256C753B  1544 _5:     DB      025H,063H,058H,025H,06CH,075H,03BH,000H
+       00                   
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+000011 25635525753B00  1545 _8:     DB      025H,063H,055H,025H,075H,03BH,000H
+000018 25635425753B00  1546 _6:     DB      025H,063H,054H,025H,075H,03BH,000H
+000000                 1549 BB_CLR_FA       SEGMENT HDATA INSEGMENT CLEAR
+000000                 1550         RSEG    BB_CLR_FA
+                       1551         PUBLIC  _BBSetup
+                       1552         ALIGN   1
+000000                 1553 _BBSetup:       DS      24
+   |  RESERVED             
+000017
+                       1556         EXTRN   HCODE(_LEDSet)
+00001F                 1557         RSEG    BB_INI_FA
+00001F 25634525753B00  1558 _9:     DB      025H,063H,045H,025H,075H,03BH,000H
+000026 25634425753B00  1559 _11:    DB      025H,063H,044H,025H,075H,03BH,000H
+00002D 25634825753B00  1560 _19:    DB      025H,063H,048H,025H,075H,03BH,000H
+000034 256359256C753B  1561 _7:     DB      025H,063H,059H,025H,06CH,075H,03BH,000H
+       00                   
+00003C 25634325753B00  1562 _10:    DB      025H,063H,043H,025H,075H,03BH,000H
+000043 48493F00        1563 _15:    DB      048H,049H,03FH,000H
+070008                 1566         HSEG AT 070008H
+                       1567         PUBLIC  _BBControlPort
+                       1568         ALIGN   1
+070008                 1569 _BBControlPort: DS      2
+   |  RESERVED             
+070009
+                       1571         EXTRN   HDATA(_SettingsPtr)
+                       1573         EXTRN   HDATA(_Settings)
+                       1576         EXTRN   HCODE(_NV_Store)
+                       1578         EXTRN   HDATA(_Calibration)
+                       1579         EXTRN   HCODE(__SDIVL)
+                       1582         EXTRN   HCODE(_sio0SndRequest)
+                       1583         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1584         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1585         CALLS   'BBDefaults', 'NV_Store'
+                       1586         CALLS   'BBInit', 'sio0SndCommand'
+                       1587         CALLS   'BBVersion', 'sio0SndRequest'
+                       1588         CALLS   'BBUpdate', 'SetBBSystem'
+                       1589         CALLS   'BBUpdate', 'SetBBScHPhase'
+                       1590         CALLS   'SetBBSystem', 'NV_Store'
+                       1591         CALLS   'SetBBSystem', 'LEDSet'
+                       1592         CALLS   'SetBBSystem', 'sio0SndCommand'
+                       1593         CALLS   'SetBBDelay', 'NV_Store'
+                       1594         CALLS   'SetBBDelay', 'sio0SndCommand'
+                       1595         CALLS   'SetBBScHPhase', 'NV_Store'
+                       1596         CALLS   'SetBBScHPhase', 'sio0SndCommand'

@@ -1,0 +1,115 @@
+INCLUDE "par2ser";
+
+SUBDESIGN AES
+% 
+AES control logic for AES generator in PT5201
+991123 PF
+%
+(
+CLK6144,
+CLK56448,
+SEL441,
+BLOCK[1..0],
+AUD_RESET,
+AU_D[7..0],
+GL_PER_1SEC,        -- set glitch periode to 1 sec (else 3 sec)
+AES_ON              -- serial data on (off at power up)
+
+                        : input;
+
+AESCOUNT[14..0],
+WCLK,
+XZPRE,
+AESDATA,
+GL1
+                        : output;
+)
+
+variable
+aes_count[17..0]         : dff;
+gl_count[9..0]           : dffe;
+
+CLK,
+GL_RESET,
+PLOAD,
+AES_RESET                : node;
+b0,b1,b2                 : soft;
+shreg                    : par2ser;
+
+
+begin
+
+if SEL441 == VCC then
+ CLK = CLK56448;
+else
+ CLK = CLK6144;
+end if;
+
+
+aes_count[].clk = CLK;                 -- AES counter
+aes_count[].clrn = !AUD_RESET;         -- asynchronous reset
+
+case BLOCK[] is
+	when 0 => AES_RESET = (aes_count[] == 24576 -1);
+	when 1 => AES_RESET = (aes_count[] == 73728 -1);
+	when 2 => AES_RESET = (aes_count[] == 147456 -1);
+end case;
+
+if AES_RESET then
+  aes_count[].d = B"0";                     -- synchronous reset after 192/576/1152 blocks
+ else
+  aes_count[] = aes_count[] + 1;
+end if;
+
+% serialize audio data %
+shreg.(clk,pload,on,din[]) = (CLK, PLOAD, AES_ON,AU_D[]);
+
+AESDATA = shreg.(qq);
+
+
+AESCOUNT[] = aes_count[17..3];
+PLOAD = (aes_count[2..0] == 0);
+WCLK = !aes_count[6];
+XZPRE = (aes_count[6..0] == 1) # 
+        (aes_count[6..0] == 2);
+
+
+
+b0 = aes_count[] == 0;
+b1 = aes_count[] == 24576;
+b2 = aes_count[] == 49152;
+gl_count[].clk = CLK;              -- glitch counter
+gl_count[].ena =  b0 # B1 # b2;    -- enable for GL counter each 4ms/4.3537ms
+
+if SEL441 == VCC then  -- 44.1kHz
+ GL1 = gl_count[] < 57;                         -- 57 counts x 4.3537ms = 248ms
+ if GL_PER_1SEC == VCC then                  -- selects glitch period = 1 or 3 sec
+   GL_RESET = (gl_count[] == 228-1);         -- 4.3537ms x 228 = 0.992 sec
+  else
+   GL_RESET = (gl_count[] == 690-1);         -- 4.3537ms x 690 = 3.004 sec
+ end if;
+else -- 48kHz
+ GL1 = gl_count[] < 63;                         -- 63 counts x 4ms = 252ms
+ if GL_PER_1SEC == VCC then                  -- selects glitch period = 1 or 3 sec
+   GL_RESET = (gl_count[] == 250-1);         -- 4.0ms x 250 = 1.0 sec
+  else
+   GL_RESET = (gl_count[] == 750-1);         -- 4.0ms x 750 = 3.0 sec
+ end if; 
+end if; -- if SEL441
+
+if GL_RESET == VCC then
+  gl_count[].d = B"0";                      -- synchronous reset
+ else
+  gl_count[] = gl_count[] + 1;
+end if;
+
+
+
+end;
+
+
+
+
+
+
+

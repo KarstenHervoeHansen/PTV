@@ -1,0 +1,757 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTXCIO\cc717b8b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    RTIO_UTL
+                          6 ; rtio_utl.c    1       /************************************************************************
+                            ****/
+                          7 ; rtio_utl.c    2       /* MODULE:                                                               
+                               */
+                          8 ; rtio_utl.c    3       /*   rtio_utl.c - utility functions                                      
+                               */
+                          9 ; rtio_utl.c    4       /************************************************************************
+                            ****/
+                         10 ; rtio_utl.c    5       /* FUNCTIONS:                                                            
+                               */
+                         11 ; rtio_utl.c    6       /*                                                                       
+                               */
+                         12 ; rtio_utl.c    7       /*     void UL_inq_error( IORC, UL_ERROR_PACK * )                        
+                               */
+                         13 ; rtio_utl.c    8       /*     INT  UL_create_FIFO(FIFO *, CHAR *, UCHAR, INT, INT, UCHAR, UCHAR)
+                            ;  */
+                         14 ; rtio_utl.c    9       /*     INT  UL_put_FIFO (FIFO *, CHAR *);                                
+                               */
+                         15 ; rtio_utl.c   10       /*     INT  UL_get_FIFO (FIFO *, CHAR *);                                
+                               */
+                         16 ; rtio_utl.c   11       /*     INT  UL_put_LIFO (FIFO *, CHAR *);                                
+                               */
+                         17 ; rtio_utl.c   12       /*                                                                       
+                               */
+                         18 ; rtio_utl.c   13       /************************************************************************
+                            ****/
+                         19 ; rtio_utl.c   14       /*
+                         20 ; rtio_utl.c   15        *   RTXCio    
+                         21 ; rtio_utl.c   16        *   Copyright (c) 
+                         22 ; rtio_utl.c   17        *   Embedded System Products, Inc.
+                         23 ; rtio_utl.c   18        *   ALL RIGHTS RESERVED
+                         24 ; rtio_utl.c   19       */
+                         25 ; rtio_utl.c   20       /************************************************************************
+                            ****/
+                         26 ; rtio_utl.c   21       #include "rtio_tdf.h"        /* RTXCio - Type definitions                
+                               */
+                         27 ; rtio_utl.c   22       #include "rtio_utl.h"        /* RTXCio - Utilities Header file include fi
+                            le */
+                         28 ; rtio_utl.c   23       
+                         29 ; rtio_utl.c   24       /*=======================================================================
+                            ===*/
+                         30 ; rtio_utl.c   25       /*                              Error utility                            
+                               */
+                         31 ; rtio_utl.c   26       /*=======================================================================
+                            ===*/
+                         32 ; rtio_utl.c   27       void UL_inq_error(IORC ret_code, UL_ERROR_PACK *error_pack )
+                         33 ; rtio_utl.c   28       {
+                         34         PUBLIC  _UL_inq_error
+000000                   35 RTIO_UTL_PR     SEGMENT HCODE
+000000                   36         RSEG    RTIO_UTL_PR
+000000                   36         RSEG    RTIO_UTL_PR
+000000                   37 _UL_inq_error:
+                         38 ; rtio_utl.c   29           /* get result of bits 11-14 inclusive */
+                         39 ; rtio_utl.c   30           error_pack->controller = ((ret_code >> 11) & ~(~0 << 4));
+000000 8910              40         MOV.W   R1,R0
+000002 DA1B              41         ASR.W   R1,#0BH
+000004 9915000F          42         AND.W   R1,#0FH
+000008 866C42            43         MOV.B   ES,R3L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+00000B 8A1A              44         MOV.W   [R2],R1
+                         45 ; rtio_utl.c   31       
+                         46 ; rtio_utl.c   32           if( error_pack->controller >= 13 )
+00000D 9914000D          47         CMP.W   R1,#0DH
+000011 FB0A              48         BLT     _3
+                         49 ; rtio_utl.c   33           {
+                         50 ; rtio_utl.c   34               /* there is no device return zero */
+                         51 ; rtio_utl.c   35               error_pack->device = 0;
+000013 866C42            52         MOV.B   ES,R3L
+000016 BC2002            53         MOV.W   [R2+2],#00H
+                         54 ; rtio_utl.c   36               /* get result of bits 0-10 inclusive */
+                         55 ; rtio_utl.c   37               error_pack->error = ((ret_code >> 0) & ~(~0 << 11));
+000019 990507FF          56         AND.W   R0,#07FFH
+00001D 866C42            57         MOV.B   ES,R3L
+000020 8C0A04            58         MOV.W   [R2+4],R0
+                         59 ; rtio_utl.c   38           }
+000023 D680              60         RET
+000023 D68000            60         RET
+000026                   61 _3:
+                         62 ; rtio_utl.c   39           else
+                         63 ; rtio_utl.c   40           {
+                         64 ; rtio_utl.c   41               /* get result of bits 6-10 inclusive */
+                         65 ; rtio_utl.c   42               error_pack->device = ((ret_code >> 6) & ~(~0 << 5));
+000026 8910              66         MOV.W   R1,R0
+000028 DA16              67         ASR.W   R1,#06H
+00002A 9915001F          68         AND.W   R1,#01FH
+00002E 866C42            69         MOV.B   ES,R3L
+000031 8C1A02            70         MOV.W   [R2+2],R1
+                         71 ; rtio_utl.c   43               /* get result of bits 0-5 inclusive */
+                         72 ; rtio_utl.c   44               error_pack->error = ((ret_code >> 0) & ~(~0 << 6));
+000034 9905003F          73         AND.W   R0,#03FH
+000038 866C42            74         MOV.B   ES,R3L
+00003B 8C0A04            75         MOV.W   [R2+4],R0
+00003B 8C0A04            75         MOV.W   [R2+4],R0
+                         76 ; rtio_utl.c   45           }
+00003E                   77 _4:
+                         78 ; rtio_utl.c   46       
+                         79 ; rtio_utl.c   47           /* if the device will equal to zero than when RTXCio error is returne
+                            d */
+                         80 ; rtio_utl.c   48           /* RTXCio error range from bits 0-10 */
+                         81 ; rtio_utl.c   49       }
+00003E D680              82         RET
+00003E D680              82         RET
+                         83 ; rtio_utl.c   50       
+                         84 ; rtio_utl.c   51       /*=======================================================================
+                            ===*/
+                         85 ; rtio_utl.c   52       /*                              FIFO utilities                           
+                               */
+                         86 ; rtio_utl.c   53       /*=======================================================================
+                            ===*/
+                         87 ; rtio_utl.c   54       INT UL_create_FIFO( FIFO *pf,
+                         88 ; rtio_utl.c   55                           CHAR *body,
+                         89 ; rtio_utl.c   56                           UCHAR width,
+                         90 ; rtio_utl.c   57                           INT blksize,
+                         91 ; rtio_utl.c   58                           INT cursize,
+                         92 ; rtio_utl.c   59                           UCHAR highwater,
+                         93 ; rtio_utl.c   60                           UCHAR lowwater )
+                         94 ; rtio_utl.c   61       {
+                         95         PUBLIC  _UL_create_FIFO
+000040                   96 _UL_create_FIFO:
+000040 0F30              97         PUSH.W  R4, R5
+                         98 ; rtio_utl.c   62          INT m;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                         99 ; rtio_utl.c   63       
+                        100 ; rtio_utl.c   64          if (body != NULLPTR)
+000042 8953             101         MOV.W   R5,R3
+000044 8942             102         MOV.W   R4,R2
+000046 6932             103         OR.W    R3,R2
+000048 F30C             104         BEQ     _7
+                        105 ; rtio_utl.c   65          {
+                        106 ; rtio_utl.c   66             if (blksize > 256)
+00004A 9C74080100       107         CMP.W   [R7+8],#0100H
+00004F FD04             108         BLE     _6
+                        109 ; rtio_utl.c   67                return (BAD_FIFO_SIZE);
+000051 9908FFFF         110         MOV.W   R0,#0FFFFH
+000055 FE4E             111         BR      _14
+000055 FE4E00           111         BR      _14
+000058                  112 _6:
+                        113 ; rtio_utl.c   68             pf->body = body;
+000058 862C42           114         MOV.B   ES,R1L
+00005B 8A48             115         MOV.W   [R0],R4
+00005D 8C5802           116         MOV.W   [R0+2],R5
+                        117 ; rtio_utl.c   69          }
+000060 FE17             118         BR      _10
+000060 FE17             118         BR      _10
+000062                  119 _7:
+                        120 ; rtio_utl.c   70          else
+                        121 ; rtio_utl.c   71          {
+                        122 ; rtio_utl.c   72             if ( (blksize > 256) || (blksize < sizeof(FIFO)) )
+000062 8C2708           123         MOV.W   R2,[R7+8]
+000065 99240100         124         CMP.W   R2,#0100H
+000069 FC04             125         BGT     _8
+00006B 9924000C         126         CMP.W   R2,#0CH
+00006F FA04             127         BGE     _9
+00006F FA0400           127         BGE     _9
+000072                  128 _8:
+                        129 ; rtio_utl.c   73                 return (BAD_FIFO_SIZE);
+000072 9908FFFF         130         MOV.W   R0,#0FFFFH
+000076 FE3D             131         BR      _14
+000076 FE3D             131         BR      _14
+000078                  132 _9:
+                        133 ; rtio_utl.c   74             blksize -= sizeof(FIFO);
+000078 9922000C         134         SUB.W   R2,#0CH
+00007C 8C2F08           135         MOV.W   [R7+8],R2
+                        136 ; rtio_utl.c   75             pf->body = (CHAR *)pf+sizeof(FIFO);
+00007F 8931             137         MOV.W   R3,R1
+000081 8920             138         MOV.W   R2,R0
+000083 9920000C         139         ADD.W   R2,#0CH
+000087 862C42           140         MOV.B   ES,R1L
+00008A 8A28             141         MOV.W   [R0],R2
+00008C 8C3802           142         MOV.W   [R0+2],R3
+00008C 8C380200         142         MOV.W   [R0+2],R3
+                        143 ; rtio_utl.c   76          };
+000090                  144 _10:
+                        145 ; rtio_utl.c   77          m = 256;
+000090 99280100         146         MOV.W   R2,#0100H
+                        147 ; rtio_utl.c   78          blksize /= width;
+000094 816C             148         MOV.B   R3L,R6L
+000096 B170             149         MOVS.B  R3H,#00H
+000098 8C4708           150         MOV.W   R4,[R7+8]
+00009B 8954             151         MOV.W   R5,R4
+00009D 9859             152         SEXT.W  R5
+00009F EF43             153         DIV.D   R4,R3
+0000A1 8934             154         MOV.W   R3,R4
+                        155 ; rtio_utl.c   79          while ((m & blksize) == 0)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+0000A3 99480100         156         MOV.W   R4,#0100H
+0000A7 5943             157         AND.W   R4,R3
+0000A9 F20A             158         BNE     _12
+0000A9 F20A00           158         BNE     _12
+0000AC                  159 _11:
+                        160 ; rtio_utl.c   80             m /= 2;
+0000AC 8942             161         MOV.W   R4,R2
+0000AE 8954             162         MOV.W   R5,R4
+0000B0 9859             163         SEXT.W  R5
+0000B2 E9490002         164         DIV.D   R4,#02H
+0000B6 8924             165         MOV.W   R2,R4
+0000B8 8942             166         MOV.W   R4,R2
+0000BA 5943             167         AND.W   R4,R3
+0000BC F3F7             168         BEQ     _11
+0000BC F3F7             168         BEQ     _11
+0000BE                  169 _12:
+                        170 ; rtio_utl.c   81       
+                        171 ; rtio_utl.c   82          pf->depth = (unsigned char)(m - 1);
+0000BE A14F             172         ADDS.B  R2L,#0FH
+0000C0 862C42           173         MOV.B   ES,R1L
+0000C3 844805           174         MOV.B   [R0+5],R2L
+                        175 ; rtio_utl.c   83          pf->width = width;
+0000C6 862C42           176         MOV.B   ES,R1L
+0000C9 84C804           177         MOV.B   [R0+4],R6L
+                        178 ; rtio_utl.c   84          pf->cursize = cursize;
+0000CC 8C270A           179         MOV.W   R2,[R7+10]
+0000CF 862C42           180         MOV.B   ES,R1L
+0000D2 8C280A           181         MOV.W   [R0+10],R2
+                        182 ; rtio_utl.c   85          pf->highT = highwater;
+0000D5 862C42           183         MOV.B   ES,R1L
+0000D8 84D806           184         MOV.B   [R0+6],R6H
+                        185 ; rtio_utl.c   86          pf->lowT = lowwater;
+0000DB 84670C           186         MOV.B   R3L,[R7+12]
+0000DE 862C42           187         MOV.B   ES,R1L
+0000E1 846807           188         MOV.B   [R0+7],R3L
+                        189 ; rtio_utl.c   87          pf->putindex = cursize;
+0000E4 862C42           190         MOV.B   ES,R1L
+0000E7 844808           191         MOV.B   [R0+8],R2L
+                        192 ; rtio_utl.c   88          pf->getindex = 0;
+0000EA 862C42           193         MOV.B   ES,R1L
+0000ED B40009           194         MOV.B   [R0+9],#00H
+                        195 ; rtio_utl.c   89       
+                        196 ; rtio_utl.c   90          return (FIFO_OKAY);
+0000F0 B900             197         MOV.W   R0,#00H
+0000F0 B900             197         MOV.W   R0,#00H
+                        198 ; rtio_utl.c   91       }
+0000F2                  199 _14:
+0000F2 2F30             200         POP.W   R4, R5
+0000F4 D680             201         RET
+0000F4 D680             201         RET
+                        202 ; rtio_utl.c   92       
+                        203 ; rtio_utl.c   93       /*=======================================================================
+                            ===*/
+                        204 ; rtio_utl.c   94       INT UL_put_FIFO( FIFO *pf,
+                        205 ; rtio_utl.c   95                        CHAR *src )
+                        206 ; rtio_utl.c   96       {
+                        207         PUBLIC  _UL_put_FIFO
+0000F6                  208 _UL_put_FIFO:
+0000F6 0F70             209         PUSH.W  R4, R5, R6
+0000F8 99720018         210         SUB.W   R7,#018H
+0000FC 8C3F12           211         MOV.W   [R7+18],R3
+0000FF 8C2F10           212         MOV.W   [R7+16],R2
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        213 ; rtio_utl.c   97          INT i;
+                        214 ; rtio_utl.c   98          CHAR *put;
+                        215 ; rtio_utl.c   99       
+                        216 ; rtio_utl.c  100          if (pf->cursize == pf->depth + 1)
+000102 8931             217         MOV.W   R3,R1
+000104 8920             218         MOV.W   R2,R0
+000106 9900000A         219         ADD.W   R0,#0AH
+00010A 8C1F0E           220         MOV.W   [R7+14],R1
+00010D 8C0F0C           221         MOV.W   [R7+12],R0
+000110 866C42           222         MOV.B   ES,R3L
+000113 8C620A           223         MOV.W   R6,[R2+10]
+000116 8913             224         MOV.W   R1,R3
+000118 8902             225         MOV.W   R0,R2
+00011A 99000005         226         ADD.W   R0,#05H
+00011E 8C1F0A           227         MOV.W   [R7+10],R1
+000121 8C0F08           228         MOV.W   [R7+8],R0
+000124 866C42           229         MOV.B   ES,R3L
+000127 848205           230         MOV.B   R4L,[R2+5]
+00012A B190             231         MOVS.B  R4H,#00H
+00012C A941             232         ADDS.W  R4,#01H
+00012E 866C42           233         MOV.B   ES,R3L
+000131 4C4A0A           234         CMP.W   [R2+10],R4
+000134 F203             235         BNE     _18
+                        236 ; rtio_utl.c  101             return (FIFO_FULL);
+000136 9908FFFF         237         MOV.W   R0,#0FFFFH
+00013A FE78             238         BR      _26
+00013A FE78             238         BR      _26
+00013C                  239 _18:
+                        240 ; rtio_utl.c  102       
+                        241 ; rtio_utl.c  103          put = pf->body + (pf->width * pf->putindex);
+00013C 8913             242         MOV.W   R1,R3
+00013E 8902             243         MOV.W   R0,R2
+000140 99000004         244         ADD.W   R0,#04H
+000144 8C1F06           245         MOV.W   [R7+6],R1
+000147 8C0F04           246         MOV.W   [R7+4],R0
+00014A 866C42           247         MOV.B   ES,R3L
+00014D 84A204           248         MOV.B   R5L,[R2+4]
+000150 8913             249         MOV.W   R1,R3
+000152 8902             250         MOV.W   R0,R2
+000154 99000008         251         ADD.W   R0,#08H
+000158 8C1F02           252         MOV.W   [R7+2],R1
+00015B 8A0F             253         MOV.W   [R7],R0
+00015D 8C3F16           254         MOV.W   [R7+22],R3
+000160 8C2F14           255         MOV.W   [R7+20],R2
+000163 866C42           256         MOV.B   ES,R3L
+000166 844208           257         MOV.B   R2L,[R2+8]
+000169 E04A             258         MULU.B  R2L,R5L
+00016B B930             259         MOVS.W  R3,#00H
+00016D 8C1716           260         MOV.W   R1,[R7+22]
+000170 8C0714           261         MOV.W   R0,[R7+20]
+000173 862C42           262         MOV.B   ES,R1L
+000176 0A20             263         ADD.W   R2,[R0]
+000178 1C3002           264         ADDC.W  R3,[R0+2]
+00017B 8913             265         MOV.W   R1,R3
+00017D 8902             266         MOV.W   R0,R2
+                        267 ; rtio_utl.c  104       
+                        268 ; rtio_utl.c  105          for (i = 0; i < pf->width; i++)
+00017F B940             269         MOV.W   R4,#00H
+000181 B1B0             270         MOVS.B  R5H,#00H
+000183 99540000         271         CMP.W   R5,#00H
+000187 FD20             272         BLE     _20
+000187 FD2000           272         BLE     _20
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+00018A                  273 _19:
+                        274 ; rtio_utl.c  106             *put++ = *src++;
+00018A 8C3712           275         MOV.W   R3,[R7+18]
+00018D 8C2710           276         MOV.W   R2,[R7+16]
+000190 866C42           277         MOV.B   ES,R3L
+000193 8242             278         MOV.B   R2L,[R2]
+000195 862C42           279         MOV.B   ES,R1L
+000198 8248             280         MOV.B   [R0],R2L
+00019A 8C3712           281         MOV.W   R3,[R7+18]
+00019D 8C2710           282         MOV.W   R2,[R7+16]
+0001A0 99200001         283         ADD.W   R2,#01H
+0001A4 99000001         284         ADD.W   R0,#01H
+0001A8 8C3F12           285         MOV.W   [R7+18],R3
+0001AB 8C2F10           286         MOV.W   [R7+16],R2
+0001AE 8C3712           287         MOV.W   R3,[R7+18]
+0001B1 8C2710           288         MOV.W   R2,[R7+16]
+0001B4 A941             289         ADDS.W  R4,#01H
+0001B6 8C3706           290         MOV.W   R3,[R7+6]
+0001B9 8C2704           291         MOV.W   R2,[R7+4]
+0001BC 866C42           292         MOV.B   ES,R3L
+0001BF 82A2             293         MOV.B   R5L,[R2]
+0001C1 B1B0             294         MOVS.B  R5H,#00H
+0001C3 4945             295         CMP.W   R4,R5
+0001C5 FBE2             296         BLT     _19
+0001C5 FBE200           296         BLT     _19
+0001C8                  297 _20:
+                        298 ; rtio_utl.c  107       
+                        299 ; rtio_utl.c  108          pf->putindex = (pf->putindex + 1) & pf->depth;
+0001C8 8C1702           300         MOV.W   R1,[R7+2]
+0001CB 8A07             301         MOV.W   R0,[R7]
+0001CD 862C42           302         MOV.B   ES,R1L
+0001D0 8200             303         MOV.B   R0L,[R0]
+0001D2 A101             304         ADDS.B  R0L,#01H
+0001D4 8C370A           305         MOV.W   R3,[R7+10]
+0001D7 8C2708           306         MOV.W   R2,[R7+8]
+0001DA 866C42           307         MOV.B   ES,R3L
+0001DD 8212             308         MOV.B   R0H,[R2]
+0001DF 5101             309         AND.B   R0L,R0H
+0001E1 8C3702           310         MOV.W   R3,[R7+2]
+0001E4 8A27             311         MOV.W   R2,[R7]
+0001E6 866C42           312         MOV.B   ES,R3L
+0001E9 820A             313         MOV.B   [R2],R0L
+                        314 ; rtio_utl.c  109          pf->cursize++;
+0001EB 8926             315         MOV.W   R2,R6
+0001ED A921             316         ADDS.W  R2,#01H
+0001EF 8C170E           317         MOV.W   R1,[R7+14]
+0001F2 8C070C           318         MOV.W   R0,[R7+12]
+0001F5 862C42           319         MOV.B   ES,R1L
+0001F8 8A28             320         MOV.W   [R0],R2
+                        321 ; rtio_utl.c  110       
+                        322 ; rtio_utl.c  111          if ( (pf->highT > 0) && (pf->highT == pf->cursize) )
+0001FA 8C1716           323         MOV.W   R1,[R7+22]
+0001FD 8C0714           324         MOV.W   R0,[R7+20]
+000200 862C42           325         MOV.B   ES,R1L
+000203 840006           326         MOV.B   R0L,[R0+6]
+000206 8C5716           327         MOV.W   R5,[R7+22]
+000209 8C4714           328         MOV.W   R4,[R7+20]
+00020C 86AC42           329         MOV.B   ES,R5L
+00020F 94440600         330         CMP.B   [R4+6],#00H
+000213 F906             331         BL      _22
+000215 B110             332         MOVS.B  R0H,#00H
+000217 4902             333         CMP.W   R0,R2
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+000219 F203             334         BNE     _22
+                        335 ; rtio_utl.c  112             return (HIGH_THRESHOLD);
+00021B B902             336         MOV.W   R0,#02H
+00021D FE07             337         BR      _26
+00021D FE0700           337         BR      _26
+000220                  338 _22:
+                        339 ; rtio_utl.c  113       
+                        340 ; rtio_utl.c  114          if (pf->cursize == 1)
+000220 99240001         341         CMP.W   R2,#01H
+000224 F202             342         BNE     _23
+                        343 ; rtio_utl.c  115                return (FIFO_NOT_EMPTY);
+000226 B901             344         MOV.W   R0,#01H
+000228 FE01             345         BR      _26
+000228 FE01             345         BR      _26
+00022A                  346 _23:
+                        347 ; rtio_utl.c  116       
+                        348 ; rtio_utl.c  117          return (PUT_OKAY);
+00022A B900             349         MOV.W   R0,#00H
+00022A B900             349         MOV.W   R0,#00H
+                        350 ; rtio_utl.c  118       }
+00022C                  351 _26:
+00022C 99700018         352         ADD.W   R7,#018H
+000230 2F70             353         POP.W   R4, R5, R6
+000232 D680             354         RET
+000232 D680             354         RET
+                        355 ; rtio_utl.c  119       
+                        356 ; rtio_utl.c  120       /*=======================================================================
+                            ===*/
+                        357 ; rtio_utl.c  121       INT UL_get_FIFO( FIFO *pf,
+                        358 ; rtio_utl.c  122                        CHAR *dst)
+                        359 ; rtio_utl.c  123       {
+                        360         PUBLIC  _UL_get_FIFO
+000234                  361 _UL_get_FIFO:
+000234 0F70             362         PUSH.W  R4, R5, R6
+000236 99720018         363         SUB.W   R7,#018H
+00023A 8C3F12           364         MOV.W   [R7+18],R3
+00023D 8C2F10           365         MOV.W   [R7+16],R2
+                        366 ; rtio_utl.c  124          INT i;
+                        367 ; rtio_utl.c  125          CHAR *get;
+                        368 ; rtio_utl.c  126       
+                        369 ; rtio_utl.c  127          if (pf->cursize == 0)
+000240 8931             370         MOV.W   R3,R1
+000242 8920             371         MOV.W   R2,R0
+000244 9900000A         372         ADD.W   R0,#0AH
+000248 8C1F0E           373         MOV.W   [R7+14],R1
+00024B 8C0F0C           374         MOV.W   [R7+12],R0
+00024E 866C42           375         MOV.B   ES,R3L
+000251 8C620A           376         MOV.W   R6,[R2+10]
+000254 F204             377         BNE     _33
+                        378 ; rtio_utl.c  128             return (FIFO_EMPTY);
+000256 9908FFFF         379         MOV.W   R0,#0FFFFH
+                        380         BR      _41
+00025A D50086          +380         JMP.L   _41
+00025A D5008600        +380         JMP.L   _41
+00025E                  381 _33:
+                        382 ; rtio_utl.c  129       
+                        383 ; rtio_utl.c  130          get = pf->body + (pf->width * pf->getindex);
+00025E 8913             384         MOV.W   R1,R3
+000260 8902             385         MOV.W   R0,R2
+000262 99000004         386         ADD.W   R0,#04H
+000266 8C1F0A           387         MOV.W   [R7+10],R1
+000269 8C0F08           388         MOV.W   [R7+8],R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+00026C 866C42           389         MOV.B   ES,R3L
+00026F 84A204           390         MOV.B   R5L,[R2+4]
+000272 8913             391         MOV.W   R1,R3
+000274 8902             392         MOV.W   R0,R2
+000276 99000009         393         ADD.W   R0,#09H
+00027A 8C1F06           394         MOV.W   [R7+6],R1
+00027D 8C0F04           395         MOV.W   [R7+4],R0
+000280 8C3F16           396         MOV.W   [R7+22],R3
+000283 8C2F14           397         MOV.W   [R7+20],R2
+000286 866C42           398         MOV.B   ES,R3L
+000289 844209           399         MOV.B   R2L,[R2+9]
+00028C E04A             400         MULU.B  R2L,R5L
+00028E B930             401         MOVS.W  R3,#00H
+000290 8C1716           402         MOV.W   R1,[R7+22]
+000293 8C0714           403         MOV.W   R0,[R7+20]
+000296 862C42           404         MOV.B   ES,R1L
+000299 0A20             405         ADD.W   R2,[R0]
+00029B 1C3002           406         ADDC.W  R3,[R0+2]
+00029E 8913             407         MOV.W   R1,R3
+0002A0 8902             408         MOV.W   R0,R2
+                        409 ; rtio_utl.c  131       
+                        410 ; rtio_utl.c  132          for (i = 0; i < pf->width; i++)
+0002A2 B940             411         MOV.W   R4,#00H
+0002A4 B1B0             412         MOVS.B  R5H,#00H
+0002A6 99540000         413         CMP.W   R5,#00H
+0002AA FD24             414         BLE     _35
+0002AA FD24             414         BLE     _35
+0002AC                  415 _34:
+                        416 ; rtio_utl.c  133             *dst++ = *get++;
+0002AC 8C1F02           417         MOV.W   [R7+2],R1
+0002AF 8A0F             418         MOV.W   [R7],R0
+0002B1 862C42           419         MOV.B   ES,R1L
+0002B4 8240             420         MOV.B   R2L,[R0]
+0002B6 8C1712           421         MOV.W   R1,[R7+18]
+0002B9 8C0710           422         MOV.W   R0,[R7+16]
+0002BC 862C42           423         MOV.B   ES,R1L
+0002BF 8248             424         MOV.B   [R0],R2L
+0002C1 8C1702           425         MOV.W   R1,[R7+2]
+0002C4 8A07             426         MOV.W   R0,[R7]
+0002C6 99000001         427         ADD.W   R0,#01H
+0002CA 8C3712           428         MOV.W   R3,[R7+18]
+0002CD 8C2710           429         MOV.W   R2,[R7+16]
+0002D0 99200001         430         ADD.W   R2,#01H
+0002D4 8C3F12           431         MOV.W   [R7+18],R3
+0002D7 8C2F10           432         MOV.W   [R7+16],R2
+0002DA 8C3712           433         MOV.W   R3,[R7+18]
+0002DD 8C2710           434         MOV.W   R2,[R7+16]
+0002E0 A941             435         ADDS.W  R4,#01H
+0002E2 8C370A           436         MOV.W   R3,[R7+10]
+0002E5 8C2708           437         MOV.W   R2,[R7+8]
+0002E8 866C42           438         MOV.B   ES,R3L
+0002EB 82A2             439         MOV.B   R5L,[R2]
+0002ED B1B0             440         MOVS.B  R5H,#00H
+0002EF 4945             441         CMP.W   R4,R5
+0002F1 FBDD             442         BLT     _34
+0002F1 FBDD00           442         BLT     _34
+0002F4                  443 _35:
+                        444 ; rtio_utl.c  134       
+                        445 ; rtio_utl.c  135          pf->getindex = (pf->getindex + 1) & pf->depth;
+0002F4 8C1706           446         MOV.W   R1,[R7+6]
+0002F7 8C0704           447         MOV.W   R0,[R7+4]
+0002FA 862C42           448         MOV.B   ES,R1L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+0002FD 8200             449         MOV.B   R0L,[R0]
+0002FF A101             450         ADDS.B  R0L,#01H
+000301 8C5716           451         MOV.W   R5,[R7+22]
+000304 8C4714           452         MOV.W   R4,[R7+20]
+000307 99400005         453         ADD.W   R4,#05H
+00030B 8C3716           454         MOV.W   R3,[R7+22]
+00030E 8C2714           455         MOV.W   R2,[R7+20]
+000311 866C42           456         MOV.B   ES,R3L
+000314 841205           457         MOV.B   R0H,[R2+5]
+000317 5101             458         AND.B   R0L,R0H
+000319 8C3706           459         MOV.W   R3,[R7+6]
+00031C 8C2704           460         MOV.W   R2,[R7+4]
+00031F 866C42           461         MOV.B   ES,R3L
+000322 820A             462         MOV.B   [R2],R0L
+                        463 ; rtio_utl.c  136          pf->cursize--;
+000324 A96F             464         ADDS.W  R6,#0FH
+000326 8C170E           465         MOV.W   R1,[R7+14]
+000329 8C070C           466         MOV.W   R0,[R7+12]
+00032C 862C42           467         MOV.B   ES,R1L
+00032F 8A68             468         MOV.W   [R0],R6
+                        469 ; rtio_utl.c  137       
+                        470 ; rtio_utl.c  138          if ( (pf->lowT > 0) && (pf->lowT == pf->cursize) )
+000331 8C1716           471         MOV.W   R1,[R7+22]
+000334 8C0714           472         MOV.W   R0,[R7+20]
+000337 862C42           473         MOV.B   ES,R1L
+00033A 840007           474         MOV.B   R0L,[R0+7]
+00033D 8C3716           475         MOV.W   R3,[R7+22]
+000340 8C2714           476         MOV.W   R2,[R7+20]
+000343 866C42           477         MOV.B   ES,R3L
+000346 94240700         478         CMP.B   [R2+7],#00H
+00034A F905             479         BL      _37
+00034C B110             480         MOVS.B  R0H,#00H
+00034E 4906             481         CMP.W   R0,R6
+000350 F202             482         BNE     _37
+                        483 ; rtio_utl.c  139             return (LOW_THRESHOLD);
+000352 B902             484         MOV.W   R0,#02H
+000354 FE09             485         BR      _41
+000354 FE09             485         BR      _41
+000356                  486 _37:
+                        487 ; rtio_utl.c  140       
+                        488 ; rtio_utl.c  141             if (pf->cursize == pf->depth)
+000356 86AC42           489         MOV.B   ES,R5L
+000359 8204             490         MOV.B   R0L,[R4]
+00035B B110             491         MOVS.B  R0H,#00H
+00035D 4960             492         CMP.W   R6,R0
+00035F F203             493         BNE     _38
+                        494 ; rtio_utl.c  142                return (FIFO_NOT_FULL);
+000361 B901             495         MOV.W   R0,#01H
+000363 FE02             496         BR      _41
+000363 FE0200           496         BR      _41
+000366                  497 _38:
+                        498 ; rtio_utl.c  143       
+                        499 ; rtio_utl.c  144             return (GET_OKAY);
+000366 B900             500         MOV.W   R0,#00H
+000366 B900             500         MOV.W   R0,#00H
+                        501 ; rtio_utl.c  145       }
+000368                  502 _41:
+000368 99700018         503         ADD.W   R7,#018H
+00036C 2F70             504         POP.W   R4, R5, R6
+00036E D680             505         RET
+00036E D680             505         RET
+                        506 ; rtio_utl.c  146       
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        507 ; rtio_utl.c  147       /*=======================================================================
+                            ===*/
+                        508 ; rtio_utl.c  148       INT UL_put_LIFO( FIFO *pf,
+                        509 ; rtio_utl.c  149                        CHAR *src )
+                        510 ; rtio_utl.c  150       {
+                        511         PUBLIC  _UL_put_LIFO
+000370                  512 _UL_put_LIFO:
+000370 0F70             513         PUSH.W  R4, R5, R6
+000372 99720014         514         SUB.W   R7,#014H
+000376 8C3F0E           515         MOV.W   [R7+14],R3
+000379 8C2F0C           516         MOV.W   [R7+12],R2
+                        517 ; rtio_utl.c  151          INT i;
+                        518 ; rtio_utl.c  152          CHAR *put;
+                        519 ; rtio_utl.c  153       
+                        520 ; rtio_utl.c  154          if (pf->cursize == pf->depth + 1)
+00037C 8931             521         MOV.W   R3,R1
+00037E 8920             522         MOV.W   R2,R0
+000380 9900000A         523         ADD.W   R0,#0AH
+000384 8C1F0A           524         MOV.W   [R7+10],R1
+000387 8C0F08           525         MOV.W   [R7+8],R0
+00038A 866C42           526         MOV.B   ES,R3L
+00038D 8C620A           527         MOV.W   R6,[R2+10]
+000390 866C42           528         MOV.B   ES,R3L
+000393 848205           529         MOV.B   R4L,[R2+5]
+000396 81A8             530         MOV.B   R5L,R4L
+000398 B1B0             531         MOVS.B  R5H,#00H
+00039A A951             532         ADDS.W  R5,#01H
+00039C 866C42           533         MOV.B   ES,R3L
+00039F 4C5A0A           534         CMP.W   [R2+10],R5
+0003A2 F203             535         BNE     _47
+                        536 ; rtio_utl.c  155             return (FIFO_FULL);
+0003A4 9908FFFF         537         MOV.W   R0,#0FFFFH
+0003A8 FE70             538         BR      _55
+0003A8 FE70             538         BR      _55
+0003AA                  539 _47:
+                        540 ; rtio_utl.c  156       
+                        541 ; rtio_utl.c  157          pf->getindex = (pf->getindex - 1) & pf->depth;
+0003AA 866C42           542         MOV.B   ES,R3L
+0003AD 849209           543         MOV.B   R4H,[R2+9]
+0003B0 A19F             544         ADDS.B  R4H,#0FH
+0003B2 5189             545         AND.B   R4L,R4H
+0003B4 866C42           546         MOV.B   ES,R3L
+0003B7 848A09           547         MOV.B   [R2+9],R4L
+                        548 ; rtio_utl.c  158          put = pf->body + (pf->width * pf->getindex);
+0003BA 8913             549         MOV.W   R1,R3
+0003BC 8902             550         MOV.W   R0,R2
+0003BE 99000004         551         ADD.W   R0,#04H
+0003C2 8C1F06           552         MOV.W   [R7+6],R1
+0003C5 8C0F04           553         MOV.W   [R7+4],R0
+0003C8 8C3F12           554         MOV.W   [R7+18],R3
+0003CB 8C2F10           555         MOV.W   [R7+16],R2
+0003CE 866C42           556         MOV.B   ES,R3L
+0003D1 84A204           557         MOV.B   R5L,[R2+4]
+0003D4 E08A             558         MULU.B  R4L,R5L
+0003D6 8924             559         MOV.W   R2,R4
+0003D8 B930             560         MOVS.W  R3,#00H
+0003DA 8C1712           561         MOV.W   R1,[R7+18]
+0003DD 8C0710           562         MOV.W   R0,[R7+16]
+0003E0 862C42           563         MOV.B   ES,R1L
+0003E3 0A20             564         ADD.W   R2,[R0]
+0003E5 1C3002           565         ADDC.W  R3,[R0+2]
+0003E8 8C3F02           566         MOV.W   [R7+2],R3
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+0003EB 8A2F             567         MOV.W   [R7],R2
+                        568 ; rtio_utl.c  159       
+                        569 ; rtio_utl.c  160          for (i = 0; i < pf->width; i++)
+0003ED B940             570         MOV.W   R4,#00H
+0003EF B1B0             571         MOVS.B  R5H,#00H
+0003F1 99540000         572         CMP.W   R5,#00H
+0003F5 FD29             573         BLE     _49
+0003F5 FD2900           573         BLE     _49
+0003F8                  574 _48:
+                        575 ; rtio_utl.c  161             *put++ = *src++;
+0003F8 8C170E           576         MOV.W   R1,[R7+14]
+0003FB 8C070C           577         MOV.W   R0,[R7+12]
+0003FE 862C42           578         MOV.B   ES,R1L
+000401 8200             579         MOV.B   R0L,[R0]
+000403 8C3702           580         MOV.W   R3,[R7+2]
+000406 8A27             581         MOV.W   R2,[R7]
+000408 866C42           582         MOV.B   ES,R3L
+00040B 820A             583         MOV.B   [R2],R0L
+00040D 8C170E           584         MOV.W   R1,[R7+14]
+000410 8C070C           585         MOV.W   R0,[R7+12]
+000413 99000001         586         ADD.W   R0,#01H
+000417 8C3702           587         MOV.W   R3,[R7+2]
+00041A 8A27             588         MOV.W   R2,[R7]
+00041C 99200001         589         ADD.W   R2,#01H
+000420 8C3F02           590         MOV.W   [R7+2],R3
+000423 8A2F             591         MOV.W   [R7],R2
+000425 8931             592         MOV.W   R3,R1
+000427 8920             593         MOV.W   R2,R0
+000429 8C3F0E           594         MOV.W   [R7+14],R3
+00042C 8C2F0C           595         MOV.W   [R7+12],R2
+00042F 8C370E           596         MOV.W   R3,[R7+14]
+000432 8C270C           597         MOV.W   R2,[R7+12]
+000435 A941             598         ADDS.W  R4,#01H
+000437 8C1706           599         MOV.W   R1,[R7+6]
+00043A 8C0704           600         MOV.W   R0,[R7+4]
+00043D 862C42           601         MOV.B   ES,R1L
+000440 82A0             602         MOV.B   R5L,[R0]
+000442 B1B0             603         MOVS.B  R5H,#00H
+000444 4945             604         CMP.W   R4,R5
+000446 FBD8             605         BLT     _48
+000446 FBD8             605         BLT     _48
+000448                  606 _49:
+                        607 ; rtio_utl.c  162       
+                        608 ; rtio_utl.c  163          pf->cursize++;
+000448 8926             609         MOV.W   R2,R6
+00044A A921             610         ADDS.W  R2,#01H
+00044C 8C170A           611         MOV.W   R1,[R7+10]
+00044F 8C0708           612         MOV.W   R0,[R7+8]
+000452 862C42           613         MOV.B   ES,R1L
+000455 8A28             614         MOV.W   [R0],R2
+                        615 ; rtio_utl.c  164       
+                        616 ; rtio_utl.c  165          if (pf->cursize == 1)
+000457 99240001         617         CMP.W   R2,#01H
+00045B F203             618         BNE     _50
+                        619 ; rtio_utl.c  166                return (FIFO_NOT_EMPTY);
+00045D B901             620         MOV.W   R0,#01H
+00045F FE15             621         BR      _55
+00045F FE1500           621         BR      _55
+000462                  622 _50:
+                        623 ; rtio_utl.c  167       
+                        624 ; rtio_utl.c  168          if ( (pf->highT > 0) && (pf->highT == pf->cursize) )
+000462 8C1712           625         MOV.W   R1,[R7+18]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+000465 8C0710           626         MOV.W   R0,[R7+16]
+000468 862C42           627         MOV.B   ES,R1L
+00046B 840006           628         MOV.B   R0L,[R0+6]
+00046E 8C5712           629         MOV.W   R5,[R7+18]
+000471 8C4710           630         MOV.W   R4,[R7+16]
+000474 86AC42           631         MOV.B   ES,R5L
+000477 94440600         632         CMP.B   [R4+6],#00H
+00047B F906             633         BL      _52
+00047D B110             634         MOVS.B  R0H,#00H
+00047F 4902             635         CMP.W   R0,R2
+000481 F203             636         BNE     _52
+                        637 ; rtio_utl.c  169             return (HIGH_THRESHOLD);
+000483 B902             638         MOV.W   R0,#02H
+000485 FE02             639         BR      _55
+000485 FE0200           639         BR      _55
+000488                  640 _52:
+                        641 ; rtio_utl.c  170       
+                        642 ; rtio_utl.c  171          return (PUT_OKAY);
+000488 B900             643         MOV.W   R0,#00H
+000488 B900             643         MOV.W   R0,#00H
+                        644 ; rtio_utl.c  172       }
+00048A                  645 _55:
+00048A 99700014         646         ADD.W   R7,#014H
+00048E 2F70             647         POP.W   R4, R5, R6
+000490 D680             648         RET
+                        649 ; rtio_utl.c  173       
+                        650 ; rtio_utl.c  174       /* End of the RTIO_UTL.C module */

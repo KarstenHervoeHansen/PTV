@@ -1,0 +1,83 @@
+INCLUDE "par2ser";
+
+SUBDESIGN ANALOG
+% 
+Analog audio control logic for PT5201
+000106 PF
+%
+(
+CLK6144,
+AU_D[7..0],
+GL_PER_1SEC,
+AN_ON           -- serial data on   (off at power up)
+
+                        : input;
+
+ANCOUNT[9..0],
+LRCK,
+AN_SDATA,
+ANGL1
+                        : output;
+)
+
+variable
+an_count[12..0]         : dff;
+angl_count[10..0]       : dffe;
+Q1                      : tff;
+
+CLK3072,
+ANGL_RESET,
+ANLOAD
+                         : node;
+
+shreg                    : par2ser;
+
+
+begin
+
+Q1.clk = CLK6144;               -- divide 6.144MHz with 2 giving 3.072MHz
+Q1.t = VCC;
+CLK3072 = Q1;
+
+an_count[].clk = CLK3072;              -- analog counter
+if (an_count[] == 6144 - 1) then
+  an_count[].d = B"0";                 -- synchronous reset after 6144/8 = 768 bytes = 2ms
+ else
+  an_count[] = an_count[] + 1;
+end if;
+
+% serialize analog audio data %
+shreg.(clk,pload,on,din[]) = (!CLK3072, ANLOAD, AN_ON,AU_D[]);
+AN_SDATA = shreg.(qq);                    -- serial data to CS4340
+
+
+ANCOUNT[] = an_count[12..3];
+ANLOAD = (an_count[2..0] == 0);
+LRCK = !an_count[5];
+
+angl_count[].clk = CLK3072;                 -- glitch counter
+angl_count[].ena = (an_count[] == 0);       -- enable for analog glitch counter each 2ms
+
+ANGL1 = angl_count[] < 126;                 -- 126 counts x 2ms = 252ms
+if GL_PER_1SEC == VCC then                  -- selects glitch period = 1 or 3 sec
+  ANGL_RESET = (angl_count[] == 500-1);     -- 2ms x 500 = 1.0 sec
+ else
+  ANGL_RESET = (angl_count[] == 1500-1);    -- 4ms x 1500 = 3.0 sec
+end if; 
+
+if ANGL_RESET == VCC then
+  angl_count[].d = B"0";                    -- synchronous reset of glitch counter
+ else
+  angl_count[] = angl_count[] + 1;
+end if;
+
+
+
+end;
+
+
+
+
+
+
+

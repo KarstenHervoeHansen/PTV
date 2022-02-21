@@ -1,0 +1,32 @@
+SUBDESIGN klkcntdr
+(
+  clk1,field2,ad1,ad0,syssel:  INPUT;
+  ramrst:                      INPUT;
+  klik1:                       OUTPUT;
+)
+VARIABLE
+  frame_count[6..0],rammemo:   DFF;
+  klik1:                       DFFE;
+
+BEGIN
+  klik1.clk  = clk1;        % klik-afkoder EBU klik , clk1 is hload1 %
+
+  klik1.clrn = !((frame_count[]== 20 & !syssel));
+  klik1.ena  =  ((frame_count[]== 14 # (frame_count[] == 13 & syssel)) & ad1); % (ad0 # ad1)); %
+  klik1.d    = VCC;
+
+  frame_count[].clk    = !field2;    % Frame-tæller %
+
+  rammemo.clk  = ramrst;
+  rammemo.d    = VCC;
+  rammemo.clrn = !(frame_count[]==0);
+
+  IF rammemo == 1 THEN
+    frame_count[].d = 0;
+  ELSIF (frame_count[].q == 74 & !syssel) # (frame_count[].q == 89 & syssel) THEN
+    frame_count[].d = 0;
+  ELSE
+    frame_count[].d = frame_count[].q+1;
+  END IF;
+END;
+

@@ -1,0 +1,182 @@
+%/* FILE NAME        ramdrw.TDF                                             */%
+%/* PURPOSE          Subdesign file for 8633 V63 generator      .           */%
+%/*                  Sound Ram Address generator                            * %
+%/*                  Modified for moving TDC Logo similar to 8603/905       */%
+%/* TEST                                                                    */%
+%/* LAST UPDT:       18.06.2003                                             */%
+%/* NOTES:           New design for long logo 256 x 44 with 2 x 64 k        */%
+%/*                  sound/logo RAM                                         */%
+%/*                                                                         */%
+
+%/*
+  When moving logo is selected and audio signal is "Stereo EBU 1 kHz",
+  or "Mono EBU 1 kHz" logo's
+  movement is synchronized with click.  When logo moves from left to right and
+  left logo edge passes left edge of red bar below logo area, the click pause
+  begins.
+*/%
+
+%/*
+  Constants below define max and min count that the offset[] counter holds.
+  This translates to leftmost and rightmost positions of logo moving in the
+  text field.  The offset[] counter, together with linenr[] counter deliver
+  address of logo data to be moved from sound ram to multiplexer.
+  Note that not full length of logo lines is used, if it was, the constants
+  would be:
+      CONSTANT OFFSET_MAX  = H"1FF";
+      CONSTANT OFFSET_MIN  = H"0";
+*/%
+
+CONSTANT OFFSET_MAX  = H"140";    %/* 320 */%
+CONSTANT OFFSET_MID  = H"104";    %/* this signals start of click */%
+CONSTANT OFFSET_MIN  = H"0";
+
+%/*
+  Constants below define boundaries for linenr[5]counter.  Its contents
+  appear on abu[14..9] lines and select one of 22 lines of logo data (field2
+  selects even or odd 22 logo lines).  Logo as picture has 44 lines.  Logo
+  data start and end addresses are defined in uP program:
+      far volatile UC LowPulseRAM[22528]  @ 0x12800 - 0x17FFF  // CSRAM3
+      far volatile UC HighPulseRAM[22528] @ 0x1A800 - 0x1FFFF  // CSRAM4
+                                            ^^^^^^^   ^^^^^^^
+                            Boundaries ---->  0x0A      0x1F
+*/%  
+CONSTANT FIRST_LINE_ADDRESS = H"0A";
+CONSTANT LAST_LINE_ADDRESS  = H"1F";
+
+%/*
+  Constants below determine boundaries for the hsound[14] counter,
+  which delivers address of sound data to be moved from sound ram to
+  multiplexer.  They correspond to start and end address of sound and
+  click data, defined in uP program:
+
+   volatile UC LowAudioRAM[11520]       @ 0x00200 - 0x02EFF  // CSRAM1
+   volatile UC LowClickAudioRAM[11520]  @ 0x04200 - 0x06EFF
+   volatile UC HighAudioRAM[11520]      @ 0x08200 - 0x0AEFF  // CSRAM2
+   volatile UC HighClickAudioRAM[11520] @ 0x0C200 - 0x0EEFF
+
+  Node tnode14 selects Audio or Click arrays.
+*/%  
+CONSTANT LOW_AUDIO_RAM_BEG = H"200";
+CONSTANT LOW_AUDIO_RAM_END = H"2EFF";
+
+
+SUBDESIGN ramdrw
+
+(
+  clk, count_enable, oe                : INPUT;
+  klik, adjust,frameb,framea           : INPUT;
+  window,hsync,field2,mres,16x9        : INPUT;
+  MOVEBIT                              : INPUT;
+  abu[14..0],ram_rst                   : OUTPUT;
+)
+
+VARIABLE
+  tnode[14..0]                  : TRI_STATE_NODE;
+  hsound[13..0]                 : DFF; %/* sound ram counter */%
+  adjust_memo                   : DFF;
+  rst                           : DFF;
+  logo_ram[14..0]               : DFF; %/* logo ram counter  */%
+  offset[8..0]                  : DFF;
+  linenr[4..0]                  : DFF;
+  updown,ram_rst                : DFFE; 
+
+BEGIN
+  hsound[13..0].clk  = clk;
+  hsound[13..0].clrn = !adjust;
+  offset[].clk       = MOVEBIT;  %/* Movebit eller field-pulse */%
+  logo_ram[].clk     = clk;
+
+  adjust_memo.clk   = clk;
+  adjust_memo.d     = adjust;
+
+  rst.clk    = MOVEBIT;
+  rst.d      = (!16x9 & offset[].q == OFFSET_MIN) #
+                (16x9 & offset[].q == OFFSET_MIN);
+
+  updown.clk   = MOVEBIT;
+  updown.d     = VCC;
+  updown.ena   = (offset[] == OFFSET_MAX);
+  updown.clrn  = !rst.q;
+
+  ram_rst.clk = MOVEBIT;
+  ram_rst.ena = VCC;
+  ram_rst.d   = (offset[] == OFFSET_MID) & updown;
+
+  IF updown == 1 THEN
+    offset[].d = offset[].q-4;
+  ELSE 
+    offset[].d = offset[].q+4; %/* offset advances by four */%
+  END IF;
+
+  %/* Note that if we make above equation like this:                    */%
+  %/*       ....................                                        */%
+  %/*      offset[].d = offset[].q;                                     */%              
+  %/*    ELSE                                                           */%
+  %/*      offset[].d = offset[].q;                                     */%
+  %/*    END IF;                                                        */%
+  %/* i.e. offset counter does not advance, the logo will be scanned    */%
+  %/*  OK because of (1), but will not move.                            */%
+              
+  offset[].clrn = mres; 
+
+  linenr[].clk  = hsync;  %/* couter for addressing of 42 logo lines */%
+
+  IF MOVEBIT == 1 THEN
+    IF linenr[].q == LAST_LINE_ADDRESS THEN
+      linenr[].d = FIRST_LINE_ADDRESS;
+    ELSE
+      linenr[].d = linenr[].q+1;
+    END IF;
+  ELSE
+    linenr[].d = FIRST_LINE_ADDRESS;
+  END IF;
+
+  IF count_enable == 1 THEN
+    IF (hsound[13..0].q == LOW_AUDIO_RAM_END) THEN
+      hsound[13..0].d = LOW_AUDIO_RAM_BEG;
+    ELSE
+      hsound[13..0].d = hsound[13..0].q+1;
+    END IF;
+  ELSE
+    hsound[8..0].d    = hsound[8..0].q;
+    hsound9.d         = hsound9.q # adjust_memo.q;
+    hsound[13..10].d  = hsound[13..10].q;
+  END IF;
+
+  IF hsync == 1 THEN
+    logo_ram[14..10].d = linenr[4..0].q;
+    logo_ram9.d        = field2;
+    logo_ram[8..0].d   = offset[8..0];    %/**** (2) ****/%
+  ELSIF window == 1 THEN
+    logo_ram[14..0].d  = logo_ram[].q+1;  %/**** (1) ****/%
+  ELSE
+    logo_ram[14..0].d  = logo_ram[].q;
+  END IF;
+
+  %/* logo_ram[8..0] advances by 4 due to offset counter equation, so */%
+  %/* in each field it will point to one sample data set ahead, which */%
+  %/*  gives logo movement.                                           */%
+  
+
+  tnode14  = TRI(!window & (klik & framea # frameb & klik) # (window & logo_ram14), !oe);
+
+  tnode13  = TRI((!window & hsound13) # (window & logo_ram13), !oe);
+  tnode12  = TRI((!window & hsound12) # (window & logo_ram12), !oe);
+  tnode11  = TRI((!window & hsound11) # (window & logo_ram11), !oe);
+  tnode10  = TRI((!window & hsound10) # (window & logo_ram10), !oe);
+  tnode9   = TRI((!window & hsound9)  # (window & logo_ram9), !oe);
+  tnode8   = TRI((!window & hsound8)  # (window & logo_ram8), !oe);
+  tnode7   = TRI((!window & hsound7)  # (window & logo_ram7), !oe);
+  tnode6   = TRI((!window & hsound6)  # (window & logo_ram6), !oe);
+  tnode5   = TRI((!window & hsound5)  # (window & logo_ram5), !oe);
+  tnode4   = TRI((!window & hsound4)  # (window & logo_ram4), !oe);
+  tnode3   = TRI((!window & hsound3)  # (window & logo_ram3), !oe);
+  tnode2   = TRI((!window & hsound2)  # (window & logo_ram2), !oe);
+  tnode1   = TRI((!window & hsound1)  # (window & logo_ram1), !oe);
+  tnode0   = TRI((!window & hsound0)  # (window & logo_ram0), !oe);
+
+  abu[14..0]    = tnode[14..0];
+END;
+
+

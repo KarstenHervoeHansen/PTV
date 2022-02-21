@@ -1,0 +1,31 @@
+SUBDESIGN adrdekv2
+(
+	fh_g,fh_m,f8_g,f4_m,rdcb,wrcb,ps:				input;
+	syssel,a12,a13,a14,a15,psen:					input;
+	vdly:											output;
+	sys_h,vint,ldlsbph,ldmsbph,page1,npage1:		output;
+	ldstatus,enprom,csram1,csram2,wrram1,wrram2:	output;
+	ldside:											output;
+)
+VARIABLE
+	vdly:		DFF;
+
+BEGIN
+	sys_h = (fh_g & !syssel) # (fh_m & syssel);	
+	vint = (f8_g & !syssel) # (f4_m & syssel);
+	ldlsbph = !(!ps & a12 & !a13 & !a14 & !a15 & !wrcb);
+	ldmsbph = !(!ps & a13 & !a14 & !a15 & !wrcb);
+	ldstatus = !(!ps & !a12 & !a13 & !a14 & !a15 & !wrcb);
+	ldside = !(!ps & a12 & a13 & a14 & !a15 & !wrcb);
+	enprom = psen & (rdcb # ps);
+	page1  = ps;
+	csram1 = ps & !(ps & !a15 & psen);
+	csram2 = ps & !(ps & a15 & psen);	
+	wrram1 = (wrcb # !ps # a15 # !psen);
+	wrram2 = (wrcb # !ps # !a15 # !psen);
+	npage1 = !page1;
+
+	vdly.clk = ldmsbph;
+	vdly.d   = a12;
+END;
+

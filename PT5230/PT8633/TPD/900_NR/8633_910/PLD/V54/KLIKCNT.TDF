@@ -1,0 +1,49 @@
+%   File: klikcnt.dtf from V54 decoder, moving logo %
+%   This file gives correct timing of EBU and BBC clicks %
+SUBDESIGN klikcnt
+  (
+  HLOAD,f2,EBU,BBC,syssel:  INPUT;
+  click,bbc_click:          OUTPUT;
+  )
+VARIABLE
+  d[6..0]:            DFF;
+  click,klik2:        DFFE;
+
+BEGIN
+  click.clk   = HLOAD;          % klik-afkoder EBU klik %
+  click.clrn  = !((d[] == 19 & !syssel) # (d[] == 20 & syssel));
+  click.ena   =  ((d[] == 12) & (BBC # EBU));
+  click.d     = VCC;
+
+% klik-afkoder EBU klik - from DRklik file 
+	klik1.clk	  = HLOAD;   
+	klik1.clrn	= !((d[]==20 & !syssel));
+	klik1.ena	  =  ((d[]==14 # (d[]==13 & syssel)) & (BBC # EBU));
+	klik1.d		  = VCC;
+%
+
+% klik-afkoder BBC-klik - jk %
+  klik2.clk   = HLOAD;          
+  klik2.clrn  = !((d[] == 34 & !syssel) # (d[] == 35  & syssel));
+  klik2.ena   =  ((d[] == 20 & !syssel  #  d[] == 20 & syssel) & (BBC & !EBU));
+  klik2.d     = VCC;
+
+
+% klik-afkoder BBC-klik - from DRklik file 
+	klik2.clk 	= HLOAD;   
+	klik2.clrn	= ((d[] == 34 & !syssel));
+	klik2.ena 	= ((d[] == 20) & (BBC & !EBU));
+	klik2.d		  = VCC;
+%
+  bbc_click   = click & (!BBC & EBU) # klik2 & (BBC & !EBU);
+
+  d[].clk     = f2;             %Field-tæller%
+
+%  IF (d[].q == 24 & !syssel) # (d[].q == 29 & syssel) THEN %
+  IF (d[].q == 74 & !syssel) # (d[].q == 89 & syssel) THEN
+    d[].d  = 0;
+  ELSE
+    d[].d  = d[].q+1;
+  END IF;
+END;
+

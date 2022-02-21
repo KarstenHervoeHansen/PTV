@@ -1,0 +1,59 @@
+
+SUBDESIGN tcxo_chk
+(
+	clk, 					-- 27MHz clock
+	10M			: INPUT;	-- 13MHz TCXO
+	TCXO_OK		: OUTPUT;	-- 1=mounted    0=not mounted
+)
+VARIABLE
+	ss: MACHINE WITH STATES (s0, s1, s2, s3, s4, s5 ,s6);
+	TCXO_VAR	: dff;      
+
+BEGIN
+TCXO_VAR.clk = clk;
+	CASE ss IS
+		WHEN s0=>
+			IF 10M THEN ss = s1;
+				ELSE ss = s2;
+			END IF;
+				tcxo_var.d = VCC;
+		WHEN s1=>
+			IF 10M THEN ss = s3;
+				ELSE ss = s0;
+			END IF;
+				tcxo_var.d = VCC;
+   		WHEN s2=>
+			IF 10M THEN ss = s0;
+				ELSE ss = s4;
+			END IF;
+				tcxo_var.d = VCC;
+   		WHEN s3=>
+			IF 10M THEN ss = s5;
+				tcxo_var.d = GND;
+				ELSE ss = s0;
+				tcxo_var.d = VCC;
+			END IF;
+
+   		WHEN s4=>
+			IF 10M THEN ss = s0;
+				tcxo_var.d = VCC;
+				ELSE ss = s6;
+				tcxo_var.d = GND;
+			END IF;
+   		WHEN s5=>
+			IF 10M THEN ss = s5;
+				tcxo_var.d = GND;
+				ELSE ss = s0;
+				tcxo_var.d = VCC;
+			END IF;
+		WHEN s6=>
+			IF 10M THEN ss = s0;
+				tcxo_var.d = VCC;
+				ELSE ss = s6;
+				tcxo_var.d = GND;
+			END IF;
+	END case;
+TCXO_OK = TCXO_VAR;
+
+	ss.(clk) = (clk);
+END;

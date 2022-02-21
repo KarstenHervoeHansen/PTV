@@ -1,0 +1,250 @@
+%
+Title           PT5220 SPG LOGIC
+Pattern          
+Revision        0
+Author          SNJ
+Company         PTV
+Date            990408
+%
+
+TITLE "SPGLOG00";
+
+constant cmax = 1729;
+
+SUBDESIGN SPGLOG00
+(	
+
+CLOCK		:	INPUT;
+G			:	INPUT;
+ADD_in		:	INPUT;
+SUPR_in		:	INPUT;
+SAMP_in		:	INPUT;
+FIELDREF	:	INPUT;
+FRAMEREF	:	INPUT;
+V8REF		:	INPUT;
+HRESET_GPS	:	INPUT;
+H[10..0]	:	OUTPUT;
+PPS_ZERO	:	OUTPUT;
+HREF		:	OUTPUT;
+HREFOUT		:	OUTPUT;
+SPGINT		:	OUTPUT;
+SAMP_EN		:	OUTPUT;
+WINDOW_GPS	:	OUTPUT;
+HOUTG		:	OUTPUT;
+FIELDG		:	OUTPUT;
+FRAMEG		:	OUTPUT;
+V8OUTG		:	OUTPUT;
+HOUTM		:	OUTPUT;
+FIELDM		:	OUTPUT;
+FRAMEM		:	OUTPUT;
+V4OUTM		:	OUTPUT;
+
+
+	
+)
+	
+VARIABLE
+
+H[10..0]	:	DFF;
+CA2			:	DFF;
+HREF		:	DFF;
+HREFOUT		:	DFF;
+SPGINT		:	DFF;
+SAMP_EN		:	tFF;
+HOUTG		:	DFF;
+FIELDG		:	DFF;
+FRAMEG		:	DFF;
+V8OUTG		:	DFF;
+HOUTM		:	DFF;
+FIELDM		:	DFF;
+FRAMEM		:	DFF;
+V4OUTM		:	DFF;
+ADD			:	DFF;
+SUPR		:	DFF;
+SAMP		:	DFF;
+HSEC[10..0]	:	DFF;
+VSEC[11..0]	:	DFF;
+KASECH		:	DFF;
+KASECV		:	DFF;
+HSECOUT		:	DFF;
+V8SECOUT	:	DFF;
+FIELDSECOUT	:	DFF;
+FRAMESECOUT	:	DFF;
+TID0		:	DFF;
+WINDOW_GPS	:	DFF;
+PPS_ZERO		:	DFF;
+BEGIN
+
+
+
+
+
+add.clk = clock;
+supr.clk = clock;
+samp.clk = clock;
+
+add  = ( add_in  & ca2 ) # ( add  & !ca2 );
+supr = ( supr_in & ca2 ) # ( supr & !ca2 );
+samp = ( samp_in & ca2 ) # ( samp & !ca2 );
+
+TID0.clk = clock;
+TID0 = H[10..0]==0;
+
+
+H[10..0].clk = clock;
+
+IF CA2 THEN
+  H[]=0;
+ELSE
+  H[]=H[]+1;
+END if;
+
+ca2.clk = clock;
+ CA2 = ( G & (H[10..0]==1726) & !SAMP & !ADD & !SUPR)
+     # ( G & (H[10..0]==1720) & !SAMP & !ADD &  SUPR)% SUPR 4%
+     # ( G & (H[10..0]==1732) & !SAMP &  ADD & !SUPR)% ADD  4%
+     # ( G & (H[10..0]==1732) & !SAMP &  ADD &  SUPR)% SAMP%
+     # ( G & (H[10..0]==1726) &  SAMP & !ADD & !SUPR)
+     # ( G & (H[10..0]==1726) &  SAMP & !ADD &  SUPR)
+     # ( G & (H[10..0]==1726) &  SAMP &  ADD & !SUPR)% ADD 2%
+     # ( G & (H[10..0]==1726) &  SAMP &  ADD &  SUPR)% ADD 1%
+     # (!G & (H[10..0]==1714) & !SAMP & !ADD & !SUPR)
+     # (!G & (H[10..0]==1706) & !SAMP & !ADD &  SUPR)% SUPR 4%
+     # (!G & (H[10..0]==1722) & !SAMP &  ADD & !SUPR)% ADD  4%
+     # (!G & (H[10..0]==1722) & !SAMP &  ADD &  SUPR)% SAMP%
+     # (!G & (H[10..0]==1714) &  SAMP & !ADD & !SUPR)
+     # (!G & (H[10..0]==1714) &  SAMP & !ADD &  SUPR)
+     # (!G & (H[10..0]==1714) &  SAMP &  ADD & !SUPR)% ADD 2%
+     # (!G & (H[10..0]==1714) &  SAMP &  ADD &  SUPR)% ADD 1%
+	 # ( G & HRESET_GPS & ! WINDOW_GPS );
+
+samp_en.clk = clock;
+SAMP_EN = (SAMP & !ADD & !SUPR & (H[10..0]==864) &  SAMP_EN)
+        # (                      (H[10..0]==864) & !SAMP_EN);
+
+
+HREFOUT.clk = clock;
+HREFOUT = (H[10..0]>=1694)#(H[10..0]<64);
+
+HREF.clk = clock;
+HREF = H[10..0]<64;
+
+spgint.clk = clock;
+spgint = (H[10..0]<64);
+
+
+
+
+
+HSEC[10..0].clk = clock;
+
+IF CA2 THEN
+  HSEC[]=0;
+ELSE
+  HSEC[]=H[]+1;
+END if;
+
+kasech.clk = clock;
+kaseCH = (( HSEC[10..0]==1726 ) & !G )
+       # (( HSEC[10..0]==1714 ) &  G );
+
+
+VSEC[11..0].clk = clock;
+
+
+IF KASECH THEN
+  IF KASECV THEN
+    VSEC[]=0;
+  ELSE
+    VSEC[]=VSEC[]+1;
+  END IF;
+ELSE
+  VSEC[]=VSEC[]; 
+END if;
+
+
+kasecv.clk = clock;
+kaseCV = (( VSEC[11..0]==2499 ) & !G )
+       # (( VSEC[11..0]==1049 ) &  G );
+
+
+hsecout.clk = clock;
+V8SECOUT.clk = clock;
+HSECout = kasech  ;
+
+V8SECOUT =    ( ( VSEC[11..0]== 1 ) & !G)
+            # ( ( VSEC[11..0]== 1 ) &  G);
+
+
+FIELDSECOUT.clk = clock;
+
+FIELDSECOUT = ( ( VSEC[11..0]== 1    ) & !G)
+            # ( ( VSEC[11..0]== 313  ) & !G)
+            # ( ( VSEC[11..0]== 626  ) & !G)
+            # ( ( VSEC[11..0]== 938  ) & !G)
+            # ( ( VSEC[11..0]== 1251 ) & !G)
+            # ( ( VSEC[11..0]== 1563 ) & !G)
+            # ( ( VSEC[11..0]== 1876 ) & !G)
+            # ( ( VSEC[11..0]== 2188 ) & !G)
+            # ( ( VSEC[11..0]==    1 ) & G)
+            # ( ( VSEC[11..0]== 263  ) & G)
+            # ( ( VSEC[11..0]== 526  ) & G)
+            # ( ( VSEC[11..0]== 788  ) & G);
+
+FRAMESECOUT.clk = clock;
+
+FRAMESECOUT = ( ( VSEC[11..0]== 1    ) & !G)
+            # ( ( VSEC[11..0]== 626  ) & !G)
+            # ( ( VSEC[11..0]== 1251 ) & !G)
+            # ( ( VSEC[11..0]== 1876 ) & !G)
+            # ( ( VSEC[11..0]==    1 ) & G)
+            # ( ( VSEC[11..0]== 526  ) & G);
+
+
+
+HOUTG.clk = clock;
+HOUTM.clk = clock;
+V8OUTG.clk = clock;
+V4OUTM.clk = clock;
+
+HOUTG = (G & TID0) # (!G & HSECOUT); 
+HOUTM = (G & HSECOUT) # (!G & TID0); 
+
+
+V8OUTG = (G  & V8REF  & TID0 ) 
+       # (G  & V8OUTG & !TID0 )
+       # (!G & V8SECOUT) ;
+
+V4OUTM = (!G & V8REF  & TID0 ) 
+       # (!G & V4OUTM & !TID0 )
+       # (G  & V8SECOUT) ;
+
+FIELDG.clk = clock;
+FRAMEG.clk = clock;
+FIELDM.clk = clock;
+FRAMEM.clk = clock;
+
+
+
+FIELDG = (G  & !FIELDREF & TID0 ) 
+       # (G  & FIELDG   & !TID0 )
+       # (!G & FIELDSECOUT) ;
+
+FIELDM = (!G & !FIELDREF & TID0 )
+       # (!G & FIELDM   & !TID0 )
+       # (G  & FIELDSECOUT) ;
+
+FRAMEG = (G  & !FRAMEREF & TID0 )
+       # (G  & FRAMEG   & !TID0 )
+       # (!G & FRAMESECOUT) ;
+
+FRAMEM = (!G & !FRAMEREF & TID0 )
+       # (!G & FRAMEM   & !TID0 )
+       # (G  & FRAMESECOUT) ;
+
+WINDOW_GPS.CLK=clock;
+WINDOW_GPS= (H[10..0]>1620) # (H[10..0]<108) # !G;
+PPS_ZERO.clk = clock;
+PPS_ZERO = H[10..0]==	127;
+
+END;

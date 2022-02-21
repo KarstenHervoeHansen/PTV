@@ -1,0 +1,205 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\2_1\temp\xa\start.src
+ADDR   CODE            LINE SOURCELINE
+                          2 $LOCALS
+                          3 ; *** 
+                          4 ;     This file has been modified by
+                          5 ;     Embedded System Products, Inc. to
+                          6 ;     be used with their RTXC kernel.
+                          7 ; ***
+                          8 ; @(#)start.asm 1.9 7/22/97
+                          9 ;       Header file for XA type processors
+                         10 ;       --------------------------------------
+                         11 ;
+                         12                 NAME START
+                         15         
+                         16         
+                         17         
+                         21 ;
+000000                   22 LIBRT_PR     SEGMENT HCODE INSEGMENT 
+000000                   23                 RSEG    LIBRT_PR
+000000                   23                 RSEG    LIBRT_PR
+                         24   ;
+                         25                 PUBLIC  __EXIT          ; address to jump to on 'exit()'
+                         26                 PUBLIC  __START         ; start label, mentioned in description file (.dsc)
+                         27                                         ; and by C-compiler, don't remove it
+                         29 $                      
+                         31 ; rtxcopts.inc - RTXC assembly options 8051XA
+                         33 ;
+                         34 ;   RTXC    
+                         35 ;   Copyright (c) 
+                         36 ;   Embedded System Products, Inc.
+                         37 ;   ALL RIGHTS RESERVED
+                         38 ;
+                         39 ;============================================================================
+                         41 ;-------------------------------------
+                         42 ; KERNEL priority level
+                         43 ;    NOTE: RTXCINTLVL must match level in RTXCOPTS.H
+                         44 ;-------------------------------------
+                         45 RTXCINTLVL    equ   0Dh
+                         47 ;-------------------------------------
+                         48 ; KERNEL Trap number
+                         49 ;    NOTE:
+                         50 ;-------------------------------------
+                         51 RTXC_TRAPNUM  equ    0h
+                         53 ;-------------------------------------
+                         54 ; RTXC stack size
+                         55 ;    NOTE: RTXCSTKSZ must match definition in RTXCOPTS.H
+                         56 ;-------------------------------------
+                         57 RTXCSTKSZ    equ   256; can be changed as needed, min = approx 256 bytes
+                         59 ;-------------------------------------
+                         60 ; Nulltask's stack size
+                         61 ;-------------------------------------
+                         62 NULLSTKSZ    equ   128; Size of null stack, min = 128
+                         64 ;===========================================================================
+                         65 ; This switch is to define 12 bytes of kernel data into the first 1k bytes
+                         66 ; of RAM.  Having this switch defined to _near allows the kernel to execute
+                         67 ; considerably faster at a minimal cost. If this data is not desired to be
+                         68 ; in the 1k bytes, then define CORE_IRAMDATA to zero (0).
+                         69 ;                1 = YES,  0 = NO
+                         70 ;---------------------------------------------------------------------------
+                         72 ;===========================================================================
+                         74 ;===========================================================================
+                         75 ; This allows the kernel in the LARGE memory model to access the stacks as
+                         76 ; 16 bit data.
+                         77 ;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         78 ;NOTE1: This switch must match the setting of the switch of the same name
+                         79 ;       in the RTXCOPTS.H module.
+                         80 ;
+                         81 ;NOTE2: This switch is supported only in the Tasking LARGE memory model.
+                         82 ;                1 = YES,  0 = NO
+                         83 ;---------------------------------------------------------------------------
+                         85 ;===========================================================================
+                         87 ;****************************************************************************
+                         88 ; Do not modify anything below this line
+                         89 ;---------------------------------------------------------------------------
+                         91    
+                         92    
+                         93    
+                         94    
+                         95        
+                         96        
+                         97            
+                         98        
+                         99    
+                        100    
+                        101    
+                        105 ;===========================================================================
+                        106 ; The SYSMODE switch should always be defined and equal to 0x080.
+                        107 ; This defines the system mode.  User mode is not supported by RTXC.
+                        108 ;---------------------------------------------------------------------------
+                        109 SYSMODE  equ 080h
+                        110 ;===========================================================================
+                        112 ; end of rtxcopts.inc
+                        115 EXTRN HDATA (_nullstak)
+                        117 ;       ------------------- SYSTEM STARTUP CODE ----------------------------
+000000                  119 __START:
+000000 96484000         120         MOV.B   SCR,#B_SCR              ; set System Configuration Register
+                        121                                         ; disable watchdog timer
+000004 B6401F           122         MOV.B   WDCON,#00H              ; set WD control register to clear WDRUN
+000007 96485DA5         123         MOV.B   WFEED1,#0A5H            ; do watchdog feed part 1
+00000B 96485E5A         124         MOV.B   WFEED2,#05AH            ; do watchdog feed part 2
+                        126 ;       ---------------- Appended by TK PTV   23/7-99 ------------------------
+00000F B6466A           127         MOV.B   BCR,#006H
+000012 964869BA         129         MOV.B   BTRH,#0BAH              ; KEN WM0=1 REQUIRED TO BE 1
+                        130 ;       MOV.B   BTRH,#088H
+000016 964868EA         131         MOV.B   BTRL,#0EAH              ; KEN WM0=1 REQUIRED TO BE 1
+                        132 ;       MOV.B   BTRL,#068H
+                        133 ;       -------------------------- Append end --------------------------------
+00001A 964841rr         137         MOV.B   DS,#SEG(__DS)      ; initialize stack pointer
+00001E 9978rrrr         140         MOV.W   R7,#SOF(__lc_es)        ; initialize stack pointer
+000022 9648037F         143         MOV.B   SSEL,#07FH              ; default indirect access via ES
+                        146                                         ; now clear BITADDR segments
+000026 99080020         147         MOV.W   R0,#020H                ; start address bit space
+00002A 99180010         148         MOV.W   R1,#010H                ; number of bit words
+00002A 99180010         148         MOV.W   R1,#010H                ; number of bit words
+00002E BB00             149 _clrb:  MOV.W   [R0+],#00H              ; clear bit word
+000030 8F18FE           150         DJNZ.W  R1,_clrb                ; loop until end of bit segment
+000033 C4rrrrrr         152         FCALL   __INITSEG               ; initialized data segments
+000037 B900             154         MOV.W   R0, #0                  ; set argc to 0
+000039 B920             156         MOV.W   R2, #0                  ;
+00003B B930             157         MOV.W   R3, #0                  ; set argv[] to 0
+                        161 ;
+                        162 ;       Load sp with RTXC null stack pointer
+                        163 ;
+00003D 964841rr         165         MOV.B   DS,#SEG(_nullstak)      ; initialize stack pointer
+000041 9978rrrr         168         MOV.W   R7,#SOF(_nullstak)        ; initialize stack pointer
+000045 C4rrrrrr         170         FCALL   _main                   ; call C program
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000049 B900             172         MOVS.W  R0,#00H                 ; set exit status 0
+00004B D4rrrrrr         173         FJMP    _exit                   ; jump to exit(0) function
+00004B D4rrrrrr00       173         FJMP    _exit                   ; jump to exit(0) function
+000050                  175 __EXIT:
+                        176         ; exit() function jumps to this place. When it is required to restart
+                        177         ; the program, R7 should be initialized again (if applicable).
+                        178         ; The exit() function causes normal program termination to occur. First, all 
+                        179         ; functions registered by the atexit() function are called in the reverse 
+                        180         ; order. Next, all open streams with unwritten buffered data are flushed, all 
+                        181         ; open streams are closed and all files created by the tmpfile() function are 
+                        182         ; removed. The status value passed to exit is returned in R0.
+000050 081221           184         SETB    PD                      ; Power down
+                        186 ;       ------------- AVOID ILLEGAL NULL POINTERS ------------------------------
+000000                  188                 DSEG AT 00H
+000000 RESERVED         189         DS      1
+000000
+                        190         
+                        191 ;       ------------- CONFIGURATION BITS ---- SCR ------------------------------
+                        193 _PT1    EQU     0       ; Peripheral Clock
+                        194 _PT0    EQU     0       ; 0 0   oscillator/4
+                        195                         ; 0 1   oscillator/16
+                        196                         ; 1 0   oscillator/64
+                        197                         ; 1 1   reserved 
+                        199 _CM     EQU     0       ; Only "native" mode XA is supported
+                        202 _PZ     EQU     0       ; Large memory mode
+                        213 B_SCR   EQU     ( 0    SHL 7 ) OR               ( 0    SHL 6 ) OR               ( 0    SHL 5 ) OR
+                                            ( 0    SHL 4 ) OR               ( _PT1 SHL 3 ) OR               ( _PT0 SHL 2 ) OR
+                                            ( _CM  SHL 1 ) OR               ( _PZ  SHL 0 )
+                        215 ;       ------------- CONFIGURATION BITS ---- RESET PSW --------------------------
+                        217 _SM     EQU     1       ; 1 = System mode
+                        218                         ; 0 = User mode
+                        220 _TM     EQU     0       ; 1 = Trace Mode
+                        221                         ; 0 = XA debugging feature are disabled
+                        223 _RS     EQU     0       ; Register bank number [0..3]
+                        225 _IM     EQU     15      ; Interrupt priority (0-15) 15 indicates highest priority
+                        227 _C      EQU     0       ; Carry flag 
+                        228 _AC     EQU     0       ; Auxilary carry
+                        229 _V      EQU     0       ; Overflow flag
+                        230 _N      EQU     0       ; Negative flag
+                        231 _Z      EQU     0       ; Zero flag
+                        236 B_PSWH  EQU     ( _SM  SHL 7 ) OR               ( _TM  SHL 6 ) OR               ( _RS  SHL 4 ) OR
+                                            ( _IM  SHL 0 )
+                        245 B_PSWL  EQU     ( _C   SHL 7 ) OR               ( _AC  SHL 6 ) OR               ( 0    SHL 5 ) OR
+                                            ( 0    SHL 4 ) OR               ( 0    SHL 3 ) OR               ( _V   SHL 2 ) OR
+                                            ( _N   SHL 1 ) OR               ( _Z   SHL 0 )
+                        247 B_PSW   EQU     ( B_PSWH SHL 8 ) OR ( B_PSWL )
+                        249 ;       ----------------------- RESET VECTOR -------------------------------
+000000                  251 RESET_VECTOR    SEGMENT CODE            ; Reset vector of the application: locator
+000000                  252         RSEG    RESET_VECTOR            ; description file contains absolute address
+000000 008F             253         DW      B_PSW                   ; set initail PSW
+000002 rrrrrrrrrrrrrr   255         DW      __RST                   ; Chain to the startup code 
+       rr                   
+000000                  257 RST_VECTOR      SEGMENT CODE            ; Reset vector allocated in segment 0
+000000                  258         RSEG    RST_VECTOR              ;
+000000                  258         RSEG    RST_VECTOR              ;
+000000 D4rrrrrr         259 __RST:  FJMP    __START                 ; Jump to the startup code 
+000000                  261 DSSEG@DS        SEGMENT DATA JOIN NOCLEAR
+000000                  262         RSEG    DSSEG@DS                ; Empty segment only used by startup code
+                        263         PUBLIC  __DS                    ; and interrupt functions to determine the
+000000                  264 __DS:                                   ; default data segment number.
+                        266         EXTRN   HCODE( _main )          ; start label user C program
+                        267         EXTRN   HCODE( _exit )          ; start label exit() function           
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        268         EXTRN   HCODE( __INITSEG )      ; label copy-table init function
+                        272         EXTRN   IDATA( __lc_bs )        ; begin of stack label, used by xvwxa
+                        273         EXTRN   IDATA( __lc_es )        ; end of stack label

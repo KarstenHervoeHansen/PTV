@@ -1,0 +1,532 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -IC:\cxa\include -Ml -Cxag3 -Sd -A1 -O1 -DWritableSector=14
+;          -DBootProgram=0 -g
+$CASE
+$NOZPAGE
+	NAME	XADRIVR
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "xadrivr.c"
+	SYMB	FILE, "C:\\cxa\\include\\stdlib.h"
+	SYMB	FILE, "C:\\cxa\\include\\limits.h"
+	SYMB	ENDF
+	SYMB	TYPE, 257, 'S', 4,\
+		 "quot", #16, 0,\
+		 "rem", #16, 2
+	SYMB	TYPE, 258, "div_t", 'T', #257
+	SYMB	TYPE, 259, 'S', 8,\
+		 "quot", #6, 0,\
+		 "rem", #6, 4
+	SYMB	TYPE, 260, "ldiv_t", 'T', #259
+	SYMB	TYPE, 261, "size_t", 'T', #18
+	SYMB	TYPE, 262, "wchar_t", 'T', #5
+	SYMB	ENDF
+	SYMB	FILE, "system.h"
+	SYMB	ENDF
+	SYMB	FILE, "xaexprt.h"
+	SYMB	TYPE, 263, "byte", 'T', #3
+	SYMB	ENDF
+	SYMB	FILE, "xadrivr.h"
+	SYMB	ENDF
+XADRIVR_PR	SEGMENT	HCODE
+	RSEG	XADRIVR_PR
+	ALIGN	1
+	SYMB	LINE, 51
+	PUBLIC	_Udr_InitUart
+_Udr_InitUart:
+	SYMB	TYPE, 264, 'X', 12, #1, 30, 2, #263, #263
+	SYMB	GFUN, "Udr_InitUart", _Udr_InitUart, #264, 0, 0, 0
+	SYMB	ALAB, _Udr_InitUart, #264
+	SYMB	LTIM, "Baudrate", 0, 0, 2253
+	SYMB	LTIM, "Handshake", 1, 0, 2253
+	SYMB	IDEN, "Baudrate", 0, #263, 0, 2061
+	SYMB	IDEN, "Handshake", 1, #263, 0, 2061
+	SYMB	LINE, 59
+	CLR	033BH
+	SYMB	LINE, 60
+	CLR	033AH
+	SYMB	LINE, 62
+	AND.B	0424H,#0ECH
+	SYMB	LINE, 65
+	CLR	0286H
+	SYMB	LINE, 67
+	SETB	038CH
+	MOV	C,038CH
+	MOV	038DH,C
+	SYMB	LINE, 69
+	MOV.B	_txBufTail,#00H
+	MOV.B	_txBufHead,#00H
+	SYMB	LINE, 70
+	MOV.B	_rxBufTail,#00H
+	MOV.B	_rxBufHead,#00H
+	SYMB	LINE, 72
+	CLR	_trxStopped
+	SYMB	LINE, 73
+	SETB	_trxEmpty
+	SYMB	LINE, 75
+	MOV.B	0424H,#0D8H
+	SYMB	LINE, 78
+	CMP.B	R0L,#02H
+	BEQ	_12
+	CMP.B	R0L,#01H
+	BEQ	_13
+	CMP.B	R0L,#03H
+	BEQ	_14
+	BR	_15
+	SYMB	LINE, 79
+_12:
+	SYMB	LINE, 80
+	MOV.B	0457H,#0FFH
+	SYMB	LINE, 81
+	MOV.B	0456H,#0F4H
+	SYMB	LINE, 82
+	BR	_18
+	SYMB	LINE, 84
+_13:
+	SYMB	LINE, 85
+	MOV.B	0457H,#0FFH
+	SYMB	LINE, 86
+	MOV.B	0456H,#0E8H
+	SYMB	LINE, 87
+	BR	_18
+	SYMB	LINE, 89
+_14:
+	SYMB	LINE, 90
+	MOV.B	0457H,#0FFH
+	SYMB	LINE, 91
+	MOV.B	0456H,#0FCH
+	SYMB	LINE, 92
+	BR	_18
+	SYMB	LINE, 94
+_15:
+	SYMB	LINE, 95
+	MOV.B	0457H,#0FFH
+	SYMB	LINE, 96
+	MOV.B	0456H,#0D0H
+	SYMB	LINE, 98
+_18:
+	SYMB	LINE, 101
+	AND.B	045CH,#0FH
+	SYMB	LINE, 103
+	SETB	0286H
+	SYMB	LINE, 105
+	MOV.B	0425H,#01H
+	SYMB	LINE, 108
+	SETB	033BH
+	SYMB	LINE, 109
+	SETB	033AH
+	SYMB	LINE, 110
+	RET
+	SYMB	LTIM, "Baudrate", 0, 0, 2125
+	SYMB	LTIM, "Handshake", 1, 0, 2125
+	SYMB	EFUN
+	ALIGN	1
+	SYMB	LINE, 124
+	PUBLIC	_Udr_Uart_RX_Interrupt
+_Udr_Uart_RX_Interrupt:
+	SYMB	TYPE, 265, 'X', 140, #1, 30, 0
+	SYMB	GFUN, "Udr_Uart_RX_Interrupt", _Udr_Uart_RX_Interrupt, #265, 0, 0, 15
+	SYMB	ALAB, _Udr_Uart_RX_Interrupt, #265
+	PUSH.W	R0, R1, R2, R3
+	PUSH.B	CS
+	PUSH.B	DS
+	MOV.B	DS,#SEG( __DS )
+	PUSH.B	ES
+	PUSH.B	SSEL
+	OR.B	SSEL,#07FH
+	SYMB	LINE, 126
+	MOV.B	R0L,0425H
+	AND.B	R0L,#0EH
+	BEQ	_22
+	SYMB	LINE, 127
+	MOV	C,032BH
+	BCC	_19
+	SYMB	LINE, 128
+	MOV.B	_rcvChar,#0FBH
+_19:
+	SYMB	LINE, 130
+	MOV	C,032AH
+	BCC	_20
+	SYMB	LINE, 131
+	MOV.B	_rcvChar,#0FAH
+_20:
+	SYMB	LINE, 133
+	MOV	C,0329H
+	BCC	_21
+	SYMB	LINE, 134
+	MOV.B	_rcvChar,#0FDH
+_21:
+	SYMB	LINE, 136
+	AND.B	0425H,#0F1H
+	SYMB	LINE, 137
+	BR	_23
+_22:
+	SYMB	LINE, 139
+	MOV.B	_rcvChar,0464H
+_23:
+	SYMB	LINE, 141
+	CLR	0320H
+	SYMB	LINE, 144
+	MOV	C,_UART_Handshake
+	BCS	_24
+	SYMB	LINE, 146
+	CALL	_Udr_FreeSpaceInRxBuf
+	CMP.B	R0L,#02H
+	BL	_31
+	SYMB	LINE, 148
+	ADDS.B	_rxBufHead,#01H
+	MOV.B	R0L,_rxBufHead
+	MOV.B	R0H,R0L
+	SEXT.B	R0H
+	DIV.W	R0,#040H
+	MOV.B	_rxBufHead,R0H
+	SYMB	LINE, 149
+	MOV.B	R0L,R0H
+	SEXT.B	R0H
+	MOV.B	R1L,_rcvChar
+	MOV.B	ES,#SEG( _rxBuf )
+	MOV.B	[R0+SOF( _rxBuf )],R1L
+	SYMB	LINE, 151
+	BR	_31
+_24:
+	SYMB	LINE, 153
+	CMP.B	_rcvChar,#013H
+	BNE	_25
+	SYMB	LINE, 154
+	SETB	_trxStopped
+	BR	_31
+_25:
+	SYMB	LINE, 156
+	CMP.B	_rcvChar,#011H
+	BNE	_26
+	SYMB	LINE, 157
+	CLR	_trxStopped
+	SYMB	LINE, 158
+	SETB	0321H
+	SYMB	LINE, 159
+	BR	_31
+_26:
+	SYMB	LINE, 161
+	CALL	_Udr_FreeSpaceInRxBuf
+	CMP.B	R0L,#02H
+	BG	_27
+	SYMB	LINE, 163
+	SETB	_rcvStopped
+	SYMB	LINE, 164
+	CLR	_trxEmpty
+	SYMB	LINE, 166
+	CLR	0337H
+	SYMB	LINE, 172
+	MOV.B	0464H,#013H
+	SYMB	LINE, 173
+	CLR	0321H
+	SYMB	LINE, 175
+	SETB	0337H
+	SYMB	LINE, 176
+_27:
+	SYMB	LINE, 178
+	ADDS.B	_rxBufHead,#01H
+	MOV.B	R0L,_rxBufHead
+	MOV.B	R0H,R0L
+	SEXT.B	R0H
+	DIV.W	R0,#040H
+	MOV.B	_rxBufHead,R0H
+	SYMB	LINE, 179
+	MOV.B	R0L,R0H
+	SEXT.B	R0H
+	MOV.B	R1L,_rcvChar
+	MOV.B	ES,#SEG( _rxBuf )
+	MOV.B	[R0+SOF( _rxBuf )],R1L
+	SYMB	LINE, 182
+_31:
+	SYMB	LINE, 183
+	POP.B	SSEL
+	POP.B	ES
+	POP.B	DS
+	POP.B	CS
+	POP.W	R0, R1, R2, R3
+	RETI
+	HCSEG AT 0A8H
+	DW	08E00H,_36
+XADRIVR_CO	SEGMENT	CODE
+	RSEG	XADRIVR_CO
+_36:
+	FJMP	_Udr_Uart_RX_Interrupt
+	RSEG	XADRIVR_PR
+	SYMB	EFUN
+	ALIGN	1
+	SYMB	LINE, 197
+	PUBLIC	_Udr_Uart_TX_Interrupt
+_Udr_Uart_TX_Interrupt:
+	SYMB	TYPE, 266, 'X', 140, #1, 30, 0
+	SYMB	GFUN, "Udr_Uart_TX_Interrupt", _Udr_Uart_TX_Interrupt, #266, 0, 0, 1
+	SYMB	ALAB, _Udr_Uart_TX_Interrupt, #266
+	PUSH.W	R0
+	PUSH.B	DS
+	MOV.B	DS,#SEG( __DS )
+	PUSH.B	ES
+	PUSH.B	SSEL
+	OR.B	SSEL,#07FH
+	SYMB	LINE, 199
+	CLR	0321H
+	SYMB	LINE, 201
+	MOV	C,_trxStopped
+	BCS	_38
+	MOV.B	R0L,_txBufTail
+	CMP.B	R0L,_txBufHead
+	BEQ	_38
+	SYMB	LINE, 203
+	MOV.B	_txBufTail,R0L
+	ADDS.B	_txBufTail,#01H
+	MOV.B	R0L,_txBufTail
+	MOV.B	R0H,R0L
+	SEXT.B	R0H
+	DIV.W	R0,#010H
+	MOV.B	_txBufTail,R0H
+	SYMB	LINE, 205
+	CLR	0337H
+	SYMB	LINE, 210
+	MOV.B	R0L,R0H
+	SEXT.B	R0H
+	MOV.B	ES,#SEG( _txBuf )
+	MOV.B	R0L,[R0+SOF( _txBuf )]
+	MOV.B	0464H,R0L
+	SYMB	LINE, 211
+	CLR	0321H
+	SYMB	LINE, 214
+	SETB	0337H
+	SYMB	LINE, 215
+	BR	_39
+_38:
+	SYMB	LINE, 217
+	SETB	_trxEmpty
+_39:
+	SYMB	LINE, 218
+	POP.B	SSEL
+	POP.B	ES
+	POP.B	DS
+	POP.W	R0
+	RETI
+	HCSEG AT 0ACH
+	DW	08E00H,_41
+	RSEG	XADRIVR_CO
+_41:
+	FJMP	_Udr_Uart_TX_Interrupt
+	RSEG	XADRIVR_PR
+	SYMB	EFUN
+	ALIGN	1
+	SYMB	LINE, 232
+	PUBLIC	_Udr_ReceiveByte
+_Udr_ReceiveByte:
+	SYMB	TYPE, 268, 'n', #2, 130
+	SYMB	TYPE, 269, 'P', #268
+	SYMB	TYPE, 267, 'X', 12, #2, 30, 1, #269
+	SYMB	GFUN, "Udr_ReceiveByte", _Udr_ReceiveByte, #267, 0, 0, 48
+	SYMB	ALAB, _Udr_ReceiveByte, #267
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	SYMB	LTIM, "c", 3, 0, 2253
+	MOV.W	R5,R1
+	MOV.W	R4,R0
+	SYMB	LTIM, "c", 3, 0, 2125
+	SYMB	LTIM, "c", 19, 0, 2253
+	SYMB	IDEN, "c", 19, #269, 0, 2061
+	SYMB	LINE, 234
+	MOV.B	R0L,_rxBufHead
+	CMP.B	R0L,_rxBufTail
+	BEQ	_45
+	SYMB	LINE, 236
+	MOV.B	R0L,_rxBufTail
+	SEXT.B	R0H
+	ADDS.W	R0,#01H
+	MOV.W	R1,R0
+	SEXT.W	R1
+	DIV.D	R0,#040H
+	MOV.B	_rxBufTail,R1L
+	SYMB	LINE, 238
+	MOV	C,_UART_Handshake
+	BCC	_44
+	SYMB	LINE, 239
+	MOV	C,_rcvStopped
+	BCC	_44
+	CALL	_Udr_FreeSpaceInRxBuf
+	CMP.B	R0L,#04H
+	BL	_44
+	SYMB	LINE, 241
+	CLR	_rcvStopped
+	SYMB	LINE, 242
+	CLR	_trxEmpty
+	SYMB	LINE, 244
+	CLR	0337H
+	SYMB	LINE, 250
+	MOV.B	0464H,#011H
+	SYMB	LINE, 251
+	CLR	0321H
+	SYMB	LINE, 254
+	SETB	0337H
+	SYMB	LINE, 256
+_44:
+	SYMB	LINE, 257
+	MOV.B	R0L,_rxBufTail
+	SEXT.B	R0H
+	MOV.B	ES,#SEG( _rxBuf )
+	MOV.B	R0L,[R0+SOF( _rxBuf )]
+	MOV.B	ES,R5L
+	MOV.B	[R4],R0L
+	SYMB	LINE, 259
+	MOV.B	R0L,#00H
+	BR	_46
+	SYMB	LINE, 260
+_45:
+	SYMB	LINE, 262
+	MOV.B	R0L,#0FFH
+	SYMB	LINE, 263
+_46:
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "c", 19, 0, 2125
+	SYMB	EFUN
+	ALIGN	1
+	SYMB	LINE, 276
+	PUBLIC	_Udr_FreeSpaceInRxBuf
+_Udr_FreeSpaceInRxBuf:
+	SYMB	TYPE, 270, 'X', 12, #263, 30, 0
+	SYMB	GFUN, "Udr_FreeSpaceInRxBuf", _Udr_FreeSpaceInRxBuf, #270, 0, 0, 0
+	SYMB	ALAB, _Udr_FreeSpaceInRxBuf, #270
+	SYMB	LINE, 278
+	MOV.B	R0L,_rxBufTail
+	CMP.B	_rxBufHead,R0L
+	BLT	_49
+	SYMB	LINE, 279
+	ADD.B	R0L,#040H
+	SUB.B	R0L,_rxBufHead
+	RET
+_49:
+	SYMB	LINE, 281
+	SUB.B	R0L,_rxBufHead
+	SYMB	LINE, 282
+_50:
+	RET
+	SYMB	EFUN
+	ALIGN	1
+	SYMB	LINE, 296
+	PUBLIC	_Udr_SendByte
+_Udr_SendByte:
+	SYMB	TYPE, 271, 'X', 12, #2, 30, 1, #2
+	SYMB	GFUN, "Udr_SendByte", _Udr_SendByte, #271, 0, 0, 0
+	SYMB	ALAB, _Udr_SendByte, #271
+	SYMB	LTIM, "ch", 0, 0, 2253
+	SYMB	IDEN, "ch", 0, #2, 0, 2061
+	SYMB	LINE, 299
+	MOV.B	R1L,_txBufHead
+	SEXT.B	R1H
+	ADDS.W	R1,#01H
+	MOV.W	R2,R1
+	MOV.W	R3,R2
+	SEXT.W	R3
+	DIV.D	R2,#010H
+	MOV.B	R1L,_txBufTail
+	SEXT.B	R1H
+	CMP.W	R3,R1
+	BEQ	_54
+	SYMB	LINE, 301
+	ADDS.B	_txBufHead,#01H
+	MOV.B	R1L,_txBufHead
+	MOV.B	R1H,R1L
+	SEXT.B	R1H
+	DIV.W	R1,#010H
+	MOV.B	_txBufHead,R1H
+	SYMB	LINE, 302
+	MOV.B	R1L,R1H
+	SEXT.B	R1H
+	MOV.B	ES,#SEG( _txBuf )
+	MOV.B	[R1+SOF( _txBuf )],R0L
+	SYMB	LINE, 304
+	MOV	C,_trxEmpty
+	BCC	_53
+	MOV	C,_trxStopped
+	BCS	_53
+	SYMB	LINE, 306
+	CLR	_trxEmpty
+	SYMB	LINE, 307
+	ADDS.B	_txBufTail,#01H
+	MOV.B	R0L,_txBufTail
+	SYMB	LTIM, "ch", 0, 0, 2125
+	MOV.B	R0H,R0L
+	SEXT.B	R0H
+	DIV.W	R0,#010H
+	MOV.B	_txBufTail,R0H
+	SYMB	LINE, 309
+	CLR	0337H
+	SYMB	LINE, 315
+	MOV.B	R0L,R0H
+	SEXT.B	R0H
+	MOV.B	ES,#SEG( _txBuf )
+	MOV.B	R0L,[R0+SOF( _txBuf )]
+	MOV.B	0464H,R0L
+	SYMB	LINE, 316
+	CLR	0321H
+	SYMB	LINE, 319
+	SETB	0337H
+	SYMB	LINE, 320
+_53:
+	SYMB	LINE, 321
+	MOV.B	R0L,#00H
+	RET
+	SYMB	LINE, 322
+_54:
+	SYMB	LINE, 323
+	MOV.B	R0L,#0FEH
+	SYMB	LINE, 324
+_55:
+	RET
+	SYMB	EFUN
+	SYMB	ENDF
+
+	SYMB	IDEN, "trxStopped", _trxStopped, #256, 22, 4
+XADRIVR_CLR_BI@DS	SEGMENT	BIT JOIN
+	RSEG	XADRIVR_CLR_BI@DS
+_trxStopped:	DBIT	1
+	SYMB	TYPE, 272, 'Z', #2, 15
+	SYMB	IDEN, "txBuf", _txBuf, #272, 130, 4
+XADRIVR_CLR_NE@DS	SEGMENT	DATA JOIN CLEAR
+	RSEG	XADRIVR_CLR_NE@DS
+_txBuf:	DS	16
+	SYMB	IDEN, "txBufHead", _txBufHead, #2, 130, 0
+	SYMB	ALAB, _txBufHead, #2
+	PUBLIC	_txBufHead
+_txBufHead:	DS	1
+	SYMB	IDEN, "txBufTail", _txBufTail, #2, 130, 0
+	SYMB	ALAB, _txBufTail, #2
+	PUBLIC	_txBufTail
+_txBufTail:	DS	1
+	EXTRN	DATA(__DS)
+	SYMB	IDEN, "rcvStopped", _rcvStopped, #256, 22, 4
+	RSEG	XADRIVR_CLR_BI@DS
+_rcvStopped:	DBIT	1
+	SYMB	IDEN, "rxBufHead", _rxBufHead, #2, 130, 0
+	SYMB	ALAB, _rxBufHead, #2
+	RSEG	XADRIVR_CLR_NE@DS
+	PUBLIC	_rxBufHead
+_rxBufHead:	DS	1
+	SYMB	IDEN, "rcvChar", _rcvChar, #2, 130, 4
+_rcvChar:	DS	1
+	SYMB	IDEN, "rxBufTail", _rxBufTail, #2, 130, 0
+	SYMB	ALAB, _rxBufTail, #2
+	PUBLIC	_rxBufTail
+_rxBufTail:	DS	1
+	SYMB	IDEN, "trxEmpty", _trxEmpty, #256, 22, 4
+	RSEG	XADRIVR_CLR_BI@DS
+_trxEmpty:	DBIT	1
+	SYMB	IDEN, "UART_Handshake", _UART_Handshake, #256, 22, 4
+_UART_Handshake:	DBIT	1
+	SYMB	TYPE, 274, 'Z', #2, 63
+	SYMB	IDEN, "rxBuf", _rxBuf, #274, 130, 4
+	RSEG	XADRIVR_CLR_NE@DS
+_rxBuf:	DS	64
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'Udr_Uart_RX_Interrupt', 'Udr_FreeSpaceInRxBuf'
+	CALLS	'Udr_ReceiveByte', 'Udr_FreeSpaceInRxBuf'
+	END

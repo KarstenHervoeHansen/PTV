@@ -1,0 +1,231 @@
+/* FILE:    dksum.c
+   DATE:    28.06.2002
+   AUTHOR:  JK
+   PURPOSE: This program calculates checksum of a binary file
+            containing software for PT5210.
+
+   After reset, the PT5210 calculates checksum of its program ROM
+   and compares it with true checksum value stored at fixed 
+   address in the program ROM (function ROMCheckOK() in util.c).
+   For PT5210 the true checksum is stored at CSumAddr which is 
+   0x2FFFE, i.e. above the last program byte.
+   The checksum is calculated as 16 bit sum of all bytes up to 
+   CSumAddr + 2, i.e. including the true checksum value.  When
+   viewing the binary program file contents in a hex dumper, the
+   true checksum is visible as UI at CSumAddr.
+   To satisfy that requirement, we must insert two additional bytes
+   into the binary file, below the true checksum, which are
+   complements of true checksum value bytes.
+   The algorithm for checksum calculation is as follows:
+   Assume that 16 bit sum of all program bytes in a binary file
+   created by a compiler is data_sum and that the true checksum
+   value is: (256 * M) + L.  Then the following equation is valid:
+   data_sum + ~M + ~L + M + L = (256 * M) + L;, i.e.
+   data_sum + 0xFF + 0xFF = X, where X = (256 * M) + L.
+   Then:
+        M = X / 256;
+        L = X % 256;
+   So, this program does:
+   1. Calcualte sum of all bytes in original file
+   2. Calculates M and L
+   3. Moves file pointer to CSumAddr - 4
+   4. Writes comlement and true checksum bytes
+   5. Closes the file and prints the true checksum.
+   The bianry file may then be used to program PT5210 program
+   prom.
+   NOTE: CSumAddr may be different for other generators; PT5230
+         uses 0x3FFFE.  To use this program for other products,
+         you will have to change the CSumAddr and recompile.
+         
+         The size of input binary file must be less than CSumAddr,
+         otherwise the result will be improper.
+
+  The program is invoked as follows:
+  sum file_name to perform the above, or
+  sum file_name ? to display file's checksum
+
+
+*/
+#include <stdio.h>
+#include <alloc.h>
+#include <dos.h>
+#include <fcntl.h>
+
+#define UI unsigned int
+#define UC unsigned char
+#define UL unsigned long
+
+#define CSumAddr        0x3FFFE /* Modify this accordig to your needs */
+
+#define SizeOfPROMCode  CSumAddr + 2
+
+void give_info(void);
+void give_info(void)
+  {
+  printf("DKsum: calculates and writes checksum into binary file (5230).\n");
+  printf("Invocation: dksum input_file to write checksum into file\n");
+  printf("or\ndksum input_file ? to calculate and display checksum.\n");
+  exit(3);
+  }
+
+int main(int argc, char *argv[])
+  {
+  FILE *    fptr;
+  UI        sum;
+  UC huge * memptr;
+  UL        i;
+  UI        CalcChecksum = 0;
+  UC        tmp[10];
+  UC        m;
+  UC        l;
+  UL        file_len;
+
+  _fmode = O_BINARY;
+
+  if ((argc != 2) && (argc != 3))
+    {
+    give_info();
+    }
+
+  if ((fptr = fopen(argv[1], "r+b")) == NULL)
+    {
+    printf("Cannot open input file: %s\n", argv[1]);
+    exit(1);
+    }
+
+  memptr = (UC huge *) farmalloc(SizeOfPROMCode);
+  if (memptr == NULL)
+    {
+    printf("Cannot allocate memory\n");
+    exit(2);
+    }
+/* Zero memory contents */
+  for (i = 0; i < SizeOfPROMCode; i++)
+    *(memptr + i) = 0;
+
+/* get file length */
+  fseek(fptr, 0, SEEK_END); /* move to end of file */
+  file_len = ftell(fptr);
+  fseek(fptr, 0, SEEK_SET); /* move to beginning   */
+/*  printf("File len is: %lx\n", file_len); */
+
+/* read file contents into memory */
+  for (i = 0; i < file_len; i++)
+    {
+    fread(tmp, sizeof (*tmp), 1, fptr);
+    *(memptr + i) = *tmp;
+    }
+
+  if (argv[2][0] == '?')
+    {
+    for (i = 0; i < SizeOfPROMCode; i++)
+      {
+      CalcChecksum += *(memptr + i);
+      }
+    printf("Checksum is: %2x\n", CalcChecksum); 
+    fclose(fptr);
+    exit(5);
+    }
+
+/* SizeOfPROMCode may be greater than binary file length.  Move file 
+   pointer while filling file with 00 */
+  m = 0;
+  fseek(fptr, 0, SEEK_END); /* move to end of file */
+  while (file_len < SizeOfPROMCode)
+    {
+    fwrite(&m, sizeof(m), 1, fptr);
+    file_len++;
+    }
+/*  printf("File len is now: %lx\n", file_len); */
+
+  for (i = 0; i < SizeOfPROMCode - 4; i++)
+    {
+    CalcChecksum += *(memptr + i);
+    }
+
+/*  printf("Data Checksum is: %2x\n", CalcChecksum); */
+
+  CalcChecksum += 0xFF;
+  CalcChecksum += 0xFF; 
+
+  m = (UC) (CalcChecksum / 256);
+  l = (UC) (CalcChecksum % 256);
+  sum  = 256 * (UI)m;
+  sum += (UI)l;
+  m = ~m;
+  l = ~l;
+  fseek(fptr, SizeOfPROMCode - 4, SEEK_SET);
+  fwrite(&m, sizeof(m), 1, fptr); /* write complements */
+  fwrite(&l, sizeof(m), 1, fptr);
+
+  m = (UC) (sum / 256);
+  l = (UC) (sum % 256);
+
+  fwrite(&m, sizeof(m), 1, fptr); /* write checksum */
+  fwrite(&l, sizeof(m), 1, fptr);
+
+  printf("Sum written to file is: %2x\n", sum);
+
+/*  farfree((UC *)memptr); */
+  fclose(fptr);
+  exit(0);
+  }
+
+
+
+#if 0
+
+Below is original function for checksum calculation
+from util.c
+
+int ROMCheckOK(UI* Checksum, UC huge *ptr)
+  {
+  register code char* page_ptr;
+  register UI i;
+  UC j;
+  UI CalcChecksum = 0;
+
+  for (j = 0; j < (SizeOfPROMCode / 0x10000); j++)
+    {
+    switch (j)
+      {
+      case 0:
+        page_ptr = &Page0;
+        break;
+      case 1:
+        page_ptr = &Page1;
+        break;
+      case 2:
+        page_ptr = &Page2;
+        break;
+      case 3:
+        page_ptr = &Page3;
+        break;
+      case 4:
+        page_ptr = &Page4;
+        break;
+      case 5:
+        page_ptr = &Page5;
+        break;
+      case 6:
+        page_ptr = &Page6;
+        break;
+      case 7:
+        page_ptr = &Page7;
+        break;
+      }
+    i = 0;
+    do
+      {
+      CalcChecksum += (UC) *page_ptr++;  // CalcChecksum += (UI) *page_ptr++; !!
+      } while (++i);
+    }
+  page_ptr = &CSumAddr;
+
+  *Checksum  = (256 * (UC) *page_ptr++);
+  *Checksum += (UC) *page_ptr;
+
+  return(CalcChecksum == *Checksum);
+  }
+#endif
+

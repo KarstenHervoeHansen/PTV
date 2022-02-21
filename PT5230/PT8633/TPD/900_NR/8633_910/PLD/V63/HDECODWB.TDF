@@ -1,0 +1,103 @@
+%                     SDI test signal generator                      %
+
+% This file is from PT8633_902 and apparently is the source for      %
+% production PLD software                                            %
+
+SUBDESIGN hdecodwb
+  (
+  clk,da[10..0],sound, 3or4,adjust,syssel    : INPUT;
+  hint,addenable,checksum,count              : OUTPUT;
+  rambit,hload1,ramadj,frameb,framea,upint   : OUTPUT;
+  )
+VARIABLE
+  hsync,checksum,pause,hload1           : DFF;
+  frame_B_reset, frame_A_reset,upint    : DFF;
+  addenable,count,ramdata,hint,ramadj   : DFFE;
+  frameb, framea                        : DFFE;
+
+BEGIN
+  hint.clk  = clk;     % processor-interrupt %
+  hint.d    = VCC; 
+  hint.ena  =  (da[10..0] == 1485);
+  hint.clrn = !(da[10..0] == 1391);
+
+  hload1.clk = clk;    % Loadpuls til promadresse (segment nr.)%
+  hload1.d   = (da[10..0] == 1487);    % 1485 970821 test movement % 
+
+  checksum.clk = clk;                 % placering af checksum %
+  checksum.d   = sound & (3or4 & da[10..0] == 1598 # !3or4 & da[10..0] == 1586);
+
+  ramadj.clk  = clk;     % Nulstil lyd ved fejlsekvens %
+  ramadj.d    = VCC; 
+  ramadj.ena  = sound & (!adjust) & (da[10..0] == 1553); 
+  ramadj.clrn = !hsync.q; 
+
+  addenable.clk  = clk;   %checksums addder enable%
+  addenable.d    = VCC;
+  addenable.ena  =  (sound & da[10..0] == 1547);    % 1447+96 %
+  addenable.clrn = !((3or4 & da[10..0] == 1601) # (!3or4 & da[10..0] == 1589));
+
+  frameb.clk = clk; %/* Set bit i de kanaler, der skal have langt
+                    klik, dvs. BBC-klik i subframe B           */%
+  frameb.d   = VCC;
+  frameb.ena =  ((da[10..0] == 1552) #
+                 (da[10..0] == 1564) #
+                 (da[10..0] == 1576) #
+                 (da[10..0] == 1588));
+
+  frameb.clrn = !frame_B_reset.q;
+
+
+  frame_B_reset.clk = clk;      %/* reset til BBC klik-generator */%
+  frame_B_reset.d   = ((da[10..0] == 1555) # (da[10..0] == 1562) #
+                       (da[10..0] == 1567) # (da[10..0] == 1574) #
+                       (da[10..0] == 1579) # (da[10..0] == 1586) #
+                       (da[10..0] == 1591) # (da[10..0] == 1598));
+
+%/*************************************************************/%
+  framea.clk = clk; %/* Set bit i de kanaler, der skal have langt 
+                        klik, dvs. TeleDK-klik i subframe B       */%
+%/* bemærk, at der kan være fejl i kanal A's styrebit, idet ikke alle
+    kombinationer er testet.                                      */%
+%/* We add click (pause) in channel 3   ||||||||||||||||||| here */%
+  framea.d   = VCC;
+  framea.ena =  ((da[10..0] == 1549) # (da[10..0] == 1555) #
+                 (da[10..0] == 1561) # (da[10..0] == 1567) #
+                 (da[10..0] == 1573) # (da[10..0] == 1579) #
+                 (da[10..0] == 1585) # (da[10..0] == 1591));
+
+  framea.clrn = !frame_A_reset.q;
+
+  frame_A_reset.clk = clk;   %/* reset til TeleDK klik-generator */%
+
+  frame_A_reset.d = ((da[10..0] == 1552) # (da[10..0] == 1558) #
+                     (da[10..0] == 1564) # (da[10..0] == 1570) #
+                     (da[10..0] == 1576) # (da[10..0] == 1582) #
+                     (da[10..0] == 1588) # (da[10..0] == 1594));
+
+%/* her slutter klik til kanal A */%
+
+  pause.clk = clk;             %ekstra reset til ramdata ?!%
+  pause.d   = (!3or4 & (da[10..0] == 1585) # (3or4 & (da[10..0] == 1597)));
+
+  ramdata.clk  = clk;          %/* data fra ram */%
+  ramdata.d    = VCC;
+  ramdata.ena  = (sound & da[10..0] == 1541);
+  ramdata.clrn = !(pause);
+
+  rambit       = ramdata;
+    
+  count.clk    = clk;          %/* lydtæller */%
+  count.d      = VCC;
+  count.ena    = (sound & da[10..0] == 1549);      %/* 1598        1586 org */%
+  count.clrn   = !(3or4 & da[10..0] == 1598 # !3or4 & da[10..0] == 1586);
+
+  hsync.clk    = clk;         %/* load-pulse til adressedekoder */%
+  hsync.d      = ((da[10..0] == 1439) & !syssel) # 
+                 ((da[10..0] == 1439) &  syssel);
+
+  upint.clk    = clk;
+  upint.d      = (da[10..0] == 1528);
+
+END;
+

@@ -1,0 +1,49 @@
+PARAMETERS
+(
+	TIM = 48
+);
+
+
+SUBDESIGN PWM
+% 
+Puls width modulator for AES generator
+990115 PF
+%
+(
+
+CLK6144M                      -- 6.144MHz master clock
+--TIM[5..0]                      -- pwm timing control
+                        : input;
+
+PWM_OUT                        -- pwm output signal
+                        : output;
+
+)
+variable
+pwm_count[5..0]         : dff;
+q1ff                    : dffe;
+q2ff                    : dff;
+
+
+begin
+pwm_count[].clk = CLK6144M;                   -- pwm counter
+pwm_count[] = pwm_count[] +1;
+
+q1ff.clk = CLK6144M;
+q1ff.d = VCC;
+q1ff.ena = pwm_count[] == TIM;
+q1ff.clrn = !q2ff;
+
+q2ff.clk = CLK6144M;
+q2ff.d = pwm_count[] == B"111111";
+
+PWM_OUT = !q1ff;
+
+end;
+
+
+
+
+
+
+

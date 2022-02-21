@@ -1,0 +1,1724 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\work\temp\xa\i2c_drv.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -I..\..\rtxcdef\xa
+                          3 ;          -I..\..\rtxc\xa\include -I..\..\code\include\1_0 -I..\..\app_spec\xa
+                          4 ;          -Ml -O2 -s
+                          6 $NOZPAGE
+                          7         NAME    I2C_DRV
+                         11 ; i2c_drv.c    1        /* Generic iic module */
+                         12 ; i2c_drv.c    2        
+                         13 ; i2c_drv.c    3        /* History Rev 0_1 introduced in PT5765 pilot production */
+                         14 ; i2c_drv.c    4        
+                         15 ; i2c_drv.c    5        /* Rev 1_1 has changes required for PT5765 production and for use in PT52
+                            01 project     */
+                         16 ; i2c_drv.c    6        /* Rev 1_1 Modify 15. Jan 2000 SAA                                       
+                                           */
+                         17 ; i2c_drv.c    7        /* Rev 1_1 Remove access to eventlog from this level                     
+                                           */
+                         18 ; i2c_drv.c    8        /* Rev 1_1 Add support for more busses                                   
+                                           */
+                         19 ; i2c_drv.c    9        /* Rev 1_1 Add support for enable/disable support for each individual bus
+                                           */
+                         20 ; i2c_drv.c   10        
+                         21 ; i2c_drv.c   11        
+                         22 ; i2c_drv.c   12        #include <stdio.h>       /* Using sprintf() */
+                         43 ; i2c_drv.c   13        
+                         44 ; i2c_drv.c   14        #include "define.h"     /* Standard PTV definitions */
+                         47 ; i2c_drv.c   15        #include "rtxcobj.h"    /* Kernal objects */
+                        372 ; i2c_drv.c   16        
+                        373 ; i2c_drv.c   17        #include "config.h"     /* Include project specifics , Number of IIC-buss
+                            es */
+                        376 ; i2c_drv.c   18        
+                        377 ; i2c_drv.c   19        #include "i2c_drv.h"    /* Own h file */
+                        380 ; i2c_drv.c   20        
+                        381 ; i2c_drv.c   21        // In file 'config.h' the specific project can define the number of busse
+                            s supported
+                        382 ; i2c_drv.c   22        // By using only #define NiicBus either 1 (system) 4 or 7 busses are defi
+                            ne
+                        383 ; i2c_drv.c   23        // if only a few selected busses should be included, then add a #define I
+                            icBusX for each bus
+                        384 ; i2c_drv.c   24        
+                        385 ; i2c_drv.c   25        
+                        386 ; i2c_drv.c   26        #if (NiicBus==0)
+                        387 ; i2c_drv.c   27        #compiletime error : This module should not be included if iic-busses not
+                             are used
+                        388 ; i2c_drv.c   28        
+                        389 ; i2c_drv.c   29        #elif (NiicBus==1) //Include only system bus
+                        390 ; i2c_drv.c   30        
+                        391 ; i2c_drv.c   31        #elif (NiicBus<=4) //Include 3 instrument busses
+                        392 ; i2c_drv.c   32        #define IicBus1
+                        393 ; i2c_drv.c   33        #define IicBus2
+                        394 ; i2c_drv.c   34        #define IicBus3
+                        395 ; i2c_drv.c   35        
+                        396 ; i2c_drv.c   36        #else              // Include all supported busses
+                        397 ; i2c_drv.c   37        
+                        398 ; i2c_drv.c   38        #define IicBus1
+                        399 ; i2c_drv.c   39        #define IicBus2
+                        400 ; i2c_drv.c   40        #define IicBus3
+                        401 ; i2c_drv.c   41        #define IicBus4
+                        402 ; i2c_drv.c   42        #define IicBus5
+                        403 ; i2c_drv.c   43        #define IicBus6
+                        404 ; i2c_drv.c   44        
+                        405 ; i2c_drv.c   45        #endif
+                        406 ; i2c_drv.c   46        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        407 ; i2c_drv.c   47        
+                        408 ; i2c_drv.c   48        
+                        409 ; i2c_drv.c   49        
+                        410 ; i2c_drv.c   50        
+                        411 ; i2c_drv.c   51        // Rev 1_1 Remove eventlog reference
+                        412 ; i2c_drv.c   52        // #include "EvLog.h"      /* Event (error) reporting funtions */
+                        413 ; i2c_drv.c   53        
+                        414 ; i2c_drv.c   54        #include "EventDef.h"   /* Defines event IDs, used for error / status rep
+                            orting */
+                        417 ; i2c_drv.c   55        
+                        418 ; i2c_drv.c   56        /*  Module supports 4 busses : _ptv , _1, _2 and _3
+                        419 ; i2c_drv.c   57            bus _ptv is the  local iic bus on the controller
+                        420 ; i2c_drv.c   58            while busses _1, _2 and _3 are available for use on
+                        421 ; i2c_drv.c   59            any instrument connector */
+                        422 ; i2c_drv.c   60        
+                        423 ; i2c_drv.c   61        
+                        424 ; i2c_drv.c   62        /* Define local PTV bus as direct pin or via FPGA */
+                        425 ; i2c_drv.c   63        #define FPGA 1
+                        426 ; i2c_drv.c   64        #define Direct 2
+                        427 ; i2c_drv.c   65        #define BusPTV Direct
+                        428 ; i2c_drv.c   66        
+                        429 ; i2c_drv.c   67        
+                        430 ; i2c_drv.c   68        /* Functions to support external :
+                        431 ; i2c_drv.c   69           InitBus(UC bus)
+                        432 ; i2c_drv.c   70           TransmitIIC(UC Address ,UC num ,UC *data ,UC bus )
+                        433 ; i2c_drv.c   71           ReceiveIIC(UC Address ,UC num ,UC *data ,UC bus )
+                        434 ; i2c_drv.c   72           */
+                        435 ; i2c_drv.c   73        
+                        436 ; i2c_drv.c   74        /* Hardware dependent definitions for the BIT version */
+                        437 ; i2c_drv.c   75        /* Includes functions : */
+                        438 ; i2c_drv.c   76        /* Read SDA */
+                        439 ; i2c_drv.c   77        /* Read SCL */
+                        440 ; i2c_drv.c   78        /* Set SDA high or low */
+                        441 ; i2c_drv.c   79        /* Set SCL high or low */
+                        442 ; i2c_drv.c   80        
+                        443 ; i2c_drv.c   81        /* Prototypes of local procedures */
+                        444 ; i2c_drv.c   82        //static void Delay(int usec);
+                        445 ; i2c_drv.c   83        static int SDA_get(UC bus);
+                        446 ; i2c_drv.c   84        static int SCL_get(UC bus);
+                        447 ; i2c_drv.c   85        static int SCL_set(UC level, UC bus);
+                        448 ; i2c_drv.c   86        static int SCL_set_wait(UC bus);
+                        449 ; i2c_drv.c   87        static int SDA_set(UC level, UC bus);
+                        450 ; i2c_drv.c   88        static int Start_IIC(UC bus);
+                        451 ; i2c_drv.c   89        static int Stop_IIC(UC bus);
+                        452 ; i2c_drv.c   90        static UC RxByte(int Last,UC bus);
+                        453 ; i2c_drv.c   91        static int TxByte(UC X,UC bus);
+                        454 ; i2c_drv.c   92        
+                        455 ; i2c_drv.c   93        
+                        456 ; i2c_drv.c   94        /* Delay of 1 to 5 microseconds */
+                        457 ; i2c_drv.c   95        /* Processor dependent delay of 5 usec */
+                        458 ; i2c_drv.c   96        /* XA controller running at 29.xx MHz  */
+                        459 ; i2c_drv.c   97        #define lopru 7        /* Number of loops executed each microsecond */
+                        460 ; i2c_drv.c   98        
+                        461 ; i2c_drv.c   99        #define Delay(x)
+                        462 ; i2c_drv.c  100        
+                        463 ; i2c_drv.c  101        //static void Delay(int usec)
+                        464 ; i2c_drv.c  102        //{
+                        465 ; i2c_drv.c  103        //    usec *= lopru;
+                        466 ; i2c_drv.c  104        //    while ( usec-- > 0 );
+                        467 ; i2c_drv.c  105        //}
+                        468 ; i2c_drv.c  106        
+                        469 ; i2c_drv.c  107        /* Local defines */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        470 ; i2c_drv.c  108        
+                        471 ; i2c_drv.c  109        #define High 1
+                        472 ; i2c_drv.c  110        #define Low  0
+                        473 ; i2c_drv.c  111        #define Bit7 0x80
+                        474 ; i2c_drv.c  112        
+                        475 ; i2c_drv.c  113        #define IICtimeout 10    // Timeout in usec
+                        476 ; i2c_drv.c  114        
+                        477 ; i2c_drv.c  115        
+                        478 ; i2c_drv.c  116        /* Define 1+6 busses for IIC ports in FPGA  */
+                        479 ; i2c_drv.c  117        
+                        480 ; i2c_drv.c  118        #if (BusPTV==FPGA)
+                        481 ; i2c_drv.c  119        volatile UC IICbit_0 _at(0x90012); /* For controller if via FPGA */
+                        482 ; i2c_drv.c  120        static UC   IICmir0;
+                        483 ; i2c_drv.c  121        #endif
+                        484 ; i2c_drv.c  122        
+                        485 ; i2c_drv.c  123        #ifdef IicBus1
+                        486 ; i2c_drv.c  124        volatile UC IICbit_1 _at(0x90312); /* Instrument busses */
+                        487 ; i2c_drv.c  125        static UC   IICmir1;
+                        488 ; i2c_drv.c  126        #endif
+                        489 ; i2c_drv.c  127        
+                        490 ; i2c_drv.c  128        #ifdef IicBus2
+                        491 ; i2c_drv.c  129        volatile UC IICbit_2 _at(0x90322);
+                        492 ; i2c_drv.c  130        static UC   IICmir2;
+                        493 ; i2c_drv.c  131        #endif
+                        494 ; i2c_drv.c  132        
+                        495 ; i2c_drv.c  133        #ifdef IicBus3
+                        496 ; i2c_drv.c  134        volatile UC IICbit_3 _at(0x90332);
+                        497 ; i2c_drv.c  135        static UC   IICmir3;
+                        498 ; i2c_drv.c  136        #endif
+                        499 ; i2c_drv.c  137        
+                        500 ; i2c_drv.c  138        #ifdef IicBus4
+                        501 ; i2c_drv.c  139        volatile UC IICbit_4 _at(0x90342);
+                        502 ; i2c_drv.c  140        static UC   IICmir4;
+                        503 ; i2c_drv.c  141        #endif
+                        504 ; i2c_drv.c  142        
+                        505 ; i2c_drv.c  143        #ifdef IicBus5
+                        506 ; i2c_drv.c  144        volatile UC IICbit_5 _at(0x90352);
+                        507 ; i2c_drv.c  145        static UC   IICmir5;
+                        508 ; i2c_drv.c  146        #endif
+                        509 ; i2c_drv.c  147        
+                        510 ; i2c_drv.c  148        #ifdef IicBus6
+                        511 ; i2c_drv.c  149        volatile UC IICbit_6 _at(0x90362);
+                        512 ; i2c_drv.c  150        static UC   IICmir6;
+                        513 ; i2c_drv.c  151        #endif
+                        514 ; i2c_drv.c  152        
+                        515 ; i2c_drv.c  153        
+                        516 ; i2c_drv.c  154        #define SDA_mask 0x02
+                        517 ; i2c_drv.c  155        #define SCL_mask 0x01
+                        518 ; i2c_drv.c  156        
+                        519 ; i2c_drv.c  157        /* Define direct pins used for local (PTV) IIC */
+                        520 ; i2c_drv.c  158        _sfrbit    SCLpin  _atbit(P1,7);   // P1^7
+                        521 ; i2c_drv.c  159        _sfrbit    SDApin  _atbit(P1,6);   // P1^6
+                        522 ; i2c_drv.c  160        
+                        523 ; i2c_drv.c  161        /* Functions for Reading SDA line */
+                        524 ; i2c_drv.c  162        /* Internal use only              */
+                        525 ; i2c_drv.c  163        
+                        526 ; i2c_drv.c  164        static int SDA_get(UC bus)
+                        527 ; i2c_drv.c  165        {
+000000                  528 I2C_DRV_PR      SEGMENT HCODE
+000000                  529         RSEG    I2C_DRV_PR
+                        530         ALIGN   1
+000000                  532 _SDA_get:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        539 ; i2c_drv.c  166           UC locvar;
+                        540 ; i2c_drv.c  167           switch (bus)
+                        541 ; i2c_drv.c  168           {
+                        542 ; i2c_drv.c  169           default:
+                        543 ; i2c_drv.c  170           case 0:
+                        544 ; i2c_drv.c  171        
+                        545 ; i2c_drv.c  172        #if (BusPTV==FPGA)
+                        546 ; i2c_drv.c  173              locvar = ( (IICbit_0 & SDA_mask) == 0 ? Low : High);
+                        547 ; i2c_drv.c  174        #elif (BusPTV==Direct)
+                        548 ; i2c_drv.c  175              locvar = (SDApin == 0 ? Low : High);    /*pin reading on XA*/
+000000 08238E           550         MOV     C,0431H.6
+000003 F103             551         BCS     _3
+000005 910800           552         MOV.B   R0L,#00H
+000008 FE02             554         BR      _4
+000008 FE02             554         BR      _4
+00000A                  555 _3:
+00000A 910801           556         MOV.B   R0L,#01H
+00000A 91080100         556         MOV.B   R0L,#01H
+00000E                  557 _4:
+                        559 ; i2c_drv.c  176        #else /* Error : local bus not defined */
+                        560 ; i2c_drv.c  177        #compiletime error : Local bus not defined
+                        561 ; i2c_drv.c  178        #endif
+                        562 ; i2c_drv.c  179        
+                        563 ; i2c_drv.c  180           break;
+                        564 ; i2c_drv.c  181        
+                        565 ; i2c_drv.c  182        #ifdef IicBus1
+                        566 ; i2c_drv.c  183           case 1:
+                        567 ; i2c_drv.c  184              locvar = ( (IICbit_1 & SDA_mask) == 0 ? Low : High);
+                        568 ; i2c_drv.c  185           break;
+                        569 ; i2c_drv.c  186        #endif
+                        570 ; i2c_drv.c  187        
+                        571 ; i2c_drv.c  188        #ifdef IicBus2
+                        572 ; i2c_drv.c  189           case 2:
+                        573 ; i2c_drv.c  190              locvar = ( (IICbit_2 & SDA_mask) == 0 ? Low : High);
+                        574 ; i2c_drv.c  191           break;
+                        575 ; i2c_drv.c  192        #endif
+                        576 ; i2c_drv.c  193        
+                        577 ; i2c_drv.c  194        #ifdef IicBus3
+                        578 ; i2c_drv.c  195           case 3:
+                        579 ; i2c_drv.c  196              locvar = ( (IICbit_3 & SDA_mask) == 0 ? Low : High);
+                        580 ; i2c_drv.c  197           break;
+                        581 ; i2c_drv.c  198        #endif
+                        582 ; i2c_drv.c  199        
+                        583 ; i2c_drv.c  200        #ifdef IicBus4
+                        584 ; i2c_drv.c  201           case 4:
+                        585 ; i2c_drv.c  202              locvar = ( (IICbit_4 & SDA_mask) == 0 ? Low : High);
+                        586 ; i2c_drv.c  203           break;
+                        587 ; i2c_drv.c  204        #endif
+                        588 ; i2c_drv.c  205        
+                        589 ; i2c_drv.c  206        #ifdef IicBus5
+                        590 ; i2c_drv.c  207           case 5:
+                        591 ; i2c_drv.c  208              locvar = ( (IICbit_5 & SDA_mask) == 0 ? Low : High);
+                        592 ; i2c_drv.c  209           break;
+                        593 ; i2c_drv.c  210        #endif
+                        594 ; i2c_drv.c  211        
+                        595 ; i2c_drv.c  212        #ifdef IicBus6
+                        596 ; i2c_drv.c  213           case 6:
+                        597 ; i2c_drv.c  214              locvar = ( (IICbit_6 & SDA_mask) == 0 ? Low : High);
+                        598 ; i2c_drv.c  215           break;
+                        599 ; i2c_drv.c  216        #endif
+                        600 ; i2c_drv.c  217        
+                        601 ; i2c_drv.c  218        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        602 ; i2c_drv.c  219           }
+                        603 ; i2c_drv.c  220           return(locvar);
+00000E B110             605         MOVS.B  R0H,#00H
+                        607 ; i2c_drv.c  221        }
+000010 D680             609         RET
+                        611 ; i2c_drv.c  222        
+                        612 ; i2c_drv.c  223        static int SCL_get(UC bus)
+                        613 ; i2c_drv.c  224        {
+                        614         ALIGN   1
+000012                  616 _SCL_get:
+                        623 ; i2c_drv.c  225           UC locvar;
+                        624 ; i2c_drv.c  226           switch (bus)
+                        625 ; i2c_drv.c  227           {
+                        626 ; i2c_drv.c  228           default:
+                        627 ; i2c_drv.c  229           case 0:
+                        628 ; i2c_drv.c  230        
+                        629 ; i2c_drv.c  231        #if (BusPTV==FPGA)
+                        630 ; i2c_drv.c  232              locvar = ( (IICbit_0 & SCL_mask) == 0 ? Low : High);
+                        631 ; i2c_drv.c  233        #elif (BusPTV==Direct)
+                        632 ; i2c_drv.c  234              locvar = (SCLpin == 0 ? Low : High);    /*pin reading on XA*/
+000012 08238F           634         MOV     C,0431H.7
+000015 F103             635         BCS     _5
+000017 910800           636         MOV.B   R0L,#00H
+00001A FE02             638         BR      _6
+00001A FE02             638         BR      _6
+00001C                  639 _5:
+00001C 910801           640         MOV.B   R0L,#01H
+00001C 91080100         640         MOV.B   R0L,#01H
+000020                  641 _6:
+                        643 ; i2c_drv.c  235        #else /* Error : local bus not defined */
+                        644 ; i2c_drv.c  236        #compiletime error : Local bus not defined
+                        645 ; i2c_drv.c  237        #endif
+                        646 ; i2c_drv.c  238        
+                        647 ; i2c_drv.c  239           break;
+                        648 ; i2c_drv.c  240        
+                        649 ; i2c_drv.c  241        #ifdef IicBus1
+                        650 ; i2c_drv.c  242           case 1:
+                        651 ; i2c_drv.c  243              locvar = ( (IICbit_1 & SCL_mask) == 0 ? Low : High);
+                        652 ; i2c_drv.c  244           break;
+                        653 ; i2c_drv.c  245        #endif
+                        654 ; i2c_drv.c  246        #ifdef IicBus2
+                        655 ; i2c_drv.c  247           case 2:
+                        656 ; i2c_drv.c  248              locvar = ( (IICbit_2 & SCL_mask) == 0 ? Low : High);
+                        657 ; i2c_drv.c  249           break;
+                        658 ; i2c_drv.c  250        #endif
+                        659 ; i2c_drv.c  251        #ifdef IicBus3
+                        660 ; i2c_drv.c  252           case 3:
+                        661 ; i2c_drv.c  253              locvar = ( (IICbit_3 & SCL_mask) == 0 ? Low : High);
+                        662 ; i2c_drv.c  254           break;
+                        663 ; i2c_drv.c  255        #endif
+                        664 ; i2c_drv.c  256        #ifdef IicBus4
+                        665 ; i2c_drv.c  257           case 4:
+                        666 ; i2c_drv.c  258              locvar = ( (IICbit_4 & SCL_mask) == 0 ? Low : High);
+                        667 ; i2c_drv.c  259           break;
+                        668 ; i2c_drv.c  260        #endif
+                        669 ; i2c_drv.c  261        #ifdef IicBus5
+                        670 ; i2c_drv.c  262           case 5:
+                        671 ; i2c_drv.c  263              locvar = ( (IICbit_5 & SCL_mask) == 0 ? Low : High);
+                        672 ; i2c_drv.c  264           break;
+                        673 ; i2c_drv.c  265        #endif
+                        674 ; i2c_drv.c  266        #ifdef IicBus6
+                        675 ; i2c_drv.c  267           case 6:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+                        676 ; i2c_drv.c  268              locvar = ( (IICbit_6 & SCL_mask) == 0 ? Low : High);
+                        677 ; i2c_drv.c  269           break;
+                        678 ; i2c_drv.c  270        #endif
+                        679 ; i2c_drv.c  271        
+                        680 ; i2c_drv.c  272           }
+                        681 ; i2c_drv.c  273           return(locvar);
+000020 B110             683         MOVS.B  R0H,#00H
+                        685 ; i2c_drv.c  274        }
+000022 D680             687         RET
+                        689 ; i2c_drv.c  275        
+                        690 ; i2c_drv.c  276        
+                        691 ; i2c_drv.c  277        
+                        692 ; i2c_drv.c  278        
+                        693 ; i2c_drv.c  279        static int SCL_set(UC level, UC bus)
+                        694 ; i2c_drv.c  280        {
+                        695         ALIGN   1
+000024                  697 _SCL_set:
+                        704 ; i2c_drv.c  281           switch (bus)
+                        705 ; i2c_drv.c  282           {
+                        706 ; i2c_drv.c  283           default:
+                        707 ; i2c_drv.c  284           case 0:
+                        708 ; i2c_drv.c  285        
+                        709 ; i2c_drv.c  286        #if (BusPTV==FPGA)
+                        710 ; i2c_drv.c  287              if (level == High)
+                        711 ; i2c_drv.c  288              {
+                        712 ; i2c_drv.c  289                 IICmir0   |=  SCL_mask;
+                        713 ; i2c_drv.c  290                 IICbit_0     = IICmir0;
+                        714 ; i2c_drv.c  291              }
+                        715 ; i2c_drv.c  292              else
+                        716 ; i2c_drv.c  293              {
+                        717 ; i2c_drv.c  294                 IICmir0   &= ~SCL_mask;
+                        718 ; i2c_drv.c  295                 IICbit_0     = IICmir0;
+                        719 ; i2c_drv.c  296              }
+                        720 ; i2c_drv.c  297        
+                        721 ; i2c_drv.c  298        #elif (BusPTV==Direct)
+                        722 ; i2c_drv.c  299              if (level == High)
+000024 910401           724         CMP.B   R0L,#01H
+000027 F203             725         BNE     _7
+                        726 ; i2c_drv.c  300                  SCLpin = 1;
+000029 08138F           728         SETB    0431H.7
+00002C FE02             729         BR      _8
+00002C FE02             729         BR      _8
+00002E                  730 _7:
+                        731 ; i2c_drv.c  301              else
+                        732 ; i2c_drv.c  302                  SCLpin = 0;
+00002E 08038F           734         CLR     0431H.7
+                        735 ; i2c_drv.c  303        #else /* Error : local bus not defined */
+                        736 ; i2c_drv.c  304        #compiletime error : Local bus not defined
+                        737 ; i2c_drv.c  305        #endif
+                        738 ; i2c_drv.c  306        
+                        739 ; i2c_drv.c  307           break;
+                        740 ; i2c_drv.c  308        
+                        741 ; i2c_drv.c  309        #ifdef IicBus1
+                        742 ; i2c_drv.c  310           case 1:
+                        743 ; i2c_drv.c  311              if (level == High)
+                        744 ; i2c_drv.c  312              {
+                        745 ; i2c_drv.c  313                 IICmir1   |=  SCL_mask;
+                        746 ; i2c_drv.c  314                 IICbit_1     = IICmir1;
+                        747 ; i2c_drv.c  315              }
+                        748 ; i2c_drv.c  316              else
+                        749 ; i2c_drv.c  317              {
+                        750 ; i2c_drv.c  318                 IICmir1   &= ~SCL_mask;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        751 ; i2c_drv.c  319                 IICbit_1     = IICmir1;
+                        752 ; i2c_drv.c  320              }
+                        753 ; i2c_drv.c  321           break;
+                        754 ; i2c_drv.c  322        #endif
+                        755 ; i2c_drv.c  323        #ifdef IicBus2
+                        756 ; i2c_drv.c  324           case 2:
+                        757 ; i2c_drv.c  325              if (level == High)
+                        758 ; i2c_drv.c  326              {
+                        759 ; i2c_drv.c  327                 IICmir2   |=  SCL_mask;
+                        760 ; i2c_drv.c  328                 IICbit_2     = IICmir2;
+                        761 ; i2c_drv.c  329              }
+                        762 ; i2c_drv.c  330              else
+                        763 ; i2c_drv.c  331              {
+                        764 ; i2c_drv.c  332                 IICmir2   &= ~SCL_mask;
+                        765 ; i2c_drv.c  333                 IICbit_2     = IICmir2;
+                        766 ; i2c_drv.c  334              }
+                        767 ; i2c_drv.c  335           break;
+                        768 ; i2c_drv.c  336        #endif
+                        769 ; i2c_drv.c  337        #ifdef IicBus3
+                        770 ; i2c_drv.c  338           case 3:
+                        771 ; i2c_drv.c  339              if (level == High)
+                        772 ; i2c_drv.c  340              {
+                        773 ; i2c_drv.c  341                 IICmir3   |=  SCL_mask;
+                        774 ; i2c_drv.c  342                 IICbit_3     = IICmir3;
+                        775 ; i2c_drv.c  343              }
+                        776 ; i2c_drv.c  344              else
+                        777 ; i2c_drv.c  345              {
+                        778 ; i2c_drv.c  346                 IICmir3   &= ~SCL_mask;
+                        779 ; i2c_drv.c  347                 IICbit_3     = IICmir3;
+                        780 ; i2c_drv.c  348              }
+                        781 ; i2c_drv.c  349           break;
+                        782 ; i2c_drv.c  350        #endif
+                        783 ; i2c_drv.c  351        #ifdef IicBus4
+                        784 ; i2c_drv.c  352           case 4:
+                        785 ; i2c_drv.c  353              if (level == High)
+                        786 ; i2c_drv.c  354              {
+                        787 ; i2c_drv.c  355                 IICmir4   |=  SCL_mask;
+                        788 ; i2c_drv.c  356                 IICbit_4     = IICmir4;
+                        789 ; i2c_drv.c  357              }
+                        790 ; i2c_drv.c  358              else
+                        791 ; i2c_drv.c  359              {
+                        792 ; i2c_drv.c  360                 IICmir4   &= ~SCL_mask;
+                        793 ; i2c_drv.c  361                 IICbit_4     = IICmir4;
+                        794 ; i2c_drv.c  362              }
+                        795 ; i2c_drv.c  363           break;
+                        796 ; i2c_drv.c  364        #endif
+                        797 ; i2c_drv.c  365        #ifdef IicBus5
+                        798 ; i2c_drv.c  366           case 5:
+                        799 ; i2c_drv.c  367              if (level == High)
+                        800 ; i2c_drv.c  368              {
+                        801 ; i2c_drv.c  369                 IICmir5   |=  SCL_mask;
+                        802 ; i2c_drv.c  370                 IICbit_5     = IICmir5;
+                        803 ; i2c_drv.c  371              }
+                        804 ; i2c_drv.c  372              else
+                        805 ; i2c_drv.c  373              {
+                        806 ; i2c_drv.c  374                 IICmir5   &= ~SCL_mask;
+                        807 ; i2c_drv.c  375                 IICbit_5     = IICmir5;
+                        808 ; i2c_drv.c  376              }
+                        809 ; i2c_drv.c  377           break;
+                        810 ; i2c_drv.c  378        #endif
+                        811 ; i2c_drv.c  379        #ifdef IicBus6
+                        812 ; i2c_drv.c  380           case 6:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        813 ; i2c_drv.c  381              if (level == High)
+                        814 ; i2c_drv.c  382              {
+                        815 ; i2c_drv.c  383                 IICmir6   |=  SCL_mask;
+                        816 ; i2c_drv.c  384                 IICbit_6     = IICmir6;
+                        817 ; i2c_drv.c  385              }
+                        818 ; i2c_drv.c  386              else
+                        819 ; i2c_drv.c  387              {
+                        820 ; i2c_drv.c  388                 IICmir6   &= ~SCL_mask;
+                        821 ; i2c_drv.c  389                 IICbit_6     = IICmir6;
+                        822 ; i2c_drv.c  390              }
+                        823 ; i2c_drv.c  391           break;
+                        824 ; i2c_drv.c  392        #endif
+                        825 ; i2c_drv.c  393           }
+000032                  827 _8:
+                        828 ; i2c_drv.c  394           return(OK);  /* No errors possible */
+000032 9908FFFF         830         MOV.W   R0,#0FFFFH
+                        833 ; i2c_drv.c  395        }
+000036 D680             835         RET
+                        837 ; i2c_drv.c  396        
+                        838 ; i2c_drv.c  397        static int SCL_set_wait(UC bus)
+                        839 ; i2c_drv.c  398        {
+                        840         ALIGN   1
+000038                  842 _SCL_set_wait:
+000038 0F30             845         PUSH.W  R4, R5
+                        851 ; i2c_drv.c  399                UI i;
+                        852 ; i2c_drv.c  400                SCL_set(High,bus);      /* Release clockline and */
+00003A 81A0             854         MOV.B   R5L,R0L
+00003C 8110             855         MOV.B   R0H,R0L
+00003E 910801           860         MOV.B   R0L,#01H
+000041 C5FFF0           861         CALL    _SCL_set
+                        864 ; i2c_drv.c  401                i = 0;              /* wait for physical line to go high */
+000044 B940             866         MOV.W   R4,#00H
+000046 810A             868         MOV.B   R0L,R5L
+                        871 ; i2c_drv.c  402        
+                        872 ; i2c_drv.c  403                while ( (SCL_get(bus) == Low) && (i++ < IICtimeout) );
+000048 C5FFE4           874         CALL    _SCL_get
+00004B 6900             877         OR.W    R0,R0
+00004D F210             878         BNE     _13
+00004F B941             879         MOV.W   R4,#01H
+000051 B900             882         MOV.W   R0,#00H
+000053 9904000A         883         CMP.W   R0,#0AH
+000057 F00B             884         BCC     _13
+000057 F00B00           884         BCC     _13
+00005A                  885 _10:
+00005A 810A             886         MOV.B   R0L,R5L
+00005C C5FFDA           889         CALL    _SCL_get
+00005F 6900             892         OR.W    R0,R0
+000061 F206             893         BNE     _13
+000063 8904             894         MOV.W   R0,R4
+000065 A941             897         ADDS.W  R4,#01H
+000067 9904000A         900         CMP.W   R0,#0AH
+00006B F1F7             901         BCS     _10
+00006B F1F700           901         BCS     _10
+00006E                  902 _13:
+                        903 ; i2c_drv.c  404        
+                        904 ; i2c_drv.c  405                if(i < IICtimeout)
+00006E 9944000A         906         CMP.W   R4,#0AH
+000072 F003             907         BCC     _14
+                        908 ; i2c_drv.c  406                        return(OK);
+000074 9908FFFF         910         MOV.W   R0,#0FFFFH
+000078 FE02             911         BR      _15
+000078 FE02             911         BR      _15
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+00007A                  912 _14:
+                        913 ; i2c_drv.c  407                else
+                        914 ; i2c_drv.c  408                        return(EventIICTimeout);
+00007A 99080CE6         916         MOV.W   R0,#0CE6H
+                        917 ; i2c_drv.c  409        }
+00007E                  919 _15:
+00007E 2F30             920         POP.W   R4, R5
+000080 D680             922         RET
+                        926 ; i2c_drv.c  410        
+                        927 ; i2c_drv.c  411        
+                        928 ; i2c_drv.c  412        
+                        929 ; i2c_drv.c  413        
+                        930 ; i2c_drv.c  414        
+                        931 ; i2c_drv.c  415        
+                        932 ; i2c_drv.c  416        
+                        933 ; i2c_drv.c  417        
+                        934 ; i2c_drv.c  418        static int SDA_set(UC level, UC bus)
+                        935 ; i2c_drv.c  419        {
+                        936         ALIGN   1
+000082                  938 _SDA_set:
+                        945 ; i2c_drv.c  420           switch (bus)
+                        946 ; i2c_drv.c  421           {
+                        947 ; i2c_drv.c  422           default:
+                        948 ; i2c_drv.c  423           case 0:
+                        949 ; i2c_drv.c  424        
+                        950 ; i2c_drv.c  425        #if (BusPTV==FPGA)
+                        951 ; i2c_drv.c  426              if (level == High)
+                        952 ; i2c_drv.c  427              {
+                        953 ; i2c_drv.c  428                 IICmir0   |=  SDA_mask;
+                        954 ; i2c_drv.c  429                 IICbit_0     = IICmir0;
+                        955 ; i2c_drv.c  430              }
+                        956 ; i2c_drv.c  431              else
+                        957 ; i2c_drv.c  432              {
+                        958 ; i2c_drv.c  433                 IICmir0   &= ~SDA_mask;
+                        959 ; i2c_drv.c  434                 IICbit_0     = IICmir0;
+                        960 ; i2c_drv.c  435              }
+                        961 ; i2c_drv.c  436        
+                        962 ; i2c_drv.c  437        #elif (BusPTV==Direct)
+                        963 ; i2c_drv.c  438              if (level == High)
+000082 910401           965         CMP.B   R0L,#01H
+000085 F203             966         BNE     _19
+                        967 ; i2c_drv.c  439                  SDApin = 1;
+000087 08138E           969         SETB    0431H.6
+00008A FE02             970         BR      _20
+00008A FE02             970         BR      _20
+00008C                  971 _19:
+                        972 ; i2c_drv.c  440              else
+                        973 ; i2c_drv.c  441                  SDApin = 0;
+00008C 08038E           975         CLR     0431H.6
+                        976 ; i2c_drv.c  442        #else /* Error : local bus not defined */
+                        977 ; i2c_drv.c  443        #compiletime error : Local bus not defined
+                        978 ; i2c_drv.c  444        #endif
+                        979 ; i2c_drv.c  445        
+                        980 ; i2c_drv.c  446        
+                        981 ; i2c_drv.c  447        
+                        982 ; i2c_drv.c  448           break;
+                        983 ; i2c_drv.c  449        
+                        984 ; i2c_drv.c  450        #ifdef IicBus6
+                        985 ; i2c_drv.c  451           case 1:
+                        986 ; i2c_drv.c  452              if (level == High)
+                        987 ; i2c_drv.c  453              {
+                        988 ; i2c_drv.c  454                 IICmir1   |=  SDA_mask;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        989 ; i2c_drv.c  455                 IICbit_1     = IICmir1;
+                        990 ; i2c_drv.c  456              }
+                        991 ; i2c_drv.c  457              else
+                        992 ; i2c_drv.c  458              {
+                        993 ; i2c_drv.c  459                 IICmir1   &= ~SDA_mask;
+                        994 ; i2c_drv.c  460                 IICbit_1     = IICmir1;
+                        995 ; i2c_drv.c  461              }
+                        996 ; i2c_drv.c  462           break;
+                        997 ; i2c_drv.c  463        #endif
+                        998 ; i2c_drv.c  464        #ifdef IicBus2
+                        999 ; i2c_drv.c  465           case 2:
+                       1000 ; i2c_drv.c  466              if (level == High)
+                       1001 ; i2c_drv.c  467              {
+                       1002 ; i2c_drv.c  468                 IICmir2   |=  SDA_mask;
+                       1003 ; i2c_drv.c  469                 IICbit_2     = IICmir2;
+                       1004 ; i2c_drv.c  470              }
+                       1005 ; i2c_drv.c  471              else
+                       1006 ; i2c_drv.c  472              {
+                       1007 ; i2c_drv.c  473                 IICmir2   &= ~SDA_mask;
+                       1008 ; i2c_drv.c  474                 IICbit_2     = IICmir2;
+                       1009 ; i2c_drv.c  475              }
+                       1010 ; i2c_drv.c  476           break;
+                       1011 ; i2c_drv.c  477        #endif
+                       1012 ; i2c_drv.c  478        #ifdef IicBus3
+                       1013 ; i2c_drv.c  479           case 3:
+                       1014 ; i2c_drv.c  480              if (level == High)
+                       1015 ; i2c_drv.c  481              {
+                       1016 ; i2c_drv.c  482                 IICmir3   |=  SDA_mask;
+                       1017 ; i2c_drv.c  483                 IICbit_3     = IICmir3;
+                       1018 ; i2c_drv.c  484              }
+                       1019 ; i2c_drv.c  485              else
+                       1020 ; i2c_drv.c  486              {
+                       1021 ; i2c_drv.c  487                 IICmir3   &= ~SDA_mask;
+                       1022 ; i2c_drv.c  488                 IICbit_3     = IICmir3;
+                       1023 ; i2c_drv.c  489              }
+                       1024 ; i2c_drv.c  490           break;
+                       1025 ; i2c_drv.c  491        #endif
+                       1026 ; i2c_drv.c  492        #ifdef IicBus4
+                       1027 ; i2c_drv.c  493           case 4:
+                       1028 ; i2c_drv.c  494              if (level == High)
+                       1029 ; i2c_drv.c  495              {
+                       1030 ; i2c_drv.c  496                 IICmir4   |=  SDA_mask;
+                       1031 ; i2c_drv.c  497                 IICbit_4     = IICmir4;
+                       1032 ; i2c_drv.c  498              }
+                       1033 ; i2c_drv.c  499              else
+                       1034 ; i2c_drv.c  500              {
+                       1035 ; i2c_drv.c  501                 IICmir4   &= ~SDA_mask;
+                       1036 ; i2c_drv.c  502                 IICbit_4     = IICmir4;
+                       1037 ; i2c_drv.c  503              }
+                       1038 ; i2c_drv.c  504           break;
+                       1039 ; i2c_drv.c  505        #endif
+                       1040 ; i2c_drv.c  506        #ifdef IicBus5
+                       1041 ; i2c_drv.c  507           case 5:
+                       1042 ; i2c_drv.c  508              if (level == High)
+                       1043 ; i2c_drv.c  509              {
+                       1044 ; i2c_drv.c  510                 IICmir5   |=  SDA_mask;
+                       1045 ; i2c_drv.c  511                 IICbit_5     = IICmir5;
+                       1046 ; i2c_drv.c  512              }
+                       1047 ; i2c_drv.c  513              else
+                       1048 ; i2c_drv.c  514              {
+                       1049 ; i2c_drv.c  515                 IICmir5   &= ~SDA_mask;
+                       1050 ; i2c_drv.c  516                 IICbit_5     = IICmir5;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                       1051 ; i2c_drv.c  517              }
+                       1052 ; i2c_drv.c  518           break;
+                       1053 ; i2c_drv.c  519        #endif
+                       1054 ; i2c_drv.c  520        #ifdef IicBus6
+                       1055 ; i2c_drv.c  521           case 6:
+                       1056 ; i2c_drv.c  522              if (level == High)
+                       1057 ; i2c_drv.c  523              {
+                       1058 ; i2c_drv.c  524                 IICmir6   |=  SDA_mask;
+                       1059 ; i2c_drv.c  525                 IICbit_6     = IICmir6;
+                       1060 ; i2c_drv.c  526              }
+                       1061 ; i2c_drv.c  527              else
+                       1062 ; i2c_drv.c  528              {
+                       1063 ; i2c_drv.c  529                 IICmir6   &= ~SDA_mask;
+                       1064 ; i2c_drv.c  530                 IICbit_6     = IICmir6;
+                       1065 ; i2c_drv.c  531              }
+                       1066 ; i2c_drv.c  532           break;
+                       1067 ; i2c_drv.c  533        #endif
+                       1068 ; i2c_drv.c  534           }
+000090                 1070 _20:
+                       1071 ; i2c_drv.c  535           return(OK);  /* No errors possible */
+000090 9908FFFF        1073         MOV.W   R0,#0FFFFH
+                       1076 ; i2c_drv.c  536        
+                       1077 ; i2c_drv.c  537        }
+000094 D680            1079         RET
+                       1081 ; i2c_drv.c  538        
+                       1082 ; i2c_drv.c  539        
+                       1083 ; i2c_drv.c  540        static int Start_IIC(UC bus)
+                       1084 ; i2c_drv.c  541        {
+                       1085         ALIGN   1
+000096                 1087 _Start_IIC:
+000096 0F10            1090         PUSH.W  R4
+000098 8180            1094         MOV.B   R4L,R0L
+                       1099 ; i2c_drv.c  542           /* Test for bus ready ( both lines high ) */
+                       1100 ; i2c_drv.c  543           if ((SCL_get(bus) == High) && (SDA_get(bus) == High))
+00009A C5FFBB          1102         CALL    _SCL_get
+00009D 99040001        1105         CMP.W   R0,#01H
+0000A1 F206            1106         BNE     _22
+0000A3 8108            1107         MOV.B   R0L,R4L
+0000A5 C5FFAC          1110         CALL    _SDA_get
+0000A8 99040001        1113         CMP.W   R0,#01H
+0000AC F303            1114         BEQ     _23
+                       1115 ; i2c_drv.c  544           {
+                       1116 ; i2c_drv.c  545              SDA_set(Low,bus);
+                       1117 ; i2c_drv.c  546              Delay(5);
+                       1118 ; i2c_drv.c  547              SCL_set(Low,bus);
+                       1119 ; i2c_drv.c  548           }
+0000AE                 1121 _22:
+                       1122 ; i2c_drv.c  549           else /* Bus not ready => Start condition not generated */
+                       1123 ; i2c_drv.c  550           {
+                       1124 ; i2c_drv.c  551              return(EventIICBusError);
+0000AE 99080CE7        1126         MOV.W   R0,#0CE7H
+0000B2 FE0A            1127         BR      _24
+0000B4                 1129 _23:
+0000B4 8118            1132         MOV.B   R0H,R4L
+0000B6 910800          1135         MOV.B   R0L,#00H
+0000B9 C5FFE3          1136         CALL    _SDA_set
+0000BC 8118            1140         MOV.B   R0H,R4L
+0000BE 910800          1141         MOV.B   R0L,#00H
+0000C1 C5FFB0          1142         CALL    _SCL_set
+                       1146 ; i2c_drv.c  552           }
+                       1147 ; i2c_drv.c  553           return(OK);
+0000C4 9908FFFF        1149         MOV.W   R0,#0FFFFH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                       1150 ; i2c_drv.c  554        }
+0000C8                 1152 _24:
+0000C8 2F10            1153         POP.W   R4
+0000CA D680            1155         RET
+                       1157 ; i2c_drv.c  555        
+                       1158 ; i2c_drv.c  556        static int Stop_IIC(UC bus)
+                       1159 ; i2c_drv.c  557        {
+                       1160         ALIGN   1
+0000CC                 1162 _Stop_IIC:
+0000CC 0F10            1165         PUSH.W  R4
+                       1169 ; i2c_drv.c  558           Delay(2);                      /* prepare by setting dataline low */
+                       1170 ; i2c_drv.c  559           SDA_set(Low,bus);
+0000CE 8180            1172         MOV.B   R4L,R0L
+0000D0 8110            1173         MOV.B   R0H,R0L
+0000D2 910800          1178         MOV.B   R0L,#00H
+0000D5 C5FFD5          1179         CALL    _SDA_set
+0000D8 8108            1182         MOV.B   R0L,R4L
+                       1185 ; i2c_drv.c  560           Delay(3);
+                       1186 ; i2c_drv.c  561        
+                       1187 ; i2c_drv.c  562           SCL_set_wait(bus);
+0000DA C5FFAE          1189         CALL    _SCL_set_wait
+                       1192 ; i2c_drv.c  563        
+                       1193 ; i2c_drv.c  564           Delay(5);                     /* Setup time to stopcondition */
+                       1194 ; i2c_drv.c  565        
+                       1195 ; i2c_drv.c  566           SDA_set(High,bus);
+0000DD 910801          1197         MOV.B   R0L,#01H
+0000E0 8118            1198         MOV.B   R0H,R4L
+0000E2 C5FFCF          1199         CALL    _SDA_set
+                       1203 ; i2c_drv.c  567           return(OK);
+0000E5 9908FFFF        1205         MOV.W   R0,#0FFFFH
+                       1206 ; i2c_drv.c  568        }
+0000E9 2F10            1208         POP.W   R4
+0000EB D680            1210         RET
+                       1212 ; i2c_drv.c  569        
+                       1213 ; i2c_drv.c  570        static int TxByte(UC X,UC bus) {
+0000ED 00              1214         ALIGN   1
+0000EE                 1216 _TxByte:
+0000EE 0F70            1219         PUSH.W  R4, R5, R6
+0000F0 81A1            1222         MOV.B   R5L,R0H
+0000F2 81C0            1225         MOV.B   R6L,R0L
+                       1231 ; i2c_drv.c  571        
+                       1232 ; i2c_drv.c  572           int locvar;
+                       1233 ; i2c_drv.c  573           for (locvar = 8;locvar != 0; locvar-- )
+0000F4 99480008        1235         MOV.W   R4,#08H
+0000F8                 1237 _33:
+                       1238 ; i2c_drv.c  574           {
+                       1239 ; i2c_drv.c  575              SCL_set(Low,bus);            /* Clock line low */
+0000F8 811A            1241         MOV.B   R0H,R5L
+0000FA 910800          1244         MOV.B   R0L,#00H
+0000FD C5FF92          1245         CALL    _SCL_set
+                       1248 ; i2c_drv.c  576              Delay(2);                   /* Small delay before changing data */
+                       1249 ; i2c_drv.c  577        
+                       1250 ; i2c_drv.c  578              if ((X & Bit7) == 0 )       /* Output databit */
+000100 81BC            1252         MOV.B   R5H,R6L
+000102 91B580          1253         AND.B   R5H,#080H
+000105 F206            1254         BNE     _34
+000107 811A            1255         MOV.B   R0H,R5L
+000109 910800          1258         MOV.B   R0L,#00H
+                       1259 ; i2c_drv.c  579                 SDA_set(Low,bus);
+00010C C5FFBA          1261         CALL    _SDA_set
+00010F FE05            1264         BR      _35
+00010F FE0500          1264         BR      _35
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+000112                 1265 _34:
+                       1266 ; i2c_drv.c  580              else
+                       1267 ; i2c_drv.c  581                 SDA_set(High,bus);
+000112 910801          1269         MOV.B   R0L,#01H
+000115 811A            1270         MOV.B   R0H,R5L
+000117 C5FFB4          1273         CALL    _SDA_set
+00011A                 1276 _35:
+                       1277 ; i2c_drv.c  582        
+                       1278 ; i2c_drv.c  583              X += X;                     /* Get next databit in position   */
+00011A 01CC            1280         ADD.B   R6L,R6L
+00011C 810A            1281         MOV.B   R0L,R5L
+                       1284 ; i2c_drv.c  584                                          /* Rotate left by adding to itself*/
+                       1285 ; i2c_drv.c  585        
+                       1286 ; i2c_drv.c  586              Delay(3);                   /* Data setup time to clock high */
+                       1287 ; i2c_drv.c  587        
+                       1288 ; i2c_drv.c  588              SCL_set_wait(bus);
+00011E C5FF8C          1290         CALL    _SCL_set_wait
+000121 A94F            1294         ADDS.W  R4,#0FH
+000123 F2EA            1297         BNE     _33
+000125 811A            1298         MOV.B   R0H,R5L
+000127 910800          1301         MOV.B   R0L,#00H
+                       1302 ; i2c_drv.c  589        
+                       1303 ; i2c_drv.c  590              Delay(5);                   /* 5 usec clock high time */
+                       1304 ; i2c_drv.c  591        
+                       1305 ; i2c_drv.c  592           }
+                       1306 ; i2c_drv.c  593                                /* 8 bits are now out , get ready for acknowledge
+                             */
+                       1307 ; i2c_drv.c  594        
+                       1308 ; i2c_drv.c  595           SCL_set(Low,bus);            /* Clock line low */
+00012A C5FF7C          1310         CALL    _SCL_set
+                       1313 ; i2c_drv.c  596           Delay(2);                   /* Small delay before changing data */
+                       1314 ; i2c_drv.c  597           SDA_set(High,bus);           /* Data line high : ready for input */
+00012D 910801          1316         MOV.B   R0L,#01H
+000130 811A            1317         MOV.B   R0H,R5L
+000132 C5FFA7          1320         CALL    _SDA_set
+000135 810A            1323         MOV.B   R0L,R5L
+                       1326 ; i2c_drv.c  598           Delay(3);                   /* Data setup time to clock high */
+                       1327 ; i2c_drv.c  599        
+                       1328 ; i2c_drv.c  600           SCL_set_wait(bus);
+000137 C5FF7F          1330         CALL    _SCL_set_wait
+00013A 810A            1333         MOV.B   R0L,R5L
+                       1336 ; i2c_drv.c  601        
+                       1337 ; i2c_drv.c  602           if (SDA_get(bus) == Low)
+00013C C5FF61          1339         CALL    _SDA_get
+00013F 6900            1342         OR.W    R0,R0
+000141 F204            1343         BNE     _36
+                       1344 ; i2c_drv.c  603           {                          /* Acknowledge OK */
+                       1345 ; i2c_drv.c  604              locvar = OK;
+000143 9948FFFF        1347         MOV.W   R4,#0FFFFH
+                       1350 ; i2c_drv.c  605           }
+000147 FE02            1352         BR      _37
+000147 FE0200          1352         BR      _37
+00014A                 1353 _36:
+                       1354 ; i2c_drv.c  606           else
+                       1355 ; i2c_drv.c  607           {                          /* Acknowledge FAIL */
+                       1356 ; i2c_drv.c  608              locvar = FAIL;
+00014A B940            1358         MOV.W   R4,#00H
+                       1361 ; i2c_drv.c  609           }
+00014C                 1363 _37:
+                       1364 ; i2c_drv.c  610        
+                       1365 ; i2c_drv.c  611           Delay(5);                   /* 5 usec clock high time */
+                       1366 ; i2c_drv.c  612           SCL_set(Low,bus);            /* Clock line low */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+00014C 811A            1368         MOV.B   R0H,R5L
+00014E 910800          1369         MOV.B   R0L,#00H
+000151 C5FF68          1370         CALL    _SCL_set
+                       1374 ; i2c_drv.c  613        
+                       1375 ; i2c_drv.c  614           return(locvar);
+000154 8904            1377         MOV.W   R0,R4
+                       1380 ; i2c_drv.c  615        
+                       1381 ; i2c_drv.c  616        }
+000156 2F70            1383         POP.W   R4, R5, R6
+000158 D680            1385         RET
+                       1388 ; i2c_drv.c  617        
+                       1389 ; i2c_drv.c  618        static UC RxByte(int Last,UC bus) {
+                       1390         ALIGN   1
+00015A                 1392 _RxByte:
+00015A 0F70            1395         PUSH.W  R4, R5, R6
+00015C 81A2            1399         MOV.B   R5L,R1L
+00015E 8960            1402         MOV.W   R6,R0
+                       1411 ; i2c_drv.c  619        
+                       1412 ; i2c_drv.c  620           int locvar;
+                       1413 ; i2c_drv.c  621           UC  datarx = 0;   /* Initialise datashifter */
+000160 91B800          1415         MOV.B   R5H,#00H
+                       1417 ; i2c_drv.c  622        
+                       1418 ; i2c_drv.c  623           for (locvar = 8;locvar != 0; locvar-- )
+000163 99480008        1420         MOV.W   R4,#08H
+000168                 1422 _42:
+000168 810A            1423         MOV.B   R0L,R5L
+                       1426 ; i2c_drv.c  624           {
+                       1427 ; i2c_drv.c  625              Delay(5);
+                       1428 ; i2c_drv.c  626        
+                       1429 ; i2c_drv.c  627              SCL_set_wait(bus);
+00016A C5FF66          1431         CALL    _SCL_set_wait
+                       1434 ; i2c_drv.c  628        
+                       1435 ; i2c_drv.c  629              datarx += datarx + SDA_get(bus);    /* Shift and input databit  */
+00016D 810A            1437         MOV.B   R0L,R5L
+00016F C5FF47          1440         CALL    _SDA_get
+000172 010B            1443         ADD.B   R0L,R5H
+000174 01B0            1444         ADD.B   R5H,R0L
+000176 811A            1447         MOV.B   R0H,R5L
+000178 910800          1450         MOV.B   R0L,#00H
+                       1451 ; i2c_drv.c  630              Delay(5);                      /* Clock high >= 5 microseconds */
+                       1452 ; i2c_drv.c  631        
+                       1453 ; i2c_drv.c  632              SCL_set(Low,bus);            /* Clock line low */
+00017B C5FF53          1455         CALL    _SCL_set
+00017E A94F            1459         ADDS.W  R4,#0FH
+000180 F2F3            1462         BNE     _42
+                       1463 ; i2c_drv.c  633           }
+                       1464 ; i2c_drv.c  634           Delay(2);
+                       1465 ; i2c_drv.c  635           /* Acknowledge bit has to be set low if NOT last byte */
+                       1466 ; i2c_drv.c  636           /* and high if last byte */
+                       1467 ; i2c_drv.c  637           if(Last == TRUE)
+000182 9964FFFF        1469         CMP.W   R6,#0FFFFH
+000186 F205            1470         BNE     _43
+                       1471 ; i2c_drv.c  638              SDA_set(High,bus);
+000188 910801          1473         MOV.B   R0L,#01H
+00018B 811A            1474         MOV.B   R0H,R5L
+00018D C5FF79          1477         CALL    _SDA_set
+000190 FE04            1480         BR      _44
+000190 FE04            1480         BR      _44
+000192                 1481 _43:
+000192 811A            1482         MOV.B   R0H,R5L
+000194 910800          1485         MOV.B   R0L,#00H
+                       1486 ; i2c_drv.c  639           else
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+                       1487 ; i2c_drv.c  640              SDA_set(Low,bus);
+000197 C5FF74          1489         CALL    _SDA_set
+00019A                 1492 _44:
+00019A 810A            1493         MOV.B   R0L,R5L
+                       1496 ; i2c_drv.c  641        
+                       1497 ; i2c_drv.c  642           Delay(3);
+                       1498 ; i2c_drv.c  643        
+                       1499 ; i2c_drv.c  644           SCL_set_wait(bus);
+00019C C5FF4D          1501         CALL    _SCL_set_wait
+00019F 811A            1504         MOV.B   R0H,R5L
+                       1507 ; i2c_drv.c  645        
+                       1508 ; i2c_drv.c  646           Delay(5);                   /* 5 usec clock high time */
+                       1509 ; i2c_drv.c  647           SCL_set(Low,bus);            /* Clock line low */
+0001A1 910800          1511         MOV.B   R0L,#00H
+0001A4 C5FF3F          1512         CALL    _SCL_set
+                       1515 ; i2c_drv.c  648        
+                       1516 ; i2c_drv.c  649           Delay(2);                   /* Allways leave dataline high */
+                       1517 ; i2c_drv.c  650           SDA_set(High,bus);
+0001A7 910801          1519         MOV.B   R0L,#01H
+0001AA 811A            1520         MOV.B   R0H,R5L
+0001AC C5FF6A          1521         CALL    _SDA_set
+                       1525 ; i2c_drv.c  651        
+                       1526 ; i2c_drv.c  652           return(datarx);             /* Return the received byte */
+0001AF 810B            1528         MOV.B   R0L,R5H
+                       1531 ; i2c_drv.c  653        }
+0001B1 2F70            1533         POP.W   R4, R5, R6
+0001B3 D680            1535         RET
+                       1540 ; i2c_drv.c  654        
+                       1541 ; i2c_drv.c  655        /**********************/
+                       1542 ; i2c_drv.c  656        /* External functions */
+                       1543 ; i2c_drv.c  657        /* Bus initialisation */
+                       1544 ; i2c_drv.c  658        /* Required before access to other functions */
+                       1545 ; i2c_drv.c  659        // Arrays need to be sized after the highest number active
+                       1546 ; i2c_drv.c  660        
+                       1547 ; i2c_drv.c  661        #define HighestBus 0
+                       1548 ; i2c_drv.c  662        #define b0i FALSE
+                       1549 ; i2c_drv.c  663        
+                       1550 ; i2c_drv.c  664        #ifdef IicBus1
+                       1551 ; i2c_drv.c  665        #define b1i FALSE
+                       1552 ; i2c_drv.c  666        #undef  HighestBus
+                       1553 ; i2c_drv.c  667        #define HighestBus 1
+                       1554 ; i2c_drv.c  668        #else
+                       1555 ; i2c_drv.c  669        #define b1i EventIICNoBus
+                       1556 ; i2c_drv.c  670        #endif
+                       1557 ; i2c_drv.c  671        
+                       1558 ; i2c_drv.c  672        #ifdef IicBus2
+                       1559 ; i2c_drv.c  673        #define b2i FALSE
+                       1560 ; i2c_drv.c  674        #undef  HighestBus
+                       1561 ; i2c_drv.c  675        #define HighestBus 2
+                       1562 ; i2c_drv.c  676        #else
+                       1563 ; i2c_drv.c  677        #define b2i EventIICNoBus
+                       1564 ; i2c_drv.c  678        #endif
+                       1565 ; i2c_drv.c  679        
+                       1566 ; i2c_drv.c  680        #ifdef IicBus3
+                       1567 ; i2c_drv.c  681        #define b3i FALSE
+                       1568 ; i2c_drv.c  682        #undef  HighestBus
+                       1569 ; i2c_drv.c  683        #define HighestBus 3
+                       1570 ; i2c_drv.c  684        #else
+                       1571 ; i2c_drv.c  685        #define b3i EventIICNoBus
+                       1572 ; i2c_drv.c  686        #endif
+                       1573 ; i2c_drv.c  687        
+                       1574 ; i2c_drv.c  688        #ifdef IicBus4
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                       1575 ; i2c_drv.c  689        #define b4i FALSE
+                       1576 ; i2c_drv.c  690        #undef  HighestBus
+                       1577 ; i2c_drv.c  691        #define HighestBus 4
+                       1578 ; i2c_drv.c  692        #else
+                       1579 ; i2c_drv.c  693        #define b4i EventIICNoBus
+                       1580 ; i2c_drv.c  694        #endif
+                       1581 ; i2c_drv.c  695        
+                       1582 ; i2c_drv.c  696        #ifdef IicBus5
+                       1583 ; i2c_drv.c  697        #define b5i FALSE
+                       1584 ; i2c_drv.c  698        #undef  HighestBus
+                       1585 ; i2c_drv.c  699        #define HighestBus 5
+                       1586 ; i2c_drv.c  700        #else
+                       1587 ; i2c_drv.c  701        #define b5i EventIICNoBus
+                       1588 ; i2c_drv.c  702        #endif
+                       1589 ; i2c_drv.c  703        
+                       1590 ; i2c_drv.c  704        #ifdef IicBus6
+                       1591 ; i2c_drv.c  705        #define b6i FALSE
+                       1592 ; i2c_drv.c  706        #undef  HighestBus
+                       1593 ; i2c_drv.c  707        #define HighestBus 6
+                       1594 ; i2c_drv.c  708        #else
+                       1595 ; i2c_drv.c  709        #define b6i EventIICNoBus
+                       1596 ; i2c_drv.c  710        #endif
+                       1597 ; i2c_drv.c  711        
+                       1598 ; i2c_drv.c  712        
+                       1599 ; i2c_drv.c  713        static int BusInitialised[7] = 
+000000                 1600 I2C_DRV_INI_FA  SEGMENT HDATA INSEGMENT INIT
+000000                 1601         RSEG    I2C_DRV_INI_FA
+                       1604         ALIGN   1
+000000                 1605 _BusInitialised:
+                       1606 ; i2c_drv.c  714        {b0i,b1i,b2i,b3i,b4i,b5i,b6i};
+                       1607 ; i2c_drv.c  715        
+                       1608 ; i2c_drv.c  716        static   TResource *Res[HighestBus+1];
+                       1609 ; i2c_drv.c  717        
+                       1610 ; i2c_drv.c  718        int InitBus(UC bus)
+                       1611 ; i2c_drv.c  719        {
+000000 0000ED0CED0CED  1612         DW      00000H,00CEDH,00CEDH,00CEDH,00CEDH,00CEDH,00CEDH
+       0CED0CED0CED0C       
+0001B5                 1613         RSEG    I2C_DRV_PR
+0001B5 00              1614         ALIGN   1
+                       1616         PUBLIC  _InitBus
+0001B6                 1617 _InitBus:
+0001B6 0F70            1621         PUSH.W  R4, R5, R6
+0001B8 A97A            1623         ADDS.W  R7,#0AH
+                       1629 ; i2c_drv.c  720                UC i;
+                       1630 ; i2c_drv.c  721        //      char report[16];
+                       1631 ; i2c_drv.c  722        
+                       1632 ; i2c_drv.c  723        
+                       1633 ; i2c_drv.c  724        // Check for valid bus number :
+                       1634 ; i2c_drv.c  725           switch (bus)
+0001BA 910400          1636         CMP.B   R0L,#00H
+0001BD F307            1637         BEQ     _62
+0001BF FE01            1638         BR      _61
+                       1639 ; i2c_drv.c  726           {
+                       1640 ; i2c_drv.c  727           case 0: // Bus 0 allways defined
+                       1641 ; i2c_drv.c  728           break;
+                       1642 ; i2c_drv.c  729        #ifdef IicBus1
+                       1643 ; i2c_drv.c  730           case 1:
+                       1644 ; i2c_drv.c  731           break;
+                       1645 ; i2c_drv.c  732        #endif
+                       1646 ; i2c_drv.c  733        #ifdef IicBus2
+                       1647 ; i2c_drv.c  734           case 2:
+                       1648 ; i2c_drv.c  735           break;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+                       1649 ; i2c_drv.c  736        #endif
+                       1650 ; i2c_drv.c  737        #ifdef IicBus3
+                       1651 ; i2c_drv.c  738           case 3:
+                       1652 ; i2c_drv.c  739           break;
+                       1653 ; i2c_drv.c  740        #endif
+                       1654 ; i2c_drv.c  741        #ifdef IicBus4
+                       1655 ; i2c_drv.c  742           case 4:
+                       1656 ; i2c_drv.c  743           break;
+                       1657 ; i2c_drv.c  744        #endif
+                       1658 ; i2c_drv.c  745        #ifdef IicBus5
+                       1659 ; i2c_drv.c  746           case 5:
+                       1660 ; i2c_drv.c  747           break;
+                       1661 ; i2c_drv.c  748        #endif
+                       1662 ; i2c_drv.c  749        #ifdef IicBus6
+                       1663 ; i2c_drv.c  750           case 6:
+                       1664 ; i2c_drv.c  751           break;
+                       1665 ; i2c_drv.c  752        #endif
+                       1666 ; i2c_drv.c  753           default:   // Undefined busses will end here
+0001C2                 1668 _61:
+                       1669 ; i2c_drv.c  754              return(EventIICNoBus+10*bus);
+0001C2 E8000A          1671         MULU.B  R0L,#0AH
+0001C5 99000CED        1673         ADD.W   R0,#0CEDH
+                       1674         BR      _74
+0001C9 D500A0         +1674         JMP.L   _74
+                       1675 ; i2c_drv.c  755        //   break;
+                       1676 ; i2c_drv.c  756           }
+0001CC                 1678 _62:
+                       1680 ; i2c_drv.c  757        
+                       1681 ; i2c_drv.c  758        
+                       1682 ; i2c_drv.c  759        //Allocate resources for bus locking only first time 
+                       1683 ; i2c_drv.c  760        // Try ignoring initial value :
+                       1684 ; i2c_drv.c  761           if (BusInitialised[bus] == FALSE)
+0001CC 840F04          1686         MOV.B   [R7+4],R0L
+0001CF 81C0            1687         MOV.B   R6L,R0L
+0001D1 B1D0            1688         MOVS.B  R6H,#00H
+0001D3 8906            1691         MOV.W   R0,R6
+0001D5 D901            1692         ASL.W   R0,#01H
+0001D7 8940            1693         MOV.W   R4,R0
+0001D9 B950            1694         MOVS.W  R5,#00H
+0001DB 9918rrrr        1695         MOV.W   R1,#SEG( _BusInitialised )
+0001DF 9908rrrr        1696         MOV.W   R0,#SOF( _BusInitialised )
+0001E3 0904            1697         ADD.W   R0,R4
+0001E5 8C1F02          1698         MOV.W   [R7+2],R1
+0001E8 8A0F            1699         MOV.W   [R7],R0
+0001EA 964842rr        1700         MOV.B   ES,#SEG( _BusInitialised )
+0001EE 8D04rrrr        1701         MOV.W   R0,[R4+SOF( _BusInitialised )]
+0001F2 F21B            1702         BNE     _65
+                       1703 ; i2c_drv.c  762        //   if (BusInitialised[bus] !=EventNoMoreResources)
+                       1704 ; i2c_drv.c  763           {
+                       1705 ; i2c_drv.c  764              Res[bus] = newTResource(0);
+0001F4 B910            1707         MOV.W   R1,#00H
+0001F6 B900            1708         MOV.W   R0,#00H
+                       1709         CALL    _newTResource
+0001F8 C4rrrrrr       +1709 ;       FCALL   _newTResource
+0001FC D962            1710         ASL.W   R6,#02H
+0001FE 8926            1711         MOV.W   R2,R6
+000200 B930            1712         MOVS.W  R3,#00H
+000202 964842rr        1713         MOV.B   ES,#SEG( _Res )
+000206 8D0Arrrr        1714         MOV.W   [R2+SOF( _Res )],R0
+00020A 8D1Arrrr        1715         MOV.W   [R2+SOF( _Res+2 )],R1
+                       1716 ; i2c_drv.c  765              if (Res[bus]== NULL)
+00020E 6910            1718         OR.W    R1,R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+000210 F306            1719         BEQ     _63
+                       1720 ; i2c_drv.c  766              {
+                       1721 ; i2c_drv.c  767                 /* Error : No more resources , bus cannot initialise */
+                       1722 ; i2c_drv.c  768        //Rev1_1 removed eventlogging from lowest level
+                       1723 ; i2c_drv.c  769        //         LogEvent(EventNoMoreResources,NULL);
+                       1724 ; i2c_drv.c  770                 BusInitialised[bus] = EventNoMoreResources;
+                       1725 ; i2c_drv.c  771              }
+                       1726 ; i2c_drv.c  772              else
+                       1727 ; i2c_drv.c  773              {
+                       1728 ; i2c_drv.c  774                 BusInitialised[bus] = OK;
+000212 964842rr        1730         MOV.B   ES,#SEG( _BusInitialised )
+000216 9D48rrrrFFFF    1731         MOV.W   [R4+SOF( _BusInitialised )],#0FFFFH
+                       1732 ; i2c_drv.c  775              }
+                       1733 ; i2c_drv.c  776        
+                       1734 ; i2c_drv.c  777           }
+00021C FE06            1736         BR      _65
+00021E                 1738 _63:
+00021E 8C1702          1739         MOV.W   R1,[R7+2]
+000221 8A07            1740         MOV.W   R0,[R7]
+000223 862C42          1741         MOV.B   ES,R1L
+000226 9A0817DF        1742         MOV.W   [R0],#017DFH
+                       1743 ; i2c_drv.c  778           else
+                       1744 ; i2c_drv.c  779           {  /* Repeated initialising */
+                       1745 ; i2c_drv.c  780        //Rev1_1 removed eventlogging from lowest level
+                       1746 ; i2c_drv.c  781        //      LogEvent(EventRepeatedInit,NULL);
+                       1747 ; i2c_drv.c  782           }
+00022A                 1749 _65:
+                       1750 ; i2c_drv.c  783        
+                       1751 ; i2c_drv.c  784           if (BusInitialised[bus]==OK)
+00022A 8C1702          1753         MOV.W   R1,[R7+2]
+00022D 8A07            1754         MOV.W   R0,[R7]
+00022F 862C42          1755         MOV.B   ES,R1L
+000232 9A04FFFF        1756         CMP.W   [R0],#0FFFFH
+000236 F265            1757         BNE     _73
+                       1758 ; i2c_drv.c  785           {
+                       1759 ; i2c_drv.c  786                 /* Release bus by setting SDA high and toggling SCL */
+                       1760 ; i2c_drv.c  787                SDA_set(High,bus);
+000238 841704          1762         MOV.B   R0H,[R7+4]
+00023B 910801          1765         MOV.B   R0L,#01H
+00023E C5FF21          1766         CALL    _SDA_set
+                       1769 ; i2c_drv.c  788                Delay(5);
+                       1770 ; i2c_drv.c  789        
+                       1771 ; i2c_drv.c  790                for( i = 9 ; i != 0 ; i--  )
+000241 918809          1773         MOV.B   R4L,#09H
+000244                 1775 _66:
+                       1776 ; i2c_drv.c  791                {
+                       1777 ; i2c_drv.c  792                         SCL_set(Low,bus);
+000244 841704          1779         MOV.B   R0H,[R7+4]
+000247 910800          1782         MOV.B   R0L,#00H
+00024A C5FEEC          1783         CALL    _SCL_set
+00024D 841704          1786         MOV.B   R0H,[R7+4]
+000250 910801          1789         MOV.B   R0L,#01H
+                       1790 ; i2c_drv.c  793                         Delay(5);
+                       1791 ; i2c_drv.c  794                         SCL_set(High,bus);
+000253 C5FEE7          1793         CALL    _SCL_set
+000256 A18F            1797         ADDS.B  R4L,#0FH
+000258 F2F5            1800         BNE     _66
+00025A 840704          1801         MOV.B   R0L,[R7+4]
+                       1804 ; i2c_drv.c  795                         Delay(5);
+                       1805 ; i2c_drv.c  796                }
+                       1806 ; i2c_drv.c  797        
+                       1807 ; i2c_drv.c  798           /* Test for actual high level on SCL then SDA */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+                       1808 ; i2c_drv.c  799                 if ( SCL_get(bus) == Low ) {
+00025D C5FED9          1810         CALL    _SCL_get
+000260 6900            1813         OR.W    R0,R0
+000262 F202            1814         BNE     _67
+                       1815 ; i2c_drv.c  800                          /* SCL Short to gnd */
+                       1816 ; i2c_drv.c  801                          i |= 0x01;
+000264 918601          1818         OR.B    R4L,#01H
+                       1821 ; i2c_drv.c  802                 }
+000268                 1823 _67:
+000268 840704          1824         MOV.B   R0L,[R7+4]
+                       1827 ; i2c_drv.c  803                 if ( SDA_get(bus) == Low  ) {
+00026B C5FEC9          1829         CALL    _SDA_get
+00026E 6900            1832         OR.W    R0,R0
+000270 F202            1833         BNE     _68
+                       1834 ; i2c_drv.c  804                          /* SDA Short to gnd */
+                       1835 ; i2c_drv.c  805                          i |= 0x02;
+000272 918602          1837         OR.B    R4L,#02H
+                       1840 ; i2c_drv.c  806                 }
+000276                 1842 _68:
+000276 841704          1843         MOV.B   R0H,[R7+4]
+000279 910800          1846         MOV.B   R0L,#00H
+                       1847 ; i2c_drv.c  807        
+                       1848 ; i2c_drv.c  808           /* Set SCL low and test for actual low level on SCL */
+                       1849 ; i2c_drv.c  809                 SCL_set(Low,bus);
+00027C C5FED3          1851         CALL    _SCL_set
+00027F 840704          1854         MOV.B   R0L,[R7+4]
+                       1857 ; i2c_drv.c  810                 if ( SCL_get(bus) == High ) {
+000282 C5FEC7          1859         CALL    _SCL_get
+000285 99040001        1862         CMP.W   R0,#01H
+000289 F202            1863         BNE     _69
+                       1864 ; i2c_drv.c  811                          /* SCL Short to vcc */
+                       1865 ; i2c_drv.c  812                          i |= 0x04;
+00028B 918604          1867         OR.B    R4L,#04H
+                       1870 ; i2c_drv.c  813                 }
+00028E                 1872 _69:
+00028E 840704          1873         MOV.B   R0L,[R7+4]
+                       1876 ; i2c_drv.c  814                 /* Test for SDA low after setting SCL low (Short-circ. SDA-SCL) 
+                            */
+                       1877 ; i2c_drv.c  815                 if ( SDA_get(bus) == Low  ) {
+000291 C5FEB6          1879         CALL    _SDA_get
+000294 6900            1882         OR.W    R0,R0
+000296 F202            1883         BNE     _70
+                       1884 ; i2c_drv.c  816                          /* SDA Short to SCL */
+                       1885 ; i2c_drv.c  817                          i |= 0x10;
+000298 918610          1887         OR.B    R4L,#010H
+                       1890 ; i2c_drv.c  818                 }
+00029C                 1892 _70:
+00029C 841704          1893         MOV.B   R0H,[R7+4]
+00029F 910800          1896         MOV.B   R0L,#00H
+                       1897 ; i2c_drv.c  819                 /* Set SDA low and test for actual low level on SDA */
+                       1898 ; i2c_drv.c  820        
+                       1899 ; i2c_drv.c  821                 SDA_set(Low,bus);
+0002A2 C5FEEF          1901         CALL    _SDA_set
+0002A5 841704          1904         MOV.B   R0H,[R7+4]
+0002A8 910801          1907         MOV.B   R0L,#01H
+                       1908 ; i2c_drv.c  822                 SCL_set(High,bus);
+0002AB C5FEBB          1910         CALL    _SCL_set
+0002AE 840704          1913         MOV.B   R0L,[R7+4]
+                       1916 ; i2c_drv.c  823               if ( SDA_get(bus) == High ) {
+0002B1 C5FEA6          1918         CALL    _SDA_get
+0002B4 99040001        1921         CMP.W   R0,#01H
+0002B8 F202            1922         BNE     _71
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+                       1923 ; i2c_drv.c  824                   /* SDA Short to vcc */
+                       1924 ; i2c_drv.c  825                   i |= 0x08;
+0002BA 918608          1926         OR.B    R4L,#08H
+                       1929 ; i2c_drv.c  826                 }
+0002BE                 1931 _71:
+0002BE 841704          1932         MOV.B   R0H,[R7+4]
+0002C1 910801          1935         MOV.B   R0L,#01H
+                       1936 ; i2c_drv.c  827        
+                       1937 ; i2c_drv.c  828                 /* Release bus by setting SDA high and toggling SCL */
+                       1938 ; i2c_drv.c  829                SDA_set(High,bus);
+0002C4 C5FEDE          1940         CALL    _SDA_set
+0002C7 841704          1943         MOV.B   R0H,[R7+4]
+0002CA 910800          1946         MOV.B   R0L,#00H
+                       1947 ; i2c_drv.c  830              Delay(5);
+                       1948 ; i2c_drv.c  831        
+                       1949 ; i2c_drv.c  832              SCL_set(Low,bus);
+0002CD C5FEAA          1951         CALL    _SCL_set
+0002D0 841704          1954         MOV.B   R0H,[R7+4]
+0002D3 910801          1957         MOV.B   R0L,#01H
+                       1958 ; i2c_drv.c  833              Delay(5);
+                       1959 ; i2c_drv.c  834                SCL_set(High,bus);
+0002D6 C5FEA6          1961         CALL    _SCL_set
+0002D9 841704          1964         MOV.B   R0H,[R7+4]
+                       1967 ; i2c_drv.c  835              Delay(5);
+                       1968 ; i2c_drv.c  836        
+                       1969 ; i2c_drv.c  837              SCL_set(Low,bus);
+0002DC 910800          1971         MOV.B   R0L,#00H
+0002DF C5FEA1          1972         CALL    _SCL_set
+0002E2 841704          1975         MOV.B   R0H,[R7+4]
+                       1978 ; i2c_drv.c  838              Delay(5);
+                       1979 ; i2c_drv.c  839              SCL_set(High,bus);
+0002E5 910801          1981         MOV.B   R0L,#01H
+0002E8 C5FE9D          1982         CALL    _SCL_set
+                       1985 ; i2c_drv.c  840              Delay(5);
+                       1986 ; i2c_drv.c  841        
+                       1987 ; i2c_drv.c  842                Stop_IIC(bus);
+0002EB 840704          1989         MOV.B   R0L,[R7+4]
+0002EE C5FEEE          1990         CALL    _Stop_IIC
+                       1994 ; i2c_drv.c  843              
+                       1995 ; i2c_drv.c  844              if(i != 0)
+0002F1 6188            1997         OR.B    R4L,R4L
+0002F3 F307            1998         BEQ     _73
+                       1999 ; i2c_drv.c  845              {
+                       2000 ; i2c_drv.c  846        //Rev1_1 removed eventlogging from lowest level
+                       2001 ; i2c_drv.c  847        //         sprintf(report,"%u,%u",bus,i);
+                       2002 ; i2c_drv.c  848        //         LogEvent(EventIICBusError,report);
+                       2003 ; i2c_drv.c  849                 BusInitialised[bus] = EventIICBusError;
+0002F5 8C1702          2005         MOV.W   R1,[R7+2]
+0002F8 8A07            2006         MOV.W   R0,[R7]
+0002FA 862C42          2007         MOV.B   ES,R1L
+0002FD 9A080CE7        2008         MOV.W   [R0],#0CE7H
+                       2009 ; i2c_drv.c  850              }
+                       2010 ; i2c_drv.c  851              
+                       2011 ; i2c_drv.c  852           }
+000302                 2013 _73:
+                       2014 ; i2c_drv.c  853                return(BusInitialised[bus]);
+000302 8C1702          2016         MOV.W   R1,[R7+2]
+000305 8A07            2017         MOV.W   R0,[R7]
+000307 862C42          2018         MOV.B   ES,R1L
+00030A 8A00            2019         MOV.W   R0,[R0]
+                       2020 ; i2c_drv.c  854        }
+00030C                 2022 _74:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+00030C A976            2023         ADDS.W  R7,#06H
+00030E 2F70            2025         POP.W   R4, R5, R6
+000310 D680            2027         RET
+                       2030 ; i2c_drv.c  855        
+                       2031 ; i2c_drv.c  856        
+                       2032 ; i2c_drv.c  857        
+                       2033 ; i2c_drv.c  858        
+                       2034 ; i2c_drv.c  859        
+                       2035 ; i2c_drv.c  860        int InitBusses(void)
+                       2036 ; i2c_drv.c  861        {
+                       2037         ALIGN   1
+                       2039         PUBLIC  _InitBusses
+000312                 2040 _InitBusses:
+000312 0F10            2044         PUSH.W  R4
+                       2048 ; i2c_drv.c  862                
+                       2049 ; i2c_drv.c  863           int Result=OK;
+000314 9948FFFF        2051         MOV.W   R4,#0FFFFH
+                       2053 ; i2c_drv.c  864        
+                       2054 ; i2c_drv.c  865           if (InitBus(IIC_PTV) != OK)
+000318 910800          2056         MOV.B   R0L,#00H
+00031B C5FF4C          2057         CALL    _InitBus
+00031E 9904FFFF        2058         CMP.W   R0,#0FFFFH
+000322 F301            2059         BEQ     _78
+                       2060 ; i2c_drv.c  866              Result = FAIL;
+000324 B940            2062         MOV.W   R4,#00H
+000326                 2065 _78:
+                       2066 ; i2c_drv.c  867        
+                       2067 ; i2c_drv.c  868        // Instrument iic busses
+                       2068 ; i2c_drv.c  869        
+                       2069 ; i2c_drv.c  870        #ifdef IicBus1
+                       2070 ; i2c_drv.c  871           if (InitBus(IIC_1)!= OK)
+                       2071 ; i2c_drv.c  872              Result = FAIL;
+                       2072 ; i2c_drv.c  873        #endif
+                       2073 ; i2c_drv.c  874        #ifdef IicBus2
+                       2074 ; i2c_drv.c  875           if (InitBus(IIC_2)!= OK)
+                       2075 ; i2c_drv.c  876              Result = FAIL;
+                       2076 ; i2c_drv.c  877        #endif
+                       2077 ; i2c_drv.c  878        #ifdef IicBus3
+                       2078 ; i2c_drv.c  879           if (InitBus(IIC_3)!= OK)
+                       2079 ; i2c_drv.c  880              Result = FAIL;
+                       2080 ; i2c_drv.c  881        #endif
+                       2081 ; i2c_drv.c  882        #ifdef IicBus4
+                       2082 ; i2c_drv.c  883           if (InitBus(IIC_4)!= OK)
+                       2083 ; i2c_drv.c  884              Result = FAIL;
+                       2084 ; i2c_drv.c  885        #endif
+                       2085 ; i2c_drv.c  886        #ifdef IicBus5
+                       2086 ; i2c_drv.c  887           if (InitBus(IIC_5)!= OK)
+                       2087 ; i2c_drv.c  888              Result = FAIL;
+                       2088 ; i2c_drv.c  889        #endif
+                       2089 ; i2c_drv.c  890        #ifdef IicBus6
+                       2090 ; i2c_drv.c  891           if (InitBus(IIC_6)!= OK)
+                       2091 ; i2c_drv.c  892              Result = FAIL;
+                       2092 ; i2c_drv.c  893        #endif
+                       2093 ; i2c_drv.c  894        
+                       2094 ; i2c_drv.c  895           return(Result);
+000326 8904            2096         MOV.W   R0,R4
+                       2099 ; i2c_drv.c  896        }   
+000328 2F10            2101         POP.W   R4
+00032A D680            2103         RET
+                       2106 ; i2c_drv.c  897        
+                       2107 ; i2c_drv.c  898        
+                       2108 ; i2c_drv.c  899        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+                       2109 ; i2c_drv.c  900        
+                       2110 ; i2c_drv.c  901        
+                       2111 ; i2c_drv.c  902        
+                       2112 ; i2c_drv.c  903        
+                       2113 ; i2c_drv.c  904        
+                       2114 ; i2c_drv.c  905        
+                       2115 ; i2c_drv.c  906        int TransmitIIC(UC Address ,UC num ,UC *data ,UC bus )
+                       2116 ; i2c_drv.c  907        {
+                       2117         ALIGN   1
+                       2119         PUBLIC  _TransmitIIC
+00032C                 2120 _TransmitIIC:
+00032C 0F70            2126         PUSH.W  R4, R5, R6
+00032E 9972000C        2128         SUB.W   R7,#0CH
+000332 8C3F08          2134         MOV.W   [R7+8],R3
+000335 8C2F06          2135         MOV.W   [R7+6],R2
+000338 841F0A          2138         MOV.B   [R7+10],R0H
+00033B 81C0            2141         MOV.B   R6L,R0L
+                       2154 ; i2c_drv.c  908        UC i;
+                       2155 ; i2c_drv.c  909        int status=EventNotInitialised;
+00033D 9C780417D5      2157         MOV.W   [R7+4],#017D5H
+                       2159 ; i2c_drv.c  910                if (BusInitialised[bus] == OK) 
+000342 81D2            2161         MOV.B   R6H,R1L
+000344 810D            2162         MOV.B   R0L,R6H
+000346 B110            2163         MOVS.B  R0H,#00H
+000348 8910            2166         MOV.W   R1,R0
+00034A D911            2167         ASL.W   R1,#01H
+00034C 8921            2168         MOV.W   R2,R1
+00034E B930            2169         MOVS.W  R3,#00H
+000350 964842rr        2170         MOV.B   ES,#SEG( _BusInitialised )
+000354 8D12rrrr        2171         MOV.W   R1,[R2+SOF( _BusInitialised )]
+000358 9914FFFF        2172         CMP.W   R1,#0FFFFH
+00035C F257            2173         BNE     _86
+                       2174 ; i2c_drv.c  911                {
+                       2175 ; i2c_drv.c  912              Res[bus]->Lock(Res[bus]);
+00035E D902            2177         ASL.W   R0,#02H
+000360 8920            2178         MOV.W   R2,R0
+000362 B930            2179         MOVS.W  R3,#00H
+000364 9918rrrr        2180         MOV.W   R1,#SEG( _Res )
+000368 9908rrrr        2181         MOV.W   R0,#SOF( _Res )
+00036C 0902            2182         ADD.W   R0,R2
+00036E 8C1F02          2183         MOV.W   [R7+2],R1
+000371 8A0F            2184         MOV.W   [R7],R0
+000373 964842rr        2185         MOV.B   ES,#SEG( _Res )
+000377 8D02rrrr        2186         MOV.W   R0,[R2+SOF( _Res )]
+00037B 8D12rrrr        2187         MOV.W   R1,[R2+SOF( _Res+2 )]
+00037F 862C42          2188         MOV.B   ES,R1L
+000382 8C400A          2189         MOV.W   R4,[R0+10]
+000385 8C500C          2190         MOV.W   R5,[R0+12]
+000388 C4rrrrrr        2191         FCALL   __ICALL
+00038C 810D            2192         MOV.B   R0L,R6H
+                       2195 ; i2c_drv.c  913                if( status = Start_IIC(bus) )
+00038E C5FE83          2197         CALL    _Start_IIC
+000391 8C0F04          2202         MOV.W   [R7+4],R0
+000394 6900            2203         OR.W    R0,R0
+000396 F32D            2206         BEQ     _85
+                       2207 ; i2c_drv.c  914                {
+                       2208 ; i2c_drv.c  915                status = TxByte(Address & ~0x01,bus);
+000398 91C5FE          2210         AND.B   R6L,#0FEH
+00039B 811D            2212         MOV.B   R0H,R6H
+00039D 810C            2215         MOV.B   R0L,R6L
+00039F C5FEA6          2216         CALL    _TxByte
+0003A2 8C0F04          2219         MOV.W   [R7+4],R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  23
+
+ADDR   CODE            LINE SOURCELINE
+                       2222 ; i2c_drv.c  916        
+                       2223 ; i2c_drv.c  917                 if (status == EventIICNoAck )
+0003A5 99040CE5        2225         CMP.W   R0,#0CE5H
+0003A9 F203            2226         BNE     _80
+                       2227 ; i2c_drv.c  918                    status = EventIICNoAdrAck;
+0003AB 9C78040CE8      2229         MOV.W   [R7+4],#0CE8H
+0003B0                 2232 _80:
+                       2233 ; i2c_drv.c  919             
+                       2234 ; i2c_drv.c  920                for (i=0;i<num;i++)
+0003B0 91C800          2236         MOV.B   R6L,#00H
+0003B3 8C5708          2238         MOV.W   R5,[R7+8]
+0003B6 8C4706          2239         MOV.W   R4,[R7+6]
+0003B9 94740A00        2244         CMP.B   [R7+10],#00H
+0003BD F917            2245         BL      _84
+0003BD F91700          2245         BL      _84
+0003C0                 2246 _81:
+                       2247 ; i2c_drv.c  921                {
+                       2248 ; i2c_drv.c  922                 if (status == OK)
+0003C0 9C7404FFFF      2250         CMP.W   [R7+4],#0FFFFH
+0003C5 F208            2251         BNE     _82
+                       2252 ; i2c_drv.c  923                         status = TxByte(data[i],bus);
+0003C7 86AC42          2254         MOV.B   ES,R5L
+0003CA 8204            2255         MOV.B   R0L,[R4]
+0003CC 811D            2256         MOV.B   R0H,R6H
+0003CE C5FE8F          2259         CALL    _TxByte
+0003D1 8C0F04          2262         MOV.W   [R7+4],R0
+0003D4 FE05            2265         BR      _83
+0003D4 FE05            2265         BR      _83
+0003D6                 2266 _82:
+                       2267 ; i2c_drv.c  924                 else
+                       2268 ; i2c_drv.c  925                     TxByte(data[i],bus);
+0003D6 86AC42          2270         MOV.B   ES,R5L
+0003D9 8204            2271         MOV.B   R0L,[R4]
+0003DB 811D            2272         MOV.B   R0H,R6H
+0003DD C5FE87          2275         CALL    _TxByte
+0003E0                 2278 _83:
+0003E0 99400001        2280         ADD.W   R4,#01H
+0003E4 A1C1            2283         ADDS.B  R6L,#01H
+0003E6 44C70A          2286         CMP.B   R6L,[R7+10]
+0003E9 F1EB            2287         BCS     _81
+                       2288 ; i2c_drv.c  926                }
+0003EC                 2290 _84:
+                       2291 ; i2c_drv.c  927                Stop_IIC(bus);
+0003EC 810D            2293         MOV.B   R0L,R6H
+0003EE C5FE6E          2294         CALL    _Stop_IIC
+                       2298 ; i2c_drv.c  928                }
+                       2299 ; i2c_drv.c  929              else
+                       2300 ; i2c_drv.c  930              {
+                       2301 ; i2c_drv.c  931        //Rev1_1 removed eventlogging from lowest level
+                       2302 ; i2c_drv.c  932        //          LogEvent(status,NULL);
+                       2303 ; i2c_drv.c  933              }
+0003F2                 2305 _85:
+                       2306 ; i2c_drv.c  934              Res[bus]->Unlock(Res[bus]);
+0003F2 8C1702          2308         MOV.W   R1,[R7+2]
+0003F5 8A07            2309         MOV.W   R0,[R7]
+0003F7 862C42          2310         MOV.B   ES,R1L
+0003FA 8C1002          2311         MOV.W   R1,[R0+2]
+0003FD 8A00            2312         MOV.W   R0,[R0]
+0003FF 862C42          2313         MOV.B   ES,R1L
+000402 8C400E          2314         MOV.W   R4,[R0+14]
+000405 8C5010          2315         MOV.W   R5,[R0+16]
+000408 C4rrrrrr        2317         FCALL   __ICALL
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  24
+
+ADDR   CODE            LINE SOURCELINE
+                       2318 ; i2c_drv.c  935                }
+00040C                 2320 _86:
+                       2321 ; i2c_drv.c  936           return(status);
+00040C 8C0704          2323         MOV.W   R0,[R7+4]
+                       2326 ; i2c_drv.c  937        }
+00040F 9970000C        2328         ADD.W   R7,#0CH
+000413 2F70            2330         POP.W   R4, R5, R6
+000415 D680            2332         RET
+                       2337 ; i2c_drv.c  938        
+                       2338 ; i2c_drv.c  939        
+                       2339 ; i2c_drv.c  940        int ReceiveIIC(UC Address ,UC num ,UC *data ,UC bus )
+                       2340 ; i2c_drv.c  941        {
+000417 00              2341         ALIGN   1
+                       2343         PUBLIC  _ReceiveIIC
+000418                 2344 _ReceiveIIC:
+000418 0F70            2348         PUSH.W  R4, R5, R6
+00041A 9972000E        2350         SUB.W   R7,#0EH
+00041E 8C3F0A          2356         MOV.W   [R7+10],R3
+000421 8C2F08          2357         MOV.W   [R7+8],R2
+000424 841F0C          2360         MOV.B   [R7+12],R0H
+000427 81C0            2363         MOV.B   R6L,R0L
+                       2374 ; i2c_drv.c  942        UC i;
+                       2375 ; i2c_drv.c  943                if (BusInitialised[bus] == OK) 
+000429 81D2            2377         MOV.B   R6H,R1L
+00042B 810D            2378         MOV.B   R0L,R6H
+00042D B110            2379         MOVS.B  R0H,#00H
+00042F 8910            2382         MOV.W   R1,R0
+000431 D911            2383         ASL.W   R1,#01H
+000433 8941            2384         MOV.W   R4,R1
+000435 B950            2385         MOVS.W  R5,#00H
+000437 9938rrrr        2386         MOV.W   R3,#SEG( _BusInitialised )
+00043B 9928rrrr        2387         MOV.W   R2,#SOF( _BusInitialised )
+00043F 0924            2388         ADD.W   R2,R4
+000441 8C3F06          2389         MOV.W   [R7+6],R3
+000444 8C2F04          2390         MOV.W   [R7+4],R2
+000447 964842rr        2391         MOV.B   ES,#SEG( _BusInitialised )
+00044B 8D14rrrr        2392         MOV.W   R1,[R4+SOF( _BusInitialised )]
+00044F 9914FFFF        2393         CMP.W   R1,#0FFFFH
+000453 F258            2394         BNE     _94
+                       2395 ; i2c_drv.c  944                {
+                       2396 ; i2c_drv.c  945              Res[bus]->Lock(Res[bus]);
+000455 D902            2398         ASL.W   R0,#02H
+000457 8920            2399         MOV.W   R2,R0
+000459 B930            2400         MOVS.W  R3,#00H
+00045B 9918rrrr        2401         MOV.W   R1,#SEG( _Res )
+00045F 9908rrrr        2402         MOV.W   R0,#SOF( _Res )
+000463 0902            2403         ADD.W   R0,R2
+000465 8C1F02          2404         MOV.W   [R7+2],R1
+000468 8A0F            2405         MOV.W   [R7],R0
+00046A 964842rr        2406         MOV.B   ES,#SEG( _Res )
+00046E 8D02rrrr        2407         MOV.W   R0,[R2+SOF( _Res )]
+000472 8D12rrrr        2408         MOV.W   R1,[R2+SOF( _Res+2 )]
+000476 862C42          2409         MOV.B   ES,R1L
+000479 8C400A          2410         MOV.W   R4,[R0+10]
+00047C 8C500C          2411         MOV.W   R5,[R0+12]
+00047F C4rrrrrr        2412         FCALL   __ICALL
+000483 810D            2413         MOV.B   R0L,R6H
+                       2416 ; i2c_drv.c  946                Start_IIC(bus);
+000485 C5FE07          2418         CALL    _Start_IIC
+                       2421 ; i2c_drv.c  947                TxByte(Address | 0x01,bus);
+000488 91C601          2423         OR.B    R6L,#01H
+00048B 811D            2425         MOV.B   R0H,R6H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  25
+
+ADDR   CODE            LINE SOURCELINE
+00048D 810C            2428         MOV.B   R0L,R6L
+00048F C5FE2E          2429         CALL    _TxByte
+                       2432 ; i2c_drv.c  948                for (i=0;i<num-1;i++)
+000492 91C800          2434         MOV.B   R6L,#00H
+000495 8C570A          2436         MOV.W   R5,[R7+10]
+000498 8C4708          2437         MOV.W   R4,[R7+8]
+00049B 84070C          2439         MOV.B   R0L,[R7+12]
+00049E B110            2440         MOVS.B  R0H,#00H
+0004A0 A90F            2444         ADDS.W  R0,#0FH
+0004A2 8C0F0C          2445         MOV.W   [R7+12],R0
+0004A5 99040000        2446         CMP.W   R0,#00H
+0004A9 FD0F            2447         BLE     _93
+0004A9 FD0F00          2447         BLE     _93
+0004AC                 2448 _92:
+                       2449 ; i2c_drv.c  949                {
+                       2450 ; i2c_drv.c  950                        data[i] = RxByte(FALSE,bus);
+0004AC B900            2452         MOV.W   R0,#00H
+0004AE 812D            2453         MOV.B   R1L,R6H
+0004B0 C5FE54          2456         CALL    _RxByte
+0004B3 86AC42          2459         MOV.B   ES,R5L
+0004B6 820C            2460         MOV.B   [R4],R0L
+0004B8 99400001        2462         ADD.W   R4,#01H
+0004BC A1C1            2465         ADDS.B  R6L,#01H
+0004BE 810C            2468         MOV.B   R0L,R6L
+0004C0 B110            2469         MOVS.B  R0H,#00H
+0004C2 4C070C          2470         CMP.W   R0,[R7+12]
+0004C5 FBF3            2471         BLT     _92
+                       2472 ; i2c_drv.c  951                }
+0004C8                 2474 _93:
+                       2475 ; i2c_drv.c  952                data[i] = RxByte(TRUE,bus);
+0004C8 9908FFFF        2477         MOV.W   R0,#0FFFFH
+0004CC 812D            2478         MOV.B   R1L,R6H
+0004CE C5FE45          2481         CALL    _RxByte
+0004D1 814C            2484         MOV.B   R2L,R6L
+0004D3 B150            2485         MOVS.B  R2H,#00H
+0004D5 B930            2486         MOVS.W  R3,#00H
+0004D7 8C570A          2487         MOV.W   R5,[R7+10]
+0004DA 8C4708          2488         MOV.W   R4,[R7+8]
+0004DD 0942            2489         ADD.W   R4,R2
+0004DF 86AC42          2494         MOV.B   ES,R5L
+0004E2 820C            2495         MOV.B   [R4],R0L
+                       2496 ; i2c_drv.c  953                Stop_IIC(bus);
+0004E4 810D            2498         MOV.B   R0L,R6H
+0004E6 C5FDF2          2499         CALL    _Stop_IIC
+                       2503 ; i2c_drv.c  954              Res[bus]->Unlock(Res[bus]);
+0004E9 8C1702          2505         MOV.W   R1,[R7+2]
+0004EC 8A07            2506         MOV.W   R0,[R7]
+0004EE 862C42          2507         MOV.B   ES,R1L
+0004F1 8C1002          2508         MOV.W   R1,[R0+2]
+0004F4 8A00            2509         MOV.W   R0,[R0]
+0004F6 862C42          2510         MOV.B   ES,R1L
+0004F9 8C400E          2511         MOV.W   R4,[R0+14]
+0004FC 8C5010          2512         MOV.W   R5,[R0+16]
+0004FF C4rrrrrr        2513         FCALL   __ICALL
+                       2514 ; i2c_drv.c  955                }
+000504                 2516 _94:
+                       2517 ; i2c_drv.c  956           return(BusInitialised[bus]);
+000504 8C1706          2519         MOV.W   R1,[R7+6]
+000507 8C0704          2520         MOV.W   R0,[R7+4]
+00050A 862C42          2521         MOV.B   ES,R1L
+00050D 8A00            2522         MOV.W   R0,[R0]
+                       2523 ; i2c_drv.c  957        }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  26
+
+ADDR   CODE            LINE SOURCELINE
+00050F 9970000E        2525         ADD.W   R7,#0EH
+000513 2F70            2527         POP.W   R4, R5, R6
+000515 D680            2529         RET
+                       2532 ; i2c_drv.c  958        
+                       2533 ; i2c_drv.c  959        //  If uninterrupted writing / reading is required on the IIC bus
+                       2534 ; i2c_drv.c  960        //  then the following functions could be implemented.
+                       2535 ; i2c_drv.c  961        //  Normally this is done by the devicedriver by protecting each
+                       2536 ; i2c_drv.c  962        //  device with the required resources.
+                       2537 ; i2c_drv.c  963        //   TxAndRx(UC Address,UC rxnum, UC *rxdat,UC txnum, UC *txdat, UC bus)
+                       2538 ; i2c_drv.c  964        //   RxAndTx(UC Address,UC rxnum, UC *rxdat,UC txnum, UC *txdat, UC bus)
+                       2545         EXTRN   HCODE(_newTResource)
+000000                 2548 I2C_DRV_CLR_FA  SEGMENT HDATA INSEGMENT CLEAR
+000000                 2549         RSEG    I2C_DRV_CLR_FA
+                       2550         ALIGN   1
+000000                 2551 _Res:   DS      4
+   |  RESERVED             
+000003
+                       2552         EXTRN   HCODE(__ICALL)
+                       2553         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       2554         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       2555         CALLS   'I2C_DRV?SCL_set_wait', 'I2C_DRV?SCL_set'
+                       2556         CALLS   'I2C_DRV?SCL_set_wait', 'I2C_DRV?SCL_get'
+                       2557         CALLS   'I2C_DRV?Start_IIC', 'I2C_DRV?SCL_get'
+                       2558         CALLS   'I2C_DRV?Start_IIC', 'I2C_DRV?SDA_get'
+                       2559         CALLS   'I2C_DRV?Start_IIC', 'I2C_DRV?SDA_set'
+                       2560         CALLS   'I2C_DRV?Start_IIC', 'I2C_DRV?SCL_set'
+                       2561         CALLS   'I2C_DRV?Stop_IIC', 'I2C_DRV?SDA_set'
+                       2562         CALLS   'I2C_DRV?Stop_IIC', 'I2C_DRV?SCL_set_wait'
+                       2563         CALLS   'I2C_DRV?Stop_IIC', 'I2C_DRV?SDA_set'
+                       2564         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SCL_set'
+                       2565         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SDA_set'
+                       2566         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SCL_set_wait'
+                       2567         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SCL_set'
+                       2568         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SDA_set'
+                       2569         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SCL_set_wait'
+                       2570         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SDA_get'
+                       2571         CALLS   'I2C_DRV?TxByte', 'I2C_DRV?SCL_set'
+                       2572         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SCL_set_wait'
+                       2573         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SDA_get'
+                       2574         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SCL_set'
+                       2575         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SDA_set'
+                       2576         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SCL_set_wait'
+                       2577         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SCL_set'
+                       2578         CALLS   'I2C_DRV?RxByte', 'I2C_DRV?SDA_set'
+                       2579         CALLS   'InitBus', 'newTResource'
+                       2580         CALLS   'InitBus', 'I2C_DRV?SDA_set'
+                       2581         CALLS   'InitBus', 'I2C_DRV?SCL_set'
+                       2582         CALLS   'InitBus', 'I2C_DRV?SCL_get'
+                       2583         CALLS   'InitBus', 'I2C_DRV?SDA_get'
+                       2584         CALLS   'InitBus', 'I2C_DRV?SCL_set'
+                       2585         CALLS   'InitBus', 'I2C_DRV?SCL_get'
+                       2586         CALLS   'InitBus', 'I2C_DRV?SDA_get'
+                       2587         CALLS   'InitBus', 'I2C_DRV?SDA_set'
+                       2588         CALLS   'InitBus', 'I2C_DRV?SCL_set'
+                       2589         CALLS   'InitBus', 'I2C_DRV?SDA_get'
+                       2590         CALLS   'InitBus', 'I2C_DRV?SDA_set'
+                       2591         CALLS   'InitBus', 'I2C_DRV?SCL_set'
+                       2592         CALLS   'InitBus', 'I2C_DRV?Stop_IIC'
+                       2593         CALLS   'InitBusses', 'InitBus'
+                       2594         CALLS   'TransmitIIC', 'I2C_DRV?Start_IIC'
+                       2595         CALLS   'TransmitIIC', 'I2C_DRV?TxByte'
+                       2596         CALLS   'TransmitIIC', 'I2C_DRV?Stop_IIC'
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  27
+
+ADDR   CODE            LINE SOURCELINE
+                       2597         CALLS   'ReceiveIIC', 'I2C_DRV?Start_IIC'
+                       2598         CALLS   'ReceiveIIC', 'I2C_DRV?TxByte'
+                       2599         CALLS   'ReceiveIIC', 'I2C_DRV?RxByte'
+                       2600         CALLS   'ReceiveIIC', 'I2C_DRV?Stop_IIC'

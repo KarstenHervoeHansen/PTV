@@ -1,0 +1,76 @@
+SUBDESIGN PLL
+  
+%	
+	
+	Divides 27MHz, 6.144MHz and 5.6448MHz to 12kHz or 1600Hz.
+%
+
+(
+	CLK27,						-- 27 MHz ref clock
+	CLK6144,					-- 6.144 MHz input clock for 48 kHz
+	CLK56448,					-- 5.6448 MHz input clock for 44.1 kHz
+	SEL441						-- selects 44.1 kHz sample freq
+ 					: input;
+	FREQ,
+	FREQREF,
+	MCLK		    : output;	-- outputs for 4046 phase comperator
+)
+
+variable
+	count_A[11..0]	: dff;      -- 27M to 12k divider
+	count_B[8..0]	: dff;      -- 6.144M to 12k divider
+	count_C[14..0]	: dff;      -- 27M to 1600 divider
+	count_D[11..0]	: dff;      -- 5.6448M to 1600 divider
+	
+	CLK12K,
+	CLK12KREF,
+	CLK1600,
+	CLK1600REF		: node;
+
+begin
+	
+count_A[].clk = CLK27;      -- 27M to 12k divider
+if count_A[] == 2249 then	-- div 2250
+	count_A[].d = B"0";
+else
+	count_A[] = count_A[] + 1;
+end if;
+CLK12KREF = (count_A[11] == VCC) # (count_A[10] == VCC);
+
+
+count_B[].clk = CLK6144;      -- 6.144M to 12k divider
+count_B[] = count_B[] + 1;    -- div 512
+CLK12K = count_B[8];
+
+
+count_C[].clk = CLK27;      -- 27M to 1600 divider
+if count_C[] == 16874 then  -- div 16875
+	count_C[].d = B"0";
+else
+	count_C[] = count_C[] + 1;
+end if;
+CLK1600REF = (count_C[14] == VCC) # (count_C[13] == VCC);
+
+
+count_D[].clk = CLK56448;      -- 5.6448M to 1600 divider
+if count_D[] == 3527 then      -- div 3528
+	count_D[].d = B"0";
+else
+	count_D[] = count_D[] + 1;
+end if;
+CLK1600 = count_D[11] == VCC ;
+
+
+if SEL441 == VCC then       -- 44.1kHz sample rate
+ FREQ = CLK1600;
+ FREQREF = CLK1600REF;
+else                        -- 48kHz sample rate
+ FREQ = CLK12K;
+ FREQREF = CLK12KREF;
+end if;
+
+MCLK = CLK6144;
+
+
+end;
+

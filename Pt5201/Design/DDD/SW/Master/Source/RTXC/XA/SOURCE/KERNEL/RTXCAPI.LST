@@ -1,0 +1,2719 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\KERNEL\cc71512b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    RTXCAPI
+                          6 ; rtxcapi.c    1        /* rtxcapi.c - RTXC application program interface to kernel directives */
+                            
+                          7 ; rtxcapi.c    2        
+                          8 ; rtxcapi.c    3        /*
+                          9 ; rtxcapi.c    4         *   RTXC    
+                         10 ; rtxcapi.c    5         *   Copyright (c)
+                         11 ; rtxcapi.c    6         *   Embedded System Products, Inc.
+                         12 ; rtxcapi.c    7         *   ALL RIGHTS RESERVED
+                         13 ; rtxcapi.c    8        */
+                         14 ; rtxcapi.c    9        
+                         15 ; rtxcapi.c   10        #include <cxa.h>
+                         16 ; rtxcapi.c   11        
+                         17 ; rtxcapi.c   12        #include "rtxcapi.h"    /* function prototypes */
+                         18 ; rtxcapi.c   13        #include "typedef.h"
+                         19 ; rtxcapi.c   14        #include "rtxstruc.h"
+                         20 ; rtxcapi.c   15        #include "rtxcarg.h"
+                         21 ; rtxcapi.c   16        #include "enable.h"
+                         22 ; rtxcapi.c   17        
+                         23 ; rtxcapi.c   18        #define NULL        ((void *)0)
+                         24 ; rtxcapi.c   19        #define NULLCLK     ((CLKBLK ks_clk *)0)
+                         25 ; rtxcapi.c   20        #define NULLTCB     ((TCB ks_tbl *)0)
+                         26 ; rtxcapi.c   21        #define SELFTASK    ((TASK)0)
+                         27 ; rtxcapi.c   22        
+                         28 ; rtxcapi.c   23        extern SSTATE ks_tblx semat[];
+                         29 ; rtxcapi.c   24        extern TCB ks_tblx rtxtcb[];
+                         30 ; rtxcapi.c   25        extern TCB ks_tbl * core_iramdata hipritsk; /* highest priority task */
+                         31 ; rtxcapi.c   26        
+                         32 ; rtxcapi.c   27        /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                            ++*/
+                         33 ; rtxcapi.c   28        #if 1
+                         34 ; rtxcapi.c   29        #define KS(p) ks((void ks_stk *)&p); /* traditional model for rtxc entry,
+                              */
+                         35 ; rtxcapi.c   30        extern void ks(void ks_stk *);     /* C to assembly function call        
+                               */
+                         36 ; rtxcapi.c   31        #else
+                         37 ; rtxcapi.c   32        #if 0
+                         38 ; rtxcapi.c   33        _inline void KS( void ks_stk * p)
+                         39 ; rtxcapi.c   34        {
+                         40 ; rtxcapi.c   35        #pragma asm
+                         41 ; rtxcapi.c   36             trap #0
+                         42 ; rtxcapi.c   37        #pragma endasm
+                         43 ; rtxcapi.c   38        }
+                         44 ; rtxcapi.c   39        #else
+                         45 ; rtxcapi.c   40        #define KS(p) ks((void ks_stk *)(ks_stk)&p); /* traditional model for rtx
+                            c entry,  */
+                         46 ; rtxcapi.c   41        extern void ks(void ks_stk *);     /* C to assembly function call        
+                               */
+                         47 ; rtxcapi.c   42        #endif
+                         48 ; rtxcapi.c   43        #endif
+                         49 ; rtxcapi.c   44        
+                         50 ; rtxcapi.c   45        /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                            ++*/
+                         51 ; rtxcapi.c   46        
+                         52 ; rtxcapi.c   47        /*
+                         53 ; rtxcapi.c   48         * NOTE: The next two FAST switches improve performance at the
+                         54 ; rtxcapi.c   49         *       expense of a considerable increase in the size of the
+                         55 ; rtxcapi.c   50         *       rtxcapi module considerably.
+                         56 ; rtxcapi.c   51        */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         57 ; rtxcapi.c   52        
+                         58 ; rtxcapi.c   53        /* user defined option for speed optimized KS_lockw()/KS_unlock() */
+                         59 ; rtxcapi.c   54        #undef FASTLOCK
+                         60 ; rtxcapi.c   55        
+                         61 ; rtxcapi.c   56        /* user defined option for speed optimized KS_alloc()/KS_allocw() */
+                         62 ; rtxcapi.c   57        #undef FASTALLOC
+                         63 ; rtxcapi.c   58        
+                         64 ; rtxcapi.c   59        #ifdef FPU /* { */
+                         65 ; rtxcapi.c   60        extern TCB ks_tbl * ks_tbl fputask; /* current owner of FPU */
+                         66 ; rtxcapi.c   61        #endif /* } FPU */
+                         67 ; rtxcapi.c   62        
+                         68 ; rtxcapi.c   63        #ifdef HAS_RESOURCES /* { */
+                         69 ; rtxcapi.c   64        #ifdef FASTLOCK /* { */
+                         70 ; rtxcapi.c   65        extern RHEADER ks_tblx rheader[];
+                         71 ; rtxcapi.c   66        #endif /* } FASTLOCK */
+                         72 ; rtxcapi.c   67        #endif /* } HAS_RESOURCES */
+                         73 ; rtxcapi.c   68        
+                         74 ; rtxcapi.c   69        #ifdef HAS_PARTITIONS /* { */
+                         75 ; rtxcapi.c   70        extern PHEADER ks_tblx pheader[];
+                         76 ; rtxcapi.c   71        #endif /* } HAS_PARTITIONS */
+                         77 ; rtxcapi.c   72        
+                         78 ; rtxcapi.c   73        #ifdef HAS_QUEUES /* { */
+                         79 ; rtxcapi.c   74        extern QHEADER ks_tblx qheader[];
+                         80 ; rtxcapi.c   75        #endif /* } HAS_QUEUES */
+                         81 ; rtxcapi.c   76        
+                         82 ; rtxcapi.c   77        #ifdef CBUG
+                         83 ; rtxcapi.c   78        extern void stkinit(short ks_stk *, size_t);
+                         84 ; rtxcapi.c   79        #endif /* } CBUG */
+                         85 ; rtxcapi.c   80        
+                         86 ; rtxcapi.c   81        /*******************************************************/
+                         87 ; rtxcapi.c   82        #ifdef HAS_BLOCK /* { */
+                         88 ; rtxcapi.c   83        void KS_block(TASK starttask, TASK endtask)
+                         89 ; rtxcapi.c   84        {
+                         90         PUBLIC  _KS_block
+000000                   91 RTXCAPI_PR      SEGMENT HCODE
+000000                   92         RSEG    RTXCAPI_PR
+000000                   92         RSEG    RTXCAPI_PR
+000000                   93 _KS_block:
+000000 A97C              94         ADDS.W  R7,#0CH
+                         95 ; rtxcapi.c   85           struct blkarg p;
+                         96 ; rtxcapi.c   86        
+                         97 ; rtxcapi.c   87           p.ksnum = RTXC_BLOCK;
+000002 92781D            98         MOV.B   [R7],#01DH
+                         99 ; rtxcapi.c   88           p.starttask = starttask;
+000005 840F01           100         MOV.B   [R7+1],R0L
+                        101 ; rtxcapi.c   89           p.endtask = endtask;
+000008 841F02           102         MOV.B   [R7+2],R0H
+                        103 ; rtxcapi.c   90        
+                        104 ; rtxcapi.c   91           KS(p);
+00000B 9128rr           105         MOV.B   R1L,#SEG( __lc_bs )
+00000E 7133             106         XOR.B   R1H,R1H
+000010 8907             107         MOV.W   R0,R7
+                        108         CALL    _ks
+000012 C4rrrrrr        +108 ;       FCALL   _ks
+                        109 ; rtxcapi.c   92        }
+000016 A974             110         ADDS.W  R7,#04H
+000018 D680             111         RET
+000018 D680             111         RET
+                        112 ; rtxcapi.c   93        #endif /* } HAS_BLOCK */
+                        113 ; rtxcapi.c   94        
+                        114 ; rtxcapi.c   95        /*******************************************************/
+                        115 ; rtxcapi.c   96        const char * KS_version(void)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        116 ; rtxcapi.c   97        {
+                        117         PUBLIC  _KS_version
+00001A                  118 _KS_version:
+                        119 ; rtxcapi.c   98           return((const char *)"RTXC v3.2d XA-G3/Tasking v2.0 Mar-26-98 KEY:2236
+                            1");
+00001A 9918rrrr         120         MOV.W   R1,#SEG( _3 )
+00001E 9908rrrr         121         MOV.W   R0,#SOF( _3 )
+                        122 ; rtxcapi.c   99        }
+000022 D680             123         RET
+000022 D680             123         RET
+                        124 ; rtxcapi.c  100        
+                        125 ; rtxcapi.c  101        /*******************************************************/
+                        126 ; rtxcapi.c  102        #ifdef HAS_NOP /* { */
+                        127 ; rtxcapi.c  103        void KS_nop(void)
+                        128 ; rtxcapi.c  104        {
+                        129         PUBLIC  _KS_nop
+000024                  130 _KS_nop:
+000024 A97A             131         ADDS.W  R7,#0AH
+                        132 ; rtxcapi.c  105           struct targ p;
+                        133 ; rtxcapi.c  106        
+                        134 ; rtxcapi.c  107           p.ksnum = RTXC_NOP;
+000026 B270             135         MOV.B   [R7],#00H
+                        136 ; rtxcapi.c  108           KS(p);
+000028 9128rr           137         MOV.B   R1L,#SEG( __lc_bs )
+00002B 7133             138         XOR.B   R1H,R1H
+00002D 8907             139         MOV.W   R0,R7
+                        140         CALL    _ks
+00002F C4rrrrrr        +140 ;       FCALL   _ks
+                        141 ; rtxcapi.c  109        }
+000033 A976             142         ADDS.W  R7,#06H
+000035 D680             143         RET
+000035 D68000           143         RET
+                        144 ; rtxcapi.c  110        #endif /* } HAS_NOP */
+                        145 ; rtxcapi.c  111        
+                        146 ; rtxcapi.c  112        /*******************************************************/
+                        147 ; rtxcapi.c  113        #ifdef HAS_ALLOC /* { */
+                        148 ; rtxcapi.c  114        void * KS_alloc(MAP map)
+                        149 ; rtxcapi.c  115        {
+                        150         PUBLIC  _KS_alloc
+000038                  151 _KS_alloc:
+000038 9972001A         152         SUB.W   R7,#01AH
+                        153 ; rtxcapi.c  116           struct parg p;
+                        154 ; rtxcapi.c  117        #ifdef FASTALLOC /* { */
+                        155 ; rtxcapi.c  118           PHEADER ks_tbl *pph;
+                        156 ; rtxcapi.c  119           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+                        157 ; rtxcapi.c  120        
+                        158 ; rtxcapi.c  121           pph = (PHEADER ks_tbl *)&pheader[map];
+                        159 ; rtxcapi.c  122        
+                        160 ; rtxcapi.c  123           PUSHPSWH;  /* save processor priority level */
+                        161 ; rtxcapi.c  124           DISABLE;  /* disable interrupts */
+                        162 ; rtxcapi.c  125        
+                        163 ; rtxcapi.c  126           if ( (p.val = (char *)pph->next) != NULL ) /* if any available */
+                        164 ; rtxcapi.c  127           {
+                        165 ; rtxcapi.c  128              pph->next = ((struct xmap *)p.val)->link; /* unlink 1st from list *
+                            /
+                        166 ; rtxcapi.c  129        #ifdef CBUG /* { */
+                        167 ; rtxcapi.c  130              if (++pph->cur > pph->worst) /* check for new worst case */
+                        168 ; rtxcapi.c  131                 pph->worst = pph->cur;          /* useage level */
+                        169 ; rtxcapi.c  132        #endif /* } CBUG */
+                        170 ; rtxcapi.c  133           }
+                        171 ; rtxcapi.c  134           POPPSWH;  /* restore processor priority level */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        172 ; rtxcapi.c  135        #else /* } FASTALLOC { */
+                        173 ; rtxcapi.c  136           p.ksnum = RTXC_ALLOC;
+00003C B276             174         MOV.B   [R7],#06H
+                        175 ; rtxcapi.c  137           p.map = map;
+00003E 840F04           176         MOV.B   [R7+4],R0L
+                        177 ; rtxcapi.c  138        #ifdef PARTITION_WAITERS /* { */
+                        178 ; rtxcapi.c  139           p.wait = 0;
+000041 B4700C           179         MOV.B   [R7+12],#00H
+                        180 ; rtxcapi.c  140        #endif /* } PARTITION_WAITERS */
+                        181 ; rtxcapi.c  141           KS(p);
+000044 9128rr           182         MOV.B   R1L,#SEG( __lc_bs )
+000047 7133             183         XOR.B   R1H,R1H
+000049 8907             184         MOV.W   R0,R7
+                        185         CALL    _ks
+00004B C4rrrrrr        +185 ;       FCALL   _ks
+                        186 ; rtxcapi.c  142        #endif /* } FASTALLOC */
+                        187 ; rtxcapi.c  143           return(p.val);
+00004F 8C1708           188         MOV.W   R1,[R7+8]
+000052 8C0706           189         MOV.W   R0,[R7+6]
+                        190 ; rtxcapi.c  144        }
+000055 9970001A         191         ADD.W   R7,#01AH
+000059 D680             192         RET
+000059 D68000           192         RET
+                        193 ; rtxcapi.c  145        #endif /* } HAS_ALLOC */
+                        194 ; rtxcapi.c  146        
+                        195 ; rtxcapi.c  147        /*******************************************************/
+                        196 ; rtxcapi.c  148        #ifdef HAS_ALLOC_TIMER /* { */
+                        197 ; rtxcapi.c  149        CLKBLK ks_clk * KS_alloc_timer(void)
+                        198 ; rtxcapi.c  150        {
+                        199         PUBLIC  _KS_alloc_timer
+00005C                  200 _KS_alloc_timer:
+00005C 9972000E         201         SUB.W   R7,#0EH
+                        202 ; rtxcapi.c  151           struct clkarg p;
+                        203 ; rtxcapi.c  152        
+                        204 ; rtxcapi.c  153           p.ksnum = RTXC_ALLOC_TIMER;
+000060 927810           205         MOV.B   [R7],#010H
+                        206 ; rtxcapi.c  154           KS(p);
+000063 9128rr           207         MOV.B   R1L,#SEG( __lc_bs )
+000066 7133             208         XOR.B   R1H,R1H
+000068 8907             209         MOV.W   R0,R7
+                        210         CALL    _ks
+00006A C4rrrrrr        +210 ;       FCALL   _ks
+                        211 ; rtxcapi.c  155           return(p.pclkblk);
+00006E 8C170C           212         MOV.W   R1,[R7+12]
+000071 8C070A           213         MOV.W   R0,[R7+10]
+                        214 ; rtxcapi.c  156        }
+000074 9970000E         215         ADD.W   R7,#0EH
+000078 D680             216         RET
+000078 D680             216         RET
+                        217 ; rtxcapi.c  157        #endif /* } HAS_ALLOC_TIMER */
+                        218 ; rtxcapi.c  158        
+                        219 ; rtxcapi.c  159        /*******************************************************/
+                        220 ; rtxcapi.c  160        #ifdef HAS_DEFPRIORITY /* { */
+                        221 ; rtxcapi.c  161        void KS_defpriority(TASK task, PRIORITY priority)
+                        222 ; rtxcapi.c  162        {
+                        223         PUBLIC  _KS_defpriority
+00007A                  224 _KS_defpriority:
+00007A A97A             225         ADDS.W  R7,#0AH
+                        226 ; rtxcapi.c  163           struct targ p;
+                        227 ; rtxcapi.c  164        
+                        228 ; rtxcapi.c  165           p.ksnum = RTXC_DEFPRIORITY;
+00007C 92781B           229         MOV.B   [R7],#01BH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+                        230 ; rtxcapi.c  166           p.task = task;
+00007F 840F04           231         MOV.B   [R7+4],R0L
+                        232 ; rtxcapi.c  167           p.priority = priority;
+000082 841F05           233         MOV.B   [R7+5],R0H
+                        234 ; rtxcapi.c  168           KS(p);
+000085 9128rr           235         MOV.B   R1L,#SEG( __lc_bs )
+000088 7133             236         XOR.B   R1H,R1H
+00008A 8907             237         MOV.W   R0,R7
+                        238         CALL    _ks
+00008C C4rrrrrr        +238 ;       FCALL   _ks
+                        239 ; rtxcapi.c  169        }
+000090 A976             240         ADDS.W  R7,#06H
+000092 D680             241         RET
+000092 D680             241         RET
+                        242 ; rtxcapi.c  170        #endif /* } HAS_DEFPRIORITY */
+                        243 ; rtxcapi.c  171        
+                        244 ; rtxcapi.c  172        /*******************************************************/
+                        245 ; rtxcapi.c  173        #ifdef TIME_SLICE /* { */
+                        246 ; rtxcapi.c  174        void KS_defslice(TASK task, TICKS ticks)
+                        247 ; rtxcapi.c  175        {
+                        248         PUBLIC  _KS_defslice
+000094                  249 _KS_defslice:
+000094 0F30             250         PUSH.W  R4, R5
+                        251 ; rtxcapi.c  176           TCB ks_tbl *ptcb;
+                        252 ; rtxcapi.c  177        
+                        253 ; rtxcapi.c  178           if (task == SELFTASK)
+000096 6100             254         OR.B    R0L,R0L
+000098 F204             255         BNE     _4
+                        256 ; rtxcapi.c  179              ptcb = hipritsk;
+00009A 8E3rrr           257         MOV.W   R3,_hipritsk+2
+00009D 8E2rrr           258         MOV.W   R2,_hipritsk
+0000A0 FE0B             259         BR      _5
+0000A0 FE0B             259         BR      _5
+0000A2                  260 _4:
+                        261 ; rtxcapi.c  180           else
+                        262 ; rtxcapi.c  181              ptcb = (TCB ks_tbl *)&rtxtcb[task];
+0000A2 8140             263         MOV.B   R2L,R0L
+0000A4 9059             264         SEXT.B  R2H
+0000A6 E9200024         265         MULU.W  R2,#024H
+0000AA 8942             266         MOV.W   R4,R2
+0000AC B950             267         MOVS.W  R5,#00H
+0000AE 9938rrrr         268         MOV.W   R3,#SEG( _rtxtcb )
+0000B2 9928rrrr         269         MOV.W   R2,#SOF( _rtxtcb )
+0000B6 0924             270         ADD.W   R2,R4
+0000B6 0924             270         ADD.W   R2,R4
+0000B8                  271 _5:
+                        272 ; rtxcapi.c  182        
+                        273 ; rtxcapi.c  183           /* if slicing is just becoming active */
+                        274 ; rtxcapi.c  184           if (ptcb->newslice == (TSLICE)0)
+0000B8 8953             275         MOV.W   R5,R3
+0000BA 8942             276         MOV.W   R4,R2
+0000BC 9940001F         277         ADD.W   R4,#01FH
+0000C0 866C42           278         MOV.B   ES,R3L
+0000C3 84021F           279         MOV.B   R0L,[R2+31]
+0000C6 F204             280         BNE     _6
+                        281 ; rtxcapi.c  185           {
+                        282 ; rtxcapi.c  186              ptcb->tslice = ticks;
+0000C8 8901             283         MOV.W   R0,R1
+0000CA 866C42           284         MOV.B   ES,R3L
+0000CD 840A1E           285         MOV.B   [R2+30],R0L
+0000CD 840A1E           285         MOV.B   [R2+30],R0L
+                        286 ; rtxcapi.c  187           }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+0000D0                  287 _6:
+                        288 ; rtxcapi.c  188           ptcb->newslice = ticks;
+0000D0 86AC42           289         MOV.B   ES,R5L
+0000D3 822C             290         MOV.B   [R4],R1L
+                        291 ; rtxcapi.c  189        }
+0000D5 2F30             292         POP.W   R4, R5
+0000D7 D680             293         RET
+0000D7 D68000           293         RET
+                        294 ; rtxcapi.c  190        #endif /* } TIME_SLICE */
+                        295 ; rtxcapi.c  191        
+                        296 ; rtxcapi.c  192        /*******************************************************/
+                        297 ; rtxcapi.c  193        #ifdef HAS_DELAY /* { */
+                        298 ; rtxcapi.c  194        void KS_delay(TASK task, TICKS ticks)
+                        299 ; rtxcapi.c  195        {
+                        300         PUBLIC  _KS_delay
+0000DA                  301 _KS_delay:
+0000DA 9972001E         302         SUB.W   R7,#01EH
+                        303 ; rtxcapi.c  196           struct delayarg p;
+                        304 ; rtxcapi.c  197           CLKBLK clkblk;
+                        305 ; rtxcapi.c  198        
+                        306 ; rtxcapi.c  199           p.ksnum = RTXC_DELAY;
+0000DE 927814           307         MOV.B   [R7],#014H
+                        308 ; rtxcapi.c  200           p.task = task;
+0000E1 840F04           309         MOV.B   [R7+4],R0L
+                        310 ; rtxcapi.c  201           p.ticks = ticks;
+0000E4 8C1F06           311         MOV.W   [R7+6],R1
+                        312 ; rtxcapi.c  202           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+0000E7 9128rr           313         MOV.B   R1L,#SEG( __lc_bs )
+0000EA 7133             314         XOR.B   R1H,R1H
+0000EC 40070C           315         LEA     R0,R7+12
+0000EF 8C1F0A           316         MOV.W   [R7+10],R1
+0000F2 8C0F08           317         MOV.W   [R7+8],R0
+                        318 ; rtxcapi.c  203        
+                        319 ; rtxcapi.c  204           KS(p);
+0000F5 9128rr           320         MOV.B   R1L,#SEG( __lc_bs )
+0000F8 7133             321         XOR.B   R1H,R1H
+0000FA 8907             322         MOV.W   R0,R7
+                        323         CALL    _ks
+0000FC C4rrrrrr        +323 ;       FCALL   _ks
+                        324 ; rtxcapi.c  205        }
+000100 9970001E         325         ADD.W   R7,#01EH
+000104 D680             326         RET
+000104 D680             326         RET
+                        327 ; rtxcapi.c  206        #endif /* } HAS_DELAY */
+                        328 ; rtxcapi.c  207        
+                        329 ; rtxcapi.c  208        /*******************************************************/
+                        330 ; rtxcapi.c  209        #ifdef HAS_DEQUEUE /* { */
+                        331 ; rtxcapi.c  210        KSRC KS_dequeue(QUEUE queue, void *data)
+                        332 ; rtxcapi.c  211        {
+                        333         PUBLIC  _KS_dequeue
+000106                  334 _KS_dequeue:
+000106 99720012         335         SUB.W   R7,#012H
+                        336 ; rtxcapi.c  212           struct qarg p;
+                        337 ; rtxcapi.c  213        
+                        338 ; rtxcapi.c  214           p.ksnum = RTXC_DEQUEUE;
+00010A 92780D           339         MOV.B   [R7],#0DH
+                        340 ; rtxcapi.c  215           p.queue = queue;
+00010D 840F05           341         MOV.B   [R7+5],R0L
+                        342 ; rtxcapi.c  216           p.data = data;
+000110 8C3F08           343         MOV.W   [R7+8],R3
+000113 8C2F06           344         MOV.W   [R7+6],R2
+                        345 ; rtxcapi.c  217        #ifdef QUEUE_WAITERS /* { */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                        346 ; rtxcapi.c  218           p.wait = 0;
+000116 B4700A           347         MOV.B   [R7+10],#00H
+                        348 ; rtxcapi.c  219        #endif /* } QUEUE_WAITERS */
+                        349 ; rtxcapi.c  220           p.ksrc = RC_QUEUE_EMPTY;
+000119 BC7702           350         MOV.W   [R7+2],#07H
+                        351 ; rtxcapi.c  221           KS(p);
+00011C 9128rr           352         MOV.B   R1L,#SEG( __lc_bs )
+00011F 7133             353         XOR.B   R1H,R1H
+000121 8907             354         MOV.W   R0,R7
+                        355         CALL    _ks
+000123 C4rrrrrr        +355 ;       FCALL   _ks
+                        356 ; rtxcapi.c  222           return(p.ksrc);
+000127 8C0702           357         MOV.W   R0,[R7+2]
+                        358 ; rtxcapi.c  223        }
+00012A 99700012         359         ADD.W   R7,#012H
+00012E D680             360         RET
+00012E D680             360         RET
+                        361 ; rtxcapi.c  224        #endif /* } HAS_DEQUEUE */
+                        362 ; rtxcapi.c  225        
+                        363 ; rtxcapi.c  226        /*******************************************************/
+                        364 ; rtxcapi.c  227        #ifdef HAS_ENQUEUE /* { */
+                        365 ; rtxcapi.c  228        KSRC KS_enqueue(QUEUE queue, void *data)
+                        366 ; rtxcapi.c  229        {
+                        367         PUBLIC  _KS_enqueue
+000130                  368 _KS_enqueue:
+000130 99720012         369         SUB.W   R7,#012H
+                        370 ; rtxcapi.c  230           struct qarg p;
+                        371 ; rtxcapi.c  231        
+                        372 ; rtxcapi.c  232           p.ksnum = RTXC_ENQUEUE;
+000134 92780C           373         MOV.B   [R7],#0CH
+                        374 ; rtxcapi.c  233           p.queue = queue;
+000137 840F05           375         MOV.B   [R7+5],R0L
+                        376 ; rtxcapi.c  234           p.data = data;
+00013A 8C3F08           377         MOV.W   [R7+8],R3
+00013D 8C2F06           378         MOV.W   [R7+6],R2
+                        379 ; rtxcapi.c  235        #ifdef QUEUE_WAITERS /* { */
+                        380 ; rtxcapi.c  236           p.wait = 0;
+000140 B4700A           381         MOV.B   [R7+10],#00H
+                        382 ; rtxcapi.c  237        #endif /* } QUEUE_WAITERS */
+                        383 ; rtxcapi.c  238           p.ksrc = RC_QUEUE_FULL;
+000143 BC7602           384         MOV.W   [R7+2],#06H
+                        385 ; rtxcapi.c  239           KS(p);
+000146 9128rr           386         MOV.B   R1L,#SEG( __lc_bs )
+000149 7133             387         XOR.B   R1H,R1H
+00014B 8907             388         MOV.W   R0,R7
+                        389         CALL    _ks
+00014D C4rrrrrr        +389 ;       FCALL   _ks
+                        390 ; rtxcapi.c  240           return(p.ksrc);
+000151 8C0702           391         MOV.W   R0,[R7+2]
+                        392 ; rtxcapi.c  241        }
+000154 99700012         393         ADD.W   R7,#012H
+000158 D680             394         RET
+000158 D680             394         RET
+                        395 ; rtxcapi.c  242        #endif /* } HAS_ENQUEUE */
+                        396 ; rtxcapi.c  243        
+                        397 ; rtxcapi.c  244        /*******************************************************/
+                        398 ; rtxcapi.c  245        void KS_execute(TASK task)
+                        399 ; rtxcapi.c  246        {
+                        400         PUBLIC  _KS_execute
+00015A                  401 _KS_execute:
+00015A A97A             402         ADDS.W  R7,#0AH
+                        403 ; rtxcapi.c  247           struct targ p;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        404 ; rtxcapi.c  248        
+                        405 ; rtxcapi.c  249           p.ksnum = RTXC_EXECUTE;
+00015C 927815           406         MOV.B   [R7],#015H
+                        407 ; rtxcapi.c  250           p.task = task;
+00015F 840F04           408         MOV.B   [R7+4],R0L
+                        409 ; rtxcapi.c  251           KS(p);
+000162 9128rr           410         MOV.B   R1L,#SEG( __lc_bs )
+000165 7133             411         XOR.B   R1H,R1H
+000167 8907             412         MOV.W   R0,R7
+                        413         CALL    _ks
+000169 C4rrrrrr        +413 ;       FCALL   _ks
+                        414 ; rtxcapi.c  252        }
+00016D A976             415         ADDS.W  R7,#06H
+00016F D680             416         RET
+00016F D68000           416         RET
+                        417 ; rtxcapi.c  253        
+                        418 ; rtxcapi.c  254        /*******************************************************/
+                        419 ; rtxcapi.c  255        #ifdef HAS_DEFTASK /* { */
+                        420 ; rtxcapi.c  256        KSRC KS_deftask(TASK task, PRIORITY priority,
+                        421 ; rtxcapi.c  257                        char ks_stk *stackbase, size_t stacksize,
+                        422 ; rtxcapi.c  258                        void (*entry)(void))
+                        423 ; rtxcapi.c  259        {
+                        424         PUBLIC  _KS_deftask
+000172                  425 _KS_deftask:
+000172 99720014         426         SUB.W   R7,#014H
+                        427 ; rtxcapi.c  260           struct deftaskarg p;
+                        428 ; rtxcapi.c  261        
+                        429 ; rtxcapi.c  262        #ifdef CBUG
+                        430 ; rtxcapi.c  263           stkinit((short ks_stk *)stackbase, stacksize);
+                        431 ; rtxcapi.c  264        #endif /* } CBUG */
+                        432 ; rtxcapi.c  265           p.ksnum = RTXC_DEFTASK;
+000176 927816           433         MOV.B   [R7],#016H
+                        434 ; rtxcapi.c  266           p.task = task;
+000179 840F04           435         MOV.B   [R7+4],R0L
+                        436 ; rtxcapi.c  267           p.priority = priority;
+00017C 841F05           437         MOV.B   [R7+5],R0H
+                        438 ; rtxcapi.c  268           p.stackbase = stackbase;
+00017F 8C3F08           439         MOV.W   [R7+8],R3
+000182 8C2F06           440         MOV.W   [R7+6],R2
+                        441 ; rtxcapi.c  269           p.stacksize = stacksize;
+000185 8C1F0A           442         MOV.W   [R7+10],R1
+                        443 ; rtxcapi.c  270           p.entry = entry;
+000188 8C171A           444         MOV.W   R1,[R7+26]
+00018B 8C0718           445         MOV.W   R0,[R7+24]
+00018E 8C1F0E           446         MOV.W   [R7+14],R1
+000191 8C0F0C           447         MOV.W   [R7+12],R0
+                        448 ; rtxcapi.c  271           p.ksrc = RC_GOOD;
+000194 BC7002           449         MOV.W   [R7+2],#00H
+                        450 ; rtxcapi.c  272           KS(p);
+000197 9128rr           451         MOV.B   R1L,#SEG( __lc_bs )
+00019A 7133             452         XOR.B   R1H,R1H
+00019C 8907             453         MOV.W   R0,R7
+                        454         CALL    _ks
+00019E C4rrrrrr        +454 ;       FCALL   _ks
+                        455 ; rtxcapi.c  273        
+                        456 ; rtxcapi.c  274           return(p.ksrc);
+0001A2 8C0702           457         MOV.W   R0,[R7+2]
+                        458 ; rtxcapi.c  275        }
+0001A5 99700014         459         ADD.W   R7,#014H
+0001A9 D680             460         RET
+0001A9 D68000           460         RET
+                        461 ; rtxcapi.c  276        #endif /* } HAS_DEFTASK */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        462 ; rtxcapi.c  277        
+                        463 ; rtxcapi.c  278        /*******************************************************/
+                        464 ; rtxcapi.c  279        #ifdef HAS_ALLOC_TASK /* { */
+                        465 ; rtxcapi.c  280        TASK KS_alloc_task(void)
+                        466 ; rtxcapi.c  281        {
+                        467         PUBLIC  _KS_alloc_task
+0001AC                  468 _KS_alloc_task:
+0001AC A97A             469         ADDS.W  R7,#0AH
+                        470 ; rtxcapi.c  282           struct targ p;
+                        471 ; rtxcapi.c  283        
+                        472 ; rtxcapi.c  284           p.ksnum = RTXC_ALLOC_TASK;
+0001AE 927817           473         MOV.B   [R7],#017H
+                        474 ; rtxcapi.c  285           KS(p);
+0001B1 9128rr           475         MOV.B   R1L,#SEG( __lc_bs )
+0001B4 7133             476         XOR.B   R1H,R1H
+0001B6 8907             477         MOV.W   R0,R7
+                        478         CALL    _ks
+0001B8 C4rrrrrr        +478 ;       FCALL   _ks
+                        479 ; rtxcapi.c  286        
+                        480 ; rtxcapi.c  287           /* return task # (0 = no tasks available) */
+                        481 ; rtxcapi.c  288           return(p.task);
+0001BC 840704           482         MOV.B   R0L,[R7+4]
+                        483 ; rtxcapi.c  289        }
+0001BF A976             484         ADDS.W  R7,#06H
+0001C1 D680             485         RET
+0001C1 D68000           485         RET
+                        486 ; rtxcapi.c  290        #endif /* } HAS_ALLOC_TASK */
+                        487 ; rtxcapi.c  291        
+                        488 ; rtxcapi.c  292        /*******************************************************/
+                        489 ; rtxcapi.c  293        #ifdef HAS_FREE /* { */
+                        490 ; rtxcapi.c  294        void KS_free(MAP map, void *val)
+                        491 ; rtxcapi.c  295        {
+                        492         PUBLIC  _KS_free
+0001C4                  493 _KS_free:
+0001C4 9972001A         494         SUB.W   R7,#01AH
+                        495 ; rtxcapi.c  296           struct parg p;
+                        496 ; rtxcapi.c  297        
+                        497 ; rtxcapi.c  298           p.ksnum = RTXC_FREE;
+0001C8 B277             498         MOV.B   [R7],#07H
+                        499 ; rtxcapi.c  299           p.map = map;
+0001CA 840F04           500         MOV.B   [R7+4],R0L
+                        501 ; rtxcapi.c  300           p.val = val;
+0001CD 8C3F08           502         MOV.W   [R7+8],R3
+0001D0 8C2F06           503         MOV.W   [R7+6],R2
+                        504 ; rtxcapi.c  301           KS(p);
+0001D3 9128rr           505         MOV.B   R1L,#SEG( __lc_bs )
+0001D6 7133             506         XOR.B   R1H,R1H
+0001D8 8907             507         MOV.W   R0,R7
+                        508         CALL    _ks
+0001DA C4rrrrrr        +508 ;       FCALL   _ks
+                        509 ; rtxcapi.c  302        }
+0001DE 9970001A         510         ADD.W   R7,#01AH
+0001E2 D680             511         RET
+0001E2 D680             511         RET
+                        512 ; rtxcapi.c  303        #endif /* } HAS_FREE */
+                        513 ; rtxcapi.c  304        
+                        514 ; rtxcapi.c  305        /*******************************************************/
+                        515 ; rtxcapi.c  306        #ifdef HAS_ALLOC_PART /* { */
+                        516 ; rtxcapi.c  307        MAP KS_alloc_part(void)
+                        517 ; rtxcapi.c  308        {
+                        518         PUBLIC  _KS_alloc_part
+0001E4                  519 _KS_alloc_part:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+0001E4 9972001A         520         SUB.W   R7,#01AH
+                        521 ; rtxcapi.c  309           struct parg p;
+                        522 ; rtxcapi.c  310        
+                        523 ; rtxcapi.c  311           p.ksnum = RTXC_ALLOC_PART;
+0001E8 927809           524         MOV.B   [R7],#09H
+                        525 ; rtxcapi.c  312           KS(p);
+0001EB 9128rr           526         MOV.B   R1L,#SEG( __lc_bs )
+0001EE 7133             527         XOR.B   R1H,R1H
+0001F0 8907             528         MOV.W   R0,R7
+                        529         CALL    _ks
+0001F2 C4rrrrrr        +529 ;       FCALL   _ks
+                        530 ; rtxcapi.c  313        
+                        531 ; rtxcapi.c  314           /* return map # (0 = no dynamic partition headers available) */
+                        532 ; rtxcapi.c  315           return(p.map);
+0001F6 840704           533         MOV.B   R0L,[R7+4]
+                        534 ; rtxcapi.c  316        }
+0001F9 9970001A         535         ADD.W   R7,#01AH
+0001FD D680             536         RET
+0001FD D68000           536         RET
+                        537 ; rtxcapi.c  317        #endif /* } HAS_ALLOC_PART */
+                        538 ; rtxcapi.c  318        
+                        539 ; rtxcapi.c  319        /*******************************************************/
+                        540 ; rtxcapi.c  320        #ifdef HAS_DEFPART /* { */
+                        541 ; rtxcapi.c  321        void KS_defpart(MAP map, void *addr, size_t blksize, size_t nblocks)
+                        542 ; rtxcapi.c  322        {
+                        543         PUBLIC  _KS_defpart
+000200                  544 _KS_defpart:
+000200 9972001A         545         SUB.W   R7,#01AH
+                        546 ; rtxcapi.c  323           struct parg p;
+                        547 ; rtxcapi.c  324        
+                        548 ; rtxcapi.c  325           p.ksnum = RTXC_DEFPART;
+000204 92780A           549         MOV.B   [R7],#0AH
+                        550 ; rtxcapi.c  326           p.map = map;
+000207 840F04           551         MOV.B   [R7+4],R0L
+                        552 ; rtxcapi.c  327           p.addr = addr;
+00020A 8C3F16           553         MOV.W   [R7+22],R3
+00020D 8C2F14           554         MOV.W   [R7+20],R2
+                        555 ; rtxcapi.c  328           p.size = blksize;
+000210 8C1F0A           556         MOV.W   [R7+10],R1
+                        557 ; rtxcapi.c  329           p.nblocks = nblocks;
+000213 8C6F18           558         MOV.W   [R7+24],R6
+                        559 ; rtxcapi.c  330           KS(p);
+000216 9128rr           560         MOV.B   R1L,#SEG( __lc_bs )
+000219 7133             561         XOR.B   R1H,R1H
+00021B 8907             562         MOV.W   R0,R7
+                        563         CALL    _ks
+00021D C4rrrrrr        +563 ;       FCALL   _ks
+                        564 ; rtxcapi.c  331        }
+000221 9970001A         565         ADD.W   R7,#01AH
+000225 D680             566         RET
+000225 D68000           566         RET
+                        567 ; rtxcapi.c  332        #endif /* } HAS_DEFPART */
+                        568 ; rtxcapi.c  333        
+                        569 ; rtxcapi.c  334        /*******************************************************/
+                        570 ; rtxcapi.c  335        #ifdef HAS_FREE_PART /* { */
+                        571 ; rtxcapi.c  336        void * KS_free_part(MAP map)
+                        572 ; rtxcapi.c  337        {
+                        573         PUBLIC  _KS_free_part
+000228                  574 _KS_free_part:
+000228 9972001A         575         SUB.W   R7,#01AH
+                        576 ; rtxcapi.c  338           struct parg p;
+                        577 ; rtxcapi.c  339        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        578 ; rtxcapi.c  340           p.ksnum = RTXC_FREE_PART;
+00022C 92780B           579         MOV.B   [R7],#0BH
+                        580 ; rtxcapi.c  341           p.map = map;
+00022F 840F04           581         MOV.B   [R7+4],R0L
+                        582 ; rtxcapi.c  342           KS(p);
+000232 9128rr           583         MOV.B   R1L,#SEG( __lc_bs )
+000235 7133             584         XOR.B   R1H,R1H
+000237 8907             585         MOV.W   R0,R7
+                        586         CALL    _ks
+000239 C4rrrrrr        +586 ;       FCALL   _ks
+                        587 ; rtxcapi.c  343           return(p.addr);
+00023D 8C1716           588         MOV.W   R1,[R7+22]
+000240 8C0714           589         MOV.W   R0,[R7+20]
+                        590 ; rtxcapi.c  344        }
+000243 9970001A         591         ADD.W   R7,#01AH
+000247 D680             592         RET
+000247 D68000           592         RET
+                        593 ; rtxcapi.c  345        #endif /* } HAS_FREE_PART */
+                        594 ; rtxcapi.c  346        
+                        595 ; rtxcapi.c  347        /*******************************************************/
+                        596 ; rtxcapi.c  348        #ifdef HAS_FREE_TIMER /* { */
+                        597 ; rtxcapi.c  349        void KS_free_timer(CLKBLK ks_clk *pclkblk)
+                        598 ; rtxcapi.c  350        {
+                        599         PUBLIC  _KS_free_timer
+00024A                  600 _KS_free_timer:
+00024A 9972000E         601         SUB.W   R7,#0EH
+                        602 ; rtxcapi.c  351           struct clkarg p;
+                        603 ; rtxcapi.c  352        
+                        604 ; rtxcapi.c  353           p.ksnum = RTXC_FREE_TIMER;
+00024E 927811           605         MOV.B   [R7],#011H
+                        606 ; rtxcapi.c  354           if ( (p.pclkblk = pclkblk) != NULLCLK)
+000251 8C1F0C           607         MOV.W   [R7+12],R1
+000254 8C0F0A           608         MOV.W   [R7+10],R0
+000257 6910             609         OR.W    R1,R0
+000259 F306             610         BEQ     _7
+                        611 ; rtxcapi.c  355           {
+                        612 ; rtxcapi.c  356              KS(p);
+00025B 9128rr           613         MOV.B   R1L,#SEG( __lc_bs )
+00025E 7133             614         XOR.B   R1H,R1H
+000260 8907             615         MOV.W   R0,R7
+                        616         CALL    _ks
+000262 C4rrrrrr        +616 ;       FCALL   _ks
+000262 C4rrrrrr        +616 ;       FCALL   _ks
+                        617 ; rtxcapi.c  357           }
+000266                  618 _7:
+                        619 ; rtxcapi.c  358        }
+000266 9970000E         620         ADD.W   R7,#0EH
+00026A D680             621         RET
+00026A D680             621         RET
+                        622 ; rtxcapi.c  359        #endif /* } HAS_FREE_TIMER */
+                        623 ; rtxcapi.c  360        
+                        624 ; rtxcapi.c  361        /*******************************************************/
+                        625 ; rtxcapi.c  362        #ifdef HAS_LOCK /* { */
+                        626 ; rtxcapi.c  363        KSRC KS_lock(RESOURCE resource)
+                        627 ; rtxcapi.c  364        {
+                        628         PUBLIC  _KS_lock
+00026C                  629 _KS_lock:
+00026C 99720010         630         SUB.W   R7,#010H
+                        631 ; rtxcapi.c  365           struct larg p;
+                        632 ; rtxcapi.c  366        #ifdef FASTLOCK /* { */
+                        633 ; rtxcapi.c  367           RHEADER ks_tbl *prh;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+                        634 ; rtxcapi.c  368           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+                        635 ; rtxcapi.c  369        
+                        636 ; rtxcapi.c  370           prh = (RHEADER ks_tbl *)&rheader[resource];
+                        637 ; rtxcapi.c  371        
+                        638 ; rtxcapi.c  372           PUSHPSWH;  /* save processor priority level */
+                        639 ; rtxcapi.c  373           DISABLE;
+                        640 ; rtxcapi.c  374        
+                        641 ; rtxcapi.c  375           if (prh->owner == NULLTCB)  /* if resource not currently owned */
+                        642 ; rtxcapi.c  376           {
+                        643 ; rtxcapi.c  377        #ifdef CBUG /* { */
+                        644 ; rtxcapi.c  378              prh->count++;           /* update statistics */
+                        645 ; rtxcapi.c  379        #endif /* } CBUG */
+                        646 ; rtxcapi.c  380              prh->owner = hipritsk; /* lock resource with task # */
+                        647 ; rtxcapi.c  381              prh->level = 1;         /* set nesting level = 1 */
+                        648 ; rtxcapi.c  382              POPPSWH;  /* restore processor priority level */
+                        649 ; rtxcapi.c  383              return(RC_GOOD);        /* mark successful */
+                        650 ; rtxcapi.c  384           }
+                        651 ; rtxcapi.c  385        
+                        652 ; rtxcapi.c  386           if (prh->owner == hipritsk) /* if already owned by caller */
+                        653 ; rtxcapi.c  387           {
+                        654 ; rtxcapi.c  388        #ifdef CBUG /* { */
+                        655 ; rtxcapi.c  389              prh->count++;           /* update statistics */
+                        656 ; rtxcapi.c  390        #endif /* } CBUG */
+                        657 ; rtxcapi.c  391              prh->level++;           /* bump nesting level */
+                        658 ; rtxcapi.c  392              POPPSWH;  /* restore processor priority level */
+                        659 ; rtxcapi.c  393              return(RC_NESTED);      /* mark successful */
+                        660 ; rtxcapi.c  394           }
+                        661 ; rtxcapi.c  395           POPPSWH;  /* restore processor priority level */
+                        662 ; rtxcapi.c  396        #endif /* } FASTLOCK */
+                        663 ; rtxcapi.c  397        
+                        664 ; rtxcapi.c  398           p.ksnum = RTXC_LOCK;
+000270 92780E           665         MOV.B   [R7],#0EH
+                        666 ; rtxcapi.c  399           p.resource = resource;
+000273 840F04           667         MOV.B   [R7+4],R0L
+                        668 ; rtxcapi.c  400        #ifdef RESOURCE_WAITERS /* { */
+                        669 ; rtxcapi.c  401           p.wait = 0;
+000276 B47005           670         MOV.B   [R7+5],#00H
+                        671 ; rtxcapi.c  402        #endif /* } RESOURCE_WAITERS */
+                        672 ; rtxcapi.c  403           p.ksrc = RC_GOOD;
+000279 BC7002           673         MOV.W   [R7+2],#00H
+                        674 ; rtxcapi.c  404           KS(p);
+00027C 9128rr           675         MOV.B   R1L,#SEG( __lc_bs )
+00027F 7133             676         XOR.B   R1H,R1H
+000281 8907             677         MOV.W   R0,R7
+                        678         CALL    _ks
+000283 C4rrrrrr        +678 ;       FCALL   _ks
+                        679 ; rtxcapi.c  405           return(p.ksrc);
+000287 8C0702           680         MOV.W   R0,[R7+2]
+                        681 ; rtxcapi.c  406        }
+00028A 99700010         682         ADD.W   R7,#010H
+00028E D680             683         RET
+00028E D680             683         RET
+                        684 ; rtxcapi.c  407        #endif /* } HAS_LOCK */
+                        685 ; rtxcapi.c  408        
+                        686 ; rtxcapi.c  409        /*******************************************************/
+                        687 ; rtxcapi.c  410        #ifdef HAS_PEND /* { */
+                        688 ; rtxcapi.c  411        void KS_pend(SEMA sema)
+                        689 ; rtxcapi.c  412        {
+                        690         PUBLIC  _KS_pend
+000290                  691 _KS_pend:
+000290 9972000C         692         SUB.W   R7,#0CH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+                        693 ; rtxcapi.c  413           struct sarg p;
+                        694 ; rtxcapi.c  414        
+                        695 ; rtxcapi.c  415           p.ksnum = RTXC_PEND;
+000294 B273             696         MOV.B   [R7],#03H
+                        697 ; rtxcapi.c  416           p.sema = sema;
+000296 840F04           698         MOV.B   [R7+4],R0L
+                        699 ; rtxcapi.c  417           KS(p);
+000299 9128rr           700         MOV.B   R1L,#SEG( __lc_bs )
+00029C 7133             701         XOR.B   R1H,R1H
+00029E 8907             702         MOV.W   R0,R7
+                        703         CALL    _ks
+0002A0 C4rrrrrr        +703 ;       FCALL   _ks
+                        704 ; rtxcapi.c  418        }
+0002A4 9970000C         705         ADD.W   R7,#0CH
+0002A8 D680             706         RET
+0002A8 D680             706         RET
+                        707 ; rtxcapi.c  419        #endif /* } HAS_PEND */
+                        708 ; rtxcapi.c  420        
+                        709 ; rtxcapi.c  421        /*******************************************************/
+                        710 ; rtxcapi.c  422        #ifdef HAS_RECEIVE /* { */
+                        711 ; rtxcapi.c  423        RTXCMSG * KS_receive(MBOX mbox, TASK task)
+                        712 ; rtxcapi.c  424        {
+                        713         PUBLIC  _KS_receive
+0002AA                  714 _KS_receive:
+0002AA 99720014         715         SUB.W   R7,#014H
+                        716 ; rtxcapi.c  425           struct msgarg p;
+                        717 ; rtxcapi.c  426        
+                        718 ; rtxcapi.c  427           p.ksnum = RTXC_RECEIVE;
+0002AE B275             719         MOV.B   [R7],#05H
+                        720 ; rtxcapi.c  428           p.mbox = mbox;
+0002B0 840F05           721         MOV.B   [R7+5],R0L
+                        722 ; rtxcapi.c  429           p.task = task;
+0002B3 841F06           723         MOV.B   [R7+6],R0H
+                        724 ; rtxcapi.c  430        #ifdef MAILBOX_WAITERS /* { */
+                        725 ; rtxcapi.c  431           p.wait = 0;
+0002B6 B4700C           726         MOV.B   [R7+12],#00H
+                        727 ; rtxcapi.c  432        #endif /* } MAILBOX_WAITERS */
+                        728 ; rtxcapi.c  433           KS(p);
+0002B9 9128rr           729         MOV.B   R1L,#SEG( __lc_bs )
+0002BC 7133             730         XOR.B   R1H,R1H
+0002BE 8907             731         MOV.W   R0,R7
+                        732         CALL    _ks
+0002C0 C4rrrrrr        +732 ;       FCALL   _ks
+                        733 ; rtxcapi.c  434           return(p.prtxcmsg);
+0002C4 8C170A           734         MOV.W   R1,[R7+10]
+0002C7 8C0708           735         MOV.W   R0,[R7+8]
+                        736 ; rtxcapi.c  435        }
+0002CA 99700014         737         ADD.W   R7,#014H
+0002CE D680             738         RET
+0002CE D680             738         RET
+                        739 ; rtxcapi.c  436        #endif /* } HAS_RECEIVE */
+                        740 ; rtxcapi.c  437        
+                        741 ; rtxcapi.c  438        /*******************************************************/
+                        742 ; rtxcapi.c  439        #ifdef HAS_RESUME /* { */
+                        743 ; rtxcapi.c  440        void KS_resume(TASK task)
+                        744 ; rtxcapi.c  441        {
+                        745         PUBLIC  _KS_resume
+0002D0                  746 _KS_resume:
+0002D0 A97A             747         ADDS.W  R7,#0AH
+                        748 ; rtxcapi.c  442           struct targ p;
+                        749 ; rtxcapi.c  443        
+                        750 ; rtxcapi.c  444           p.ksnum = RTXC_RESUME;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+0002D2 92781A           751         MOV.B   [R7],#01AH
+                        752 ; rtxcapi.c  445           p.task = task;
+0002D5 840F04           753         MOV.B   [R7+4],R0L
+                        754 ; rtxcapi.c  446           KS(p);
+0002D8 9128rr           755         MOV.B   R1L,#SEG( __lc_bs )
+0002DB 7133             756         XOR.B   R1H,R1H
+0002DD 8907             757         MOV.W   R0,R7
+                        758         CALL    _ks
+0002DF C4rrrrrr        +758 ;       FCALL   _ks
+                        759 ; rtxcapi.c  447        }
+0002E3 A976             760         ADDS.W  R7,#06H
+0002E5 D680             761         RET
+0002E5 D68000           761         RET
+                        762 ; rtxcapi.c  448        #endif /* } HAS_RESUME */
+                        763 ; rtxcapi.c  449        
+                        764 ; rtxcapi.c  450        /*******************************************************/
+                        765 ; rtxcapi.c  451        #ifdef HAS_SEND /* { */
+                        766 ; rtxcapi.c  452        void KS_send(MBOX mbox, RTXCMSG *prtxcmsg, PRIORITY priority, SEMA sema)
+                        767 ; rtxcapi.c  453        {
+                        768         PUBLIC  _KS_send
+0002E8                  769 _KS_send:
+0002E8 99720014         770         SUB.W   R7,#014H
+                        771 ; rtxcapi.c  454           struct msgarg p;
+                        772 ; rtxcapi.c  455        
+                        773 ; rtxcapi.c  456           p.ksnum = RTXC_SEND;
+0002EC B274             774         MOV.B   [R7],#04H
+                        775 ; rtxcapi.c  457           p.mbox = mbox;
+0002EE 840F05           776         MOV.B   [R7+5],R0L
+                        777 ; rtxcapi.c  458           p.prtxcmsg = prtxcmsg;
+0002F1 8C3F0A           778         MOV.W   [R7+10],R3
+0002F4 8C2F08           779         MOV.W   [R7+8],R2
+                        780 ; rtxcapi.c  459           p.priority = priority;
+0002F7 841F07           781         MOV.B   [R7+7],R0H
+                        782 ; rtxcapi.c  460           p.sema = sema;
+0002FA 842F04           783         MOV.B   [R7+4],R1L
+                        784 ; rtxcapi.c  461           p.wait = 0;
+0002FD B4700C           785         MOV.B   [R7+12],#00H
+                        786 ; rtxcapi.c  462           KS(p);
+000300 9128rr           787         MOV.B   R1L,#SEG( __lc_bs )
+000303 7133             788         XOR.B   R1H,R1H
+000305 8907             789         MOV.W   R0,R7
+                        790         CALL    _ks
+000307 C4rrrrrr        +790 ;       FCALL   _ks
+                        791 ; rtxcapi.c  463        }
+00030B 99700014         792         ADD.W   R7,#014H
+00030F D680             793         RET
+00030F D68000           793         RET
+                        794 ; rtxcapi.c  464        #endif /* } HAS_SEND */
+                        795 ; rtxcapi.c  465        
+                        796 ; rtxcapi.c  466        /*******************************************************/
+                        797 ; rtxcapi.c  467        KSRC KS_signal(SEMA sema)
+                        798 ; rtxcapi.c  468        {
+                        799         PUBLIC  _KS_signal
+000312                  800 _KS_signal:
+000312 9972000C         801         SUB.W   R7,#0CH
+                        802 ; rtxcapi.c  469           struct sarg p;
+                        803 ; rtxcapi.c  470        
+                        804 ; rtxcapi.c  471           p.ksnum = RTXC_SIGNAL;
+000316 B272             805         MOV.B   [R7],#02H
+                        806 ; rtxcapi.c  472           p.sema = sema;
+000318 840F04           807         MOV.B   [R7+4],R0L
+                        808 ; rtxcapi.c  473           p.ksrc = RC_GOOD;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+00031B BC7002           809         MOV.W   [R7+2],#00H
+                        810 ; rtxcapi.c  474           KS(p);
+00031E 9128rr           811         MOV.B   R1L,#SEG( __lc_bs )
+000321 7133             812         XOR.B   R1H,R1H
+000323 8907             813         MOV.W   R0,R7
+                        814         CALL    _ks
+000325 C4rrrrrr        +814 ;       FCALL   _ks
+                        815 ; rtxcapi.c  475           return(p.ksrc);
+000329 8C0702           816         MOV.W   R0,[R7+2]
+                        817 ; rtxcapi.c  476        }
+00032C 9970000C         818         ADD.W   R7,#0CH
+000330 D680             819         RET
+000330 D680             819         RET
+                        820 ; rtxcapi.c  477        
+                        821 ; rtxcapi.c  478        /*******************************************************/
+                        822 ; rtxcapi.c  479        #ifdef HAS_ACK /* { */
+                        823 ; rtxcapi.c  480        void KS_ack(RTXCMSG *prtxcmsg)
+                        824 ; rtxcapi.c  481        {
+                        825         PUBLIC  _KS_ack
+000332                  826 _KS_ack:
+                        827 ; rtxcapi.c  482        
+                        828 ; rtxcapi.c  483           KS_signal(prtxcmsg->sema);
+000332 862C42           829         MOV.B   ES,R1L
+000335 840006           830         MOV.B   R0L,[R0+6]
+                        831 ; rtxcapi.c  484        
+                        832 ; rtxcapi.c  485        }
+                        833         JMP     _KS_signal
+000338 FEEC            +833         BR      _KS_signal
+000338 FEEC            +833         BR      _KS_signal
+                        834 ; rtxcapi.c  486        #endif /* } HAS_ACK */
+                        835 ; rtxcapi.c  487        
+                        836 ; rtxcapi.c  488        /*******************************************************/
+                        837 ; rtxcapi.c  489        #ifdef HAS_STOP_TIMER /* { */
+                        838 ; rtxcapi.c  490        KSRC KS_stop_timer(CLKBLK ks_clk *pclkblk)
+                        839 ; rtxcapi.c  491        {
+                        840         PUBLIC  _KS_stop_timer
+00033A                  841 _KS_stop_timer:
+00033A 9972000E         842         SUB.W   R7,#0EH
+                        843 ; rtxcapi.c  492           struct clkarg p;
+                        844 ; rtxcapi.c  493        
+                        845 ; rtxcapi.c  494           p.ksnum = RTXC_STOP_TIMER;
+00033E 927813           846         MOV.B   [R7],#013H
+                        847 ; rtxcapi.c  495           p.pclkblk = pclkblk;
+000341 8C1F0C           848         MOV.W   [R7+12],R1
+000344 8C0F0A           849         MOV.W   [R7+10],R0
+                        850 ; rtxcapi.c  496           p.ksrc = RC_GOOD;
+000347 BC7002           851         MOV.W   [R7+2],#00H
+                        852 ; rtxcapi.c  497           KS(p);
+00034A 9128rr           853         MOV.B   R1L,#SEG( __lc_bs )
+00034D 7133             854         XOR.B   R1H,R1H
+00034F 8907             855         MOV.W   R0,R7
+                        856         CALL    _ks
+000351 C4rrrrrr        +856 ;       FCALL   _ks
+                        857 ; rtxcapi.c  498           return(p.ksrc);
+000355 8C0702           858         MOV.W   R0,[R7+2]
+                        859 ; rtxcapi.c  499        }
+000358 9970000E         860         ADD.W   R7,#0EH
+00035C D680             861         RET
+00035C D680             861         RET
+                        862 ; rtxcapi.c  500        #endif /* } HAS_STOP_TIMER */
+                        863 ; rtxcapi.c  501        
+                        864 ; rtxcapi.c  502        /*******************************************************/
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+                        865 ; rtxcapi.c  503        #ifdef HAS_START_TIMER /* { */
+                        866 ; rtxcapi.c  504        CLKBLK ks_clk * KS_start_timer(CLKBLK ks_clk *pclkblk, TICKS ticks,
+                        867 ; rtxcapi.c  505                                       TICKS period, SEMA sema)
+                        868 ; rtxcapi.c  506        {
+                        869         PUBLIC  _KS_start_timer
+00035E                  870 _KS_start_timer:
+00035E 9972000E         871         SUB.W   R7,#0EH
+                        872 ; rtxcapi.c  507           struct clkarg p;
+                        873 ; rtxcapi.c  508        
+                        874 ; rtxcapi.c  509           p.ksnum = RTXC_START_TIMER;
+000362 927812           875         MOV.B   [R7],#012H
+                        876 ; rtxcapi.c  510           p.pclkblk = pclkblk;
+000365 8C1F0C           877         MOV.W   [R7+12],R1
+000368 8C0F0A           878         MOV.W   [R7+10],R0
+                        879 ; rtxcapi.c  511           p.ticks = ticks;
+00036B 8C2F06           880         MOV.W   [R7+6],R2
+                        881 ; rtxcapi.c  512           p.period = period;
+00036E 8C3F08           882         MOV.W   [R7+8],R3
+                        883 ; rtxcapi.c  513           p.sema = sema;
+000371 84CF04           884         MOV.B   [R7+4],R6L
+                        885 ; rtxcapi.c  514           KS(p);
+000374 9128rr           886         MOV.B   R1L,#SEG( __lc_bs )
+000377 7133             887         XOR.B   R1H,R1H
+000379 8907             888         MOV.W   R0,R7
+                        889         CALL    _ks
+00037B C4rrrrrr        +889 ;       FCALL   _ks
+                        890 ; rtxcapi.c  515           return(p.pclkblk);
+00037F 8C170C           891         MOV.W   R1,[R7+12]
+000382 8C070A           892         MOV.W   R0,[R7+10]
+                        893 ; rtxcapi.c  516        }
+000385 9970000E         894         ADD.W   R7,#0EH
+000389 D680             895         RET
+000389 D68000           895         RET
+                        896 ; rtxcapi.c  517        #endif /* } HAS_START_TIMER */
+                        897 ; rtxcapi.c  518        
+                        898 ; rtxcapi.c  519        /*******************************************************/
+                        899 ; rtxcapi.c  520        #ifdef HAS_SUSPEND /* { */
+                        900 ; rtxcapi.c  521        void KS_suspend(TASK task)
+                        901 ; rtxcapi.c  522        {
+                        902         PUBLIC  _KS_suspend
+00038C                  903 _KS_suspend:
+00038C A97A             904         ADDS.W  R7,#0AH
+                        905 ; rtxcapi.c  523           struct targ p;
+                        906 ; rtxcapi.c  524        
+                        907 ; rtxcapi.c  525           p.ksnum = RTXC_SUSPEND;
+00038E 927819           908         MOV.B   [R7],#019H
+                        909 ; rtxcapi.c  526           p.task = task;
+000391 840F04           910         MOV.B   [R7+4],R0L
+                        911 ; rtxcapi.c  527           KS(p);
+000394 9128rr           912         MOV.B   R1L,#SEG( __lc_bs )
+000397 7133             913         XOR.B   R1H,R1H
+000399 8907             914         MOV.W   R0,R7
+                        915         CALL    _ks
+00039B C4rrrrrr        +915 ;       FCALL   _ks
+                        916 ; rtxcapi.c  528        }
+00039F A976             917         ADDS.W  R7,#06H
+0003A1 D680             918         RET
+0003A1 D68000           918         RET
+                        919 ; rtxcapi.c  529        #endif /* } HAS_SUSPEND */
+                        920 ; rtxcapi.c  530        
+                        921 ; rtxcapi.c  531        /*******************************************************/
+                        922 ; rtxcapi.c  532        #ifdef HAS_TERMINATE /* { */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+                        923 ; rtxcapi.c  533        void KS_terminate(TASK task)
+                        924 ; rtxcapi.c  534        {
+                        925         PUBLIC  _KS_terminate
+0003A4                  926 _KS_terminate:
+0003A4 A97A             927         ADDS.W  R7,#0AH
+                        928 ; rtxcapi.c  535           struct targ p;
+                        929 ; rtxcapi.c  536        
+                        930 ; rtxcapi.c  537           p.ksnum = RTXC_TERMINATE;
+0003A6 927818           931         MOV.B   [R7],#018H
+                        932 ; rtxcapi.c  538           p.task = task;
+0003A9 840F04           933         MOV.B   [R7+4],R0L
+                        934 ; rtxcapi.c  539           KS(p);
+0003AC 9128rr           935         MOV.B   R1L,#SEG( __lc_bs )
+0003AF 7133             936         XOR.B   R1H,R1H
+0003B1 8907             937         MOV.W   R0,R7
+                        938         CALL    _ks
+0003B3 C4rrrrrr        +938 ;       FCALL   _ks
+                        939 ; rtxcapi.c  540        }
+0003B7 A976             940         ADDS.W  R7,#06H
+0003B9 D680             941         RET
+0003B9 D68000           941         RET
+                        942 ; rtxcapi.c  541        #endif /* } HAS_TERMINATE */
+                        943 ; rtxcapi.c  542        
+                        944 ; rtxcapi.c  543        /*******************************************************/
+                        945 ; rtxcapi.c  544        #ifdef HAS_UNBLOCK /* { */
+                        946 ; rtxcapi.c  545        void KS_unblock(TASK starttask, TASK endtask)
+                        947 ; rtxcapi.c  546        {
+                        948         PUBLIC  _KS_unblock
+0003BC                  949 _KS_unblock:
+0003BC A97C             950         ADDS.W  R7,#0CH
+                        951 ; rtxcapi.c  547           struct blkarg p;
+                        952 ; rtxcapi.c  548        
+                        953 ; rtxcapi.c  549           p.ksnum = RTXC_UNBLOCK;
+0003BE 92781E           954         MOV.B   [R7],#01EH
+                        955 ; rtxcapi.c  550           p.starttask = starttask;
+0003C1 840F01           956         MOV.B   [R7+1],R0L
+                        957 ; rtxcapi.c  551           p.endtask = endtask;
+0003C4 841F02           958         MOV.B   [R7+2],R0H
+                        959 ; rtxcapi.c  552           KS(p);
+0003C7 9128rr           960         MOV.B   R1L,#SEG( __lc_bs )
+0003CA 7133             961         XOR.B   R1H,R1H
+0003CC 8907             962         MOV.W   R0,R7
+                        963         CALL    _ks
+0003CE C4rrrrrr        +963 ;       FCALL   _ks
+                        964 ; rtxcapi.c  553        }
+0003D2 A974             965         ADDS.W  R7,#04H
+0003D4 D680             966         RET
+0003D4 D680             966         RET
+                        967 ; rtxcapi.c  554        #endif /* } HAS_UNBLOCK */
+                        968 ; rtxcapi.c  555        
+                        969 ; rtxcapi.c  556        /*******************************************************/
+                        970 ; rtxcapi.c  557        #ifdef HAS_UNLOCK /* { */
+                        971 ; rtxcapi.c  558        KSRC KS_unlock(RESOURCE resource)
+                        972 ; rtxcapi.c  559        {
+                        973         PUBLIC  _KS_unlock
+0003D6                  974 _KS_unlock:
+0003D6 99720010         975         SUB.W   R7,#010H
+                        976 ; rtxcapi.c  560           struct larg p;
+                        977 ; rtxcapi.c  561        #ifdef FASTLOCK /* { */
+                        978 ; rtxcapi.c  562           RHEADER ks_tbl *prh;
+                        979 ; rtxcapi.c  563           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+                        980 ; rtxcapi.c  564        
+                        981 ; rtxcapi.c  565           prh = (RHEADER ks_tbl *)&rheader[resource];
+                        982 ; rtxcapi.c  566        
+                        983 ; rtxcapi.c  567           PUSHPSWH;  /* save processor priority level */
+                        984 ; rtxcapi.c  568           DISABLE;
+                        985 ; rtxcapi.c  569        
+                        986 ; rtxcapi.c  570           if (prh->owner != hipritsk) /* if hipritsk not owner, then nop */
+                        987 ; rtxcapi.c  571           {
+                        988 ; rtxcapi.c  572              POPPSWH; /* fast return */
+                        989 ; rtxcapi.c  573              return(RC_BUSY);
+                        990 ; rtxcapi.c  574           }
+                        991 ; rtxcapi.c  575        
+                        992 ; rtxcapi.c  576           if (prh->level > 1) /* if nesting level > 1 */
+                        993 ; rtxcapi.c  577           {
+                        994 ; rtxcapi.c  578              prh->level--;   /* decrement nesting level */
+                        995 ; rtxcapi.c  579              POPPSWH;              /* fast return */
+                        996 ; rtxcapi.c  580              return(RC_NESTED);
+                        997 ; rtxcapi.c  581           }
+                        998 ; rtxcapi.c  582        
+                        999 ; rtxcapi.c  583        #ifdef RESOURCE_WAITERS /* { */
+                       1000 ; rtxcapi.c  584           if (prh->waiters == NULLTCB) /* if no tasks are waiting */
+                       1001 ; rtxcapi.c  585           {
+                       1002 ; rtxcapi.c  586              prh->level = 0;  /* zero nesting level */
+                       1003 ; rtxcapi.c  587              prh->owner = NULLTCB; /* mark resource not owned */
+                       1004 ; rtxcapi.c  588              POPPSWH;              /* fast return */
+                       1005 ; rtxcapi.c  589              return(RC_GOOD);
+                       1006 ; rtxcapi.c  590           }
+                       1007 ; rtxcapi.c  591        #endif /* } RESOURCE_WAITERS */
+                       1008 ; rtxcapi.c  592        
+                       1009 ; rtxcapi.c  593           POPPSWH;              /* fast return */
+                       1010 ; rtxcapi.c  594        #endif /* } FASTLOCK */
+                       1011 ; rtxcapi.c  595        
+                       1012 ; rtxcapi.c  596           p.ksnum = RTXC_UNLOCK;
+0003DA 92780F          1013         MOV.B   [R7],#0FH
+                       1014 ; rtxcapi.c  597           p.ksrc = RC_GOOD;
+0003DD BC7002          1015         MOV.W   [R7+2],#00H
+                       1016 ; rtxcapi.c  598           p.resource = resource;
+0003E0 840F04          1017         MOV.B   [R7+4],R0L
+                       1018 ; rtxcapi.c  599           KS(p);
+0003E3 9128rr          1019         MOV.B   R1L,#SEG( __lc_bs )
+0003E6 7133            1020         XOR.B   R1H,R1H
+0003E8 8907            1021         MOV.W   R0,R7
+                       1022         CALL    _ks
+0003EA C4rrrrrr       +1022 ;       FCALL   _ks
+                       1023 ; rtxcapi.c  600           return(p.ksrc);
+0003EE 8C0702          1024         MOV.W   R0,[R7+2]
+                       1025 ; rtxcapi.c  601        }
+0003F1 99700010        1026         ADD.W   R7,#010H
+0003F5 D680            1027         RET
+0003F5 D68000          1027         RET
+                       1028 ; rtxcapi.c  602        #endif /* } HAS_UNLOCK */
+                       1029 ; rtxcapi.c  603        
+                       1030 ; rtxcapi.c  604        /*******************************************************/
+                       1031 ; rtxcapi.c  605        #ifdef HAS_USER /* { */
+                       1032 ; rtxcapi.c  606        int KS_user(int (*fun)(void *), void *arg)
+                       1033 ; rtxcapi.c  607        {
+                       1034         PUBLIC  _KS_user
+0003F8                 1035 _KS_user:
+0003F8 9972000C        1036         SUB.W   R7,#0CH
+                       1037 ; rtxcapi.c  608           struct userarg p;
+                       1038 ; rtxcapi.c  609        
+                       1039 ; rtxcapi.c  610           p.ksnum = RTXC_USER;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+0003FC 92782F          1040         MOV.B   [R7],#02FH
+                       1041 ; rtxcapi.c  611           p.fun = fun;
+0003FF 8C1F08          1042         MOV.W   [R7+8],R1
+000402 8C0F06          1043         MOV.W   [R7+6],R0
+                       1044 ; rtxcapi.c  612           p.arg = arg;
+000405 8C3F04          1045         MOV.W   [R7+4],R3
+000408 8C2F02          1046         MOV.W   [R7+2],R2
+                       1047 ; rtxcapi.c  613           KS(p);
+00040B 9128rr          1048         MOV.B   R1L,#SEG( __lc_bs )
+00040E 7133            1049         XOR.B   R1H,R1H
+000410 8907            1050         MOV.W   R0,R7
+                       1051         CALL    _ks
+000412 C4rrrrrr       +1051 ;       FCALL   _ks
+                       1052 ; rtxcapi.c  614           return(p.val);
+000416 8C070A          1053         MOV.W   R0,[R7+10]
+                       1054 ; rtxcapi.c  615        }
+000419 9970000C        1055         ADD.W   R7,#0CH
+00041D D680            1056         RET
+00041D D68000          1056         RET
+                       1057 ; rtxcapi.c  616        #endif /* } HAS_USER */
+                       1058 ; rtxcapi.c  617        
+                       1059 ; rtxcapi.c  618        /*******************************************************/
+                       1060 ; rtxcapi.c  619        KSRC KS_wait(SEMA sema)
+                       1061 ; rtxcapi.c  620        {
+                       1062         PUBLIC  _KS_wait
+000420                 1063 _KS_wait:
+000420 9972000C        1064         SUB.W   R7,#0CH
+                       1065 ; rtxcapi.c  621           struct sarg p;
+                       1066 ; rtxcapi.c  622        
+                       1067 ; rtxcapi.c  623           p.ksnum = RTXC_WAIT;
+000424 B271            1068         MOV.B   [R7],#01H
+                       1069 ; rtxcapi.c  624           p.sema = sema;
+000426 840F04          1070         MOV.B   [R7+4],R0L
+                       1071 ; rtxcapi.c  625           p.ticks = (TICKS)0;
+000429 BC7006          1072         MOV.W   [R7+6],#00H
+                       1073 ; rtxcapi.c  626           p.ksrc = RC_GOOD;
+00042C BC7002          1074         MOV.W   [R7+2],#00H
+                       1075 ; rtxcapi.c  627           KS(p);
+00042F 9128rr          1076         MOV.B   R1L,#SEG( __lc_bs )
+000432 7133            1077         XOR.B   R1H,R1H
+000434 8907            1078         MOV.W   R0,R7
+                       1079         CALL    _ks
+000436 C4rrrrrr       +1079 ;       FCALL   _ks
+                       1080 ; rtxcapi.c  628           return(p.ksrc);
+00043A 8C0702          1081         MOV.W   R0,[R7+2]
+                       1082 ; rtxcapi.c  629        }
+00043D 9970000C        1083         ADD.W   R7,#0CH
+000441 D680            1084         RET
+000441 D68000          1084         RET
+                       1085 ; rtxcapi.c  630        
+                       1086 ; rtxcapi.c  631        /*******************************************************/
+                       1087 ; rtxcapi.c  632        #ifdef HAS_YIELD /* { */
+                       1088 ; rtxcapi.c  633        KSRC KS_yield(void)
+                       1089 ; rtxcapi.c  634        {
+                       1090         PUBLIC  _KS_yield
+000444                 1091 _KS_yield:
+000444 A97A            1092         ADDS.W  R7,#0AH
+                       1093 ; rtxcapi.c  635           struct targ p;
+                       1094 ; rtxcapi.c  636        
+                       1095 ; rtxcapi.c  637           p.ksnum = RTXC_YIELD;
+000446 92781C          1096         MOV.B   [R7],#01CH
+                       1097 ; rtxcapi.c  638           p.ksrc = RC_NO_YIELD;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+000449 9C7802000D      1098         MOV.W   [R7+2],#0DH
+                       1099 ; rtxcapi.c  639           KS(p);
+00044E 9128rr          1100         MOV.B   R1L,#SEG( __lc_bs )
+000451 7133            1101         XOR.B   R1H,R1H
+000453 8907            1102         MOV.W   R0,R7
+                       1103         CALL    _ks
+000455 C4rrrrrr       +1103 ;       FCALL   _ks
+                       1104 ; rtxcapi.c  640           return(p.ksrc);
+000459 8C0702          1105         MOV.W   R0,[R7+2]
+                       1106 ; rtxcapi.c  641        }
+00045C A976            1107         ADDS.W  R7,#06H
+00045E D680            1108         RET
+00045E D680            1108         RET
+                       1109 ; rtxcapi.c  642        #endif /* } HAS_YIELD */
+                       1110 ; rtxcapi.c  643        
+                       1111 ; rtxcapi.c  644        #ifdef RTXC_AL /* { */
+                       1112 ; rtxcapi.c  645        /*******************************************************/
+                       1113 ; rtxcapi.c  646        /*              ADVANCED RTXC LIBRARY                  */
+                       1114 ; rtxcapi.c  647        /*******************************************************/
+                       1115 ; rtxcapi.c  648        #ifdef HAS_ALLOCW /* { */
+                       1116 ; rtxcapi.c  649        void * KS_allocw(MAP map)
+                       1117 ; rtxcapi.c  650        {
+                       1118         PUBLIC  _KS_allocw
+000460                 1119 _KS_allocw:
+000460 9972001A        1120         SUB.W   R7,#01AH
+                       1121 ; rtxcapi.c  651           struct parg p;
+                       1122 ; rtxcapi.c  652        #ifdef FASTALLOC /* { */
+                       1123 ; rtxcapi.c  653           PHEADER ks_tbl *pph;
+                       1124 ; rtxcapi.c  654           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+                       1125 ; rtxcapi.c  655        
+                       1126 ; rtxcapi.c  656           pph = (PHEADER ks_tbl *)&pheader[map];
+                       1127 ; rtxcapi.c  657        
+                       1128 ; rtxcapi.c  658           PUSHPSWH;  /* save processor priority level */
+                       1129 ; rtxcapi.c  659           DISABLE;
+                       1130 ; rtxcapi.c  660        
+                       1131 ; rtxcapi.c  661           if ( (p.val = (char *)pph->next) != NULL ) /* if any available */
+                       1132 ; rtxcapi.c  662           {
+                       1133 ; rtxcapi.c  663              pph->next = ((struct xmap *)p.val)->link; /* unlink 1st from list *
+                            /
+                       1134 ; rtxcapi.c  664        #ifdef CBUG /* { */
+                       1135 ; rtxcapi.c  665              if (++pph->cur > pph->worst) /* check for new worst case */
+                       1136 ; rtxcapi.c  666                 pph->worst = pph->cur;          /* useage level */
+                       1137 ; rtxcapi.c  667        #endif /* } CBUG */
+                       1138 ; rtxcapi.c  668              POPPSWH;
+                       1139 ; rtxcapi.c  669              return(p.val);
+                       1140 ; rtxcapi.c  670           }
+                       1141 ; rtxcapi.c  671           POPPSWH;
+                       1142 ; rtxcapi.c  672        #endif /* } FASTALLOC */
+                       1143 ; rtxcapi.c  673        
+                       1144 ; rtxcapi.c  674           p.ksnum = RTXC_ALLOC;
+000464 B276            1145         MOV.B   [R7],#06H
+                       1146 ; rtxcapi.c  675           p.map = map;
+000466 840F04          1147         MOV.B   [R7+4],R0L
+                       1148 ; rtxcapi.c  676           p.wait = 1;
+000469 B4710C          1149         MOV.B   [R7+12],#01H
+                       1150 ; rtxcapi.c  677        #ifdef PARTITION_TIMEOUTS /* { */
+                       1151 ; rtxcapi.c  678           p.ticks = (TICKS)0; /* indicate NO timeout */
+00046C BC700E          1152         MOV.W   [R7+14],#00H
+                       1153 ; rtxcapi.c  679        #endif /* } PARTITION_TIMEOUTS */
+                       1154 ; rtxcapi.c  680           KS(p);
+00046F 9128rr          1155         MOV.B   R1L,#SEG( __lc_bs )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+000472 7133            1156         XOR.B   R1H,R1H
+000474 8907            1157         MOV.W   R0,R7
+                       1158         CALL    _ks
+000476 C4rrrrrr       +1158 ;       FCALL   _ks
+                       1159 ; rtxcapi.c  681           return(p.val);
+00047A 8C1708          1160         MOV.W   R1,[R7+8]
+00047D 8C0706          1161         MOV.W   R0,[R7+6]
+                       1162 ; rtxcapi.c  682        }
+000480 9970001A        1163         ADD.W   R7,#01AH
+000484 D680            1164         RET
+000484 D680            1164         RET
+                       1165 ; rtxcapi.c  683        #endif /* } HAS_ALLOCW */
+                       1166 ; rtxcapi.c  684        
+                       1167 ; rtxcapi.c  685        /*******************************************************/
+                       1168 ; rtxcapi.c  686        #ifdef HAS_CREATE_PART /* { */
+                       1169 ; rtxcapi.c  687        MAP KS_create_part(void *addr, size_t blksize, size_t nblocks)
+                       1170 ; rtxcapi.c  688        {
+                       1171         PUBLIC  _KS_create_part
+000486                 1172 _KS_create_part:
+000486 9972001A        1173         SUB.W   R7,#01AH
+                       1174 ; rtxcapi.c  689           struct parg p;
+                       1175 ; rtxcapi.c  690        
+                       1176 ; rtxcapi.c  691           p.ksnum = RTXC_CREATE_PART;
+00048A 927808          1177         MOV.B   [R7],#08H
+                       1178 ; rtxcapi.c  692           p.addr = addr;
+00048D 8C1F16          1179         MOV.W   [R7+22],R1
+000490 8C0F14          1180         MOV.W   [R7+20],R0
+                       1181 ; rtxcapi.c  693           p.size = blksize;
+000493 8C2F0A          1182         MOV.W   [R7+10],R2
+                       1183 ; rtxcapi.c  694           p.nblocks = nblocks;
+000496 8C3F18          1184         MOV.W   [R7+24],R3
+                       1185 ; rtxcapi.c  695           KS(p);
+000499 9128rr          1186         MOV.B   R1L,#SEG( __lc_bs )
+00049C 7133            1187         XOR.B   R1H,R1H
+00049E 8907            1188         MOV.W   R0,R7
+                       1189         CALL    _ks
+0004A0 C4rrrrrr       +1189 ;       FCALL   _ks
+                       1190 ; rtxcapi.c  696        
+                       1191 ; rtxcapi.c  697           /* return map # (0 = no dynamic partition headers available) */
+                       1192 ; rtxcapi.c  698           return(p.map);
+0004A4 840704          1193         MOV.B   R0L,[R7+4]
+                       1194 ; rtxcapi.c  699        }
+0004A7 9970001A        1195         ADD.W   R7,#01AH
+0004AB D680            1196         RET
+0004AB D68000          1196         RET
+                       1197 ; rtxcapi.c  700        #endif /* } HAS_CREATE_PART */
+                       1198 ; rtxcapi.c  701        
+                       1199 ; rtxcapi.c  702        /*******************************************************/
+                       1200 ; rtxcapi.c  703        #ifdef HAS_INQRES /* { */
+                       1201 ; rtxcapi.c  704        TASK KS_inqres(RESOURCE resource)
+                       1202 ; rtxcapi.c  705        {
+                       1203         PUBLIC  _KS_inqres
+0004AE                 1204 _KS_inqres:
+0004AE 99720010        1205         SUB.W   R7,#010H
+                       1206 ; rtxcapi.c  706           struct larg p;
+                       1207 ; rtxcapi.c  707        
+                       1208 ; rtxcapi.c  708           p.ksnum = RTXC_INQRES;
+0004B2 927826          1209         MOV.B   [R7],#026H
+                       1210 ; rtxcapi.c  709           p.resource = resource;
+0004B5 840F04          1211         MOV.B   [R7+4],R0L
+                       1212 ; rtxcapi.c  710           p.task = (TASK)0; /* initialize in case no owner exists */
+0004B8 B4700C          1213         MOV.B   [R7+12],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+                       1214 ; rtxcapi.c  711           KS(p);
+0004BB 9128rr          1215         MOV.B   R1L,#SEG( __lc_bs )
+0004BE 7133            1216         XOR.B   R1H,R1H
+0004C0 8907            1217         MOV.W   R0,R7
+                       1218         CALL    _ks
+0004C2 C4rrrrrr       +1218 ;       FCALL   _ks
+                       1219 ; rtxcapi.c  712           return(p.task);
+0004C6 84070C          1220         MOV.B   R0L,[R7+12]
+                       1221 ; rtxcapi.c  713        }
+0004C9 99700010        1222         ADD.W   R7,#010H
+0004CD D680            1223         RET
+0004CD D68000          1223         RET
+                       1224 ; rtxcapi.c  714        #endif /* } HAS_INQRES */
+                       1225 ; rtxcapi.c  715        
+                       1226 ; rtxcapi.c  716        /*******************************************************/
+                       1227 ; rtxcapi.c  717        #ifdef PRIORITY_INVERSION /* { */
+                       1228 ; rtxcapi.c  718        #ifdef HAS_DEFRES /* { */
+                       1229 ; rtxcapi.c  719        KSRC KS_defres(RESOURCE resource, RESATTR resattr)
+                       1230 ; rtxcapi.c  720        {
+                       1231         PUBLIC  _KS_defres
+0004D0                 1232 _KS_defres:
+0004D0 99720010        1233         SUB.W   R7,#010H
+                       1234 ; rtxcapi.c  721           struct larg p;
+                       1235 ; rtxcapi.c  722        
+                       1236 ; rtxcapi.c  723           p.ksnum = RTXC_DEFRES;
+0004D4 927827          1237         MOV.B   [R7],#027H
+                       1238 ; rtxcapi.c  724           p.resource = resource;
+0004D7 840F04          1239         MOV.B   [R7+4],R0L
+                       1240 ; rtxcapi.c  725           p.resattr = resattr;
+0004DA 8C1F0E          1241         MOV.W   [R7+14],R1
+                       1242 ; rtxcapi.c  726           p.ksrc = RC_GOOD;
+0004DD BC7002          1243         MOV.W   [R7+2],#00H
+                       1244 ; rtxcapi.c  727           KS(p);
+0004E0 9128rr          1245         MOV.B   R1L,#SEG( __lc_bs )
+0004E3 7133            1246         XOR.B   R1H,R1H
+0004E5 8907            1247         MOV.W   R0,R7
+                       1248         CALL    _ks
+0004E7 C4rrrrrr       +1248 ;       FCALL   _ks
+                       1249 ; rtxcapi.c  728           return(p.ksrc);
+0004EB 8C0702          1250         MOV.W   R0,[R7+2]
+                       1251 ; rtxcapi.c  729        }
+0004EE 99700010        1252         ADD.W   R7,#010H
+0004F2 D680            1253         RET
+0004F2 D680            1253         RET
+                       1254 ; rtxcapi.c  730        #endif /* } HAS_DEFRES */
+                       1255 ; rtxcapi.c  731        #endif /* } PRIORITY_INVERSION */
+                       1256 ; rtxcapi.c  732        
+                       1257 ; rtxcapi.c  733        /*******************************************************/
+                       1258 ; rtxcapi.c  734        #ifdef HAS_INQTASK_ARG /* { */
+                       1259 ; rtxcapi.c  735        void * KS_inqtask_arg(TASK task)
+                       1260 ; rtxcapi.c  736        {
+                       1261         PUBLIC  _KS_inqtask_arg
+0004F4                 1262 _KS_inqtask_arg:
+0004F4 99720014        1263         SUB.W   R7,#014H
+                       1264 ; rtxcapi.c  737           struct deftaskarg p;
+                       1265 ; rtxcapi.c  738        
+                       1266 ; rtxcapi.c  739           p.ksnum = RTXC_INQTASK_ARG;
+0004F8 927828          1267         MOV.B   [R7],#028H
+                       1268 ; rtxcapi.c  740           p.task = task;
+0004FB 840F04          1269         MOV.B   [R7+4],R0L
+                       1270 ; rtxcapi.c  741           KS(p);
+0004FE 9128rr          1271         MOV.B   R1L,#SEG( __lc_bs )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  23
+
+ADDR   CODE            LINE SOURCELINE
+000501 7133            1272         XOR.B   R1H,R1H
+000503 8907            1273         MOV.W   R0,R7
+                       1274         CALL    _ks
+000505 C4rrrrrr       +1274 ;       FCALL   _ks
+                       1275 ; rtxcapi.c  742           return(p.arg);
+000509 8C1712          1276         MOV.W   R1,[R7+18]
+00050C 8C0710          1277         MOV.W   R0,[R7+16]
+                       1278 ; rtxcapi.c  743        }
+00050F 99700014        1279         ADD.W   R7,#014H
+000513 D680            1280         RET
+000513 D68000          1280         RET
+                       1281 ; rtxcapi.c  744        #endif /* } HAS_INQTASK_ARG */
+                       1282 ; rtxcapi.c  745        
+                       1283 ; rtxcapi.c  746        /*******************************************************/
+                       1284 ; rtxcapi.c  747        #ifdef HAS_DEFTASK_ARG /* { */
+                       1285 ; rtxcapi.c  748        void KS_deftask_arg(TASK task, void *arg)
+                       1286 ; rtxcapi.c  749        {
+                       1287         PUBLIC  _KS_deftask_arg
+000516                 1288 _KS_deftask_arg:
+000516 99720014        1289         SUB.W   R7,#014H
+                       1290 ; rtxcapi.c  750           struct deftaskarg p;
+                       1291 ; rtxcapi.c  751        
+                       1292 ; rtxcapi.c  752           p.ksnum = RTXC_DEFTASK_ARG;
+00051A 927829          1293         MOV.B   [R7],#029H
+                       1294 ; rtxcapi.c  753           p.task = task;
+00051D 840F04          1295         MOV.B   [R7+4],R0L
+                       1296 ; rtxcapi.c  754           p.arg = arg;
+000520 8C3F12          1297         MOV.W   [R7+18],R3
+000523 8C2F10          1298         MOV.W   [R7+16],R2
+                       1299 ; rtxcapi.c  755           KS(p);
+000526 9128rr          1300         MOV.B   R1L,#SEG( __lc_bs )
+000529 7133            1301         XOR.B   R1H,R1H
+00052B 8907            1302         MOV.W   R0,R7
+                       1303         CALL    _ks
+00052D C4rrrrrr       +1303 ;       FCALL   _ks
+                       1304 ; rtxcapi.c  756        }
+000531 99700014        1305         ADD.W   R7,#014H
+000535 D680            1306         RET
+000535 D68000          1306         RET
+                       1307 ; rtxcapi.c  757        #endif /* } HAS_DEFTASK_ARG */
+                       1308 ; rtxcapi.c  758        
+                       1309 ; rtxcapi.c  759        /*******************************************************/
+                       1310 ; rtxcapi.c  760        #ifdef HAS_DEFMBOXSEMA /* { */
+                       1311 ; rtxcapi.c  761        /* mailbox event management */
+                       1312 ; rtxcapi.c  762        void KS_defmboxsema(MBOX mbox, SEMA sema)
+                       1313 ; rtxcapi.c  763        {
+                       1314         PUBLIC  _KS_defmboxsema
+000538                 1315 _KS_defmboxsema:
+000538 99720014        1316         SUB.W   R7,#014H
+                       1317 ; rtxcapi.c  764           struct msgarg p;
+                       1318 ; rtxcapi.c  765        
+                       1319 ; rtxcapi.c  766           p.ksnum = RTXC_DEFMBOXSEMA;
+00053C 92781F          1320         MOV.B   [R7],#01FH
+                       1321 ; rtxcapi.c  767           p.mbox = mbox;
+00053F 840F05          1322         MOV.B   [R7+5],R0L
+                       1323 ; rtxcapi.c  768           p.sema = sema;
+000542 841F04          1324         MOV.B   [R7+4],R0H
+                       1325 ; rtxcapi.c  769           KS(p);
+000545 9128rr          1326         MOV.B   R1L,#SEG( __lc_bs )
+000548 7133            1327         XOR.B   R1H,R1H
+00054A 8907            1328         MOV.W   R0,R7
+                       1329         CALL    _ks
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  24
+
+ADDR   CODE            LINE SOURCELINE
+00054C C4rrrrrr       +1329 ;       FCALL   _ks
+                       1330 ; rtxcapi.c  770        }
+000550 99700014        1331         ADD.W   R7,#014H
+000554 D680            1332         RET
+000554 D680            1332         RET
+                       1333 ; rtxcapi.c  771        #endif /* } HAS_DEFMBOXSEMA */
+                       1334 ; rtxcapi.c  772        
+                       1335 ; rtxcapi.c  773        /*******************************************************/
+                       1336 ; rtxcapi.c  774        #ifdef HAS_DEFQSEMA /* { */
+                       1337 ; rtxcapi.c  775        /* queue event management */
+                       1338 ; rtxcapi.c  776        void KS_defqsema(QUEUE queue, SEMA sema, QCOND qcond)
+                       1339 ; rtxcapi.c  777        {
+                       1340         PUBLIC  _KS_defqsema
+000556                 1341 _KS_defqsema:
+000556 99720014        1342         SUB.W   R7,#014H
+                       1343 ; rtxcapi.c  778           struct qdefarg p;
+                       1344 ; rtxcapi.c  779        
+                       1345 ; rtxcapi.c  780           p.ksnum = RTXC_DEFQSEMA;
+00055A 927821          1346         MOV.B   [R7],#021H
+                       1347 ; rtxcapi.c  781           p.queue = queue;
+00055D 840F04          1348         MOV.B   [R7+4],R0L
+                       1349 ; rtxcapi.c  782           p.sema = sema;
+000560 841F10          1350         MOV.B   [R7+16],R0H
+                       1351 ; rtxcapi.c  783           p.qcond = qcond;
+000563 8C1F12          1352         MOV.W   [R7+18],R1
+                       1353 ; rtxcapi.c  784           KS(p);
+000566 9128rr          1354         MOV.B   R1L,#SEG( __lc_bs )
+000569 7133            1355         XOR.B   R1H,R1H
+00056B 8907            1356         MOV.W   R0,R7
+                       1357         CALL    _ks
+00056D C4rrrrrr       +1357 ;       FCALL   _ks
+                       1358 ; rtxcapi.c  785        }
+000571 99700014        1359         ADD.W   R7,#014H
+000575 D680            1360         RET
+000575 D68000          1360         RET
+                       1361 ; rtxcapi.c  786        #endif /* } HAS_DEFQSEMA */
+                       1362 ; rtxcapi.c  787        
+                       1363 ; rtxcapi.c  788        /*******************************************************/
+                       1364 ; rtxcapi.c  789        #ifdef HAS_DEQUEUEW /* { */
+                       1365 ; rtxcapi.c  790        void KS_dequeuew(QUEUE queue, void *data)
+                       1366 ; rtxcapi.c  791        {
+                       1367         PUBLIC  _KS_dequeuew
+000578                 1368 _KS_dequeuew:
+000578 99720012        1369         SUB.W   R7,#012H
+                       1370 ; rtxcapi.c  792           struct qarg p;
+                       1371 ; rtxcapi.c  793        
+                       1372 ; rtxcapi.c  794           p.ksnum = RTXC_DEQUEUE;
+00057C 92780D          1373         MOV.B   [R7],#0DH
+                       1374 ; rtxcapi.c  795           p.queue = queue;
+00057F 840F05          1375         MOV.B   [R7+5],R0L
+                       1376 ; rtxcapi.c  796           p.data = data;
+000582 8C3F08          1377         MOV.W   [R7+8],R3
+000585 8C2F06          1378         MOV.W   [R7+6],R2
+                       1379 ; rtxcapi.c  797        #ifdef QUEUE_TIMEOUTS /* { */
+                       1380 ; rtxcapi.c  798           p.ticks = (TICKS)0;
+000588 BC700C          1381         MOV.W   [R7+12],#00H
+                       1382 ; rtxcapi.c  799        #endif /* } QUEUE_TIMEOUTS */
+                       1383 ; rtxcapi.c  800           p.wait = 1;
+00058B B4710A          1384         MOV.B   [R7+10],#01H
+                       1385 ; rtxcapi.c  801           KS(p);
+00058E 9128rr          1386         MOV.B   R1L,#SEG( __lc_bs )
+000591 7133            1387         XOR.B   R1H,R1H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  25
+
+ADDR   CODE            LINE SOURCELINE
+000593 8907            1388         MOV.W   R0,R7
+                       1389         CALL    _ks
+000595 C4rrrrrr       +1389 ;       FCALL   _ks
+                       1390 ; rtxcapi.c  802        }
+000599 99700012        1391         ADD.W   R7,#012H
+00059D D680            1392         RET
+00059D D68000          1392         RET
+                       1393 ; rtxcapi.c  803        #endif /* } HAS_DEQUEUEW */
+                       1394 ; rtxcapi.c  804        
+                       1395 ; rtxcapi.c  805        /*******************************************************/
+                       1396 ; rtxcapi.c  806        #ifdef HAS_ELAPSE /* { */
+                       1397 ; rtxcapi.c  807        TICKS KS_elapse(TICKS *stamp)
+                       1398 ; rtxcapi.c  808        {
+                       1399         PUBLIC  _KS_elapse
+0005A0                 1400 _KS_elapse:
+0005A0 A978            1401         ADDS.W  R7,#08H
+                       1402 ; rtxcapi.c  809           struct etarg p;
+                       1403 ; rtxcapi.c  810        
+                       1404 ; rtxcapi.c  811           p.ksnum = RTXC_ELAPSE;
+0005A2 927823          1405         MOV.B   [R7],#023H
+                       1406 ; rtxcapi.c  812           p.stamp = stamp;
+0005A5 8C1F04          1407         MOV.W   [R7+4],R1
+0005A8 8C0F02          1408         MOV.W   [R7+2],R0
+                       1409 ; rtxcapi.c  813           KS(p);
+0005AB 9128rr          1410         MOV.B   R1L,#SEG( __lc_bs )
+0005AE 7133            1411         XOR.B   R1H,R1H
+0005B0 8907            1412         MOV.W   R0,R7
+                       1413         CALL    _ks
+0005B2 C4rrrrrr       +1413 ;       FCALL   _ks
+                       1414 ; rtxcapi.c  814           return(p.val);
+0005B6 8C0706          1415         MOV.W   R0,[R7+6]
+                       1416 ; rtxcapi.c  815        }
+0005B9 99700008        1417         ADD.W   R7,#08H
+0005BD D680            1418         RET
+0005BD D68000          1418         RET
+                       1419 ; rtxcapi.c  816        #endif /* } HAS_ELAPSE */
+                       1420 ; rtxcapi.c  817        
+                       1421 ; rtxcapi.c  818        /*******************************************************/
+                       1422 ; rtxcapi.c  819        #ifdef HAS_ENQUEUEW /* { */
+                       1423 ; rtxcapi.c  820        void KS_enqueuew(QUEUE queue, void *data)
+                       1424 ; rtxcapi.c  821        {
+                       1425         PUBLIC  _KS_enqueuew
+0005C0                 1426 _KS_enqueuew:
+0005C0 99720012        1427         SUB.W   R7,#012H
+                       1428 ; rtxcapi.c  822           struct qarg p;
+                       1429 ; rtxcapi.c  823        
+                       1430 ; rtxcapi.c  824           p.ksnum = RTXC_ENQUEUE;
+0005C4 92780C          1431         MOV.B   [R7],#0CH
+                       1432 ; rtxcapi.c  825           p.queue = queue;
+0005C7 840F05          1433         MOV.B   [R7+5],R0L
+                       1434 ; rtxcapi.c  826           p.data = data;
+0005CA 8C3F08          1435         MOV.W   [R7+8],R3
+0005CD 8C2F06          1436         MOV.W   [R7+6],R2
+                       1437 ; rtxcapi.c  827        #ifdef QUEUE_TIMEOUTS /* { */
+                       1438 ; rtxcapi.c  828           p.ticks = (TICKS)0;
+0005D0 BC700C          1439         MOV.W   [R7+12],#00H
+                       1440 ; rtxcapi.c  829        #endif /* } QUEUE_TIMEOUTS */
+                       1441 ; rtxcapi.c  830           p.wait = 1;
+0005D3 B4710A          1442         MOV.B   [R7+10],#01H
+                       1443 ; rtxcapi.c  831           KS(p);
+0005D6 9128rr          1444         MOV.B   R1L,#SEG( __lc_bs )
+0005D9 7133            1445         XOR.B   R1H,R1H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  26
+
+ADDR   CODE            LINE SOURCELINE
+0005DB 8907            1446         MOV.W   R0,R7
+                       1447         CALL    _ks
+0005DD C4rrrrrr       +1447 ;       FCALL   _ks
+                       1448 ; rtxcapi.c  832        }
+0005E1 99700012        1449         ADD.W   R7,#012H
+0005E5 D680            1450         RET
+0005E5 D68000          1450         RET
+                       1451 ; rtxcapi.c  833        #endif /* } HAS_ENQUEUEW */
+                       1452 ; rtxcapi.c  834        
+                       1453 ; rtxcapi.c  835        /*******************************************************/
+                       1454 ; rtxcapi.c  836        #ifdef HAS_INQMAP /* { */
+                       1455 ; rtxcapi.c  837        size_t KS_inqmap(MAP map)
+                       1456 ; rtxcapi.c  838        {
+                       1457         PUBLIC  _KS_inqmap
+0005E8                 1458 _KS_inqmap:
+                       1459 ; rtxcapi.c  839           return(pheader[map].size);
+0005E8 E80016          1460         MULU.B  R0L,#016H
+0005EB B910            1461         MOVS.W  R1,#00H
+0005ED 964842rr        1462         MOV.B   ES,#SEG( _pheader+4 )
+0005F1 8D00rrrr        1463         MOV.W   R0,[R0+SOF( _pheader+4 )]
+                       1464 ; rtxcapi.c  840        }
+0005F5 D680            1465         RET
+0005F5 D68000          1465         RET
+                       1466 ; rtxcapi.c  841        #endif /* } HAS_INQMAP */
+                       1467 ; rtxcapi.c  842        
+                       1468 ; rtxcapi.c  843        /*******************************************************/
+                       1469 ; rtxcapi.c  844        #ifdef HAS_LOCKW /* { */
+                       1470 ; rtxcapi.c  845        KSRC KS_lockw(RESOURCE resource)
+                       1471 ; rtxcapi.c  846        {
+                       1472         PUBLIC  _KS_lockw
+0005F8                 1473 _KS_lockw:
+0005F8 99720010        1474         SUB.W   R7,#010H
+                       1475 ; rtxcapi.c  847           struct larg p;
+                       1476 ; rtxcapi.c  848        #ifdef FASTLOCK /* { */
+                       1477 ; rtxcapi.c  849           RHEADER ks_tbl *prh;
+                       1478 ; rtxcapi.c  850           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+                       1479 ; rtxcapi.c  851        
+                       1480 ; rtxcapi.c  852           prh = (RHEADER ks_tbl *)&rheader[resource];
+                       1481 ; rtxcapi.c  853        
+                       1482 ; rtxcapi.c  854           PUSHPSWH;  /* save processor priority level */
+                       1483 ; rtxcapi.c  855           DISABLE;
+                       1484 ; rtxcapi.c  856        
+                       1485 ; rtxcapi.c  857           if (prh->owner == NULLTCB)  /* if resource not currently owned */
+                       1486 ; rtxcapi.c  858           {
+                       1487 ; rtxcapi.c  859        #ifdef CBUG /* { */
+                       1488 ; rtxcapi.c  860              prh->count++;           /* update statistics */
+                       1489 ; rtxcapi.c  861        #endif /* } CBUG */
+                       1490 ; rtxcapi.c  862              prh->owner = hipritsk; /* lock resource with task # */
+                       1491 ; rtxcapi.c  863              prh->level = 1;         /* set nesting level = 1 */
+                       1492 ; rtxcapi.c  864              POPPSWH;                 /* fast return */
+                       1493 ; rtxcapi.c  865              return(RC_GOOD);
+                       1494 ; rtxcapi.c  866           }
+                       1495 ; rtxcapi.c  867        
+                       1496 ; rtxcapi.c  868           if (prh->owner == hipritsk) /* if already owned by caller */
+                       1497 ; rtxcapi.c  869           {
+                       1498 ; rtxcapi.c  870        #ifdef CBUG /* { */
+                       1499 ; rtxcapi.c  871              prh->count++;           /* update statistics */
+                       1500 ; rtxcapi.c  872        #endif /* } CBUG */
+                       1501 ; rtxcapi.c  873              prh->level++;           /* bump nesting level */
+                       1502 ; rtxcapi.c  874              POPPSWH;                 /* fast return */
+                       1503 ; rtxcapi.c  875              return(RC_NESTED);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  27
+
+ADDR   CODE            LINE SOURCELINE
+                       1504 ; rtxcapi.c  876           }
+                       1505 ; rtxcapi.c  877           POPPSWH;
+                       1506 ; rtxcapi.c  878        #endif /* } FASTLOCK */
+                       1507 ; rtxcapi.c  879        
+                       1508 ; rtxcapi.c  880           p.ksnum = RTXC_LOCK;
+0005FC 92780E          1509         MOV.B   [R7],#0EH
+                       1510 ; rtxcapi.c  881           p.resource = resource;
+0005FF 840F04          1511         MOV.B   [R7+4],R0L
+                       1512 ; rtxcapi.c  882           p.wait = 1;
+000602 B47105          1513         MOV.B   [R7+5],#01H
+                       1514 ; rtxcapi.c  883           p.ksrc = RC_GOOD;
+000605 BC7002          1515         MOV.W   [R7+2],#00H
+                       1516 ; rtxcapi.c  884        #ifdef RESOURCE_TIMEOUTS /* { */
+                       1517 ; rtxcapi.c  885           p.ticks = (TICKS)0;
+000608 BC7006          1518         MOV.W   [R7+6],#00H
+                       1519 ; rtxcapi.c  886        #endif /* } RESOURCE_TIMEOUTS */
+                       1520 ; rtxcapi.c  887           KS(p);
+00060B 9128rr          1521         MOV.B   R1L,#SEG( __lc_bs )
+00060E 7133            1522         XOR.B   R1H,R1H
+000610 8907            1523         MOV.W   R0,R7
+                       1524         CALL    _ks
+000612 C4rrrrrr       +1524 ;       FCALL   _ks
+                       1525 ; rtxcapi.c  888           return(p.ksrc);
+000616 8C0702          1526         MOV.W   R0,[R7+2]
+                       1527 ; rtxcapi.c  889        }
+000619 99700010        1528         ADD.W   R7,#010H
+00061D D680            1529         RET
+00061D D68000          1529         RET
+                       1530 ; rtxcapi.c  890        #endif /* } HAS_LOCKW */
+                       1531 ; rtxcapi.c  891        
+                       1532 ; rtxcapi.c  892        /*******************************************************/
+                       1533 ; rtxcapi.c  893        #ifdef HAS_PURGEQUEUE /* { */
+                       1534 ; rtxcapi.c  894        void KS_purgequeue(QUEUE queue)
+                       1535 ; rtxcapi.c  895        {
+                       1536         PUBLIC  _KS_purgequeue
+000620                 1537 _KS_purgequeue:
+000620 99720012        1538         SUB.W   R7,#012H
+                       1539 ; rtxcapi.c  896           struct qarg p;
+                       1540 ; rtxcapi.c  897        
+                       1541 ; rtxcapi.c  898           p.ksnum = RTXC_PURGEQUEUE;
+000624 927820          1542         MOV.B   [R7],#020H
+                       1543 ; rtxcapi.c  899           p.queue = queue;
+000627 840F05          1544         MOV.B   [R7+5],R0L
+                       1545 ; rtxcapi.c  900           KS(p);
+00062A 9128rr          1546         MOV.B   R1L,#SEG( __lc_bs )
+00062D 7133            1547         XOR.B   R1H,R1H
+00062F 8907            1548         MOV.W   R0,R7
+                       1549         CALL    _ks
+000631 C4rrrrrr       +1549 ;       FCALL   _ks
+                       1550 ; rtxcapi.c  901        }
+000635 99700012        1551         ADD.W   R7,#012H
+000639 D680            1552         RET
+000639 D68000          1552         RET
+                       1553 ; rtxcapi.c  902        #endif /* } HAS_PURGEQUEUE */
+                       1554 ; rtxcapi.c  903        
+                       1555 ; rtxcapi.c  904        /*******************************************************/
+                       1556 ; rtxcapi.c  905        #ifdef HAS_RECEIVEW /* { */
+                       1557 ; rtxcapi.c  906        RTXCMSG * KS_receivew(MBOX mbox, TASK task)
+                       1558 ; rtxcapi.c  907        {
+                       1559         PUBLIC  _KS_receivew
+00063C                 1560 _KS_receivew:
+00063C 99720014        1561         SUB.W   R7,#014H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  28
+
+ADDR   CODE            LINE SOURCELINE
+                       1562 ; rtxcapi.c  908           struct msgarg p;
+                       1563 ; rtxcapi.c  909        
+                       1564 ; rtxcapi.c  910           p.ksnum = RTXC_RECEIVE;
+000640 B275            1565         MOV.B   [R7],#05H
+                       1566 ; rtxcapi.c  911           p.mbox = mbox;
+000642 840F05          1567         MOV.B   [R7+5],R0L
+                       1568 ; rtxcapi.c  912           p.task = task;
+000645 841F06          1569         MOV.B   [R7+6],R0H
+                       1570 ; rtxcapi.c  913           p.prtxcmsg = (RTXCMSG *)0; /* preset in case timeout */
+000648 BC700A          1571         MOV.W   [R7+10],#00H
+00064B BC7008          1572         MOV.W   [R7+8],#00H
+                       1573 ; rtxcapi.c  914           p.wait = 1;
+00064E B4710C          1574         MOV.B   [R7+12],#01H
+                       1575 ; rtxcapi.c  915        #ifdef MAILBOX_TIMEOUTS /* { */
+                       1576 ; rtxcapi.c  916           p.ticks = (TICKS)0;
+000651 BC700E          1577         MOV.W   [R7+14],#00H
+                       1578 ; rtxcapi.c  917        #endif /* } MAILBOX_TIMEOUTS */
+                       1579 ; rtxcapi.c  918           KS(p);
+000654 9128rr          1580         MOV.B   R1L,#SEG( __lc_bs )
+000657 7133            1581         XOR.B   R1H,R1H
+000659 8907            1582         MOV.W   R0,R7
+                       1583         CALL    _ks
+00065B C4rrrrrr       +1583 ;       FCALL   _ks
+                       1584 ; rtxcapi.c  919           return(p.prtxcmsg);
+00065F 8C170A          1585         MOV.W   R1,[R7+10]
+000662 8C0708          1586         MOV.W   R0,[R7+8]
+                       1587 ; rtxcapi.c  920        }
+000665 99700014        1588         ADD.W   R7,#014H
+000669 D680            1589         RET
+000669 D68000          1589         RET
+                       1590 ; rtxcapi.c  921        #endif /* } HAS_RECEIVEW */
+                       1591 ; rtxcapi.c  922        
+                       1592 ; rtxcapi.c  923        /*******************************************************/
+                       1593 ; rtxcapi.c  924        #ifdef HAS_SENDW /* { */
+                       1594 ; rtxcapi.c  925        void KS_sendw(MBOX mbox, RTXCMSG *prtxcmsg, PRIORITY priority, SEMA sema)
+                            
+                       1595 ; rtxcapi.c  926        {
+                       1596         PUBLIC  _KS_sendw
+00066C                 1597 _KS_sendw:
+00066C 99720014        1598         SUB.W   R7,#014H
+                       1599 ; rtxcapi.c  927           struct msgarg p;
+                       1600 ; rtxcapi.c  928        
+                       1601 ; rtxcapi.c  929           p.ksnum = RTXC_SEND;
+000670 B274            1602         MOV.B   [R7],#04H
+                       1603 ; rtxcapi.c  930           p.mbox = mbox;
+000672 840F05          1604         MOV.B   [R7+5],R0L
+                       1605 ; rtxcapi.c  931           p.prtxcmsg = prtxcmsg;
+000675 8C3F0A          1606         MOV.W   [R7+10],R3
+000678 8C2F08          1607         MOV.W   [R7+8],R2
+                       1608 ; rtxcapi.c  932           p.priority = priority;
+00067B 841F07          1609         MOV.B   [R7+7],R0H
+                       1610 ; rtxcapi.c  933           p.sema = sema;
+00067E 842F04          1611         MOV.B   [R7+4],R1L
+                       1612 ; rtxcapi.c  934           p.wait = 1;
+000681 B4710C          1613         MOV.B   [R7+12],#01H
+                       1614 ; rtxcapi.c  935        #ifdef MAILBOX_TIMEOUTS /* { */
+                       1615 ; rtxcapi.c  936           p.ticks = (TICKS)0; /* indicate NO timeout */
+000684 BC700E          1616         MOV.W   [R7+14],#00H
+                       1617 ; rtxcapi.c  937        #endif /* } MAILBOX_TIMEOUTS */
+                       1618 ; rtxcapi.c  938           KS(p);
+000687 9128rr          1619         MOV.B   R1L,#SEG( __lc_bs )
+00068A 7133            1620         XOR.B   R1H,R1H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  29
+
+ADDR   CODE            LINE SOURCELINE
+00068C 8907            1621         MOV.W   R0,R7
+                       1622         CALL    _ks
+00068E C4rrrrrr       +1622 ;       FCALL   _ks
+                       1623 ; rtxcapi.c  939        }
+000692 99700014        1624         ADD.W   R7,#014H
+000696 D680            1625         RET
+000696 D680            1625         RET
+                       1626 ; rtxcapi.c  940        #endif /* } HAS_SENDW */
+                       1627 ; rtxcapi.c  941        
+                       1628 ; rtxcapi.c  942        /*******************************************************/
+                       1629 ; rtxcapi.c  943        #ifdef HAS_WAITM /* { */
+                       1630 ; rtxcapi.c  944        SEMA KS_waitm(const SEMA *semalist)
+                       1631 ; rtxcapi.c  945        {
+                       1632         PUBLIC  _KS_waitm
+000698                 1633 _KS_waitm:
+000698 9972000A        1634         SUB.W   R7,#0AH
+                       1635 ; rtxcapi.c  946           struct sargm p;
+                       1636 ; rtxcapi.c  947        
+                       1637 ; rtxcapi.c  948           p.ksnum = RTXC_WAITM;
+00069C 927822          1638         MOV.B   [R7],#022H
+                       1639 ; rtxcapi.c  949           p.list = semalist;
+00069F 8C1F08          1640         MOV.W   [R7+8],R1
+0006A2 8C0F06          1641         MOV.W   [R7+6],R0
+                       1642 ; rtxcapi.c  950           KS(p);
+0006A5 9128rr          1643         MOV.B   R1L,#SEG( __lc_bs )
+0006A8 7133            1644         XOR.B   R1H,R1H
+0006AA 8907            1645         MOV.W   R0,R7
+                       1646         CALL    _ks
+0006AC C4rrrrrr       +1646 ;       FCALL   _ks
+                       1647 ; rtxcapi.c  951           return(p.sema);
+0006B0 840704          1648         MOV.B   R0L,[R7+4]
+                       1649 ; rtxcapi.c  952        }
+0006B3 9970000A        1650         ADD.W   R7,#0AH
+0006B7 D680            1651         RET
+0006B7 D68000          1651         RET
+                       1652 ; rtxcapi.c  953        #endif /* } HAS_WAITM */
+                       1653 ; rtxcapi.c  954        
+                       1654 ; rtxcapi.c  955        /*******************************************************/
+                       1655 ; rtxcapi.c  956        #ifdef HAS_INQTIME /* { */
+                       1656 ; rtxcapi.c  957        time_t KS_inqtime(void)
+                       1657 ; rtxcapi.c  958        {
+                       1658         PUBLIC  _KS_inqtime
+0006BA                 1659 _KS_inqtime:
+0006BA A97A            1660         ADDS.W  R7,#0AH
+                       1661 ; rtxcapi.c  959           struct timearg p;
+                       1662 ; rtxcapi.c  960        
+                       1663 ; rtxcapi.c  961           p.ksnum = RTXC_INQTIME;
+0006BC 927824          1664         MOV.B   [R7],#024H
+                       1665 ; rtxcapi.c  962           KS(p);
+0006BF 9128rr          1666         MOV.B   R1L,#SEG( __lc_bs )
+0006C2 7133            1667         XOR.B   R1H,R1H
+0006C4 8907            1668         MOV.W   R0,R7
+                       1669         CALL    _ks
+0006C6 C4rrrrrr       +1669 ;       FCALL   _ks
+                       1670 ; rtxcapi.c  963           return(p.time);
+0006CA 8C1704          1671         MOV.W   R1,[R7+4]
+0006CD 8C0702          1672         MOV.W   R0,[R7+2]
+                       1673 ; rtxcapi.c  964        }
+0006D0 A976            1674         ADDS.W  R7,#06H
+0006D2 D680            1675         RET
+0006D2 D680            1675         RET
+                       1676 ; rtxcapi.c  965        #endif /* } HAS_INQTIME */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  30
+
+ADDR   CODE            LINE SOURCELINE
+                       1677 ; rtxcapi.c  966        
+                       1678 ; rtxcapi.c  967        /*******************************************************/
+                       1679 ; rtxcapi.c  968        #ifdef HAS_DEFTIME /* { */
+                       1680 ; rtxcapi.c  969        void KS_deftime(time_t time)
+                       1681 ; rtxcapi.c  970        {
+                       1682         PUBLIC  _KS_deftime
+0006D4                 1683 _KS_deftime:
+0006D4 A97A            1684         ADDS.W  R7,#0AH
+                       1685 ; rtxcapi.c  971           struct timearg p;
+                       1686 ; rtxcapi.c  972        
+                       1687 ; rtxcapi.c  973           p.ksnum = RTXC_DEFTIME;
+0006D6 927825          1688         MOV.B   [R7],#025H
+                       1689 ; rtxcapi.c  974           p.time = time;
+0006D9 8C1F04          1690         MOV.W   [R7+4],R1
+0006DC 8C0F02          1691         MOV.W   [R7+2],R0
+                       1692 ; rtxcapi.c  975           KS(p);
+0006DF 9128rr          1693         MOV.B   R1L,#SEG( __lc_bs )
+0006E2 7133            1694         XOR.B   R1H,R1H
+0006E4 8907            1695         MOV.W   R0,R7
+                       1696         CALL    _ks
+0006E6 C4rrrrrr       +1696 ;       FCALL   _ks
+                       1697 ; rtxcapi.c  976        }
+0006EA A976            1698         ADDS.W  R7,#06H
+0006EC D680            1699         RET
+0006EC D680            1699         RET
+                       1700 ; rtxcapi.c  977        #endif /* } HAS_DEFTIME */
+                       1701 ; rtxcapi.c  978        
+                       1702 ; rtxcapi.c  979        #endif /* } RTXC_AL */
+                       1703 ; rtxcapi.c  980        
+                       1704 ; rtxcapi.c  981        #ifdef RTXC_EL /* { */
+                       1705 ; rtxcapi.c  982        /*******************************************************/
+                       1706 ; rtxcapi.c  983        /* EXTENDED RTXC LIBRARY */
+                       1707 ; rtxcapi.c  984        /*******************************************************/
+                       1708 ; rtxcapi.c  985        #ifdef HAS_INQTIMER /* { */
+                       1709 ; rtxcapi.c  986        TICKS KS_inqtimer(CLKBLK ks_clk *pclkblk)
+                       1710 ; rtxcapi.c  987        {
+                       1711         PUBLIC  _KS_inqtimer
+0006EE                 1712 _KS_inqtimer:
+0006EE 9972000E        1713         SUB.W   R7,#0EH
+                       1714 ; rtxcapi.c  988           struct clkarg p;
+                       1715 ; rtxcapi.c  989        
+                       1716 ; rtxcapi.c  990           p.ksnum = RTXC_INQTIMER;
+0006F2 92782A          1717         MOV.B   [R7],#02AH
+                       1718 ; rtxcapi.c  991           p.pclkblk = pclkblk;
+0006F5 8C1F0C          1719         MOV.W   [R7+12],R1
+0006F8 8C0F0A          1720         MOV.W   [R7+10],R0
+                       1721 ; rtxcapi.c  992           KS(p);
+0006FB 9128rr          1722         MOV.B   R1L,#SEG( __lc_bs )
+0006FE 7133            1723         XOR.B   R1H,R1H
+000700 8907            1724         MOV.W   R0,R7
+                       1725         CALL    _ks
+000702 C4rrrrrr       +1725 ;       FCALL   _ks
+                       1726 ; rtxcapi.c  993           return(p.ticks);
+000706 8C0706          1727         MOV.W   R0,[R7+6]
+                       1728 ; rtxcapi.c  994        }
+000709 9970000E        1729         ADD.W   R7,#0EH
+00070D D680            1730         RET
+00070D D68000          1730         RET
+                       1731 ; rtxcapi.c  995        #endif /* } HAS_INQTIMER */
+                       1732 ; rtxcapi.c  996        
+                       1733 ; rtxcapi.c  997        /*******************************************************/
+                       1734 ; rtxcapi.c  998        #ifdef HAS_ALLOCT /* { */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  31
+
+ADDR   CODE            LINE SOURCELINE
+                       1735 ; rtxcapi.c  999        void * KS_alloct(MAP map, TICKS ticks, KSRC *pksrc)
+                       1736 ; rtxcapi.c 1000        {
+                       1737         PUBLIC  _KS_alloct
+000710                 1738 _KS_alloct:
+000710 0F30            1739         PUSH.W  R4, R5
+000712 9972002C        1740         SUB.W   R7,#02CH
+000716 8953            1741         MOV.W   R5,R3
+000718 8942            1742         MOV.W   R4,R2
+                       1743 ; rtxcapi.c 1001           struct parg p;
+                       1744 ; rtxcapi.c 1002           CLKBLK clkblk;
+                       1745 ; rtxcapi.c 1003        #ifdef FASTALLOC /* { */
+                       1746 ; rtxcapi.c 1004           PHEADER ks_tbl *pph;
+                       1747 ; rtxcapi.c 1005           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+                       1748 ; rtxcapi.c 1006        
+                       1749 ; rtxcapi.c 1007           pph = (PHEADER ks_tbl *)&pheader[map];
+                       1750 ; rtxcapi.c 1008        
+                       1751 ; rtxcapi.c 1009           PUSHPSWH;  /* save processor priority level */
+                       1752 ; rtxcapi.c 1010           DISABLE;
+                       1753 ; rtxcapi.c 1011        
+                       1754 ; rtxcapi.c 1012           if ( (p.val = (char *)pph->next) != NULL ) /* if any available */
+                       1755 ; rtxcapi.c 1013           {
+                       1756 ; rtxcapi.c 1014              pph->next = ((struct xmap *)p.val)->link; /* unlink 1st from list *
+                            /
+                       1757 ; rtxcapi.c 1015        #ifdef CBUG /* { */
+                       1758 ; rtxcapi.c 1016              if (++pph->cur > pph->worst) /* check for new worst case */
+                       1759 ; rtxcapi.c 1017                 pph->worst = pph->cur;          /* useage level */
+                       1760 ; rtxcapi.c 1018        #endif /* } CBUG */
+                       1761 ; rtxcapi.c 1019              POPPSWH;
+                       1762 ; rtxcapi.c 1020              *pksrc = RC_GOOD;
+                       1763 ; rtxcapi.c 1021              return(p.val);
+                       1764 ; rtxcapi.c 1022           }
+                       1765 ; rtxcapi.c 1023           POPPSWH;
+                       1766 ; rtxcapi.c 1024        #endif /* } FASTALLOC */
+                       1767 ; rtxcapi.c 1025        
+                       1768 ; rtxcapi.c 1026           p.ksnum = RTXC_ALLOC;
+00071A B276            1769         MOV.B   [R7],#06H
+                       1770 ; rtxcapi.c 1027           p.map = map;
+00071C 840F04          1771         MOV.B   [R7+4],R0L
+                       1772 ; rtxcapi.c 1028           p.wait = 1;
+00071F B4710C          1773         MOV.B   [R7+12],#01H
+                       1774 ; rtxcapi.c 1029           p.ticks = ticks;
+000722 8C1F0E          1775         MOV.W   [R7+14],R1
+                       1776 ; rtxcapi.c 1030           p.ksrc = RC_GOOD;
+000725 BC7002          1777         MOV.W   [R7+2],#00H
+                       1778 ; rtxcapi.c 1031           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+000728 9128rr          1779         MOV.B   R1L,#SEG( __lc_bs )
+00072B 7133            1780         XOR.B   R1H,R1H
+00072D 40071A          1781         LEA     R0,R7+26
+000730 8C1F12          1782         MOV.W   [R7+18],R1
+000733 8C0F10          1783         MOV.W   [R7+16],R0
+                       1784 ; rtxcapi.c 1032           KS(p);
+000736 9128rr          1785         MOV.B   R1L,#SEG( __lc_bs )
+000739 7133            1786         XOR.B   R1H,R1H
+00073B 8907            1787         MOV.W   R0,R7
+                       1788         CALL    _ks
+00073D C4rrrrrr       +1788 ;       FCALL   _ks
+                       1789 ; rtxcapi.c 1033           *pksrc = p.ksrc;
+000741 8C0702          1790         MOV.W   R0,[R7+2]
+000744 86AC42          1791         MOV.B   ES,R5L
+000747 8A0C            1792         MOV.W   [R4],R0
+                       1793 ; rtxcapi.c 1034           return(p.val);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  32
+
+ADDR   CODE            LINE SOURCELINE
+000749 8C1708          1794         MOV.W   R1,[R7+8]
+00074C 8C0706          1795         MOV.W   R0,[R7+6]
+                       1796 ; rtxcapi.c 1035        }
+00074F 9970002C        1797         ADD.W   R7,#02CH
+000753 2F30            1798         POP.W   R4, R5
+000755 D680            1799         RET
+000755 D68000          1799         RET
+                       1800 ; rtxcapi.c 1036        #endif /* } HAS_ALLOCT */
+                       1801 ; rtxcapi.c 1037        
+                       1802 ; rtxcapi.c 1038        /*******************************************************/
+                       1803 ; rtxcapi.c 1039        #ifdef HAS_DEFQUEUE /* { */
+                       1804 ; rtxcapi.c 1040        KSRC KS_defqueue(QUEUE queue, size_t width, int depth,
+                       1805 ; rtxcapi.c 1041                         void ks_queue *base, int current_size)
+                       1806 ; rtxcapi.c 1042        {
+                       1807         PUBLIC  _KS_defqueue
+000758                 1808 _KS_defqueue:
+000758 99720014        1809         SUB.W   R7,#014H
+                       1810 ; rtxcapi.c 1043           struct qdefarg p;
+                       1811 ; rtxcapi.c 1044        
+                       1812 ; rtxcapi.c 1045           p.ksnum = RTXC_DEFQUEUE;
+00075C 92782E          1813         MOV.B   [R7],#02EH
+                       1814 ; rtxcapi.c 1046           p.queue = queue;
+00075F 840F04          1815         MOV.B   [R7+4],R0L
+                       1816 ; rtxcapi.c 1047           p.width = width;
+000762 8C1F0A          1817         MOV.W   [R7+10],R1
+                       1818 ; rtxcapi.c 1048           p.depth = depth;
+000765 8C2F0C          1819         MOV.W   [R7+12],R2
+                       1820 ; rtxcapi.c 1049           p.base = (char ks_queue *)base;
+000768 8C171A          1821         MOV.W   R1,[R7+26]
+00076B 8C0718          1822         MOV.W   R0,[R7+24]
+00076E 8C1F08          1823         MOV.W   [R7+8],R1
+000771 8C0F06          1824         MOV.W   [R7+6],R0
+                       1825 ; rtxcapi.c 1050           p.current_size = current_size;
+000774 8C3F0E          1826         MOV.W   [R7+14],R3
+                       1827 ; rtxcapi.c 1051           p.ksrc = RC_GOOD;
+000777 BC7002          1828         MOV.W   [R7+2],#00H
+                       1829 ; rtxcapi.c 1052           KS(p);
+00077A 9128rr          1830         MOV.B   R1L,#SEG( __lc_bs )
+00077D 7133            1831         XOR.B   R1H,R1H
+00077F 8907            1832         MOV.W   R0,R7
+                       1833         CALL    _ks
+000781 C4rrrrrr       +1833 ;       FCALL   _ks
+                       1834 ; rtxcapi.c 1053           return(p.ksrc);
+000785 8C0702          1835         MOV.W   R0,[R7+2]
+                       1836 ; rtxcapi.c 1054        }
+000788 99700014        1837         ADD.W   R7,#014H
+00078C D680            1838         RET
+00078C D680            1838         RET
+                       1839 ; rtxcapi.c 1055        #endif /* } HAS_DEFQUEUE */
+                       1840 ; rtxcapi.c 1056        
+                       1841 ; rtxcapi.c 1057        /*******************************************************/
+                       1842 ; rtxcapi.c 1058        #ifdef HAS_DEQUEUET /* { */
+                       1843 ; rtxcapi.c 1059        KSRC KS_dequeuet(QUEUE queue, void *data, TICKS ticks)
+                       1844 ; rtxcapi.c 1060        {
+                       1845         PUBLIC  _KS_dequeuet
+00078E                 1846 _KS_dequeuet:
+00078E 99720024        1847         SUB.W   R7,#024H
+                       1848 ; rtxcapi.c 1061           struct qarg p;
+                       1849 ; rtxcapi.c 1062           CLKBLK clkblk;
+                       1850 ; rtxcapi.c 1063        
+                       1851 ; rtxcapi.c 1064           p.ksnum = RTXC_DEQUEUE;
+000792 92780D          1852         MOV.B   [R7],#0DH
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  33
+
+ADDR   CODE            LINE SOURCELINE
+                       1853 ; rtxcapi.c 1065           p.queue = queue;
+000795 840F05          1854         MOV.B   [R7+5],R0L
+                       1855 ; rtxcapi.c 1066           p.data = data;
+000798 8C3F08          1856         MOV.W   [R7+8],R3
+00079B 8C2F06          1857         MOV.W   [R7+6],R2
+                       1858 ; rtxcapi.c 1067           p.ticks = ticks;
+00079E 8C1F0C          1859         MOV.W   [R7+12],R1
+                       1860 ; rtxcapi.c 1068           p.wait = 1;
+0007A1 B4710A          1861         MOV.B   [R7+10],#01H
+                       1862 ; rtxcapi.c 1069           p.ksrc = RC_TIMEOUT;
+0007A4 BC7502          1863         MOV.W   [R7+2],#05H
+                       1864 ; rtxcapi.c 1070           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+0007A7 9128rr          1865         MOV.B   R1L,#SEG( __lc_bs )
+0007AA 7133            1866         XOR.B   R1H,R1H
+0007AC 400712          1867         LEA     R0,R7+18
+0007AF 8C1F10          1868         MOV.W   [R7+16],R1
+0007B2 8C0F0E          1869         MOV.W   [R7+14],R0
+                       1870 ; rtxcapi.c 1071           KS(p);
+0007B5 9128rr          1871         MOV.B   R1L,#SEG( __lc_bs )
+0007B8 7133            1872         XOR.B   R1H,R1H
+0007BA 8907            1873         MOV.W   R0,R7
+                       1874         CALL    _ks
+0007BC C4rrrrrr       +1874 ;       FCALL   _ks
+                       1875 ; rtxcapi.c 1072           return(p.ksrc);
+0007C0 8C0702          1876         MOV.W   R0,[R7+2]
+                       1877 ; rtxcapi.c 1073        }
+0007C3 99700024        1878         ADD.W   R7,#024H
+0007C7 D680            1879         RET
+0007C7 D68000          1879         RET
+                       1880 ; rtxcapi.c 1074        #endif /* } HAS_DEQUEUET */
+                       1881 ; rtxcapi.c 1075        
+                       1882 ; rtxcapi.c 1076        /*******************************************************/
+                       1883 ; rtxcapi.c 1077        #ifdef HAS_ENQUEUET /* { */
+                       1884 ; rtxcapi.c 1078        KSRC KS_enqueuet(QUEUE queue, void *data, TICKS ticks)
+                       1885 ; rtxcapi.c 1079        {
+                       1886         PUBLIC  _KS_enqueuet
+0007CA                 1887 _KS_enqueuet:
+0007CA 99720024        1888         SUB.W   R7,#024H
+                       1889 ; rtxcapi.c 1080           struct qarg p;
+                       1890 ; rtxcapi.c 1081           CLKBLK clkblk;
+                       1891 ; rtxcapi.c 1082        
+                       1892 ; rtxcapi.c 1083           p.ksnum = RTXC_ENQUEUE;
+0007CE 92780C          1893         MOV.B   [R7],#0CH
+                       1894 ; rtxcapi.c 1084           p.queue = queue;
+0007D1 840F05          1895         MOV.B   [R7+5],R0L
+                       1896 ; rtxcapi.c 1085           p.data = data;
+0007D4 8C3F08          1897         MOV.W   [R7+8],R3
+0007D7 8C2F06          1898         MOV.W   [R7+6],R2
+                       1899 ; rtxcapi.c 1086           p.ticks = ticks;
+0007DA 8C1F0C          1900         MOV.W   [R7+12],R1
+                       1901 ; rtxcapi.c 1087           p.wait = 1;
+0007DD B4710A          1902         MOV.B   [R7+10],#01H
+                       1903 ; rtxcapi.c 1088           p.ksrc = RC_TIMEOUT;
+0007E0 BC7502          1904         MOV.W   [R7+2],#05H
+                       1905 ; rtxcapi.c 1089           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+0007E3 9128rr          1906         MOV.B   R1L,#SEG( __lc_bs )
+0007E6 7133            1907         XOR.B   R1H,R1H
+0007E8 400712          1908         LEA     R0,R7+18
+0007EB 8C1F10          1909         MOV.W   [R7+16],R1
+0007EE 8C0F0E          1910         MOV.W   [R7+14],R0
+                       1911 ; rtxcapi.c 1090           KS(p);
+0007F1 9128rr          1912         MOV.B   R1L,#SEG( __lc_bs )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  34
+
+ADDR   CODE            LINE SOURCELINE
+0007F4 7133            1913         XOR.B   R1H,R1H
+0007F6 8907            1914         MOV.W   R0,R7
+                       1915         CALL    _ks
+0007F8 C4rrrrrr       +1915 ;       FCALL   _ks
+                       1916 ; rtxcapi.c 1091           return(p.ksrc);
+0007FC 8C0702          1917         MOV.W   R0,[R7+2]
+                       1918 ; rtxcapi.c 1092        }
+0007FF 99700024        1919         ADD.W   R7,#024H
+000803 D680            1920         RET
+000803 D68000          1920         RET
+                       1921 ; rtxcapi.c 1093        #endif /* } HAS_ENQUEUET */
+                       1922 ; rtxcapi.c 1094        
+                       1923 ; rtxcapi.c 1095        /*******************************************************/
+                       1924 ; rtxcapi.c 1096        #ifdef HAS_INQPRIORITY /* { */
+                       1925 ; rtxcapi.c 1097        PRIORITY KS_inqpriority(TASK task)
+                       1926 ; rtxcapi.c 1098        {
+                       1927         PUBLIC  _KS_inqpriority
+000806                 1928 _KS_inqpriority:
+                       1929 ; rtxcapi.c 1099           if (task == SELFTASK)
+000806 6100            1930         OR.B    R0L,R0L
+000808 F207            1931         BNE     _8
+                       1932 ; rtxcapi.c 1100              return(hipritsk->priority);
+00080A 8E1rrr          1933         MOV.W   R1,_hipritsk+2
+00080D 8E0rrr          1934         MOV.W   R0,_hipritsk
+000810 862C42          1935         MOV.B   ES,R1L
+000813 84000D          1936         MOV.B   R0L,[R0+13]
+000816 D680            1937         RET
+000816 D680            1937         RET
+000818                 1938 _8:
+                       1939 ; rtxcapi.c 1101           else
+                       1940 ; rtxcapi.c 1102              return(rtxtcb[task].priority);
+000818 8100            1941         MOV.B   R0L,R0L
+00081A 9019            1942         SEXT.B  R0H
+00081C E9000024        1943         MULU.W  R0,#024H
+000820 B910            1944         MOVS.W  R1,#00H
+000822 964842rr        1945         MOV.B   ES,#SEG( _rtxtcb+13 )
+000826 8500rrrr        1946         MOV.B   R0L,[R0+SOF( _rtxtcb+13 )]
+000826 8500rrrr        1946         MOV.B   R0L,[R0+SOF( _rtxtcb+13 )]
+                       1947 ; rtxcapi.c 1103        }
+00082A                 1948 _9:
+00082A D680            1949         RET
+00082A D680            1949         RET
+                       1950 ; rtxcapi.c 1104        #endif /* } HAS_INQPRIORITY */
+                       1951 ; rtxcapi.c 1105        
+                       1952 ; rtxcapi.c 1106        /*******************************************************/
+                       1953 ; rtxcapi.c 1107        #ifdef HAS_INQQUEUE /* { */
+                       1954 ; rtxcapi.c 1108        int KS_inqqueue(QUEUE queue)
+                       1955 ; rtxcapi.c 1109        {
+                       1956         PUBLIC  _KS_inqqueue
+00082C                 1957 _KS_inqqueue:
+                       1958 ; rtxcapi.c 1110           return(qheader[queue].curndx);
+00082C E80018          1959         MULU.B  R0L,#018H
+00082F B910            1960         MOVS.W  R1,#00H
+000831 964842rr        1961         MOV.B   ES,#SEG( _qheader+10 )
+000835 8D00rrrr        1962         MOV.W   R0,[R0+SOF( _qheader+10 )]
+                       1963 ; rtxcapi.c 1111        }
+000839 D680            1964         RET
+000839 D68000          1964         RET
+                       1965 ; rtxcapi.c 1112        #endif /* } HAS_INQQUEUE */
+                       1966 ; rtxcapi.c 1113        
+                       1967 ; rtxcapi.c 1114        /*******************************************************/
+                       1968 ; rtxcapi.c 1115        #ifdef HAS_INQSEMA /* { */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  35
+
+ADDR   CODE            LINE SOURCELINE
+                       1969 ; rtxcapi.c 1116        SSTATE KS_inqsema(SEMA sema)
+                       1970 ; rtxcapi.c 1117        {
+                       1971         PUBLIC  _KS_inqsema
+00083C                 1972 _KS_inqsema:
+                       1973 ; rtxcapi.c 1118           return(semat[sema]);
+00083C B110            1974         MOVS.B  R0H,#00H
+00083E B910            1975         MOVS.W  R1,#00H
+000840 964842rr        1976         MOV.B   ES,#SEG( _semat )
+000844 8500rrrr        1977         MOV.B   R0L,[R0+SOF( _semat )]
+                       1978 ; rtxcapi.c 1119        }
+000848 D680            1979         RET
+000848 D680            1979         RET
+                       1980 ; rtxcapi.c 1120        #endif /* } HAS_INQSEMA */
+                       1981 ; rtxcapi.c 1121        
+                       1982 ; rtxcapi.c 1122        /*******************************************************/
+                       1983 ; rtxcapi.c 1123        #ifdef HAS_INQTASK /* { */
+                       1984 ; rtxcapi.c 1124        TASK KS_inqtask(void)
+                       1985 ; rtxcapi.c 1125        {
+                       1986         PUBLIC  _KS_inqtask
+00084A                 1987 _KS_inqtask:
+                       1988 ; rtxcapi.c 1126           return(hipritsk->task);
+00084A 8E1rrr          1989         MOV.W   R1,_hipritsk+2
+00084D 8E0rrr          1990         MOV.W   R0,_hipritsk
+000850 862C42          1991         MOV.B   ES,R1L
+000853 84000C          1992         MOV.B   R0L,[R0+12]
+                       1993 ; rtxcapi.c 1127        }
+000856 D680            1994         RET
+000856 D680            1994         RET
+                       1995 ; rtxcapi.c 1128        #endif /* } HAS_INQTASK */
+                       1996 ; rtxcapi.c 1129        
+                       1997 ; rtxcapi.c 1130        /*******************************************************/
+                       1998 ; rtxcapi.c 1131        #ifdef HAS_LOCKT /* { */
+                       1999 ; rtxcapi.c 1132        KSRC KS_lockt(RESOURCE resource, TICKS ticks)
+                       2000 ; rtxcapi.c 1133        {
+                       2001         PUBLIC  _KS_lockt
+000858                 2002 _KS_lockt:
+000858 99720022        2003         SUB.W   R7,#022H
+                       2004 ; rtxcapi.c 1134        
+                       2005 ; rtxcapi.c 1135           struct larg p;
+                       2006 ; rtxcapi.c 1136           CLKBLK clkblk;
+                       2007 ; rtxcapi.c 1137        #ifdef FASTLOCK /* { */
+                       2008 ; rtxcapi.c 1138           RHEADER ks_tbl *prh;
+                       2009 ; rtxcapi.c 1139           unsigned char pswh;  /* local variable for saving processor priority l
+                            evel */
+                       2010 ; rtxcapi.c 1140        
+                       2011 ; rtxcapi.c 1141           prh = (RHEADER ks_tbl *)&rheader[resource];
+                       2012 ; rtxcapi.c 1142        
+                       2013 ; rtxcapi.c 1143           PUSHPSWH;  /* save processor priority level */
+                       2014 ; rtxcapi.c 1144           DISABLE;
+                       2015 ; rtxcapi.c 1145        
+                       2016 ; rtxcapi.c 1146           if (prh->owner == NULLTCB)  /* if resource not currently owned */
+                       2017 ; rtxcapi.c 1147           {
+                       2018 ; rtxcapi.c 1148        #ifdef CBUG /* { */
+                       2019 ; rtxcapi.c 1149              prh->count++;           /* update statistics */
+                       2020 ; rtxcapi.c 1150        #endif /* } CBUG */
+                       2021 ; rtxcapi.c 1151              prh->owner = hipritsk; /* lock resource with task # */
+                       2022 ; rtxcapi.c 1152              prh->level = 1;         /* set nesting level = 1 */
+                       2023 ; rtxcapi.c 1153              POPPSWH;                 /* fast return */
+                       2024 ; rtxcapi.c 1154              return(RC_GOOD);        /* mark successful */
+                       2025 ; rtxcapi.c 1155           }
+                       2026 ; rtxcapi.c 1156        
+                       2027 ; rtxcapi.c 1157           if (prh->owner == hipritsk) /* if already owned by caller */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  36
+
+ADDR   CODE            LINE SOURCELINE
+                       2028 ; rtxcapi.c 1158           {
+                       2029 ; rtxcapi.c 1159        #ifdef CBUG /* { */
+                       2030 ; rtxcapi.c 1160              prh->count++;           /* update statistics */
+                       2031 ; rtxcapi.c 1161        #endif /* } CBUG */
+                       2032 ; rtxcapi.c 1162              prh->level++;           /* bump nesting level */
+                       2033 ; rtxcapi.c 1163              POPPSWH;                 /* fast return */
+                       2034 ; rtxcapi.c 1164              return(RC_NESTED);      /* mark successful */
+                       2035 ; rtxcapi.c 1165           }
+                       2036 ; rtxcapi.c 1166           POPPSWH;
+                       2037 ; rtxcapi.c 1167        #endif /* } FASTLOCK */
+                       2038 ; rtxcapi.c 1168        
+                       2039 ; rtxcapi.c 1169           p.ksnum = RTXC_LOCK;
+00085C 92780E          2040         MOV.B   [R7],#0EH
+                       2041 ; rtxcapi.c 1170           p.resource = resource;
+00085F 840F04          2042         MOV.B   [R7+4],R0L
+                       2043 ; rtxcapi.c 1171           p.wait = 1;
+000862 B47105          2044         MOV.B   [R7+5],#01H
+                       2045 ; rtxcapi.c 1172           p.ticks = ticks;
+000865 8C1F06          2046         MOV.W   [R7+6],R1
+                       2047 ; rtxcapi.c 1173           p.ksrc = RC_GOOD;
+000868 BC7002          2048         MOV.W   [R7+2],#00H
+                       2049 ; rtxcapi.c 1174           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+00086B 9128rr          2050         MOV.B   R1L,#SEG( __lc_bs )
+00086E 7133            2051         XOR.B   R1H,R1H
+000870 400710          2052         LEA     R0,R7+16
+000873 8C1F0A          2053         MOV.W   [R7+10],R1
+000876 8C0F08          2054         MOV.W   [R7+8],R0
+                       2055 ; rtxcapi.c 1175           KS(p);
+000879 9128rr          2056         MOV.B   R1L,#SEG( __lc_bs )
+00087C 7133            2057         XOR.B   R1H,R1H
+00087E 8907            2058         MOV.W   R0,R7
+                       2059         CALL    _ks
+000880 C4rrrrrr       +2059 ;       FCALL   _ks
+                       2060 ; rtxcapi.c 1176           return(p.ksrc);
+000884 8C0702          2061         MOV.W   R0,[R7+2]
+                       2062 ; rtxcapi.c 1177        }
+000887 99700022        2063         ADD.W   R7,#022H
+00088B D680            2064         RET
+00088B D68000          2064         RET
+                       2065 ; rtxcapi.c 1178        #endif /* } HAS_LOCKT */
+                       2066 ; rtxcapi.c 1179        
+                       2067 ; rtxcapi.c 1180        /*******************************************************/
+                       2068 ; rtxcapi.c 1181        #ifdef HAS_PENDM /* { */
+                       2069 ; rtxcapi.c 1182        void KS_pendm(const SEMA *semalist)
+                       2070 ; rtxcapi.c 1183        {
+                       2071         PUBLIC  _KS_pendm
+00088E                 2072 _KS_pendm:
+00088E 9972000A        2073         SUB.W   R7,#0AH
+                       2074 ; rtxcapi.c 1184           struct sargm p;
+                       2075 ; rtxcapi.c 1185        
+                       2076 ; rtxcapi.c 1186           p.ksnum = RTXC_PENDM;
+000892 92782C          2077         MOV.B   [R7],#02CH
+                       2078 ; rtxcapi.c 1187           p.list = semalist;
+000895 8C1F08          2079         MOV.W   [R7+8],R1
+000898 8C0F06          2080         MOV.W   [R7+6],R0
+                       2081 ; rtxcapi.c 1188           KS(p);
+00089B 9128rr          2082         MOV.B   R1L,#SEG( __lc_bs )
+00089E 7133            2083         XOR.B   R1H,R1H
+0008A0 8907            2084         MOV.W   R0,R7
+                       2085         CALL    _ks
+0008A2 C4rrrrrr       +2085 ;       FCALL   _ks
+                       2086 ; rtxcapi.c 1189        }
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  37
+
+ADDR   CODE            LINE SOURCELINE
+0008A6 9970000A        2087         ADD.W   R7,#0AH
+0008AA D680            2088         RET
+0008AA D680            2088         RET
+                       2089 ; rtxcapi.c 1190        #endif /* } HAS_PENDM */
+                       2090 ; rtxcapi.c 1191        
+                       2091 ; rtxcapi.c 1192        /*******************************************************/
+                       2092 ; rtxcapi.c 1193        #ifdef HAS_RECEIVET /* { */
+                       2093 ; rtxcapi.c 1194        RTXCMSG * KS_receivet(MBOX mbox, TASK task, TICKS ticks, KSRC *pksrc)
+                       2094 ; rtxcapi.c 1195        {
+                       2095         PUBLIC  _KS_receivet
+0008AC                 2096 _KS_receivet:
+0008AC 0F30            2097         PUSH.W  R4, R5
+0008AE 99720026        2098         SUB.W   R7,#026H
+0008B2 8953            2099         MOV.W   R5,R3
+0008B4 8942            2100         MOV.W   R4,R2
+                       2101 ; rtxcapi.c 1196           struct msgarg p;
+                       2102 ; rtxcapi.c 1197           CLKBLK clkblk;
+                       2103 ; rtxcapi.c 1198        
+                       2104 ; rtxcapi.c 1199           p.ksnum = RTXC_RECEIVE;
+0008B6 B275            2105         MOV.B   [R7],#05H
+                       2106 ; rtxcapi.c 1200           p.mbox = mbox;
+0008B8 840F05          2107         MOV.B   [R7+5],R0L
+                       2108 ; rtxcapi.c 1201           p.task = task;
+0008BB 841F06          2109         MOV.B   [R7+6],R0H
+                       2110 ; rtxcapi.c 1202           p.prtxcmsg = (RTXCMSG *)0; /* preset in case timeout */
+0008BE BC700A          2111         MOV.W   [R7+10],#00H
+0008C1 BC7008          2112         MOV.W   [R7+8],#00H
+                       2113 ; rtxcapi.c 1203           p.wait = 1;
+0008C4 B4710C          2114         MOV.B   [R7+12],#01H
+                       2115 ; rtxcapi.c 1204           p.ticks = ticks;
+0008C7 8C1F0E          2116         MOV.W   [R7+14],R1
+                       2117 ; rtxcapi.c 1205           p.ksrc = RC_GOOD;
+0008CA BC7002          2118         MOV.W   [R7+2],#00H
+                       2119 ; rtxcapi.c 1206           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+0008CD 9128rr          2120         MOV.B   R1L,#SEG( __lc_bs )
+0008D0 7133            2121         XOR.B   R1H,R1H
+0008D2 400714          2122         LEA     R0,R7+20
+0008D5 8C1F12          2123         MOV.W   [R7+18],R1
+0008D8 8C0F10          2124         MOV.W   [R7+16],R0
+                       2125 ; rtxcapi.c 1207           KS(p);
+0008DB 9128rr          2126         MOV.B   R1L,#SEG( __lc_bs )
+0008DE 7133            2127         XOR.B   R1H,R1H
+0008E0 8907            2128         MOV.W   R0,R7
+                       2129         CALL    _ks
+0008E2 C4rrrrrr       +2129 ;       FCALL   _ks
+                       2130 ; rtxcapi.c 1208           *pksrc = p.ksrc;
+0008E6 8C0702          2131         MOV.W   R0,[R7+2]
+0008E9 86AC42          2132         MOV.B   ES,R5L
+0008EC 8A0C            2133         MOV.W   [R4],R0
+                       2134 ; rtxcapi.c 1209           return(p.prtxcmsg);
+0008EE 8C170A          2135         MOV.W   R1,[R7+10]
+0008F1 8C0708          2136         MOV.W   R0,[R7+8]
+                       2137 ; rtxcapi.c 1210        }
+0008F4 99700026        2138         ADD.W   R7,#026H
+0008F8 2F30            2139         POP.W   R4, R5
+0008FA D680            2140         RET
+0008FA D680            2140         RET
+                       2141 ; rtxcapi.c 1211        #endif /* } HAS_RECEIVET */
+                       2142 ; rtxcapi.c 1212        
+                       2143 ; rtxcapi.c 1213        /*******************************************************/
+                       2144 ; rtxcapi.c 1214        #ifdef HAS_RESTART_TIMER /* { */
+                       2145 ; rtxcapi.c 1215        KSRC KS_restart_timer(CLKBLK ks_clk *pclkblk, TICKS ticks, TICKS period)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  38
+
+ADDR   CODE            LINE SOURCELINE
+                       2146 ; rtxcapi.c 1216        {
+                       2147         PUBLIC  _KS_restart_timer
+0008FC                 2148 _KS_restart_timer:
+0008FC 9972000E        2149         SUB.W   R7,#0EH
+                       2150 ; rtxcapi.c 1217           struct clkarg p;
+                       2151 ; rtxcapi.c 1218        
+                       2152 ; rtxcapi.c 1219           p.ksnum = RTXC_RESTART_TIMER;
+000900 92782D          2153         MOV.B   [R7],#02DH
+                       2154 ; rtxcapi.c 1220           p.pclkblk = pclkblk;
+000903 8C1F0C          2155         MOV.W   [R7+12],R1
+000906 8C0F0A          2156         MOV.W   [R7+10],R0
+                       2157 ; rtxcapi.c 1221           p.ticks = ticks;
+000909 8C2F06          2158         MOV.W   [R7+6],R2
+                       2159 ; rtxcapi.c 1222           p.period = period;
+00090C 8C3F08          2160         MOV.W   [R7+8],R3
+                       2161 ; rtxcapi.c 1223           p.ksrc = RC_GOOD;
+00090F BC7002          2162         MOV.W   [R7+2],#00H
+                       2163 ; rtxcapi.c 1224           KS(p);
+000912 9128rr          2164         MOV.B   R1L,#SEG( __lc_bs )
+000915 7133            2165         XOR.B   R1H,R1H
+000917 8907            2166         MOV.W   R0,R7
+                       2167         CALL    _ks
+000919 C4rrrrrr       +2167 ;       FCALL   _ks
+                       2168 ; rtxcapi.c 1225           return(p.ksrc);
+00091D 8C0702          2169         MOV.W   R0,[R7+2]
+                       2170 ; rtxcapi.c 1226        }
+000920 9970000E        2171         ADD.W   R7,#0EH
+000924 D680            2172         RET
+000924 D680            2172         RET
+                       2173 ; rtxcapi.c 1227        #endif /* } HAS_RESTART_TIMER */
+                       2174 ; rtxcapi.c 1228        
+                       2175 ; rtxcapi.c 1229        /*******************************************************/
+                       2176 ; rtxcapi.c 1230        #ifdef HAS_SENDT /* { */
+                       2177 ; rtxcapi.c 1231        KSRC KS_sendt(MBOX mbox, RTXCMSG *prtxcmsg, PRIORITY priority, SEMA sema,
+                            
+                       2178 ; rtxcapi.c 1232                           TICKS ticks)
+                       2179 ; rtxcapi.c 1233        {
+                       2180         PUBLIC  _KS_sendt
+000926                 2181 _KS_sendt:
+000926 99720026        2182         SUB.W   R7,#026H
+                       2183 ; rtxcapi.c 1234           struct msgarg p;
+                       2184 ; rtxcapi.c 1235           CLKBLK clkblk;
+                       2185 ; rtxcapi.c 1236        
+                       2186 ; rtxcapi.c 1237           p.ksnum = RTXC_SEND;
+00092A B274            2187         MOV.B   [R7],#04H
+                       2188 ; rtxcapi.c 1238           p.mbox = mbox;
+00092C 840F05          2189         MOV.B   [R7+5],R0L
+                       2190 ; rtxcapi.c 1239           p.prtxcmsg = prtxcmsg;
+00092F 8C3F0A          2191         MOV.W   [R7+10],R3
+000932 8C2F08          2192         MOV.W   [R7+8],R2
+                       2193 ; rtxcapi.c 1240           p.priority = priority;
+000935 841F07          2194         MOV.B   [R7+7],R0H
+                       2195 ; rtxcapi.c 1241           p.sema = sema;
+000938 842F04          2196         MOV.B   [R7+4],R1L
+                       2197 ; rtxcapi.c 1242           p.wait = 1;
+00093B B4710C          2198         MOV.B   [R7+12],#01H
+                       2199 ; rtxcapi.c 1243           p.ticks = ticks;
+00093E 8C6F0E          2200         MOV.W   [R7+14],R6
+                       2201 ; rtxcapi.c 1244           p.ksrc = RC_GOOD;
+000941 BC7002          2202         MOV.W   [R7+2],#00H
+                       2203 ; rtxcapi.c 1245           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+000944 9128rr          2204         MOV.B   R1L,#SEG( __lc_bs )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  39
+
+ADDR   CODE            LINE SOURCELINE
+000947 7133            2205         XOR.B   R1H,R1H
+000949 400714          2206         LEA     R0,R7+20
+00094C 8C1F12          2207         MOV.W   [R7+18],R1
+00094F 8C0F10          2208         MOV.W   [R7+16],R0
+                       2209 ; rtxcapi.c 1246           KS(p);
+000952 9128rr          2210         MOV.B   R1L,#SEG( __lc_bs )
+000955 7133            2211         XOR.B   R1H,R1H
+000957 8907            2212         MOV.W   R0,R7
+                       2213         CALL    _ks
+000959 C4rrrrrr       +2213 ;       FCALL   _ks
+                       2214 ; rtxcapi.c 1247           return(p.ksrc);
+00095D 8C0702          2215         MOV.W   R0,[R7+2]
+                       2216 ; rtxcapi.c 1248        }
+000960 99700026        2217         ADD.W   R7,#026H
+000964 D680            2218         RET
+000964 D680            2218         RET
+                       2219 ; rtxcapi.c 1249        #endif /* } HAS_SENDT */
+                       2220 ; rtxcapi.c 1250        
+                       2221 ; rtxcapi.c 1251        /*******************************************************/
+                       2222 ; rtxcapi.c 1252        #ifdef HAS_SIGNALM /* { */
+                       2223 ; rtxcapi.c 1253        void KS_signalm(const SEMA *semalist)
+                       2224 ; rtxcapi.c 1254        {
+                       2225         PUBLIC  _KS_signalm
+000966                 2226 _KS_signalm:
+000966 9972000A        2227         SUB.W   R7,#0AH
+                       2228 ; rtxcapi.c 1255           struct sargm p;
+                       2229 ; rtxcapi.c 1256        
+                       2230 ; rtxcapi.c 1257           p.ksnum = RTXC_SIGNALM;
+00096A 92782B          2231         MOV.B   [R7],#02BH
+                       2232 ; rtxcapi.c 1258           p.list = semalist;
+00096D 8C1F08          2233         MOV.W   [R7+8],R1
+000970 8C0F06          2234         MOV.W   [R7+6],R0
+                       2235 ; rtxcapi.c 1259           KS(p);
+000973 9128rr          2236         MOV.B   R1L,#SEG( __lc_bs )
+000976 7133            2237         XOR.B   R1H,R1H
+000978 8907            2238         MOV.W   R0,R7
+                       2239         CALL    _ks
+00097A C4rrrrrr       +2239 ;       FCALL   _ks
+                       2240 ; rtxcapi.c 1260        }
+00097E 9970000A        2241         ADD.W   R7,#0AH
+000982 D680            2242         RET
+000982 D680            2242         RET
+                       2243 ; rtxcapi.c 1261        #endif /* } HAS_SIGNALM */
+                       2244 ; rtxcapi.c 1262        
+                       2245 ; rtxcapi.c 1263        /*******************************************************/
+                       2246 ; rtxcapi.c 1264        #ifdef HAS_WAITT /* { */
+                       2247 ; rtxcapi.c 1265        KSRC KS_waitt(SEMA sema, TICKS ticks)
+                       2248 ; rtxcapi.c 1266        {
+                       2249         PUBLIC  _KS_waitt
+000984                 2250 _KS_waitt:
+000984 9972001E        2251         SUB.W   R7,#01EH
+                       2252 ; rtxcapi.c 1267           struct sarg p;
+                       2253 ; rtxcapi.c 1268           CLKBLK clkblk;
+                       2254 ; rtxcapi.c 1269        
+                       2255 ; rtxcapi.c 1270           p.ksnum = RTXC_WAIT;
+000988 B271            2256         MOV.B   [R7],#01H
+                       2257 ; rtxcapi.c 1271           p.sema = sema;
+00098A 840F04          2258         MOV.B   [R7+4],R0L
+                       2259 ; rtxcapi.c 1272           p.ticks = ticks;
+00098D 8C1F06          2260         MOV.W   [R7+6],R1
+                       2261 ; rtxcapi.c 1273           p.ksrc = RC_GOOD;
+000990 BC7002          2262         MOV.W   [R7+2],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  40
+
+ADDR   CODE            LINE SOURCELINE
+                       2263 ; rtxcapi.c 1274           p.pclkblk = (CLKBLK ks_clk *)&clkblk;
+000993 9128rr          2264         MOV.B   R1L,#SEG( __lc_bs )
+000996 7133            2265         XOR.B   R1H,R1H
+000998 40070C          2266         LEA     R0,R7+12
+00099B 8C1F0A          2267         MOV.W   [R7+10],R1
+00099E 8C0F08          2268         MOV.W   [R7+8],R0
+                       2269 ; rtxcapi.c 1275           KS(p);
+0009A1 9128rr          2270         MOV.B   R1L,#SEG( __lc_bs )
+0009A4 7133            2271         XOR.B   R1H,R1H
+0009A6 8907            2272         MOV.W   R0,R7
+                       2273         CALL    _ks
+0009A8 C4rrrrrr       +2273 ;       FCALL   _ks
+                       2274 ; rtxcapi.c 1276           return(p.ksrc);
+0009AC 8C0702          2275         MOV.W   R0,[R7+2]
+                       2276 ; rtxcapi.c 1277        }
+0009AF 9970001E        2277         ADD.W   R7,#01EH
+0009B3 D680            2278         RET
+0009B3 D68000          2278         RET
+                       2279 ; rtxcapi.c 1278        #endif /* } HAS_WAITT */
+                       2280 ; rtxcapi.c 1279        
+                       2281 ; rtxcapi.c 1280        /*******************************************************/
+                       2282 ; rtxcapi.c 1281        #ifdef TIME_SLICE /* { */
+                       2283 ; rtxcapi.c 1282        #ifdef HAS_INQSLICE /* { */
+                       2284 ; rtxcapi.c 1283        TICKS KS_inqslice(TASK task)
+                       2285 ; rtxcapi.c 1284        {
+                       2286         PUBLIC  _KS_inqslice
+0009B6                 2287 _KS_inqslice:
+                       2288 ; rtxcapi.c 1285           if (task == SELFTASK)
+0009B6 6100            2289         OR.B    R0L,R0L
+0009B8 F206            2290         BNE     _10
+                       2291 ; rtxcapi.c 1286              task = hipritsk->task;
+0009BA 8E1rrr          2292         MOV.W   R1,_hipritsk+2
+0009BD 8E0rrr          2293         MOV.W   R0,_hipritsk
+0009C0 862C42          2294         MOV.B   ES,R1L
+0009C3 84000C          2295         MOV.B   R0L,[R0+12]
+0009C3 84000C          2295         MOV.B   R0L,[R0+12]
+0009C6                 2296 _10:
+                       2297 ; rtxcapi.c 1287        
+                       2298 ; rtxcapi.c 1288           return(rtxtcb[task].newslice);
+0009C6 8100            2299         MOV.B   R0L,R0L
+0009C8 9019            2300         SEXT.B  R0H
+0009CA E9000024        2301         MULU.W  R0,#024H
+0009CE B910            2302         MOVS.W  R1,#00H
+0009D0 964842rr        2303         MOV.B   ES,#SEG( _rtxtcb+31 )
+0009D4 8500rrrr        2304         MOV.B   R0L,[R0+SOF( _rtxtcb+31 )]
+0009D8 B110            2305         MOVS.B  R0H,#00H
+                       2306 ; rtxcapi.c 1289        }
+0009DA D680            2307         RET
+                       2308 ; rtxcapi.c 1290        #endif /* } HAS_INQSLICE */
+                       2309 ; rtxcapi.c 1291        #endif /* } TIME_SLICE */
+                       2310 ; rtxcapi.c 1292                
+                       2311 ; rtxcapi.c 1293        #endif /* } RTXC_EL */
+                       2312 ; rtxcapi.c 1294        
+                       2313 ; rtxcapi.c 1295        /* end of rtxcapi.c */
+                       2315         EXTRN   HDATA(_semat)
+000000                 2316 RTXCAPI_INI_FA  SEGMENT HDATA INSEGMENT INIT
+000000                 2317         RSEG    RTXCAPI_INI_FA
+000000 52545843207633  2318 _3:     DB      052H,054H,058H,043H,020H,076H,033H,02EH,032H,064H,020H,058H
+       2E32642058           
+00000C 412D47332F5461  2319         DB      041H,02DH,047H,033H,02FH,054H,061H,073H,06BH,069H,06EH,067H
+       736B696E67           
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  41
+
+ADDR   CODE            LINE SOURCELINE
+000018 2076322E30204D  2320         DB      020H,076H,032H,02EH,030H,020H,04DH,061H,072H,02DH,032H,036H
+       61722D3236           
+000024 2D3938204B4559  2321         DB      02DH,039H,038H,020H,04BH,045H,059H,03AH,032H,032H,033H,036H
+       3A32323336           
+000030 3100            2322         DB      031H,000H
+                       2323         EXTRN   DATA(_hipritsk)
+                       2324         EXTRN   HDATA(_rtxtcb)
+                       2325         EXTRN   HDATA(_pheader)
+                       2326         EXTRN   HDATA(_qheader)
+                       2327         EXTRN   HCODE(_ks)
+                       2328         EXTRN   IDATA(__lc_bs)
+                       2329         CALLS   'KS_block', 'ks'
+                       2330         CALLS   'KS_nop', 'ks'
+                       2331         CALLS   'KS_alloc', 'ks'
+                       2332         CALLS   'KS_alloc_timer', 'ks'
+                       2333         CALLS   'KS_defpriority', 'ks'
+                       2334         CALLS   'KS_delay', 'ks'
+                       2335         CALLS   'KS_dequeue', 'ks'
+                       2336         CALLS   'KS_enqueue', 'ks'
+                       2337         CALLS   'KS_execute', 'ks'
+                       2338         CALLS   'KS_deftask', 'ks'
+                       2339         CALLS   'KS_alloc_task', 'ks'
+                       2340         CALLS   'KS_free', 'ks'
+                       2341         CALLS   'KS_alloc_part', 'ks'
+                       2342         CALLS   'KS_defpart', 'ks'
+                       2343         CALLS   'KS_free_part', 'ks'
+                       2344         CALLS   'KS_free_timer', 'ks'
+                       2345         CALLS   'KS_lock', 'ks'
+                       2346         CALLS   'KS_pend', 'ks'
+                       2347         CALLS   'KS_receive', 'ks'
+                       2348         CALLS   'KS_resume', 'ks'
+                       2349         CALLS   'KS_send', 'ks'
+                       2350         CALLS   'KS_signal', 'ks'
+                       2351         CALLS   'KS_ack', 'KS_signal'
+                       2352         CALLS   'KS_stop_timer', 'ks'
+                       2353         CALLS   'KS_start_timer', 'ks'
+                       2354         CALLS   'KS_suspend', 'ks'
+                       2355         CALLS   'KS_terminate', 'ks'
+                       2356         CALLS   'KS_unblock', 'ks'
+                       2357         CALLS   'KS_unlock', 'ks'
+                       2358         CALLS   'KS_user', 'ks'
+                       2359         CALLS   'KS_wait', 'ks'
+                       2360         CALLS   'KS_yield', 'ks'
+                       2361         CALLS   'KS_allocw', 'ks'
+                       2362         CALLS   'KS_create_part', 'ks'
+                       2363         CALLS   'KS_inqres', 'ks'
+                       2364         CALLS   'KS_defres', 'ks'
+                       2365         CALLS   'KS_inqtask_arg', 'ks'
+                       2366         CALLS   'KS_deftask_arg', 'ks'
+                       2367         CALLS   'KS_defmboxsema', 'ks'
+                       2368         CALLS   'KS_defqsema', 'ks'
+                       2369         CALLS   'KS_dequeuew', 'ks'
+                       2370         CALLS   'KS_elapse', 'ks'
+                       2371         CALLS   'KS_enqueuew', 'ks'
+                       2372         CALLS   'KS_lockw', 'ks'
+                       2373         CALLS   'KS_purgequeue', 'ks'
+                       2374         CALLS   'KS_receivew', 'ks'
+                       2375         CALLS   'KS_sendw', 'ks'
+                       2376         CALLS   'KS_waitm', 'ks'
+                       2377         CALLS   'KS_inqtime', 'ks'
+                       2378         CALLS   'KS_deftime', 'ks'
+                       2379         CALLS   'KS_inqtimer', 'ks'
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  42
+
+ADDR   CODE            LINE SOURCELINE
+                       2380         CALLS   'KS_alloct', 'ks'
+                       2381         CALLS   'KS_defqueue', 'ks'
+                       2382         CALLS   'KS_dequeuet', 'ks'
+                       2383         CALLS   'KS_enqueuet', 'ks'
+                       2384         CALLS   'KS_lockt', 'ks'
+                       2385         CALLS   'KS_pendm', 'ks'
+                       2386         CALLS   'KS_receivet', 'ks'
+                       2387         CALLS   'KS_restart_timer', 'ks'
+                       2388         CALLS   'KS_sendt', 'ks'
+                       2389         CALLS   'KS_signalm', 'ks'
+                       2390         CALLS   'KS_waitt', 'ks'

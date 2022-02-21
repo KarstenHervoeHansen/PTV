@@ -1,0 +1,129 @@
+INCLUDE "lpm_add_sub.inc";
+
+SUBDESIGN lumblnk2
+(
+	clk,ab[9..0],txt[7..0]:		INPUT;
+	sb[2..0],enable:			INPUT;
+	yout[9..0]:					OUTPUT;
+)
+VARIABLE
+	txtffa[6..0],txtffb[6..0]:	DFFE;
+	txtffc[6..0]:	DFFE;
+	dout[9..0],yout[9..0]:		DFFE;
+	textadd:			 		lpm_add_sub WITH (LPM_WIDTH=7);
+
+BEGIN
+	txtffa[].ena   		= enable;
+	txtffa[].clk		= clk;
+	txtffa[].d			= txt[6..0];
+
+	txtffb[].ena   		= enable;
+	txtffb[].clk		= clk;
+	txtffb[].d			= txtffa[6..0];
+
+	txtffc[].ena   		= enable;
+	txtffc[].clk		= clk;
+	txtffc[].d			= txtffb[6..0];
+ 
+	textadd.dataa[6..0]	= dout[9..3].q;
+	textadd.datab[6..0] = txtffc[6..0];
+	textadd.cin			= GND;
+
+	yout[9..3].d = textadd.result[];
+	yout[2..0].d = dout[2..0].q;
+	yout[].clk	 = clk;
+	yout[].ena	 = enable;
+
+	dout[].clk 	 = clk;
+	dout[].ena	 = enable;
+	IF (sb[] == 0)  THEN
+	 dout[].d	= ab[];
+	ELSE
+	   dout[2..0].d= 0; 
+    CASE sb[] IS
+	  WHEN 1 =>
+	   TABLE
+		 ab[9..3]   => dout[9..3].d;
+		  B"1111xxx" => B"1110110";
+		  B"1110xxx" => B"1101110";
+		  B"1101xxx" => B"1100110";
+		  B"1100xxx" => B"1011110";
+		  B"1011xxx" => B"1011000";
+		  B"1010xxx" => B"1010000";
+		  B"1001xxx" => B"1001000";
+		  B"1000xxx" => B"1000010";
+		  B"0111xxx" => B"0111010";
+		  B"0110xxx" => B"0110000";
+		  B"0101xxx" => B"0101000";
+		  B"0100xxx" => B"0100000";
+		  B"0011xxx" => B"0011000";
+		  B"0010xxx" => B"0010000";
+		  B"0001xxx" => B"0001101";
+		  B"0000xxx" => B"0001000";
+	   END TABLE;
+	  WHEN 2 =>
+	   TABLE
+		 ab[9..3]   => dout[9..3].d;
+		  B"1111xxx" => B"1011110";
+		  B"1110xxx" => B"1011000";
+		  B"1101xxx" => B"1010010";
+		  B"1100xxx" => B"1001110";
+		  B"1011xxx" => B"1000100";
+		  B"1010xxx" => B"0111110";
+		  B"1001xxx" => B"0111100";
+		  B"1000xxx" => B"0110110";
+		  B"0111xxx" => B"0110010";
+		  B"0110xxx" => B"0110000";
+		  B"0101xxx" => B"0100100";
+		  B"0100xxx" => B"0100000";
+		  B"0011xxx" => B"0010100";
+		  B"0010xxx" => B"0001111";
+		  B"0001xxx" => B"0001110";
+		  B"0000xxx" => B"0001000";
+	   END TABLE;
+	  WHEN 3 =>
+	   TABLE
+		 ab[9..3]   => dout[9..3].d;
+		  B"1111xxx" => B"0101110";
+		  B"1110xxx" => B"0110010";
+		  B"1101xxx" => B"0101000";
+		  B"1100xxx" => B"0100110";
+		  B"1011xxx" => B"0100100";
+		  B"1010xxx" => B"0100010";
+		  B"1001xxx" => B"0100000";
+		  B"1000xxx" => B"0011110";
+		  B"0111xxx" => B"0011100";
+		  B"0110xxx" => B"0011000";
+		  B"0101xxx" => B"0010110";
+		  B"0100xxx" => B"0010100";
+		  B"0011xxx" => B"0010010";
+		  B"0010xxx" => B"0001111";
+		  B"0001xxx" => B"0001110";
+		  B"0000xxx" => B"0001100";
+	   END TABLE;
+	  WHEN 4 =>
+	   TABLE
+		 ab[9..3]   => dout[9..3].d;
+		  B"1111xxx" => B"0010110";
+		  B"1110xxx" => B"0010110";
+		  B"1101xxx" => B"0010110";
+		  B"1100xxx" => B"0010100";
+		  B"1011xxx" => B"0010100";
+		  B"1010xxx" => B"0010100";
+		  B"1001xxx" => B"0010010";
+		  B"1000xxx" => B"0010010";
+		  B"0111xxx" => B"0010010";
+		  B"0110xxx" => B"0010000";
+		  B"0101xxx" => B"0010000";
+		  B"0100xxx" => B"0001110";
+		  B"0011xxx" => B"0001110";
+		  B"0010xxx" => B"0001110";
+		  B"0001xxx" => B"0001110";
+		  B"0000xxx" => B"0001100";
+	   END TABLE;
+	WHEN OTHERS => 
+       dout[9..0].d   = H"6C";
+	 END CASE;
+	END IF;
+END;
+

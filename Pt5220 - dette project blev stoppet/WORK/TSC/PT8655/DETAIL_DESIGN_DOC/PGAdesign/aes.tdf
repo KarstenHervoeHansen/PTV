@@ -1,0 +1,107 @@
+SUBDESIGN AES
+% 
+AES control logic for AES generator
+990115 PF
+%
+(
+
+CLK6144M,
+AUD_RESET,
+GL_PER_1SEC,
+GL_MODE[2..0]
+                        : input;
+
+PLOAD,
+COUNT[16..0],
+WCLK,
+XZPRE
+
+                        : output;
+
+
+)
+variable
+aes_count[16..0]         : dff;
+gl_count[7..0]           : dffe;
+
+GL1,
+GL2,
+GL_RESET,
+AES_RESET                : node;
+
+begin
+
+aes_count[].clk = CLK6144M;                 -- AES counter
+aes_count[].clrn = !AUD_RESET;              -- asynchronous reset
+AES_RESET = (aes_count[] == 122880 -1);
+if AES_RESET then
+  aes_count[].d = B"0";                     -- synchronous reset
+ else
+  aes_count[] = aes_count[] + 1;
+end if;
+
+gl_count[].clk = CLK6144M;                  -- glitch counter
+gl_count[].ena = (aes_count[] == 0);        -- enable for GL counter
+-- gl_count[].ena = VCC;        -- enable for GL counter
+
+if GL_PER_1SEC == VCC then                  -- selects glitch period = 1 or 3 sec
+  GL_RESET = (gl_count[] == 50-1);          -- 20ms x 50 = 1 sec
+ else
+  GL_RESET = (gl_count[] == 150-1);         -- 20ms x 150 = 3 sec
+end if;
+
+if GL_RESET == VCC then
+  gl_count[].d = B"0";                      -- synchronous reset
+ else
+  gl_count[] = gl_count[] + 1;
+end if;
+
+GL1 = gl_count[] < 13;                        -- 13 counts x 20ms = 260ms
+GL2 = (gl_count[] >= 13) & (gl_count[] <38);  -- 25 counts x 20ms = 500ms
+
+COUNT[16] = GND;
+CASE GL_MODE[] IS
+	WHEN 0 =>
+     COUNT[14] = GND;
+     COUNT[15] = GND;              -- no glitch CH-A,  no glitch CH-B
+	WHEN 1 =>
+     COUNT[14] = GL1;
+     COUNT[15] = GND;              -- 1 x glitch CH-A,  no glitch CH-B
+	WHEN 2 =>
+     COUNT[14] = GL1;
+     COUNT[15] = GL2;              -- 1 x glitch CH-A,  2 x glitch CH-B
+	WHEN 3 =>
+     COUNT[14] = GL1;
+     COUNT[15] = GL1;              -- 1 x glitch CH-A,  1 x glitch CH-B
+	WHEN 4 =>
+     COUNT[14] = GND;
+     COUNT[15] = GL1;              -- no glitch CH-A,  1 x glitch CH-B
+	WHEN 5 =>
+     COUNT[14] = GL2;
+     COUNT[15] = GND;              -- 2 x glitch CH-A,  no glitch CH-B
+	WHEN 6 =>
+     COUNT[14] = GND;
+     COUNT[15] = GL2;              -- no glitch CH-A,  2 x glitch CH-B
+	WHEN 7 =>
+     COUNT[14] = GL2;
+     COUNT[15] = GL2;              -- 2 x glitch CH-A,  2 x glitch CH-B
+END CASE;
+
+
+COUNT[13..0] = aes_count[16..3];
+PLOAD = (aes_count[2..0] == 0);
+WCLK = !aes_count[6];
+XZPRE = (aes_count[6..0] == 1) # 
+        (aes_count[6..0] == 2);
+
+
+
+
+end;
+
+
+
+
+
+
+

@@ -1,0 +1,132 @@
+%Signal generator (SDI og color bar) udvidet til 12 linie-signaler (til PT5201)%
+%Videreudbygning af PT8639   000131%
+
+INCLUDE "lpm_add_sub.inc";
+
+SUBDESIGN videogv1
+(
+	clk,cbblk,ram,s1,s0,d[10..0]:			INPUT;
+	ramdata[9..0],addenable,checksum:		INPUT;
+	sound,3or4,cb_ena,hload:				INPUT;
+	hdout[9..0],cb[7..0],ramadjust:			OUTPUT;
+)
+
+VARIABLE  
+	hd[9..0],hdout[9..0],sd[9..0],cb[7..0]: 	DFF;
+	sum[8..0],ramadjust:						DFFE;
+	chkadd: 									lpm_add_sub WITH (LPM_WIDTH=9);
+	yadd:	 									lpm_add_sub WITH (LPM_WIDTH=8);
+
+BEGIN
+ 	hd[].clk 	= clk;
+	hdout[].clk = clk;
+	cb[7..0].clk= clk;
+
+	sd[].clk	= clk;
+	sd[].d		= ramdata[];
+
+	sum[].clk	= clk;
+	sum[].ena	= addenable;
+	sum[].clrn	= !hload;
+	sum[].d		= chkadd.result[];
+
+	chkadd.dataa[]	= hd[8..0];
+	chkadd.datab[]	= sum[8..0];
+	chkadd.cin		= GND;
+
+  IF checksum == 1 THEN
+	 hdout[8..0].d	= sum[8..0].q;
+	 hdout9.d		= !(sum8.q);
+  ELSE
+	 hdout[9..0].d	= hd[].q;
+  END IF;
+	
+	CASE d[] IS
+		WHEN 1724 => hd[].d=H"3ff";
+		WHEN 1725 => hd[].d=H"0";
+		WHEN 1726 => hd[].d=H"0";
+		WHEN 1727 =>			%SAV%
+			IF !s1 & !s0 THEN 	%Type B, 00%
+			 hd[].d=H"2AC";
+			ELSIF !s1 & s0 THEN %Type A, 01%
+			 hd[].d=H"3B0";
+			ELSIF s1 & !s0 THEN %Type C 01%
+			 hd[].d=H"200";
+			ELSIF s1 & s0 THEN 	%Type D, 01%
+			 hd[].d=H"31C";
+			END IF;
+
+		WHEN 1440 => hd[].d=H"3ff";
+		WHEN 1441 => hd[].d=H"0";
+		WHEN 1442 => hd[].d=H"0";
+		WHEN 1443 =>			%EAV%
+			IF !s1 & !s0 THEN 	%Type B, 00%
+			 hd[].d=H"2d8";
+			ELSIF !s1 & s0 THEN %Type A, 01%
+			 hd[].d=H"3C4";
+			ELSIF s1 & !s0 THEN %Type C 01%
+			 hd[].d=H"274";
+			ELSIF s1 & s0 THEN	%Type D, 01%
+			 hd[].d=H"368";
+			END IF;
+		WHEN 1444 => 			%ANC-flag%
+			IF sound==1 THEN
+			 hd[].d=H"0"; 
+			ELSE
+			  hd[].d=H"200";	%chromasample%
+			END IF;
+		WHEN 1445 => 			%ANC-flag%
+			IF sound==1 THEN
+			 hd[].d=H"3FF"; 
+			ELSE
+			  hd[].d=H"40";		%luminance sample%
+			END IF;
+		WHEN 1446 => 			%ANC-flag%
+			IF sound==1 THEN
+			 hd[].d=H"3FF"; 
+			ELSE
+			  hd[].d=H"200";	%chromasample%
+			END IF;
+		WHEN 1447 => 			%lydgruppe%
+			IF sound==1 THEN
+			 hd[].d=H"2FF"; 
+			ELSE
+			  hd[].d=H"40";		%luminance sample%
+			END IF;
+	WHEN 1448 => 				%bloknr.%
+			IF sound==1 THEN
+			 hd[].d=H"200"; 
+			ELSE
+			  hd[].d=H"200";	%chromasample%
+			END IF;
+		WHEN 1449 => 			%Data count%
+			IF sound==1 THEN
+			 hd[].d=(3or4 & H"230") # (!3or4 & H"224"); 
+			ELSE
+			  hd[].d=H"40";		%luminance sample%
+			END IF;
+		WHEN OTHERS =>
+	IF d0 == 0 THEN
+	  hd[9..0].d = ((H"200") & !ram) # (ram & sd[9..0]);
+	ELSE
+	  hd[9..0].d = ((H"40") & !ram) # (ram & sd[9..0]);
+	END IF;
+	END CASE;
+
+	yadd.dataa[]	= hd[9..2]; %hæver sort, på grund af multimediechip%
+	yadd.datab[]	= 9;
+	yadd.cin		= GND;
+
+	IF (!d0 & cbblk)==1 THEN
+	  cb[7..0].d = yadd.result[];    -- chroma sample  
+	ELSE
+	  cb[7..0].d = hd[9..2];  -- yadd.result[];  -- luminance sample
+	END IF;
+
+	ramadjust.clk  = clk;--kun til lyd
+	ramadjust.ena  = sound & (d[]==1453);
+	ramadjust.d    = !(sd1 & !sd2);
+	ramadjust.clrn = !hload;
+
+END;
+

@@ -1,0 +1,705 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+F:\PTV\Pt5201\Design\DDD\SW\Master\work\VER.2_3\temp\xa\isrs.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; isrs.asm - assembly interrupt service routines for 8051XA peripherals
+                          2 ;
+                          3 ; RTXC    Version 3.2
+                          4 ; Copyright (c) 1986-1997.
+                          5 ; Embedded System Products, Inc.
+                          6 ; ALL RIGHTS RESERVED
+                          7 ;
+                          8 ; Modified by KEN-PTV 28/01-00
+                          9 ;  Application code used throughout this module
+                         10 ; Modified by TK-PTV 22/20-99
+                         11 ;  No conditional code, all interrupts are coded. Enable them
+                         12 ;  through respestive call.
+                         13 ;===============================================================================
+                         14 $                      
+                         16 ; rtxcopts.inc - RTXC assembly options 8051XA
+                         18 ;
+                         19 ;   RTXC    
+                         20 ;   Copyright (c) 
+                         21 ;   Embedded System Products, Inc.
+                         22 ;   ALL RIGHTS RESERVED
+                         23 ;
+                         24 ;============================================================================
+                         26 ;-------------------------------------
+                         27 ; KERNEL priority level
+                         28 ;    NOTE: RTXCINTLVL must match level in RTXCOPTS.H
+                         29 ;-------------------------------------
+                         30 RTXCINTLVL    equ   0Dh
+                         32 ;-------------------------------------
+                         33 ; KERNEL Trap number
+                         34 ;    NOTE:
+                         35 ;-------------------------------------
+                         36 RTXC_TRAPNUM  equ    0h
+                         38 ;-------------------------------------
+                         39 ; RTXC stack size
+                         40 ;    NOTE: RTXCSTKSZ must match definition in RTXCOPTS.H
+                         41 ;-------------------------------------
+                         42 RTXCSTKSZ    equ   256; can be changed as needed, min = approx 256 bytes
+                         44 ;-------------------------------------
+                         45 ; Nulltask's stack size
+                         46 ;-------------------------------------
+                         47 NULLSTKSZ    equ   128; Size of null stack, min = 128
+                         49 ;===========================================================================
+                         50 ; This switch is to define 12 bytes of kernel data into the first 1k bytes
+                         51 ; of RAM.  Having this switch defined to _near allows the kernel to execute
+                         52 ; considerably faster at a minimal cost. If this data is not desired to be
+                         53 ; in the 1k bytes, then define CORE_IRAMDATA to zero (0).
+                         54 ;                1 = YES,  0 = NO
+                         55 ;---------------------------------------------------------------------------
+                         57 ;===========================================================================
+                         59 ;===========================================================================
+                         60 ; This allows the kernel in the LARGE memory model to access the stacks as
+                         61 ; 16 bit data.
+                         62 ;
+                         63 ;NOTE1: This switch must match the setting of the switch of the same name
+                         64 ;       in the RTXCOPTS.H module.
+                         65 ;
+                         66 ;NOTE2: This switch is supported only in the Tasking LARGE memory model.
+                         67 ;                1 = YES,  0 = NO
+                         68 ;---------------------------------------------------------------------------
+                         70 ;===========================================================================
+                         72 ;****************************************************************************
+                         73 ; Do not modify anything below this line
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         74 ;---------------------------------------------------------------------------
+                         76    
+                         77    
+                         78    
+                         79    
+                         80        
+                         81        
+                         82            
+                         83        
+                         84    
+                         85    
+                         86    
+                         90 ;===========================================================================
+                         91 ; The SYSMODE switch should always be defined and equal to 0x080.
+                         92 ; This defines the system mode.  User mode is not supported by RTXC.
+                         93 ;---------------------------------------------------------------------------
+                         94 SYSMODE  equ 080h
+                         95 ;===========================================================================
+                         97 ; end of rtxcopts.inc
+                         99 $                  
+                        101 ; isrs.inc - 8051XA peripheral options
+                        103 ;
+                        104 ;   RTXCio
+                        105 ;   Copyright (c) 
+                        106 ;   Embedded System Products, Inc.
+                        107 ;   ALL RIGHTS RESERVED
+                        108 ;
+                        110 ;
+                        111 ; CLOCK support
+                        112 ;
+                        113          ; 1=clk supported in application
+                        115   ; end of CLK
+                        118 ;=============================================================================
+                        119 ; serial support
+                        120 ;
+                        121          ; 1=serial supported in application
+                        124        ; 1=Serial I/O 0 supported in application
+                        125        ; 1=Serial I/O 1 supported in application
+                        128 ;
+                        129 ; receive 0 and transmit 0 priority levels, must match level in PERIPHAL.H
+                        130 ;
+                        131 RX0INTLVL  EQU  0Eh     ; receive interrupt level
+                        132                         ; (User may change interrupt level at which
+                        133                         ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+                        134 TX0INTLVL  EQU  0Bh     ; transmit interrupt level
+                        135                         ; (User may change interrupt level at which
+                        136                         ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+                        137   ; end if SIO_0
+                        140 ;
+                        141 ; receive 1 and transmit 1 priority levels, must match level in PERIPHAL.H
+                        142 ;
+                        143 RX1INTLVL  EQU  0Ah     ; receive interrupt level
+                        144                         ; (User may change interrupt level at which
+                        145                         ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+                        146 TX1INTLVL  EQU  09h     ; transmit interrupt level
+                        147                         ; (User may change interrupt level at which
+                        148                         ;  SCI interrupts.) cref SCIDRV.C & ISRS.ASM
+                        149   ; end if SIO_1
+                        150   ; end if SIO
+                        153 ;=============================================================================
+                        154 ; external interrupt
+                        155 ;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        156       ; 1=external interrupt 0 supported in application
+                        157       ; 1=external interrupt 1 supported in application
+                        160 ;
+                        161 ; external interrupt 0, must match level in PERIPHAL.H
+                        162 ;
+                        163 EX0INTLVL  EQU  0Fh     ; external interrupt 0 level
+                        165   ; end if EXINT0
+                        169 ;
+                        170 ; external interrupt 1, must match level in PERIPHAL.H
+                        171 ;
+                        172 EX1INTLVL  EQU  0Fh     ; external interrupt 1 level
+                        174   ; end if EXINT1
+                        177 ; end of isrs.inc
+                        180 ; claim the peripheral's interrupt vector
+                        181 ; the next line after the vector claim must
+                        182 ; be the first instruction of the interrupt service routine
+                        183 ;
+000084                  184 CSEG AT 084H
+000084 008Drrrrrrrrrr   185 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvctimer0
+       rrrrrr               
+00008C                  186 CSEG AT 08CH
+00008C 008Drrrrrrrrrr   187 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvctimer1
+       rrrrrr               
+000090                  188 CSEG AT 090H
+000090 008Drrrrrrrrrr   189 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvctimer2
+       rrrrrr               
+0000A4                  191 CSEG AT 0A4H
+0000A4 008Drrrrrrrrrr   192 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvcsio0o
+       rrrrrr               
+0000A0                  193 CSEG AT 0A0H
+0000A0 008Errrrrrrrrr   194 DW      ((SYSMODE+RX0INTLVL) SHL 8), isvcsio0i
+       rrrrrr               
+0000AC                  196 CSEG AT 0ACH
+0000AC 008Drrrrrrrrrr   197 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvcsio1o
+       rrrrrr               
+0000A8                  198 CSEG AT 0A8H
+0000A8 008Drrrrrrrrrr   199 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvcsio1i
+       rrrrrr               
+000080                  201 CSEG AT 080H
+000080 008Frrrrrrrrrr   202 DW      ((SYSMODE+EX0INTLVL) SHL 8), isvcex0
+       rrrrrr               
+000088                  203 CSEG AT 088H
+000088 008Frrrrrrrrrr   204 DW      ((SYSMODE+EX1INTLVL) SHL 8), isvcex1
+       rrrrrr               
+000114                  206 CSEG AT 0114H
+000114 008Drrrrrrrrrr   207 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvcswr6
+       rrrrrr               
+000118                  209 CSEG AT 0118H
+000118 008Drrrrrrrrrr   210 DW      ((SYSMODE+RTXCINTLVL) SHL 8), isvcswr7
+       rrrrrr               
+000000                  213     ISRS_CODE SEGMENT HCODE 
+000000                  214         RSEG ISRS_CODE
+000000                  214         RSEG ISRS_CODE
+                        216 $                      
+                        218 ; saveregs.inc - RTXC interrupt save register macro 8051XA
+                        220 ;
+                        221 ;   RTXC    
+                        222 ;   Copyright (c) 
+                        223 ;   Embedded System Products, Inc.
+                        224 ;   ALL RIGHTS RESERVED
+                        225 ;
+                        227 $ GEN
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        229 saveregs MACRO
+                        230     ; save register set on the interrupted's frame or stack
+                        231     ; R6 first, R0 last
+                        232     push      R6,R5,R4,R3,R2,R1,R0
+                        234     ; load and save the segment select and data segment
+                        235     ; registers in the interrupted's frame.
+                        236     mov.b     R6L,SSEL
+                        237     mov.b     R6H,DS
+                        238     push      R6
+                        240     mov.b     SSEL,#7Fh
+                        243     mov.b     DS,#0
+                        245     ; store the Extra and Code Segment registers in the interrupted's frame
+                        246     mov.b     R6L,ES
+                        247     mov.b     R6H,CS
+                        248     push      R6
+                        250     ; pass the frame pointer or stack pointer as an argument to the kernel
+                        252     mov.b     R1L, DS
+                        253     xor.b     R1H, R1H
+                        256     mov.w     R0,R7
+                        258     ; compare the interrupt level count to zero (0) to determine stack usage
+                        259      ; declared as type DATA
+                        260     cmp.b     _isrcnt,#0             ;if nesting level != 0
+                        261    ; end of if CORE_IRAMDATA
+                        264     bne       ^noswitch              ; don't switch, use current stack
+                        265     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+                        267 ^noswitch:
+                        268     ; increment the interrupt level count by one.
+                        269      ; declared as type DATA
+                        270     adds.b    _isrcnt,#1h
+                        271   ; end of if CORE_IRAMDATA
+                        274     ENDM
+                        276 ; end of saveregs.inc
+                        279         EXTRN HDATA ( _rtxcstak)
+                        280         EXTRN DATA ( _isrcnt)
+                        281         EXTRN DATA ( _intlvl)
+                        282         EXTRN HCODE ( isrexit)
+                        284         EXTRN BIT ( _UnitPgmMode)
+                        286 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        287 ;                                                          ;
+                        288 ; serial 0 interrupt service                               ;
+                        289 ;                                                          ;
+                        290 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        292         EXTRN HCODE ( _intsio0o)
+                        293         EXTRN DATA ( _RxOutput)
+                        294         EXTRN DATA ( _RxInput)
+                        295         EXTRN HDATA( _RxBuffer)
+                        297         public isvcsio0o
+000000                  298 isvcsio0o:
+000000 97Arrr03         300         jnb                             _UnitPgmMode, isvcsio0o_
+000004 080301           301         clr                             TI_0
+000007 D690             302         reti
+000007 D69000           302         reti
+00000A                  304 isvcsio0o_:
+                        305         ; save the world of the interrupted
+                        306         saveregs
+                       +306 ;     ; save register set on the interrupted's frame or stack
+                       +306 ;     ; R6 first, R0 last
+00000A 0F7F            +306 ;     push      R6,R5,R4,R3,R2,R1,R0
+                       +306 ;     ; load and save the segment select and data segment
+                       +306 ;     ; registers in the interrupted's frame.
+00000C 86C403          +306 ;     mov.b     R6L,SSEL
+00000F 86D441          +306 ;     mov.b     R6H,DS
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+000012 0F40            +306 ;     push      R6
+000014 9648037F        +306 ;     mov.b     SSEL,#7Fh
+000018 B64041          +306 ;     mov.b     DS,#0
+                       +306 ;     ; store the Extra and Code Segment registers in the interrupted's frame
+00001B 86C442          +306 ;     mov.b     R6L,ES
+00001E 86D443          +306 ;     mov.b     R6H,CS
+000021 0F40            +306 ;     push      R6
+                       +306 ;     ; pass the frame pointer or stack pointer as an argument to the kernel
+000023 862441          +306 ;     mov.b     R1L, DS
+000026 7133            +306 ;     xor.b     R1H, R1H
+000028 8907            +306 ;     mov.w     R0,R7
+                       +306 ;     ; compare the interrupt level count to zero (0) to determine stack usage
+                       +306 ;      ; declared as type DATA
+00002A 96r4rr00        +306 ;     cmp.b     _isrcnt,#0             ;if nesting level != 0
+                       +306 ;    ; end of if CORE_IRAMDATA
+00002E F202            +306 ;     bne       noswitch__M_L000001              ; don't switch, use current stack
+000030 9978rrrr        +306 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+000030 9978rrrr        +306 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+000034                 +306 ; noswitch__M_L000001:
+                       +306 ;     ; increment the interrupt level count by one.
+                       +306 ;      ; declared as type DATA
+000034 A6r1rr          +306 ;     adds.b    _isrcnt,#1h
+                       +306 ;   ; end of if CORE_IRAMDATA
+                        308         ; set PSWH to the priority of the interrupt
+000037 9648018B         309         mov.b                   PSWH, #SYSMODE+TX0INTLVL
+                        311         ; call interrupt handler
+00003B C4rrrrrr         312         FCALL           _intsio0o
+                        314         ; goto isr exit code
+00003F D4rrrrrr         315         FJMP                    isrexit
+00003F D4rrrrrr00       315         FJMP                    isrexit
+                        316                                                 
+                        318         public  isvcsio0i
+000044                  319 isvcsio0i:
+000044 97Arrr09         321         jnb                             _UnitPgmMode, isvcsio0i_
+000048 0F02             322         push                    R1
+00004A 080300           324         clr                             RI_0
+00004D 862460           325         mov                             R1L, S0BUF
+000050 862C64           327         mov                             S1BUF, R1L
+000053 080321           328         clr                             TI_1
+000056 2F02             330         pop                             R1
+000058 D690             331         reti    
+000058 D690             331         reti    
+00005A                  333 isvcsio0i_:
+                        334         ; save register set on the interrupted's frame or stack
+                        335         ; R1 first, R0 last
+00005A 0F03             336         push                    R1, R0
+                        338         ; store the Segment SELect register and the Extra Segment
+                        339         ; register in the interrupted's frame
+00005C 862403           340         mov.b                   R1L, SSEL
+00005F 863442           341         mov.b                   R1H, ES
+000062 0F02             342         push                    R1
+000064 080300           344         clr                             RI_0
+000067 860rrr           346         mov.b                   R0L, _RxOutput        
+00006A 260rrr           347         sub.b                   R0L, _RxInput
+00006D 6100             348         or.b                    R0L, R0L
+00006F F202             350         bne                             isvcsio0i_1
+000071 081355           351         setb                    SWR6
+000071 081355           351         setb                    SWR6
+000074                  353 isvcsio0i_1:
+000074 A6r1rr           354         adds.b          _RxInput, #01H
+000077 860rrr           355         mov.b                   R0L, _RxInput
+00007A E80140           356         divu.b          R0L, #040H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+00007D 861rrr           357         mov.b                   _RxInput, R0H
+000080 8101             358         mov.b                   R0L, R0H
+000082 B110             359         movs.b          R0H, #00H
+000084 862460           361         mov.b                   R1L, S0BUF
+000087 081218           363         setb                    R0SEG
+00008A 964842rr         364         mov.b                   ES, #SEG( _RxBuffer)
+00008E 8528rrrr         365         mov.b                   [R0+SOF( _RxBuffer)], r1l
+                        367         ; restore the Extra Segment and the Segment SELect register
+                        368         ; off the stack.
+000092 2F02             369         pop                             R1
+000094 863C42           370         mov.b                   ES, R1H
+000097 862C03           371         mov.b           SSEL, R1L
+                        373         ; restore the register set
+00009A 2F03             374         pop                             R0, R1
+                        376         ;return from interrupt
+00009C D690             377         reti
+00009C D690             377         reti
+                        380 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        381 ;                                                          ;
+                        382 ; serial 1 interrupt service                               ;
+                        383 ;                                                          ;
+                        384 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        386         EXTRN HCODE ( _int232o)
+                        387         EXTRN HCODE ( _int232i)
+                        389   public isvcsio1o
+00009E                  390 isvcsio1o:
+00009E 97Arrr03         392         jnb                             _UnitPgmMode, isvcsio1o_
+0000A2 080321           393         clr                             TI_1
+0000A5 D690             394         reti
+0000A5 D69000           394         reti
+0000A8                  396 isvcsio1o_:
+                        397   ; save the world of the interrupted
+                        398   saveregs
+                       +398 ;     ; save register set on the interrupted's frame or stack
+                       +398 ;     ; R6 first, R0 last
+0000A8 0F7F            +398 ;     push      R6,R5,R4,R3,R2,R1,R0
+                       +398 ;     ; load and save the segment select and data segment
+                       +398 ;     ; registers in the interrupted's frame.
+0000AA 86C403          +398 ;     mov.b     R6L,SSEL
+0000AD 86D441          +398 ;     mov.b     R6H,DS
+0000B0 0F40            +398 ;     push      R6
+0000B2 9648037F        +398 ;     mov.b     SSEL,#7Fh
+0000B6 B64041          +398 ;     mov.b     DS,#0
+                       +398 ;     ; store the Extra and Code Segment registers in the interrupted's frame
+0000B9 86C442          +398 ;     mov.b     R6L,ES
+0000BC 86D443          +398 ;     mov.b     R6H,CS
+0000BF 0F40            +398 ;     push      R6
+                       +398 ;     ; pass the frame pointer or stack pointer as an argument to the kernel
+0000C1 862441          +398 ;     mov.b     R1L, DS
+0000C4 7133            +398 ;     xor.b     R1H, R1H
+0000C6 8907            +398 ;     mov.w     R0,R7
+                       +398 ;     ; compare the interrupt level count to zero (0) to determine stack usage
+                       +398 ;      ; declared as type DATA
+0000C8 96r4rr00        +398 ;     cmp.b     _isrcnt,#0             ;if nesting level != 0
+                       +398 ;    ; end of if CORE_IRAMDATA
+0000CC F202            +398 ;     bne       noswitch__M_L000002              ; don't switch, use current stack
+0000CE 9978rrrr        +398 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+0000CE 9978rrrr        +398 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+0000D2                 +398 ; noswitch__M_L000002:
+                       +398 ;     ; increment the interrupt level count by one.
+                       +398 ;      ; declared as type DATA
+0000D2 A6r1rr          +398 ;     adds.b    _isrcnt,#1h
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+                       +398 ;   ; end of if CORE_IRAMDATA
+                        400         ; set PSWH to the priority of the interrupt
+0000D5 96480189         401   mov.b                 PSWH, #SYSMODE+TX1INTLVL
+                        403   ; call interrupt handler
+0000D9 C4rrrrrr         404   FCALL                 _int232o
+                        405                                                 
+                        406         ; goto isr exit code
+0000DD D4rrrrrr         407   FJMP                  isrexit
+0000DD D4rrrrrr00       407   FJMP                  isrexit
+                        410         public isvcsio1i
+0000E2                  411 isvcsio1i:
+0000E2 97Arrr0D         413         jnb                             _UnitPgmMode, isvcsio1i_
+0000E6 0F01             414         push                    R0
+0000E8 080320           416         clr                             RI_1
+0000EB 860464           417         mov                             R0L, S1BUF
+0000EE E3000203         419         cjne                    R0L, #03H, isvcsio1i_nores
+0000F2 D610             420         reset
+0000F2 D610             420         reset
+0000F2 D610             420         reset
+                        421         jmp                             $
+0000F4 FEFF            +421         BR      $
+0000F4 FEFF            +421         BR      $
+0000F4 FEFF            +421         BR      $
+0000F6                  423 isvcsio1i_nores:
+0000F6 860C60           424         mov                             S0BUF, R0L
+0000F9 080301           425         clr                             TI_0
+0000FC 2F01             427         pop                             R0
+0000FE D690             428         reti    
+0000FE D690             428         reti    
+000100                  430 isvcsio1i_:
+                        431    ; save the world of the interrupted
+                        432    saveregs
+                       +432 ;     ; save register set on the interrupted's frame or stack
+                       +432 ;     ; R6 first, R0 last
+000100 0F7F            +432 ;     push      R6,R5,R4,R3,R2,R1,R0
+                       +432 ;     ; load and save the segment select and data segment
+                       +432 ;     ; registers in the interrupted's frame.
+000102 86C403          +432 ;     mov.b     R6L,SSEL
+000105 86D441          +432 ;     mov.b     R6H,DS
+000108 0F40            +432 ;     push      R6
+00010A 9648037F        +432 ;     mov.b     SSEL,#7Fh
+00010E B64041          +432 ;     mov.b     DS,#0
+                       +432 ;     ; store the Extra and Code Segment registers in the interrupted's frame
+000111 86C442          +432 ;     mov.b     R6L,ES
+000114 86D443          +432 ;     mov.b     R6H,CS
+000117 0F40            +432 ;     push      R6
+                       +432 ;     ; pass the frame pointer or stack pointer as an argument to the kernel
+000119 862441          +432 ;     mov.b     R1L, DS
+00011C 7133            +432 ;     xor.b     R1H, R1H
+00011E 8907            +432 ;     mov.w     R0,R7
+                       +432 ;     ; compare the interrupt level count to zero (0) to determine stack usage
+                       +432 ;      ; declared as type DATA
+000120 96r4rr00        +432 ;     cmp.b     _isrcnt,#0             ;if nesting level != 0
+                       +432 ;    ; end of if CORE_IRAMDATA
+000124 F202            +432 ;     bne       noswitch__M_L000003              ; don't switch, use current stack
+000126 9978rrrr        +432 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+000126 9978rrrr        +432 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+00012A                 +432 ; noswitch__M_L000003:
+                       +432 ;     ; increment the interrupt level count by one.
+                       +432 ;      ; declared as type DATA
+00012A A6r1rr          +432 ;     adds.b    _isrcnt,#1h
+                       +432 ;   ; end of if CORE_IRAMDATA
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+                        434    ; set PSWH to the priority of the interrupt
+00012D 9648018A         435    mov.b     PSWH, #SYSMODE+RX1INTLVL
+                        437    ; call interrupt handler
+000131 C4rrrrrr         438    FCALL                _int232i
+                        440    ; goto isr exit code
+000135 D4rrrrrr         441    FJMP                 isrexit
+000135 D4rrrrrr00       441    FJMP                 isrexit
+                        444 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        445 ;                                                          ;
+                        446 ; clk interrupt service                                    ;
+                        447 ;                                                          ;
+                        448 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        450         public isvctimer0
+00013A                  451 isvctimer0:
+                        452         ; push/save all registers being used here
+                        453         ; perform private interrupt operations here
+                        454         ; pop/restore all registers being used here
+                        456         ; DO NOT USE! USED AS COUNTER FOR COLORBAR GENERATOR
+00013A D690             457         reti
+00013A D690             457         reti
+                        459         public isvctimer1
+00013C                  460 isvctimer1:
+                        461         ; push/save all registers being used here
+                        462         ; perform private interrupt operations here
+                        463         ; pop/restore all registers being used here
+                        465         ; DO NOT USE! USED AS BAUD RATE GENERATOR FOR SIO1
+00013C D690             466         reti
+00013C D690             466         reti
+                        468         public isvctimer2
+00013E                  469 isvctimer2:
+                        470         ; push/save all registers being used here
+                        471         ; perform private interrupt operations here
+                        472         ; pop/restore all registers being used here
+                        474         ; DO NOT USE! USED AS BAUD RATE GENERATOR FOR SIO0
+00013E D690             475         reti
+00013E D690             475         reti
+                        478 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        479 ;                                                          ;
+                        480 ; ext0 interrupt service                                   ;
+                        481 ;                                                          ;
+                        482 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        484         EXTRN HCODE ( _CBLineInterrupt)
+                        485         EXTRN DATA ( _TimeTickCounter)
+                        486         EXTRN DATA ( _LineOffset)
+                        488         public          isvcex0
+000140                  489 isvcex0:
+                        490         ; save register set on the interrupted's frame or stack
+                        491         ; R6 first, R0 last
+000140 0F7F             493         push                    R6, R5, R4, R3, R2, R1, R0
+                        495         ; load and save the segment select and data segment
+                        496         ; registers in the interrupted's frame.
+000142 86C403           497         mov.b                   R6L, SSEL
+000145 86D441           498         mov.b                   R6H, DS
+000148 0F40             499         push                    R6
+                        501         ; store the Extra and Code Segment registers in the interrupted's frame
+00014A 86C442           502         mov.b                   R6L, ES
+00014D 86D443           503         mov.b                   R6H, CS
+000150 0F40             504         push                    R6
+                        505  
+                        506         ; perform private interrupt operations here
+000152 8E6rrr           507         mov                             R6, _TimeTickCounter
+000155 8F6804           509         djnz                    R6, isvcex0_lbl1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+000158 9968007D         511         mov                             R6, #0125               ;reload time tick counter (PAL)
+00015C 081356           512         setb                    SWR7                            ;Time for time tick
+00015C 08135600         512         setb                    SWR7                            ;Time for time tick
+000160                  514 isvcex0_lbl1:
+000160 8E6rrr           515         mov                             _TimeTickCounter, R6
+000163 97C2830D         517         JBC                             IE1, LoadFieldTimer
+000167 C4rrrrrr         519         FCALL           _CBLineInterrupt
+                        521         ; restore the Extra and Code Segment registers off the stack.
+00016B 2F40             522         pop                             R6
+00016D 86DC43           523         mov.b                   CS, R6H
+000170 86CC42           524         mov.b                   ES, R6L
+                        526         ; restore the Data Segment and Segment SELect register off the stack.
+000173 2F40             527         pop                             R6
+000175 86DC41           528         mov.b                   DS, R6H
+000178 86CC03           529         mov.b                   SSEL, R6L
+                        531         ; restore the register set
+00017B 2F7F             532         pop                             R0, R1, R2, R3, R4, R5, R6
+                        534         ;return from interrupt
+00017D D690             535         reti
+00017D D69000           535         reti
+000180                  537 LoadFieldTimer:
+000180 8E6rrr           538         mov                             R6, _LineOffset
+000183 86DC51           540         mov.b                   TH0, R6H
+000186 86CC50           541         mov.b                   TL0, R6L
+000189 C4rrrrrr         543         FCALL           _CBLineInterrupt
+                        545         ; restore the Extra and Code Segment registers off the stack.
+00018D 2F40             546         pop                             R6
+00018F 86DC43           547         mov.b                   CS, R6H
+000192 86CC42           548         mov.b                   ES, R6L
+                        550         ; restore the Data Segment and Segment SELect register off the stack.
+000195 2F40             551         pop                             R6
+000197 86DC41           552         mov.b                   DS, R6H
+00019A 86CC03           553         mov.b                   SSEL, R6L
+                        555         ; restore the register set
+00019D 2F7F             556         pop                             R0, R1, R2, R3, R4, R5, R6
+                        557         ;return from interrupt
+00019F D690             558         reti
+00019F D69000           558         reti
+                        561 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        562 ;                                                          ;
+                        563 ; ext1 interrupt service                                   ;
+                        564 ;                                                          ;
+                        565 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        567         public isvcex1
+0001A2                  568 isvcex1:
+                        569         ; save register set on the interrupted's frame or stack
+                        570   ; R6 first, R0 last
+0001A2 0F7F             572   push                  R6, R5, R4, R3, R2, R1, R0
+                        574   ; load and save the segment select and data segment
+                        575   ; registers in the interrupted's frame.
+0001A4 86C403           576   mov.b                 R6L, SSEL
+0001A7 86D441           577   mov.b                 R6H, DS
+0001AA 0F40             578   push                  R6
+                        580   ; store the Extra and Code Segment registers in the interrupted's frame
+0001AC 86C442           581   mov.b                 R6L, ES
+0001AF 86D443           582   mov.b                 R6H, CS
+0001B2 0F40             583   push                  R6
+                        585   ; perform private interrupt operations here
+                        587   ; restore the Extra and Code Segment registers off the stack.
+0001B4 2F40             588   pop                   R6
+0001B6 86DC43           589   mov.b                 CS, R6H
+0001B9 86CC42           590   mov.b                 ES, R6L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+                        592   ; restore the Data Segment and Segment SELect register off the stack.
+0001BC 2F40             593   pop                   R6
+0001BE 86DC41           594   mov.b                 DS, R6H
+0001C1 86CC03           595   mov.b                 SSEL, R6L
+                        597   ; restore the register set
+0001C4 2F7F             598   pop                   R0, R1, R2, R3, R4, R5, R6
+                        600   ;return from interrupt
+0001C6 D690             601   reti
+0001C6 D690             601   reti
+                        604 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        605 ;                                                          ;
+                        606 ; SWR6 interrupt service                                   ;
+                        607 ;                                                          ;
+                        608 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        610         EXTRN HCODE ( _intsio0i)
+                        612         public isvcswr6
+0001C8                  613 isvcswr6:
+                        614         ; save the world of the interrupted
+                        615         saveregs
+                       +615 ;     ; save register set on the interrupted's frame or stack
+                       +615 ;     ; R6 first, R0 last
+0001C8 0F7F            +615 ;     push      R6,R5,R4,R3,R2,R1,R0
+                       +615 ;     ; load and save the segment select and data segment
+                       +615 ;     ; registers in the interrupted's frame.
+0001CA 86C403          +615 ;     mov.b     R6L,SSEL
+0001CD 86D441          +615 ;     mov.b     R6H,DS
+0001D0 0F40            +615 ;     push      R6
+0001D2 9648037F        +615 ;     mov.b     SSEL,#7Fh
+0001D6 B64041          +615 ;     mov.b     DS,#0
+                       +615 ;     ; store the Extra and Code Segment registers in the interrupted's frame
+0001D9 86C442          +615 ;     mov.b     R6L,ES
+0001DC 86D443          +615 ;     mov.b     R6H,CS
+0001DF 0F40            +615 ;     push      R6
+                       +615 ;     ; pass the frame pointer or stack pointer as an argument to the kernel
+0001E1 862441          +615 ;     mov.b     R1L, DS
+0001E4 7133            +615 ;     xor.b     R1H, R1H
+0001E6 8907            +615 ;     mov.w     R0,R7
+                       +615 ;     ; compare the interrupt level count to zero (0) to determine stack usage
+                       +615 ;      ; declared as type DATA
+0001E8 96r4rr00        +615 ;     cmp.b     _isrcnt,#0             ;if nesting level != 0
+                       +615 ;    ; end of if CORE_IRAMDATA
+0001EC F202            +615 ;     bne       noswitch__M_L000004              ; don't switch, use current stack
+0001EE 9978rrrr        +615 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+0001EE 9978rrrr        +615 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+0001F2                 +615 ; noswitch__M_L000004:
+                       +615 ;     ; increment the interrupt level count by one.
+                       +615 ;      ; declared as type DATA
+0001F2 A6r1rr          +615 ;     adds.b    _isrcnt,#1h
+                       +615 ;   ; end of if CORE_IRAMDATA
+                        617         ; set PSWH to the priority of the interrupt
+0001F5 96480186         618         mov.b           PSWH, #SYSMODE+6
+                        620         ; call interrupt handler
+0001F9 C4rrrrrr         621         FCALL           _intsio0i
+                        623   ; goto isr exit code
+0001FD D4rrrrrr         624   FJMP          isrexit
+0001FD D4rrrrrr00       624   FJMP          isrexit
+                        627 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        628 ;                                                          ;
+                        629 ; SWR7 interrupt service                                   ;
+                        630 ;                                                          ;
+                        631 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        633         EXTRN HCODE ( _ticktimer)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        635         public isvcswr7
+000202                  636 isvcswr7:
+                        637   ; save the world of the interrupted
+                        638   saveregs
+                       +638 ;     ; save register set on the interrupted's frame or stack
+                       +638 ;     ; R6 first, R0 last
+000202 0F7F            +638 ;     push      R6,R5,R4,R3,R2,R1,R0
+                       +638 ;     ; load and save the segment select and data segment
+                       +638 ;     ; registers in the interrupted's frame.
+000204 86C403          +638 ;     mov.b     R6L,SSEL
+000207 86D441          +638 ;     mov.b     R6H,DS
+00020A 0F40            +638 ;     push      R6
+00020C 9648037F        +638 ;     mov.b     SSEL,#7Fh
+000210 B64041          +638 ;     mov.b     DS,#0
+                       +638 ;     ; store the Extra and Code Segment registers in the interrupted's frame
+000213 86C442          +638 ;     mov.b     R6L,ES
+000216 86D443          +638 ;     mov.b     R6H,CS
+000219 0F40            +638 ;     push      R6
+                       +638 ;     ; pass the frame pointer or stack pointer as an argument to the kernel
+00021B 862441          +638 ;     mov.b     R1L, DS
+00021E 7133            +638 ;     xor.b     R1H, R1H
+000220 8907            +638 ;     mov.w     R0,R7
+                       +638 ;     ; compare the interrupt level count to zero (0) to determine stack usage
+                       +638 ;      ; declared as type DATA
+000222 96r4rr00        +638 ;     cmp.b     _isrcnt,#0             ;if nesting level != 0
+                       +638 ;    ; end of if CORE_IRAMDATA
+000226 F202            +638 ;     bne       noswitch__M_L000005              ; don't switch, use current stack
+000228 9978rrrr        +638 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+000228 9978rrrr        +638 ;     mov.w     R7,#_rtxcstak          ;load kernel stack into sp
+00022C                 +638 ; noswitch__M_L000005:
+                       +638 ;     ; increment the interrupt level count by one.
+                       +638 ;      ; declared as type DATA
+00022C A6r1rr          +638 ;     adds.b    _isrcnt,#1h
+                       +638 ;   ; end of if CORE_IRAMDATA
+                        640   ; set PSWH to the priority of the interrupt
+00022F 96480187         641   mov.b         PSWH, #SYSMODE+7
+                        643   ; call interrupt handler
+000233 C4rrrrrr         644   FCALL                 _ticktimer
+                        646         ; goto isr exit code
+000237 D4rrrrrr         647   FJMP          isrexit
+                        649 ; end of isrs.asm

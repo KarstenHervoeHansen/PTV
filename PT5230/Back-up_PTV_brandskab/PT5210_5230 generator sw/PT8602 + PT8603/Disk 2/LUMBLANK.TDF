@@ -1,0 +1,77 @@
+INCLUDE "lpm_add_sub.inc";
+
+SUBDESIGN lumblnk1
+(
+	clk,ab[9..0],txt[7..0]:		INPUT;
+	sb[2..0],enable:			INPUT;
+	yout[9..0]:					OUTPUT;
+)
+VARIABLE
+	dout[9..0],yout[9..0]:		DFFE;
+	textadd:			 		lpm_add_sub WITH (LPM_WIDTH=7);
+
+BEGIN
+	textadd.dataa[6..0]	= dout[9..3].q;
+	textadd.datab[6..0] = txt[6..0];
+	textadd.cin			= GND;
+
+	yout[9..3].d = textadd.result[];
+	yout[2..0].d = dout[2..0].q;
+	yout[].clk	 = clk;
+	yout[].ena	 = enable;
+
+	dout[].clk 	 = clk;
+	dout[].ena	 = enable;
+	IF (sb[] == 0)  THEN
+	 dout[].d	= ab[];
+	ELSE
+	   dout[3..0].d= 0; 
+    CASE sb[] IS
+	  WHEN 1 =>
+	   TABLE
+		 ab[9..4]   => dout[9..4].d;
+		  B"1111xx" => B"111010";
+		  B"1110xx" => B"110110";
+		  B"1101xx" => B"110011";
+		  B"1100xx" => B"101111";
+		  B"1011xx" => B"101011";
+		  B"1010xx" => B"101000";
+		  B"1001xx" => B"100100";
+		  B"1000xx" => B"100001";
+		  B"0111xx" => B"011101";
+		  B"0110xx" => B"011001";
+		  B"0101xx" => B"010110";
+		  B"0100xx" => B"010010";
+		  B"0011xx" => B"001111";
+		  B"0010xx" => B"001011";
+		  B"0001xx" => B"000111";
+		  B"0000xx" => B"000100";
+	   END TABLE;
+	  WHEN 2 =>
+	   TABLE
+		 ab[9..4]   => dout[9..4].d;
+		  B"1111xx" => B"110000";
+		  B"1110xx" => B"101101";
+		  B"1101xx" => B"101010";
+		  B"1100xx" => B"101010";
+		  B"1011xx" => B"100101";
+		  B"1010xx" => B"100010";
+		  B"1001xx" => B"101111";
+		  B"1000xx" => B"011100";
+		  B"0111xx" => B"011001";
+		  B"0110xx" => B"010110";
+		  B"0101xx" => B"010011";
+		  B"0100xx" => B"010000";
+		  B"0011xx" => B"001110";
+		  B"0010xx" => B"001011";
+		  B"0001xx" => B"001000";
+		  B"0000xx" => B"000101";
+	   END TABLE;
+	  WHEN 3 =>
+	  WHEN 4 =>
+	WHEN OTHERS => 
+       dout[9..0].d   = H"A0";
+	 END CASE;
+	END IF;
+END;
+

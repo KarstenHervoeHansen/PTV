@@ -1,0 +1,184 @@
+title " Control & status registers for AES-generator ";
+% 
+981214 PF
+%
+
+constant SW_VERSION              = H"0101";
+
+constant PLD_OK                  = H"A5A5";       % Register for check of PLD init = OK %
+                                                  % Must never be changed %
+% I/O ports C0000-FFFFF %
+constant PLD_SW_ADDR             = H"C0070";
+constant PLD_OK_ADDR             = H"C0072";
+constant TIMING1_ADDR            = H"D0000";
+constant TIMING2_ADDR            = H"D0002";
+constant CONTROL1_ADDR           = H"D0004";
+constant CONTROL2_ADDR           = H"D0006";
+constant STATUS_ADDR             = H"D0008";
+
+
+-- 128k x 8   SRAM                   A19                A0    start addr
+constant CPU_SRAM_ADDR           = B"00XXXXXXXXXXXXXXXXXX";    % 00000h    0k   %
+constant AUDIO_SRAM1_ADDR        = B"01XXXXXXXXXXXXXXXXXX";    % 40000h    256k %
+constant AUDIO_SRAM2_ADDR        = B"10XXXXXXXXXXXXXXXXXX";    % 80000h    512k %
+
+
+subdesign REGS
+(
+DM[15..0]                 : bidir;
+
+AM[2..0],
+ALE,
+RD,
+WRL,
+FREQ6144_LOCKED, 
+AUDIO_VIDEO_LOCKED1,
+AUDIO_VIDEO_LOCKED2,
+LEVELDET_BNC1,
+LEVELDET_BNC2,
+LEVELDET_XLR1,
+LEVELDET_XLR2,
+LEVELDET_WCLK1,
+LEVELDET_WCLK2            : input;
+
+ADDR[16..0],
+TIMING1[9..0],
+TIMING2[9..0],
+PLAY_AUDIO_1,
+PLAY_AUDIO_2,
+NTSCPHASE_1,
+NTSCPHASE_2,
+WCLK_SEL_1,
+WCLK_SEL_2,
+DIS_WCLK_XLR_1,
+DIS_WCLK_XLR_2,
+GLPER_1SEC_1,
+GLPER_1SEC_2,
+GLMODE_1[2..0],
+GLMODE_2[2..0],
+CPU_SRAM_ENABLE,
+AUDIORAM_ENABLE_1,
+AUDIORAM_ENABLE_2        : output;
+
+)
+variable
+AL[19..0]                 : latch;       % HC573 addr latch % 
+
+TIMING1_PORT[9..0]        : dffe;        % HC574 register with clock enable %
+TIMING2_PORT[9..0]        : dffe;
+CONTROL1_PORT[7..0]       : dffe;
+CONTROL2_PORT[7..0]       : dffe;
+STATUS_PORT[8..0]         : tri;         -- HC244 buffer
+PLD_SW_PORT[15..0]        : tri;         % PLD software version %
+PLD_OK_PORT[15..0]        : tri;
+
+CS_PLD_SW                 : node;
+CS_PLD_OK                 : node;
+CS_TIMING1                : node;
+CS_TIMING2                : node;
+CS_CONTROL1               : node;
+CS_CONTROL2               : node;
+CS_STATUS                 : node;
+CS_CPU_SRAM               : node;
+CS_AUDIO_SRAM1            : node;
+CS_AUDIO_SRAM2            : node;
+
+dm_node[15..0]            : tri_state_node;
+
+begin
+% Internal addr latch:
+  Alle adresser er byte-adresser, dvs kun lige adresser er gyldige %
+AL[].ena = ALE;
+AL[19..4] = DM[15..0];
+AL[3..1] = AM[2..0];
+AL[0] = GND;
+
+% chip selects %
+CS_PLD_SW = (AL[19..0] == PLD_SW_ADDR);
+CS_PLD_OK = (AL[19..0] == PLD_OK_ADDR);
+CS_TIMING1 = (AL[19..0] == TIMING1_ADDR);
+CS_TIMING2 = (AL[19..0] == TIMING2_ADDR);
+CS_CONTROL1 = (AL[19..0] == CONTROL1_ADDR);
+CS_CONTROL2 = (AL[19..0] == CONTROL2_ADDR);
+CS_STATUS = (AL[19..0] == STATUS_ADDR);
+
+CS_CPU_SRAM = (AL[19..0] == CPU_SRAM_ADDR);
+CS_AUDIO_SRAM1 = (AL[19..0] == AUDIO_SRAM1_ADDR);
+CS_AUDIO_SRAM2 = (AL[19..0] == AUDIO_SRAM2_ADDR);
+
+
+-- output ports
+-- ADDR lines
+ADDR[] = AL[16..0];
+
+
+-- AES generator #1 timing control
+TIMING1_PORT[].clk = WRL; 
+TIMING1_PORT[].d = DM[9..0];  
+TIMING1_PORT[].ena = CS_TIMING1;  
+TIMING1[] = TIMING1_PORT[];
+
+% AES generator #2 timing control %
+TIMING2_PORT[].clk = WRL; 
+TIMING2_PORT[].d = DM[9..0];  
+TIMING2_PORT[].ena = CS_TIMING2;  
+TIMING2[] = TIMING2_PORT[];
+
+% AES generator #1 control %
+CONTROL1_PORT[].clk = WRL; 
+CONTROL1_PORT[].d = DM[7..0];  
+CONTROL1_PORT[].ena = CS_CONTROL1;  
+PLAY_AUDIO_1 = CONTROL1_PORT[0];
+NTSCPHASE_1 = CONTROL1_PORT[1];
+WCLK_SEL_1 = CONTROL1_PORT[2];
+DIS_WCLK_XLR_1 = CONTROL1_PORT[3];
+GLPER_1SEC_1 = CONTROL1_PORT[4];
+GLMODE_1[2..0] = CONTROL1_PORT[7..5]; 
+
+% AES generator #2 control %
+CONTROL2_PORT[].clk = WRL; 
+CONTROL2_PORT[].d = DM[7..0];  
+CONTROL2_PORT[].ena = CS_CONTROL2;  
+PLAY_AUDIO_2 = CONTROL2_PORT[0];
+NTSCPHASE_2 = CONTROL2_PORT[1];
+WCLK_SEL_2 = CONTROL2_PORT[2];
+DIS_WCLK_XLR_2 = CONTROL2_PORT[3];
+GLPER_1SEC_2 = CONTROL2_PORT[4];
+GLMODE_2[2..0] = CONTROL2_PORT[7..5]; 
+
+% input ports %
+PLD_SW_PORT[].oe = !(RD # !CS_PLD_SW); 
+PLD_SW_PORT[15..0].in = SW_VERSION; 
+dm_node[] = PLD_SW_PORT[].out;
+
+PLD_OK_PORT[].oe = !(RD # !CS_PLD_OK);
+PLD_OK_PORT[].in = PLD_OK; 
+dm_node[] = PLD_OK_PORT[].out;
+
+
+% level detector status register %
+STATUS_PORT[].oe = !(RD # !CS_STATUS); 
+STATUS_PORT[0].in = LEVELDET_BNC1; 
+STATUS_PORT[1].in = LEVELDET_XLR1; 
+STATUS_PORT[2].in = LEVELDET_WCLK1; 
+STATUS_PORT[3].in = LEVELDET_BNC2; 
+STATUS_PORT[4].in = LEVELDET_XLR2; 
+STATUS_PORT[5].in = LEVELDET_WCLK2; 
+STATUS_PORT[6].in = FREQ6144_LOCKED; 
+STATUS_PORT[7].in = AUDIO_VIDEO_LOCKED1; 
+STATUS_PORT[8].in = AUDIO_VIDEO_LOCKED2; 
+dm_node[8..0] = STATUS_PORT[].out;
+
+% chip select for SRAM %
+CPU_SRAM_ENABLE = !CS_CPU_SRAM;
+AUDIORAM_ENABLE_1 = !CS_AUDIO_SRAM1;
+AUDIORAM_ENABLE_2 = !CS_AUDIO_SRAM2;
+
+
+DM[] = dm_node[];                        % connect read-buffers to DM-databus %
+
+
+end;
+
+
+

@@ -1,0 +1,218 @@
+
+  PROCEDURE AD1849Init1:
+  CONST TIREG	          = 9;
+  CONST TMREG		  = 7;
+  CONST RIREG	          = 4;
+  CONST RMREG	          = 2;
+  CONST RFScnt	          = 63;
+  CONST SampleDiv	  = XtalFrequency/(2*((RFScnt+1)*SampleRate));
+  CONST DAGno0            = 7;
+  CONST AutoBufInit0      = TBUFbit+RBUFbit+(DAGno0<<TIREG)+((DAGno0&3)<<TMREG)+(DAGno0<<RIREG)+((DAGno0&3)<<RMREG);
+  .VAR/DM WaitCount;
+  .VAR/DM ImaskSave;
+   BEGIN
+
+     M7    = 1;
+     CALL ToggleWDT;
+     CALL MaintainPWM;
+
+     AR    = IMASK;
+     DM(ImaskSave) = AR;
+     AR    = CLRBIT 1 OF AR;
+     AR    = CLRBIT 5 OF AR;		{ clear RX interrupts sport 0	}
+     IMASK = AR;
+
+     RESET DC1pin;			{ set D/C pin low (control mode)}
+     AY0 = Reset1Pin; CALL ClearIOBit;	{ set AD1849 reset pin low	}
+
+     idle;				{ PEH d. 6/11-97 }
+     idle;				{ PEH }
+
+     AR  = DM(Sys_Crtl_Reg);		{ get system control register	}
+     AR  = CLRBIT 12 OF AR;		{ disable sport0		}
+     DM(Sys_Crtl_Reg) = AR;		{ save register back		}
+     AY0 = Reset1Pin; CALL SetIOBit;	{ set AD1849 reset pin high	}
+
+     SetSport0(AutoBufInit0,RFScnt,SampleDiv,ISCLKbit+IRFSbit+SLEN16);
+
+     AR  = DM(Sys_Crtl_Reg);		{ get system control register	}
+     AR  = SETBIT 12 OF AR;		{ enable sport1			}
+     DM(Sys_Crtl_Reg) = AR;		{ save register back		}
+
+     I7  =^AD1849Buffer1+2;
+     AR  = DM(AD1849Buffer1);			{ get first data		}
+     TX0 = AR;
+
+     AR  = 0x7FFF;
+     DM(WaitCount) = AR;
+
+     WaitUntilDCBlow1:
+     AR = DM(WaitCount);
+     AR = AR-1;
+     DM(WaitCount) = AR;
+     IF EQ JUMP AD1849Init1;
+
+     AR = DM(AD1849Buffer1+3);
+     AR = TSTBIT 10 OF AR;
+     IF NE JUMP WaitUntilDCBlow1;
+
+     AR = DM(AD1849Buffer1+0);
+     AR = SETBIT 10 OF AR;
+     DM(AD1849Buffer1+0) = AR;
+
+     AR  = 0x7FFF;
+     DM(WaitCount) = AR;
+
+     WaitUntilDCBhigh1:
+     CALL ToggleWDT;
+     AR = DM(WaitCount);
+     AR = AR-1;
+     DM(WaitCount) = AR;
+     IF EQ JUMP AD1849Init1;
+
+     AR = DM(AD1849Buffer1+3);
+     AR = TSTBIT 10 OF AR;
+     IF EQ JUMP WaitUntilDCBhigh1;
+
+     AY0 = SPORT0enable; CALL ClearSysCrtlReg;
+
+     SetSport0(AutoBufInit0,0,0,{DTYPErightJustSign+}SLEN16);
+
+     I7 =^AD1849Buffer1;
+     DM(I7,M7) = 2;			{ tx 1	}
+     DM(I7,M7) = 0;			{ rx 0  }
+     DM(I7,M7) = B#1100000000000000;	{ tx 2	}
+     DM(I7,M7) = 0;			{ rx 1  }
+     DM(I7,M7) = B#1101000111110001;	{ tx 3	}
+     DM(I7,M7) = 0;                     { rx 2  }
+     DM(I7,M7) = 1;			{ tx 0	}
+     DM(I7,M7) = 0;                     { rx 3  }
+
+     AY0 = SPORT0enable; CALL SetSysCrtlReg;
+     SET DC1pin;			{ set D/C pin high	}
+
+     ar = 0x20;		/* clear SPORT0 rx irq */
+     ifc = ar;           /* PEH d. 4/11-97 */
+
+     AR    = DM(ImaskSave);
+     AR    = SETBIT 5 OF AR;		{ enable rx interrupt	}
+     IMASK = AR;
+
+   END;
+
+
+   PROCEDURE AD1849Init2:
+   CONST DAGno1           = 4;
+   CONST MDAC		  = 7;
+   CONST AutoBufInit1B    = TBUFbit+RBUFbit+(DAGno1<<TIREG)+((MDAC&3)<<TMREG)+(DAGno1<<RIREG)+((MDAC&3)<<RMREG);
+
+   BEGIN
+
+     CALL ToggleWDT;
+     CALL MaintainPWM;
+
+     AR    = IMASK;
+     DM(ImaskSave) = AR;
+     AR    = CLRBIT 1 OF AR;		{ clear RX interrupts sport 1	}
+     AR    = CLRBIT 5 OF AR; { 0}
+     IMASK = AR;
+
+     RESET DC2pin;			{ set D/C pin low (control mode)}
+     AY0 = Reset2Pin; CALL ClearIOBit;	{ set AD1849 reset pin low	}
+
+     idle;				{ PEH d. 6/11-97 }
+     idle;
+
+     AR  = DM(Sys_Crtl_Reg);		{ get system control register	}
+     AR  = CLRBIT 11 OF AR;		{ disable sport1		}
+     AR  = SETBIT 10 OF AR;		{ configure as serial port	}
+     DM(Sys_Crtl_Reg) = AR;		{ save register back		}
+     AY0 = Reset2Pin; CALL SetIOBit;	{ set AD1849 reset pin high	}
+
+     SetSport1(AutoBufInit1B,RFScnt,SampleDiv,ISCLKbit+IRFSbit+SLEN16);
+
+     AR  = DM(Sys_Crtl_Reg);		{ get system control register	}
+     AR  = SETBIT 11 OF AR;		{ enable sport1			}
+     DM(Sys_Crtl_Reg) = AR;		{ save register back		}
+
+     I4  =^AD1849Buffer2+2;
+     AR = DM(AD1849Buffer2);			{ get first data		}
+     TX1 = AR;
+
+     AR  = 0x7FFF;
+     DM(WaitCount) = AR;
+
+     WaitUntilDCBlow2:
+     AR = DM(WaitCount);
+     AR = AR-1;
+     DM(WaitCount) = AR;
+     IF EQ JUMP AD1849Init2;
+
+     AR = DM(AD1849Buffer2+3);
+     AR = TSTBIT 10 OF AR;
+     IF NE JUMP WaitUntilDCBlow2;
+
+     AR = DM(AD1849Buffer2+0);
+     AR = SETBIT 10 OF AR;
+     DM(AD1849Buffer2+0) = AR;
+
+     AR  = 0x7FFF;
+     DM(WaitCount) = AR;
+
+     WaitUntilDCBhigh2:
+     CALL ToggleWDT;
+     AR = DM(WaitCount);
+     AR = AR-1;
+     DM(WaitCount) = AR;
+     IF EQ JUMP AD1849Init2;
+
+     AR = DM(AD1849Buffer2+3);
+     AR = TSTBIT 10 OF AR;
+     IF EQ JUMP WaitUntilDCBhigh2;
+
+     AY0 = SPORT1enable; CALL ClearSysCrtlReg;
+
+     SetSport1(AutoBufInit1B,0,0,DTYPErightJustSign+SLEN16);
+     I4 = ^AD1849Buffer2;
+     DM(I4,M7) = 0;			{ tx 1	}
+     DM(I4,M7) = 0;                     { rx 0  }
+     DM(I4,M7) = B#1100000000000000;	{ tx 2	}
+     DM(I4,M7) = 0;                     { rx 1  }
+     DM(I4,M7) = B#1101000111110001;	{ tx 3	}
+     DM(I4,M7) =-1;                     { rx 2  }
+     DM(I4,M7) = 0;			{ tx 0	}
+     DM(I4,M7) =-1;                     { rx 3  }
+
+     AY0 = SPORT1enable; CALL SetSysCrtlReg;
+     SET DC2pin;			{ set D/C pin high	}
+
+     ar = 0x02;		/* clear SPORT0 & SPORT1 rx irq */
+     ifc = ar;          /* PEH d. 4/11-97 */
+
+     AR    = DM(ImaskSave);
+     AR    = SETBIT 1 OF AR;		{ enable rx interrupt	}
+     IMASK = AR;
+
+   END;
+
+
+   PROCEDURE AnalogSelectCommon:
+  { Clock input : MCK:2 (XTAL1 16.9 MHz), divisor DFR:5 appr. 44.1 kHz sampling }
+   CONST CW2Analog	  = B#1010001000000000; { MCK=10, FSEL=0, MS=1,   TXDIS=0, ENL=0, ADL=0 }
+   CONST CW3Analog	  = B#1100000000000000; { PIO=01 	                                }
+   CONST CW4Analog	  = B#0000000000000000; { REVID=NC                                      }
+
+   BEGIN
+     L0 =%AD1849Buffer2;
+     M0 = 1;
+     AR = DM(CW1Analog);
+     DM(I0,M0) = AR;
+     DM(I0,M0) = 0xFFFF;
+     DM(I0,M0) = CW2Analog;
+     DM(I0,M0) = 0XFFFF;
+     DM(I0,M0) = CW3Analog;
+     DM(I0,M0) = 0;
+     DM(I0,M0) = CW4Analog;
+     DM(I0,M0) = 0;
+   END;
+

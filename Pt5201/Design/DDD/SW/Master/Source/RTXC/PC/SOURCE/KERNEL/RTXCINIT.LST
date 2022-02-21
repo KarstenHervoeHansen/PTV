@@ -1,0 +1,232 @@
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:23	    Page 1
+.\rtxcinit.asm
+
+
+
+      1					     .286
+      2					     ifndef  ??version
+      3				     ?debug  macro
+      4					     endm
+      5				     publicdll macro name
+      6					     public  name
+      7					     endm
+      8				     $comm   macro   name,dist,size,count
+      9					     comm    dist name:BYTE:count*size
+     10					     endm
+     11					     else
+     12				     $comm   macro   name,dist,size,count
+     13					     comm    dist name[size]:BYTE:count
+     14					     endm
+     15					     endif
+     16					     ?debug  V 301h
+     17					     ?debug  S "rtxcinit.c"
+     18					     ?debug  C E9654F93260A72747863696E69742E63
+     19					     ?debug  C E9734F9326182E2E5C2E2E5C496E636C7564655C727478636F7074+
+     20					     ?debug  C 732E68
+     21					     ?debug  C E912599326172E2E5C2E2E5C496E636C7564655C62696E64696E67+
+     22					     ?debug  C 2E68
+     23	0000			     RTXC_TEXT	     segment byte public 'CODE'
+     24	0000			     RTXC_TEXT	     ends
+     25				     DGROUP  group   _DATA,_BSS
+     26					     assume  cs:RTXC_TEXT,ds:DGROUP
+     27	0000			     _DATA   segment word public 'DATA'
+     28	0000			     d@	     label   byte
+     29	0000			     d@w     label   word
+     30	0000			     _DATA   ends
+     31	0000			     _BSS    segment word public 'BSS'
+     32	0000			     b@	     label   byte
+     33	0000			     b@w     label   word
+     34	0000			     _BSS    ends
+     35	0000			     RTXC_TEXT	     segment byte public 'CODE'
+     36					     ?debug  C E8010A72747863696E69742E63654F9326
+     37					;
+     38					;    void far rtxcinit(void)
+     39					;
+     40					     ?debug  L 54
+     41					     assume  cs:RTXC_TEXT,ds:DGROUP
+     42	0000			     _rtxcinit	     proc    far
+     43					     ?debug  B
+     44					     ?debug  B
+     45					;
+     46					;    {
+     47					;	clockinit(); /*	thread timer control blocks */
+     48					;
+     49					     ?debug  L 56
+     50	0000  E8 0000e			     call    near ptr _clockinit
+     51					;
+     52					;
+     53					;	semainit();  /*	pend semaphores	*/
+     54					;
+     55					     ?debug  L 58
+     56	0003  E8 0000e			     call    near ptr _semainit
+     57					;
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:23	    Page 2
+.\rtxcinit.asm
+
+
+
+     58					;
+     59					;	taskinit();  /*	initialize task	state info */
+     60					;
+     61					     ?debug  L 60
+     62	0006  E8 0000e			     call    near ptr _taskinit
+     63					;
+     64					;
+     65					;    #ifdef HAS_MAILBOXES
+     66					;	mboxinit();  /*	initialize mailboxes */
+     67					;
+     68					     ?debug  L 63
+     69	0009  E8 0000e			     call    near ptr _mboxinit
+     70					;
+     71					;    #endif /* } HAS_MAILBOXES */
+     72					;
+     73					;    #ifdef HAS_PARTITIONS
+     74					;	partinit();  /*	thread partition blocks	*/
+     75					;
+     76					     ?debug  L 67
+     77	000C  E8 0000e			     call    near ptr _partinit
+     78					;
+     79					;    #endif /* } HAS_PARTITIONS	*/
+     80					;
+     81					;    #ifdef HAS_QUEUES
+     82					;	queueinit(); /*	initialize queue headers */
+     83					;
+     84					     ?debug  L 71
+     85	000F  E8 0000e			     call    near ptr _queueinit
+     86					;
+     87					;    #endif /* } HAS_QUEUES */
+     88					;
+     89					;    #ifdef HAS_RESOURCES
+     90					;	resinit();   /*	initialize resources */
+     91					;
+     92					     ?debug  L 75
+     93	0012  E8 0000e			     call    near ptr _resinit
+     94					;
+     95					;    #endif /* } HAS_RESOURCES */
+     96					;
+     97					;    #ifdef VECTOR_BASED /* { */
+     98					;	oldisr = getvect(RTXC_VECTOR); /* save old RTXC	isr */
+     99					;
+    100					     ?debug  L 79
+    101	0015  6A 40			     push    64
+    102	0017  9A 00000000se		     call    far ptr _getvect
+    103	001C  83 C4 02			     add     sp,2
+    104	001F  89 16 0002r		     mov     word ptr DGROUP:_oldisr+2,dx
+    105	0023  A3 0000r			     mov     word ptr DGROUP:_oldisr,ax
+    106					;
+    107					;	setvect(RTXC_VECTOR, isvcrtx); /* claim	RTXC vector */
+    108					;
+    109					     ?debug  L 80
+    110	0026  68 0000s			     push    seg _isvcrtx
+    111	0029  68 0000e			     push    offset _isvcrtx
+    112	002C  6A 40			     push    64
+    113	002E  9A 00000000se		     call    far ptr _setvect
+    114	0033  83 C4 06			     add     sp,6
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:23	    Page 3
+.\rtxcinit.asm
+
+
+
+    115					;
+    116					;    #endif /* } VECTOR_BASED */
+    117					;
+    118					;    }
+    119					;
+    120					     ?debug  L 83
+    121	0036  CB			     ret
+    122					     ?debug  E
+    123					     ?debug  E
+    124	0037			     _rtxcinit	     endp
+    125					;
+    126					;    void far rtxcstop(void)
+    127					;
+    128					     ?debug  L 85
+    129					     assume  cs:RTXC_TEXT,ds:DGROUP
+    130	0037			     _rtxcstop	     proc    far
+    131					     ?debug  B
+    132					     ?debug  B
+    133					;
+    134					;    {
+    135					;
+    136					;    #ifdef VECTOR_BASED /* { */
+    137					;	setvect(RTXC_VECTOR, oldisr); /* restore original RTXC isr */
+    138					;
+    139					     ?debug  L 89
+    140	0037  FF 36 0002r		     push    word ptr DGROUP:_oldisr+2
+    141	003B  FF 36 0000r		     push    word ptr DGROUP:_oldisr
+    142	003F  6A 40			     push    64
+    143	0041  9A 00000000se		     call    far ptr _setvect
+    144	0046  83 C4 06			     add     sp,6
+    145					;
+    146					;    #endif /* } VECTOR_BASED */
+    147					;
+    148					;    }
+    149					;
+    150					     ?debug  L 92
+    151	0049  CB			     ret
+    152					     ?debug  E
+    153					     ?debug  E
+    154	004A			     _rtxcstop	     endp
+    155	004A			     RTXC_TEXT	     ends
+    156	0000			     _BSS    segment word public 'BSS'
+    157	0000			     _oldisr label   dword
+    158	0000  04*(??)			     db	     4 dup (?)
+    159					     ?debug  C E9
+    160					     ?debug  C FA00000000
+    161	0004			     _BSS    ends
+    162	0000			     _DATA   segment word public 'DATA'
+    163	0000			     s@	     label   byte
+    164	0000			     _DATA   ends
+    165	004A			     RTXC_TEXT	     segment byte public 'CODE'
+    166	004A			     RTXC_TEXT	     ends
+    167				     _s@     equ     s@
+    168					     extrn   _isvcrtx:far
+    169					     extrn   _getvect:far
+    170					     extrn   _setvect:far
+    171					     public  _oldisr
+Turbo Assembler	 Version 3.0	    19/04/99 11:06:23	    Page 4
+.\rtxcinit.asm
+
+
+
+    172					     extrn   _clockinit:near
+    173					     extrn   _semainit:near
+    174					     extrn   _taskinit:near
+    175					     extrn   _mboxinit:near
+    176					     extrn   _queueinit:near
+    177					     extrn   _partinit:near
+    178					     extrn   _resinit:near
+    179					     public  _rtxcinit
+    180					     public  _rtxcstop
+    181					     ?debug  C EA010B
+    182					     ?debug  C E31800000023010700
+    183					     ?debug  C EB085F69737663727478180000
+    184					     ?debug  C E31B00000023010700
+    185					     ?debug  C E31A000400161B00
+    186					     ?debug  C E319000000231A0400
+    187					     ?debug  C EB085F67657476656374190000
+    188					     ?debug  C E31C00000023010400
+    189					     ?debug  C EB085F736574766563741C0000
+    190					     ?debug  C E31E00000023010700
+    191					     ?debug  C E31D000400161E00
+    192					     ?debug  C EC075F6F6C646973721D000000
+    193					     ?debug  C E31F00000023010000
+    194					     ?debug  C EB0A5F636C6F636B696E69741F0000
+    195					     ?debug  C E32000000023010000
+    196					     ?debug  C EB095F73656D61696E6974200000
+    197					     ?debug  C E32100000023010000
+    198					     ?debug  C EB095F7461736B696E6974210000
+    199					     ?debug  C E32200000023010000
+    200					     ?debug  C EB095F6D626F78696E6974220000
+    201					     ?debug  C E32300000023010000
+    202					     ?debug  C EB0A5F7175657565696E6974230000
+    203					     ?debug  C E32400000023010000
+    204					     ?debug  C EB095F70617274696E6974240000
+    205					     ?debug  C E32500000023010000
+    206					     ?debug  C EB085F726573696E6974250000
+    207					     ?debug  C E32600000023010400
+    208					     ?debug  C EC095F72747863696E697426180000
+    209					     ?debug  C E32700000023010400
+    210					     ?debug  C EC095F7274786373746F7027180000
+    211					     end
+

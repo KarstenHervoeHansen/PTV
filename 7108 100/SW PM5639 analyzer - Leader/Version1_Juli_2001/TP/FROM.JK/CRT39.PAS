@@ -1,0 +1,1864 @@
+(**********************************************************************
+                            GB
+
+   CRT39.PAS                                Code-nummer:  7108 100 73261
+   (c) ProTeleVision Technologies A/S, 1992 -1999.
+   Peter Frederiksen, 920303,   afd P-DPE.
+
+   Dette program bruges til at teste og kalibrere:
+          PM5639/90  CRT color sensor         serie III -> V
+          PM5639/92  Industrial color sensor  serie II og III
+          PM5639/916 Industrial color sensor for Philips/BrÅgge
+          PM5639/93  Miniature ind. color sensor    serie II og III
+       og PM5639/02  Barco option
+
+       Kalibrering af 5639/90 serie I og II: se program PTV39.PAS
+
+
+   Som parameter pÜ komandolinien skrives
+        '90  3'  = CRT-sensoren serie III
+        '90  4'  = CRT-sensoren serie IV
+        '90  5'  = CRT-sensoren serie V
+        '92  1'  = industri-sensoren serie I
+        '92  2'  = industri-sensoren serie II
+        '92  3'  = industri-sensoren serie III
+        '916'    = industri-sensoren for Philips/BrÅgge
+        '93 2'   = miniature industrial color sensor serie II
+        '93 3'   = miniature industrial color sensor serie III
+        '2'      = PM5639/02 Barco option
+
+   Eks.  CRT39.EXE 90 4
+         CRT39.EXE 92 1
+         CRT39.EXE 916
+         CRT39.EXE 2
+
+   Variablen SensorVer sëttes afhëngig af parameteren pÜ kommandolinien.
+   Hvis der ingen parameter er defineret vëlges 90 4.
+
+   CRT matrix genereres ud fra MX-mÜlinger.
+
+   Programmet kommunikerer med PM5639 via COM1-porten. Porten er
+   initialiseret til 4800 eller 9600 baud, 8 bit, 2 stopbit og ingen paritet.
+   Dette gõres i proceduren InitPC_COM1Port.
+
+   Korrekt SW-rev for color sensoren er i konstanten MeasHeadSWRev.
+
+   Funktionstasterne bruges til at styre de enkelte test og kalibre-
+   ringer, i den rëkkefõlge man õnsker.
+
+   Tast F10 afvikler en totaltest i en forud bestemt rëkkefõlge, og det
+   kontrolleres at SP6-skrivebeskyttelsen = OFF inden totaltesten.
+   SP6-skrivebeskyttelse benyttes kun i /90 sensorer serie I og II
+   I andre sensorer styres skrivebeskyttelse af sotfware.
+
+   I filen "Certiffile" skrives kalibreringsdata, som beskrevet
+   i justeringsvejledningen. Filen er en ASCII-fil.
+   Totaltesten kan afbrydes undervejs ved at taste pÜ SPACE.
+
+   Nominelle mÜlevërdier, tolerancer, gainfaktorer, E˝PROM-skrivetid,
+   ID-string m.v., er fastlagt i konstanter efter keyword CONST.
+
+   Tastes der en ikke defineret tast, skrives ??.
+   Mellem hver kommando skrives *.
+
+   Programmet afbrydes ved at taste pÜ ESC.
+
+   Der krëves fõlgende udstyr:
+      PC med:   Seriel-port: COM1: styring af sensor
+                             COM2: styring af PM5639M/82
+                I˝C-interface 7108 100 71821,
+                IOTech GP-488 interface (incl 488 software-driver).
+      Lyskasse        7108 100 72331.
+      RGB-generator   7108 100 72801         (for SONY BVM1410 monitor).
+      RGB-generator   PM5639M/82   KU010201  (for SONY BVM14E5U monitor).
+        (med special window pattern som passer til sensoren)
+      PM2534 Digital multimeter pÜ IEEE-adresse 22.
+      RGB-monitor med 4 x Coax-kabel med BNC-stik.
+      IEEE-kabel.
+      COM1-kabel    (DB9   pin 2-2 3-3 5-5).
+      COM2-kabel    (DB9 pin 2-3-5 til stik i PM5639M/82).
+      Videokabel for PM5639M/82 til monitor BVM14E5U
+      I˝C-bus kabel (DB25  pin 24-24  25-25 + GND).
+      PM8560 kabel ved test af PM5639/02 Barco option.
+
+   I/O-adresse pÜ I˝C-interfacet skal svare til konstanten I2CIOAddr.
+   (default I/O-addr = $300)
+
+   NÜr programmet starter op, kontrolleres om fõlgende enheder er for-
+   bundet:
+      Lyskasse
+      RGB-generator
+      PM2534 Digital multimeter  (IEEE adresse = 22)
+
+   NÜr programmet starter op, indlëses filen XYFileName med xy-koordinater
+   samt luminance. Kan filen ikke findes, afbrydes programmet.
+
+   Kan programmet ikke fÜ kontakt med enhederne, afbrydes programmet.
+   NB: RGB-generator og lyskasse SKAL vëre tëndt, nÜr programmet startes.
+       I˝C-interface i PC'en kan 'hënge' af uforklarlige Ürsager - muligvis
+       ligger fejlen i PCD8584-controlleren ??.
+       Hvis det sker, mÜ man slukke/tënde for PC'en.
+
+  Beregning af diverse matricer: se .doc fil.
+
+  Rettelser:
+  930623           Kodenummer for 5639/90 ëndret til: 4008 109 79300
+  930716           Intern ID for 5639/90 er ëndret til: 1 0 0 1
+                   Intern ID for 5639/92 er uëndret.
+  931104           Sporbar kalibrering ëndres fra NPL til NIST
+                   I E˝PROM adresse 96 skrives konstanten TraceFlag.
+                   Indtil d.d. har der stÜet 255 (= NPL).
+                   Denne ëndring gëlder ogsÜ 5639/90 sensorer med
+                   12NC = 4008 109 75430. Se program hertil.
+                   Kalibreringsudskrift viser sporbarhed.
+  940622           Timeout ved learn ëndret til 2 sek.
+                   Sensor SW rev gëlder ogsÜ for 03.0.
+                   Sensor /916 indfõres (9600 baud).
+                   E˝PROM addr 95 bestemmer output format:
+                       <> 0      R,G,B,I
+                        = 0      R,G,B
+  941118           Kontrol af indtastning af KU-nummer:
+                   2.ciffer skal vëre serie nr.
+                   Se afvisningsrapport SAL94012.
+
+  950203           Sensor /90 serie IV og /92 serie II indfõres
+  950210           PM5639/02 barco option indfõres.
+  950221           Check for overflow ved offsetmÜlinger.
+  950315           KU-nummer skal ikke ëndres ved kundeopdateringer.
+                   ReferencemÜlinger logges til file. Udskrives med
+                   programmet PRINTLOG.
+  950501           Kalibreringsdato skrives til EEPROM.
+                   Inden InternID skrives til EEPROM kontrolleres, at
+                   data i adresserne 58-61 er 255. Dette er indfõrt for
+                   at undgÜ, at sensorer kan ëndres fra /90 til /92 eller
+                   fra /92 til /90. Hvis der skal ëndres type, skal alle
+                   adresserne ëndres til 255 inden test. índringen foretages
+                   med programmet COM5639.EXE.
+  950616           Lësning af K-matrix ved reference mÜling forbedret.
+  951005           Udlësning af xy-koordinater ëndres fra 3 til 4
+                   decimaler i proceduren xyYMeasure.
+                   I filen SENSOR.LOG ëndres xy-koordinater fra 3 til 4
+                   decimaler og Y ëndres fra 0 til 1 decimal ved EBU-mÜlinger.
+  951013           Philips/BrÅgge SW-revision er rettet fra kun 3.0 til
+                   bÜde 3.0 og 3.2.
+  960111           Kalibreringsdata gemmes pÜ LAN og udskrives til
+                   laser printer.
+  961011           PM5639/93 miniature CRT color sensor tilfõjes.
+  970617           Kalibreringsdato flyttes fra addr 176-181 til
+                   addr 187-192, idet usertekst i PM8550 starter pÜ
+                   addr 176. Ved lësning af dato lëses fõrst fra
+                   addr 176-181 og dato kontrolleres for korrekt
+                   format. Hvis format er forkert lëses fra addr 187-192.
+                   Se procedurerne ReadCalDate og WriteCalDate.
+  970710           Test af baudrate skift i 5639/93. Se 'CheckSWBaudrateShift'
+                   Baudrate kan kun skiftes, hvis intern ID addr 61 = 56-63.
+                   Sensor software version rettes til 03.3
+  970905           Der var fejl i sensor software version 03.3. Indstillet
+                   baudrate huskes ikke ved power off/on. Version 03.3 udgÜr.
+                   Sensor software version rettes til 03.4
+  980128           Firmanavn pÜ certifikater ëndret til ProTeleVision Technologies A/S
+  980210           Diverse ëndringer ved mÜlinger:
+                    Datofelt ëndres til ogsÜ at omfatte tid.
+                    MÜlinger med ref.sensor pÜ EBU monitor tilfõjes.
+                    Felterne adskilles med komma i stedet for |
+                    Der laves mÜling med ref.sensor efter max 30 minutter
+                   Ved kalibrering:
+                    Skërmen skal have vëret hvid i mindst 2 minutter inden
+                    kalibrering. Efter 15 minutter uden aktivitet slukkes
+                    skërmen.
+  980515           Udskrift af kalibreringsdata fra EEPROM skal kun udskrives
+                   efter sidste kalibrering. Brugeren skal derfor bekrëfte
+                   hver udskrivning med Ja/Nej.
+  980528           SMPTE skërm slukker efter kalibrering. Det mÜ den ikke.
+                   Fejlen rettet.
+  980729           Ved sërlig fõlsom sensor reduceres lys fra lyskasse
+                   ved gainkalibrering af K4 og K5. Se BeregnGainFactor.
+                   Ekstra fõlsomhed var forÜrsaget af BG40 filtre til
+                   /93 sensor. Filtrene blev mÜlt hos L&O, og filterkarak-
+                   teristikken var ok.
+                   SENSOR.LOG filen placeres i S:\MEASDATA\... i stedet
+                   for lokal harddisk.
+
+  990108           ReadCalDate ëndret til at lëse nyt omrÜde for datafelt
+                   fõrst (187-192) derefter evt. gammelt omrÜde 176-181.
+
+  990212           Serieskift ved indfõrsel af 9mm filtre limet i holder:
+                   /90 til serie 5.
+                   /92 til serie 3.
+                   /93 til serie 2.
+                   Intern ID ëndres ikke ved dette serieskift.
+                   I 'PM5639IdStr' rettes firmanavn fra PHILIPS til PTV.
+                   Ny SMPTE monitor SONY BMV14E5U erstatter gammel SMPTE
+                   SONY BVM1310 monitor.
+                   Kalibrering vëlges til at foregÜ enten pÜ EBU monitoren
+                   eller SMPTE monitoren afhëngig af, hvor i verden sensoren
+                   skal bruges. Dette skal give en mere prëcis absolut
+                   xyY-mÜling.
+                   Efter kalibrering skrives ref monitor til EEPROM addr 193.
+                   Inden kalibrering kontrolleres det, at valgt ref monitor
+                   er lig med ref monitor angivet i EEPROM.
+
+  990520           I 'PM5639IdStr' rettes firmanavn IKKE, hvis det er PHILIPS.
+                   Dette har betydning ved kalibrering.
+                   Hvis der ved reparation skal skiftes print, skal PTV
+                   overskrives med PHILIPS. Dette gõres ved at taste Alt-F1
+                   (skrivebeskyttelse skal vëre = off). Nye sensorer fÜr
+                   navnet PTV.
+  990623           LightLevel og min vërdi ved gainkalibrering ëndres med
+                   sensorer med filtre i holdere. Gainkalibrering af sensorer
+                   med filtre uden holdere ëndres ikke.
+  991014           MÜledata logges til C:\MEASDATA....  S-drev er nedlagt
+                   midlertidigt
+  000121           Datoformat rettet. èr = 00
+  000216           Note udarbejdet af TL tilfõjet til kalibreringsdatablad
+                   efter feltet med 'Protected data:'
+                   Se 'WriteCertifFileToLaser'
+*)
+
+
+Program CRT39;
+{$M 21000,0,11000}
+
+
+{$DEFINE LYSKASSE}
+(*{$DEFINE RGBGEN}  d.8.05.01 :JK*)
+{$DEFINE IEEEBUS}
+
+
+{$R+}    {Range check}
+{$I+}    {I/O check}
+{$S+}    {Stack check}
+{$B-}    {Boolean short}
+
+uses Crt,
+     Dos,
+     Printer,
+     PepUtil,
+     Matrix,
+     ComUtil,
+     Win,
+     Timer,
+     Unit_S39,
+     Unit_Las,
+     Unit_Mea,
+     Unit_IIC;
+
+
+
+{$I TPTEST.INC}
+{$I UTIL92.INC}
+
+
+
+Procedure ReadCRTMatrix(Flag : boolean);   {CtrlF1}
+{Lëser CRT-matricer fra E˝PROM, gemmer vërdierne i en variabel og viser dem
+ pÜ skërmen. Hver matrice bestÜr af 12 bytes.
+ Kun matricer, som har et navn, lëses}
+var  n,k,
+     Value   : byte;
+     Svar    : string;
+     Kode    : integer;
+     AddrStr : STR_6;
+     CRTNo,
+     Addr    : WorD;
+begin
+ ReadNoCRTFosfor(Silent);
+ if Flag then
+  writeln('CRT-matrix:');
+ ReadCRTMatrixOk := true;
+ FillChar(CRTMatrix,SizeOf(CRTMatrix),0);
+ CRTNo := 1;
+
+ repeat
+  n := 1;
+  Addr := 1004 - (CRTNo * 20) + 20;
+  Str(Addr,AddrStr);
+  COMStatus := writeCOMPort(COMNo,'MA'+ AddrStr + ',');
+  COMStatus := ClearInputQue(COMNo);
+  if Length(CRTName[CRTNo]) > 0 then
+   begin
+    repeat
+     COMStatus := writeCOMPort(COMNo,'RM,');
+     COMStatus := ReadlnCOMPort(COMNo,Svar,1);
+     Val(Svar,Value,Kode);
+      if Kode = 0 then
+       CRTMatrix[CRTNo,n] := Value
+      else
+       begin
+        ReadCRTMatrixOk := false;
+        TestFailed := true;
+       end;
+     Inc(n);
+    until (n > 12) or (COMStatus <> 0) or (Kode <> 0) or (not ReadCRTMatrixOk);
+
+    if Flag then
+     begin
+       write('#',CRTNo,': ');
+       for k := 1 to n - 1 DO
+        write(CRTMatrix[CRTNo,k],' ');
+       writeln;
+     end; {if flag}
+    if (not ReadCRTMatrixOk) and Flag then
+     writeln('Failure reading CRT-matrix #',CRTNo);
+   end  {if Length(  )}
+  else
+   begin
+    if Flag then
+     writeln('#',CRTNo,': no name ');
+   end; {if Length(  )}
+
+ if Flag and (CRTNo = (NoCRTFosfor / 2)) then
+   begin
+    writeln(' Press any key ');
+    WaitForAnykey;
+   end;
+
+ Inc(CRTNo);
+ until (CRTNo > NoCRTFosfor) or (COMStatus <> 0) or (Kode <> 0) or (not ReadCRTMatrixOk);
+
+
+ if Flag then
+  begin
+{$R-}
+   write('CRT #1:');GotoXY(30,WhereY); writeln('CRT #2:');
+
+   write('8192':8);
+   write(CRTMatrix[1,1] * 256 + CRTMatrix[1,2]:8);
+   write(CRTMatrix[1,3] * 256 + CRTMatrix[1,4]:8);
+   GotoXY(30,WhereY); write('8192':8);
+   write(CRTMatrix[2,1] * 256 + CRTMatrix[2,2]:8);
+   writeln(CRTMatrix[2,3] * 256 + CRTMatrix[2,4]:8);
+
+   write(CRTMatrix[1,5] * 256 + CRTMatrix[1,6]:8);
+   write('8192':8);
+   write(CRTMatrix[1,7] * 256 + CRTMatrix[1,8]:8);
+   GotoXY(30,WhereY); write(CRTMatrix[2,5] * 256 + CRTMatrix[2,6]:8);
+   write('8192':8);
+   writeln(CRTMatrix[2,7] * 256 + CRTMatrix[2,8]:8);
+
+   write(CRTMatrix[1,9] * 256 + CRTMatrix[1,10]:8);
+   write(CRTMatrix[1,11] * 256 + CRTMatrix[1,12]:8);
+   write('8192':8);
+   GotoXY(30,WhereY); write(CRTMatrix[2,9] * 256 + CRTMatrix[2,10]:8);
+   write(CRTMatrix[2,11] * 256 + CRTMatrix[2,12]:8);
+   writeln('8192':8);
+{$R+}
+  end;
+
+end;  {ReadCRTMatrix}
+
+
+
+
+Procedure WriteMeasFileToLAN;
+var   IOErr   : word;
+      PNo     : byte;
+      SaveError,
+      TooManyFiles,
+      FileCopied,
+      FileFound  : boolean;
+
+begin
+ FileCopied := false;
+ PNo := 64;                     { first measfile = xxxxxxA }
+  repeat
+   Inc(PNo);
+   CertifFileName := HDDrive+PathName+KU_No+Chr(Pno)+NameExt;
+   FindFirst(CertifFileName,anyfile,DirInfo);
+   FileFound := DosError = 0;
+   TooManyFiles := Pno > Ord('Z');
+  until (not FileFound) or TooManyFiles;
+
+  if TooManyFiles then
+   begin
+    write(Bell);
+    writeln('WARNING: Too many files with measurement data.');
+    write(  '          Can only create measurement files from ');
+    writeln('xxxxxxA',NameExt,' -> xxxxxxZ',NameExt);
+    writeln;
+    writeln('Stop further measurements and call for help!');
+    TestFailed := true;
+    exit;
+   end; { if }
+
+   Assign(MeasFile,MeasFileName);
+   {$I-} Reset(MeasFile); {$I+}
+   IOErr := IOResult;
+{   writeln('Free heap: ',memavail,'     Free block: ',maxavail); <<<<<<< }
+   if (not FileCopied) and (IOErr = 0) then
+    begin
+     if (DiskFree(ord(HDDrive)-64) > 100000) then    { check M disk drive > 100000 bytes}
+        exec('\COMMAND.COM','/C COPY '+MeasFileName+' '+CertifFileName+' > NUL')
+      else
+       begin
+        SaveError := true;
+        CertifFileName := 'C'+PathName+KU_No+Chr(Pno)+NameExt;       { lokalt drev }
+        exec('\COMMand.COM','/C COPY '+MeasFileName+' '+CertifFileName+' > NUL');
+        write(Bell); delay(1000); write(Bell);
+(*
+        writeln('WARNNG: ',MeasFileName,' will not be copied to LAN, but to C-drive.');
+        writeln('          Because:');
+        writeln('           a) you are not logged on to LAN.');
+        writeln('           b) too little place on S-drive. (min. 100000 bytes).');
+        writeln('      >>> Make sure that file ',CertifFileName);
+        writeln('          is saved on LAN under directory = ',HDDrive+PathName);
+        writeln;
+*)
+       end; { if DiskFree..}
+
+      case DosError of
+       0 : begin
+            writeln(MeasFileName,' copied to ',CertifFileName);
+            FileCopied := true;
+           end;
+       8 : writeln(Bell,'Too little memory while copying to LAN');
+       else
+        writeln(Bell,'Problems while copying to LAN!  ');
+        writeln('DOS error: ',DosError);
+        writeln;
+        writeln('Stop further measurements and call for help.');
+      end;  { case }
+    end; { if not FileCopied }
+
+   if IOErr <> 0 then
+     writeln(Bell,'File ',MeasFileName,' not found !!');
+
+end; { WriteMeasFileToLAN }
+
+
+
+
+Procedure ReadKalDataFromEEPROM;            { Alt F9 }
+var   Addr       : WorD;
+      CRTNo,
+      n          : byte;
+      k          : integer;
+      Data       : byte;
+      InStr,
+      Svar       : string;
+      CRTStr,
+      DataStr,
+      AddrStr,
+      dd         : str_10;
+
+Function AddSpace(InStr: STR_10) : STR_10;
+begin
+ case Length(InStr) of
+  1 :  InStr := '    ' + InStr;
+  2 :  InStr := '   ' + InStr;
+  3 :  InStr := '  ' + InStr;
+ end; {case}
+AddSpace := Instr;
+end; {addspace}
+
+begin
+ write('Reading calibration data.');
+ ReadKaldataOk := true;
+ FillChar(KalStr,SizeOf(KalStr),0);
+ KU_No := ReadKU;
+ delay(50);
+
+ ReadCRTNames(Silent);
+ write('.');
+ ReadCRTMatrix(Silent);
+ write('.');
+
+ KalStr[1] := Marg + 'Serial No: ' +  Read12NC + '    KU' +  KU_No;
+ KalStr[2] := Marg + 'Date: ' + Dato;
+
+ CRTNo := 1;                                    {data fra CRT #1 + #2}
+ repeat
+  if Length(CRTName[CRTNo]) > 0 then
+   begin
+     Addr := CRTMatrixAddr - (CRTNo * 20) + 20;
+     Str(Addr,AddrStr);
+     if Length(AddrStr) = 3 then
+      AddrStr := ' ' + AddrStr;
+     Str(CRTNo,CRTStr);
+     KalStr[CRTNo + 2] := Marg + 'CRT-matrix #' + CRTStr + ': ' +
+                           CR + LF + Marg + AddrStr + ':  ';
+     for n := 1 to 12 DO
+      begin
+       Str(CRTMatrix[CRTNo,n],DataStr);
+       DataStr := AddSpace(DataStr);
+       KalStr[CRTNo + 2] := KalStr[CRTNo + 2] + DataStr;
+      end; { for }
+   end; { if }
+  Inc(CRTNo);
+ until (CRTNo > 2);
+
+ n := 1;
+ Svar[0] := Chr(DefMaxWPAddr);
+ COMStatus := writeCOMPort(COMNo,'MS,'); delay(20);
+ COMStatus := writeCOMPort(COMNo,'MA2,'); delay(20);
+ COMStatus := ClearInputQue(COMNo);
+ repeat
+  COMStatus := writeCOMPort(COMNo,'RM,'); delay(20);
+  COMStatus := ReadlnCOMPort(COMNo,InStr,1);
+  Val(Instr,Data,k);
+  if (n mod 20) = 0 then
+   write('.');
+  Svar[n] := Chr(Data);
+  Inc(n);
+ until (n > DefMaxWPAddr - 1) or (COMStatus <> 0) or (k <> 0);
+ Svar[0] := Chr(n);
+ writeln('.');
+
+ if (n <= DefMaxWPAddr - 1) then
+  begin
+   writeln(Bell,' Failed reading color sensor');
+    if COMStatus <> 0 then
+     writeln(' Timeout !!');
+   ReadKaldataOk := false;
+   TestFailed := true;
+   Exit;
+  end;
+
+
+ for n := 1 to 8 do                        {data fra addr 2 - 9}
+  begin
+   Str(Ord(Svar[n]),DataStr);
+   DataStr := AddSpace(DataStr);
+   KalStr[5] := KalStr[5] + DataStr;
+  end;
+
+ Addr := 10;                               {data fra addr 10 ...}
+ for n := 9 to DefMaxWPAddr - 1 do
+  begin
+   Str(Ord(Svar[n]),DataStr);
+   DataStr := AddSpace(DataStr);
+   KalStr[Addr div 10+5] := KalStr[Addr DIV 10+5] + DataStr;
+   if (n mod 10) = 8 then
+    Inc(Addr,10);
+  end;
+
+ assign(MeasFile,MeasFileName);        { new_meas._39   JK}
+ rewrite(MeasFile);
+
+ writeln(MeasFile,KalStr[1]);
+ writeln(MeasFile,KalStr[2]);
+
+ writeln(MeasFile,KalStr[3]);      {CRT #1}
+ writeln(MeasFile,KalStr[4]);      {CRT #2}
+
+ writeln(MeasFile,Marg,'Protected data:');
+ write(MeasFile,Marg,'   2:',Space:12);
+ writeln(MeasFile,KalStr[5]);               {addr 2 - 9}
+
+ Addr := 10;
+ for n := 1 to (DefMaxWPAddr DIV 10) do              {fra addr 10 ...}
+  begin
+   writeln(MeasFile,Marg,Addr:4,':  ',KalStr[n + 5]);
+   Inc(Addr,10);
+  end; {for}
+
+ writeln(MeasFile,Marg,'Color sensor calibration is traceable to NIST, USA');
+
+ writeln(MeasFile,Marg,'Calibrated by: ______________');
+
+ write(MeasFile,FF);
+ Close(MeasFile);
+
+ WriteMeasFileToLAN;
+
+end;  {ReadKalDataFromEEPROM}
+
+
+
+Procedure WriteCertifFileToLaser(Flag : boolean);  { Alt F10 }
+{ flag = true:  brugeren skal indtaste sensorens KU-nummer (evt incl version)
+  flag = false: nyeste fil med data udskrives
+  Hvis der kun indtastes de 6 cifre i KU-nummeret udskrives nyeste fil,
+  hvorimod hvis der indtastes 6 cifre+version(A..Z) udskrives denne.
+}
+var
+ SVer,
+ IOErr     : word;
+ n,
+ PNo       : byte;
+ SaveError,
+ TooManyFiles,
+ FileCopied,
+ FileFound,
+ CurrentFileFound  : boolean;
+ InStr             : array[1..31] of str_80;
+ DateStr           : str_6;
+ temp              : str_6;
+ KU_Str            : str_10;
+
+begin
+ if Flag then
+     begin
+      write('Type KU nummer: ');
+      readln(KU_Str);
+     end
+    else
+     begin
+      KU_Str := ReadKU;
+      if KU_Str = '' then
+       begin
+        writeln(Bell,'Timeout - sensor does not respond');
+        exit;
+       end;
+     end;
+
+ FileCopied := false;
+ PNo := 64;                 { ëldste fil = xxxxxxA }
+ TooManyFiles := false;
+
+ if length(KU_Str) = 6 then
+   repeat                    { sõger efter nyeste fil }
+    Inc(PNo);
+    CertifFileName := HDDrive+PathName+KU_Str+Chr(Pno)+NameExt;
+    FindFirst(CertifFileName,anyfile,DirInfo);
+    FileFound := DosError = 0;
+
+    CertifFileName := HDDrive+PathName+KU_Str+Chr(Pno-1)+NameExt;
+    FindFirst(CertifFileName,anyfile,DirInfo);
+    CurrentFileFound := DosError = 0;
+
+    TooManyFiles := Pno > Ord('Z');
+   until ((not FileFound) and CurrentFileFound) or TooManyFiles;
+
+   if TooManyFiles then
+   { sõger efter filer med gammelt filnavn, dvs uden bogstav efter KU-nummer }
+    begin
+      CertifFileName := HDDrive+PathName+KU_Str+NameExt;
+      FindFirst(CertifFileName,anyfile,DirInfo);
+      FileFound := DosError = 0;
+      TooManyFiles := (not FileFound);
+    end;
+
+  if length(KU_Str) = 7 then
+    CertifFileName := HDDrive+PathName+KU_Str+NameExt;
+
+
+  if TooManyFiles then
+    begin
+     writeln(Bell,'Sensor KU',KU_Str,': Calibration data not found on ',HDDrive+PathName);
+(*     writeln(' Probably because you are not logged ont to LAN');*)
+     writeln;
+     exit;
+    end; { if }
+
+
+ Assign(CertifFile,CertifFileName);
+ {$I-} Reset(CertifFile); {$I+}
+ IOErr := IOResult;
+ if IOErr <> 0 then
+   begin
+    writeln(Bell,'File ',KU_Str+NameExt,' not found on ',HDDrive+PathName);
+    exit;
+   end; { if }
+
+ if CertifFileName = '' then     {25.05.01 my additon: JK}
+   begin
+    writeln(Bell,'File ',KU_Str+NameExt,' not found on ',HDDrive+PathName);
+    exit;
+   end; { if }
+
+
+
+ SVer := 0;
+ n := 1;
+ while (not Eof(CertifFile)) do   { Lëser fra fil og finder SVer og DateStr }
+   begin
+    Readln(CertifFile,InStr[n]);
+
+    if (pos('Date',Instr[n]) > 0) then
+      begin
+        {Convert to American date}
+        DateStr := copy(Instr[n],15,6);
+        temp := '      ';
+        temp[1] := DateStr[3];
+        temp[2] := DateStr[4];
+        temp[3] := DateStr[5];
+        temp[4] := DateStr[6];
+        temp[5] := DateStr[1];
+        temp[6] := DateStr[2];
+      end;
+
+    if (pos('400810979300',Instr[n]) > 0) then
+     SVer := 90;
+
+    if (pos('400810978930',Instr[n]) > 0) then
+     SVer := 92;
+
+    if (pos('400810983120',Instr[n]) > 0) then
+     SVer := 93;
+
+    if InStr[n] <> '' then
+     inc(n);
+   end; { while }
+
+ close(CertifFile);
+
+ FLasName := 'laser.hp';
+ assign(FLas,FLasName);        { file til laserjet printer }
+ rewrite(FLas);
+
+ ResetPrinter;
+
+ SetFont(Univers18);
+ MoveToXY(LeftMargin+15,13);
+{write(FLas,'ProTeleVision Technologies A/S');}
+(* write(FLas,'       DK-Audio A/S           ');*)
+   write(FLas,'  Leader Instrument Corp.     ');
+ HorLine(LeftMargin+15,14,0.7,170);
+
+ SetFont(Times18);
+ case SVer of
+  93 : begin
+        MoveToXY(LeftMargin+43,42);
+        write(FLas,'PM 5639/93 Miniature CRT Color Sensor');
+       end;
+  92 : begin
+        MoveToXY(LeftMargin+43,42);
+        write(FLas,'PM 5639/92 Industrial CRT Color Sensor');
+       end;
+  90 : begin
+        MoveToXY(LeftMargin+57,42);
+        write(FLas,'PM 5639/90 CRT Color Sensor');
+       end;
+  end; { case }
+
+ MoveToXY(LeftMargin+77,49);
+ write(FLas,'Calibration Data');
+
+ SetFont(Courier10);           { serial number }
+ MoveToXY(LeftMargin,70);
+ write(FLas,InStr[1]);
+
+ MoveToXY(LeftMargin,85);      { CRT #1 }
+ write(FLas,InStr[3]);
+ MoveToXY(LeftMargin,90);
+ write(FLas,InStr[4]);
+
+ MoveToXY(LeftMargin,100);     { CRT #2 }
+ write(FLas,InStr[5]);
+ MoveToXY(LeftMargin,105);
+ write(FLas,InStr[6]);
+
+ MoveToXY(LeftMargin,115);     { protected data }
+ write(FLas,InStr[7]);
+
+ for n := 8 to 27 do
+  begin
+   MoveToXY(LeftMargin,120+(5*(n-8)));
+   write(FLas,InStr[n]);
+  end;
+
+ SetFont(Times10);
+ MoveToXY(LeftMargin+20,230);     { Note about EEPROM data }
+ write(FLas,'Please note that data in this sheet is coded PROM data not decodable by the user.');
+ MoveToXY(LeftMargin+20,234);     { Note about EEPROM data }
+ write(FLas,'Data are given for information only and can be used only in case of re-generation of the PROM.');
+
+
+ MoveToXY(LeftMargin+12,250);     { Color sensor calibration is traceable to NIST, USA }
+ write(FLas,InStr[28]);
+
+ MoveToXY(LeftMargin+12,260);     { calibrated by _________ }
+ write(FLas,InStr[29],'        Date: ',temp);
+
+ EjectPage;
+ ResetPrinter;
+
+ close(FLas);
+
+ exec('\COMMAND.COM','/C COPY '+FLasName+' '+PrinterPort+' /B > NUL');
+
+  case DosError of
+   0 : writeln(' written to printer port ',PrinterPort);
+   2 : writeln(' Write failure: "',FLasName,'" not found');
+   8 : writeln(Bell,'   Too little memory for COPY - call for help!!');
+  end;
+
+ if DosError <> 0 then
+  TestFailed := true;
+
+end; { WriteCertifFileToLaser }
+
+
+
+
+Procedure UdregnCRTMatrix(StartAddr : word; CRTName : STR_16);
+var
+ Dimen : integer;          { Dimension of the square matrix }
+ Data  : TNmatrix;         { The matrix }
+ Inv   : TNMatrix;         { Inverse of Data}
+ Error,                    { Errorflags }
+ n        : byte;
+ aa,rr1   : real;
+
+Procedure writeCRTMatrixToEEPROM(StAddr : word);
+ begin
+  writeEEPROM(StAddr    ,Hi(Round(Trunc(Inv[1,2]))));
+  writeEEPROM(StAddr + 1,Lo(Round(Trunc(Inv[1,2]))));
+  writeEEPROM(StAddr + 2,Hi(Round(Trunc(Inv[1,3]))));
+  writeEEPROM(StAddr + 3,Lo(Round(Trunc(Inv[1,3]))));
+  writeEEPROM(StAddr + 4,Hi(Round(Trunc(Inv[2,1]))));
+  writeEEPROM(StAddr + 5,Lo(Round(Trunc(Inv[2,1]))));
+  writeEEPROM(StAddr + 6,Hi(Round(Trunc(Inv[2,3]))));
+  writeEEPROM(StAddr + 7,Lo(Round(Trunc(Inv[2,3]))));
+  writeEEPROM(StAddr + 8,Hi(Round(Trunc(Inv[3,1]))));
+  writeEEPROM(StAddr + 9,Lo(Round(Trunc(Inv[3,1]))));
+  writeEEPROM(StAddr + 10,Hi(Round(Trunc(Inv[3,2]))));
+  writeEEPROM(StAddr + 11,Lo(Round(Trunc(Inv[3,2]))));
+  writeln('CRT-matrix ',CRTName,' written to E˝PROM');
+ end;
+
+begin
+ (*                  red-gun      green-gun      blu-gun
+ red   channel:        1           data 1,2      data 1,3
+ green channel:      data 2,1       1            data 2,3
+ blue  channel:      data 3,1      data 3,2          1
+ *)
+
+ Data[1,1] := 1;
+ Data[2,1] := YR / (XR * XFact);
+ Data[3,1] := (ZR * ZFact) / (XR * XFact);
+ Data[1,2] := (XG * XFact) / YG;
+ Data[2,2] := 1;
+ Data[3,2] := (ZG * ZFact) / YG;
+ Data[1,3] := (XB * XFact) / (ZB * ZFact);
+ Data[2,3] := YB / (ZB * ZFact);
+ Data[3,3] := 1;
+
+ {<<<<    Red  >>>>}
+ aa := Data[1,3];
+ for n := 1 to 10 DO
+  begin
+   rr1 := Data[1,2] - (aa * Data[3,2]);
+   aa  := Data[1,3] - (rr1 * Data[2,3]);
+  end; {for}
+ Inv[1,3] := (-1 * aa  * CRTMulFactor);
+ Inv[1,2] := (-1 * rr1 * CRTMulFactor);
+
+ {<<<<    Green  >>>>}
+ aa := Data[2,3];
+ for n := 1 to 10 DO
+  begin
+   rr1 := Data[2,1] - (aa * Data[3,1]);
+   aa  := Data[2,3] - (rr1 * Data[1,3]);
+  end; {for}
+ Inv[2,3] := (-1 * aa  * CRTMulFactor);
+ Inv[2,1] := (-1 * rr1 * CRTMulFactor);
+
+
+ {<<<<    Blue  >>>>}
+ aa := Data[3,2];
+ for n := 1 to 10 do
+  begin
+   rr1 := Data[3,1] - (aa * Data[2,1]);
+   aa  := Data[3,2] - (rr1 * Data[1,2]);
+  end; {for}
+ Inv[3,2] := (-1 * aa  * CRTMulFactor);
+ Inv[3,1] := (-1 * rr1 * CRTMulFactor);
+
+ write(CRTMulFactor:10); write(Inv[1,2]:10:2); writeln(Inv[1,3]:10:2);
+ write(Inv[2,1]:10:2); write(CRTMulFactor:10); writeln(Inv[2,3]:10:2);
+ write(Inv[3,1]:10:2); write(Inv[3,2]:10:2); writeln(CRTMulFactor:10);
+
+ if CRTName = 'EBU' then
+  begin
+  LearnEBUPhosphorOk := (Inv[1,2] < Inv[1,3]) and
+                        (Inv[2,1] < Inv[2,3]) and
+                        (Inv[3,2] < Inv[3,1]);
+  if LearnEBUPhosphorOk then
+    writeCRTMatrixToEEPROM(StartAddr)
+   else
+    writeln('CRT-matrix is not calculated correctly');
+ end;
+
+ if CRTName = 'SMPTE C' then
+  begin
+  LearnSMPTEPhosphorOk := (Inv[1,2] < Inv[1,3]) and
+                          (Inv[2,1] < Inv[2,3]) and
+                          (Inv[3,2] < Inv[3,1]);
+  if LearnSMPTEPhosphorOk then
+    writeCRTMatrixToEEPROM(StartAddr)
+   else
+    writeln('CRT-matrix is not calculated correctly');
+ end;
+end;  {UdregnCRTMatrix}
+
+
+
+Procedure MakeSensorCalibration(SaveData : boolean);
+{ Hvis SaveData = true, lëses kalibreringsdata efter kalibrering
+  fra sensor EEPROM og gemmes pÜ disk
+  Global variabel MonitorType = MonEBU eller MonSMPTE. Denne variabel
+  styrer hvilken monitor den absolutte kalibrering skal foretages pÜ.
+}
+var  n,
+     Status      : byte;
+     Svar        : string;
+     Dimen       : integer;      { Dimension of the square matrix }
+     Coef        : TNmatrix;     { The matrix }
+     Constants   : TNvector;     { Constant terms in the equations }
+     Solution    : TNvector;     { Solution to the set of equations }
+     Error       : byte;         { Flags if something went wrong }
+     St          : boolean;
+     MSxx        : MeasStrType;
+
+Function ValidSolution : boolean;
+{Kontrollerer om en af de 9 K-matrixelementer er absolut stõrre
+ end 32000/KorrMulFactor.
+ Inden matrixelementerne skrives i E˝PROM, multipliceres de med KorrMulFactor.
+ Hver element skal kunne indeholdes i en integer (Ò32768);
+ }
+var Valid : boolean;
+    n     : byte;
+    Lim   : REAL;
+ begin
+  Valid := true;
+  Lim := 32000 / KorrMulFactor;
+  for n := 1 to 9 DO
+   if Abs(Solution[n]) > Lim then
+    Valid := false;
+
+  Valid := Valid and
+  ((Solution[1] > 0) and
+  (Solution[5] > 0) and
+  (Solution[9] > 0));
+
+  ValidSolution := Valid;
+ end; {ValidSolution}
+
+
+
+begin
+ EEPROMwriteError := false;
+
+ InitPM5639_82Generator;
+
+ if ReadKalStatus = 'USER' then
+  begin
+   writeln(Bell,'Color sensor is USER calibrated - continue ?   Yes/No');
+   if TastY <> ScanCode then
+    begin
+     writeln('Calibration cancelled');
+     Exit;
+    end
+  end;
+
+
+ ReadRefMonitor(false);
+
+ if ((RefMonitorValue in [MonSMPTE]) and (MonitorType = MonEBU)) or
+    ((RefMonitorValue in [255,MonEBU]) and (MonitorType = MonSMPTE)) then
+  begin
+   writeln;
+   gotoxy(34,wherey);
+   TextColor(Red);TextBackGround(White);
+   writeln('  WARNING   ');
+   TextColor(Yellow);TextBackGround(Blue);
+   writeln;
+
+   if MonitorType = MonEBU then
+     writeln('  EBU ref monitor is choosen, but sensor is SMPTE calibrated')
+    else
+     writeln('  SMPTE ref monitor is choosen, but sensor is EBU calibrated');
+
+   write('  Continue ?   Yes/No      ');
+   Beep(700,500);
+
+   if TastY <> ScanCode then
+    begin
+     writeln('Calibration cancelled');
+     Exit;
+    end;
+
+  writeln('Yes');
+  end;
+
+
+
+
+
+ if CheckMonitorOnTime = false then
+  exit;
+
+  if MonitorType = MonEBU then { den IKKE-benyttede monitor = sort}
+    begin
+     EBUWhite;
+     SMPTEBlack;
+    end
+   else
+    begin
+     SMPTEWhite;
+     EBUBlack;
+    end;
+
+ writeln;
+
+ CRT625Lines;
+ Beep(1000,200);
+ MakeSensorCalibrationOk := true;
+ write('Place the sensor on the ');
+ TextColor(White);TextBackGround(Red);
+ if MonitorType = MonEBU then
+   write('EBU')
+  else
+   write('SMPTE');
+ TextColor(Yellow);TextBackGround(Blue);
+ writeln(' monitor over the white field - press a key');
+
+
+ WaitForAnyKey;
+ COMStatus := writeCOMPort(COMNo,'MS,'); Delay(20);
+ COMStatus := writeCOMPort(COMNo,'NR,'); Delay(20);
+ COMStatus := writeCOMPort(COMNo,'MX,'); Delay(20);
+ COMStatus := writeCOMPort(COMNo,'MC,'); Delay(20);
+ write('Measuring: R .');
+ if MonitorType = MonEBU then  { farven pÜ den IKKE-benyttede monitor = white}
+  begin
+   EBURed;
+   SMPTEWhite;
+  end
+  else
+  begin
+   SMPTERed;
+   EBUWhite;
+  end;
+
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+  MeasStr[n] := Svar;
+  write('.');
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   writeln('Timeout: no measurement');
+   COMStatus := writeCOMPort(COMNo,'MS,');
+   MakeSensorCalibrationOk := false;
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+   Exit;
+  end;
+ CalculateMean(MeasStr,AntalMeas,XR,YR,ZR,St);
+
+ write('        G .');
+ if MonitorType = MonEBU then
+  EBUGreen
+ else
+  SMPTEGreen;
+
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+  MeasStr[n] := Svar;
+  write('.');
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   COMStatus := writeCOMPort(COMNo,'MS,');
+   MakeSensorCalibrationOk := false;
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+  Exit;
+  end;
+ CalculateMean(MeasStr,AntalMeas,XG,YG,ZG,St);
+
+ write('        B .');
+ if MonitorType = MonEBU then
+  EBUBlue
+ else
+  SMPTEBlue;
+
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+  write('.');
+  MeasStr[n] := Svar;
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   COMStatus := writeCOMPort(COMNo,'MS,');
+   MakeSensorCalibrationOk := false;
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+   Exit;
+  end;
+ CalculateMean(MeasStr,AntalMeas,XB,YB,ZB,St);
+
+ write('        W .');
+ if MonitorType = MonEBU then
+  EBUWhite
+ else
+  SMPTEWhite;
+
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,3);
+  write('.');
+  MeasStr[n] := Svar;
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   COMStatus := writeCOMPort(COMNo,'MS,');
+   MakeSensorCalibrationOk := false;
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+   Exit;
+  end;
+
+ COMStatus := writeCOMPort(COMNo,'MS,'); Delay(20);
+
+ CalculateMean(MeasStr,AntalMeas,X65,Y65,Z65,St);
+
+ write(' Red:   ',XR:10:2);  write(YR:10:2);  writeln(ZR:10:2,'   ');
+ write(' Green: ',XG:10:2);  write(YG:10:2);  writeln(ZG:10:2,'   ');
+ write(' Blue:  ',XB:10:2);  write(YB:10:2);  writeln(ZB:10:2,'   ');
+ write(' White: ',X65:10:2); write(Y65:10:2); writeln(Z65:10:2,'   ');
+
+ if X65 <> 0 then
+   XFact := Y65 / X65
+  else
+   begin
+    writeln('Error:  X65 = 0');
+    MakeSensorCalibrationOk := false;
+    TestFailed := true;
+    Exit;
+   end;
+
+ YFact := 1;
+
+ if Z65 <> 0 then
+   ZFact := Y65 / Z65
+  else
+   begin
+    writeln('Z65 = 0');
+    MakeSensorCalibrationOk := false;
+    TestFailed := true;
+    Exit;
+  end;
+
+ writeln(' XFact:',XFact:6:3,'  YFact:',YFact:6:3,'  ZFact :',ZFact:6:3);
+
+ Dimen := 12;                                {define 12 x 12 matrix}
+ FillChar(Coef, SizeOf(Coef), 0);            {init 12 x 12 matrix}
+ FillChar(Constants, SizeOf(Constants), 0);  {init constants}
+ {Rõd skërm}                                       {SP-mÜlte xyz CIE }
+ Coef[1,1] := XR; Coef[1,2] := YR; Coef[1,3] := ZR; Coef[1,10] := -XpR;
+ Coef[2,4] := XR; Coef[2,5] := YR; Coef[2,6] := ZR; Coef[2,10] := -YpR;
+ Coef[3,7] := XR; Coef[3,8] := YR; Coef[3,9] := ZR; Coef[3,10] := -ZpR;
+ {grõn skërm}
+ Coef[4,1] := XG; Coef[4,2] := YG; Coef[4,3] := ZG; Coef[4,11] := -XpG;
+ Coef[5,4] := XG; Coef[5,5] := YG; Coef[5,6] := ZG; Coef[5,11] := -YpG;
+ Coef[6,7] := XG; Coef[6,8] := YG; Coef[6,9] := ZG; Coef[6,11] := -ZpG;
+ {blÜ skërm}
+ Coef[7,1] := XB; Coef[7,2] := YB; Coef[7,3] := ZB; Coef[7,12] := -XpB;
+ Coef[8,4] := XB; Coef[8,5] := YB; Coef[8,6] := ZB; Coef[8,12] := -YpB;
+ Coef[9,7] := XB; Coef[9,8] := YB; Coef[9,9] := ZB; Coef[9,12] := -ZpB;
+ {hvid skërm}
+ Coef[10,1] := X65; Coef[10,2] := Y65; Coef[10,3] := Z65;
+ Coef[11,4] := X65; Coef[11,5] := Y65; Coef[11,6] := Z65;
+ Coef[12,7] := X65; Coef[12,8] := Y65; Coef[12,9] := Z65;
+
+ Constants[10] := NominelLum / Yp65 * Xp65;
+ Constants[11] := NominelLum;
+ Constants[12] := NominelLum / Yp65 * Zp65;
+
+ Gaussian_Elimination(Dimen, Coef, Constants, Solution, Error);
+
+ write('K-matrix ');
+ if (Error <> 0) or (not ValidSolution) then
+   begin
+    writeln('NOT calculated correctly');
+    writeln('No CRT-matrix calculated');
+    MakeSensorCalibrationOk := false;
+    TestFailed := true;
+   end
+  else
+   begin
+    writeln('calculated:');
+    for n := 0 to 8 do
+     begin
+      Solution[n + 1] := Solution[n + 1] * KorrMulFactor;
+      write(Solution[n + 1]:10:2);
+       if (n + 1) mod 3 = 0 then writeln;
+     end; {for}
+
+    for n := 0 to 8 do
+     begin
+      KMatrwrited[n+1] := 256 * Hi(Trunc(Round(Solution[n + 1]))) +
+                          Lo(Trunc(Round(Solution[n + 1])));
+      writeEEPROM(KorrAddr + (n * 2),    Hi(Trunc(Round(Solution[n + 1]))));
+      writeEEPROM(KorrAddr + (n * 2) + 1,Lo(Trunc(Round(Solution[n + 1]))));
+     end; {for}
+
+    writeEEPROM(PreGainAddr    ,Hi(Trunc(Round(XFact * PreGainMulFactor))));
+    writeEEPROM(PreGainAddr + 1,Lo(Trunc(Round(XFact * PreGainMulFactor))));
+    writeEEPROM(PreGainAddr + 2,Hi(Trunc(Round(YFact * PreGainMulFactor))));
+    writeEEPROM(PreGainAddr + 3,Lo(Trunc(Round(YFact * PreGainMulFactor))));
+    writeEEPROM(PreGainAddr + 4,Hi(Trunc(Round(ZFact * PreGainMulFactor))));
+    writeEEPROM(PreGainAddr + 5,Lo(Trunc(Round(ZFact * PreGainMulFactor))));
+
+    writeEEPROM(157,255);   {Cal status = FACTORY  (bruges i PM8550)}
+
+    WriteCalDate;
+
+    WriteRefMonitor;  { angiver om kalibrering er pÜ EBU eller SMPTE monitor}
+(*
+    ReadKMatrix(Silent);     { check at K-Matrix er skrevet korrekt til EEPROM}
+    for n := 1 to 9 do
+      if KMatr[n] <> KMatrwrited[n] then
+       begin
+        EEPROMwriteError := true;
+        LearnKMatrixOk := false;
+        TestFailed := true;
+       end;
+
+    if EEPROMwriteError then
+      writeln(bell,'E˝PROM data not written correctly')
+     else
+      writeln('K-matrix and PreGain written to E˝PROM,  Kal status = FACTORY');
+ *)
+
+   writeln('K-matrix and PreGain written to E˝PROM,  Kal status = FACTORY');
+ end; {if}
+
+ if MakeSensorCalibrationOk then
+  begin
+(*
+   if MonitorType = MonEBU then
+     UdregnCRTMatrix(CRTMatrixAddr,'EBU')
+    else
+     UdregnCRTMatrix(CRTMatrixAddr - 20,'SMPTE C');
+*)
+     UdregnCRTMatrix(CRTMatrixAddr - 20,'SMPTE C');
+
+   if SaveData = true then
+    ReadKalDataFromEEPROM;
+  end;
+
+end; {MakeSensorCalibration}
+
+
+
+Procedure LearnPhosPhor;
+{ Global variabel MonitorType = MonEBU eller MonSMPTE. Denne variabel styrer
+  hvilken monitor en 'learn phosphor' skal foretages pÜ.
+}
+const Timeout = 3;              { sec }
+var  n,
+     Error,                     { Flags if something went wrong }
+     Status    : byte;
+     Svar      : string;
+     Dimen     : integer;       { Dimension of the square matrix }
+     Coef      : TNmatrix;      { The matrix }
+     Constants : TNvector;      { Constant terms in the equations }
+     Solution  : TNvector;      { Solution to the set of equations }
+     St        : boolean;
+begin
+
+ InitPM5639_82Generator;
+
+  if MonitorType = MonEBU then { den IKKE-benyttede monitor = black}
+    begin
+     SMPTEWhite;
+     EBUBlack;
+    end
+   else
+    begin
+     EBUWhite;
+     SMPTEBlack;
+    end;
+
+ ReadPreGainFactor(notSilent);
+
+ if MonitorType = MonEBU then
+   LearnSMPTEPhosphorOk := true
+  else
+   LearnEBUPhosphorOk := true;
+
+ Beep(1000,200);
+
+ write('Place the sensor on the ');
+ TextColor(White);TextBackGround(Red);
+ if MonitorType = MonEBU then
+   write('SMPTE')
+  else
+   write('EBU');
+ TextColor(Yellow);TextBackGround(Blue);
+ writeln(' monitor over the white field - press any key');
+
+ WaitForAnyKey;
+
+ if MonitorType = MonEBU then  { den IKKE-benyttede monitor = white}
+  begin
+   SMPTERed;
+   EBUWhite;
+  end
+  else
+  begin
+   EBURed;
+   SMPTEWhite;
+  end;
+
+ COMStatus := writeCOMPort(COMNo,'MX,');
+ Delay(20);
+ COMStatus := writeCOMPort(COMNo,'MC,');
+ write('Measuring: R .');
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,Timeout);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,Timeout);
+  write('.');
+  MeasStr[n] := Svar;
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   writeln('Timeout: no measurement  (',Timeout,' sec)');
+   COMStatus := writeCOMPort(COMNo,'MS,');
+
+   if MonitorType = MonEBU then
+     LearnSMPTEPhosphorOk := false
+    else
+     LearnEBUPhosphorOk := false;
+
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+   Exit;
+  end;
+
+ CalculateMean(MeasStr,AntalMeas,XR,YR,ZR,St);
+
+ write('        G .');
+ if MonitorType = MonEBU then
+   SMPTEGreen
+  else
+   EBUGreen;
+
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,Timeout);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,Timeout);
+  write('.');
+  MeasStr[n] := Svar;
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   writeln('Timeout: no measurement  (',Timeout,' sec)');
+   COMStatus := writeCOMPort(COMNo,'MS,');
+
+   if MonitorType = MonEBU then
+     LearnSMPTEPhosphorOk := false
+    else
+     LearnEBUPhosphorOk := false;
+
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+   Exit;
+  end;
+
+ CalculateMean(MeasStr,AntalMeas,XG,YG,ZG,St);
+
+ write('        B .');
+
+ if MonitorType = MonEBU then
+   SMPTEBlue
+  else
+   EBUBlue;
+
+ for n := 1 to LearnDelay do begin Delay(1000); write('.'); end;
+ n := 1;
+ COMStatus := ClearInputQue(COMNo);
+ COMStatus := ReadlnCOMPort(COMNo,Svar,Timeout);
+ repeat
+  COMStatus := ReadlnCOMPort(COMNo,Svar,Timeout);
+  write('.');
+  MeasStr[n] := Svar;
+  Inc(n);
+ until (n = AntalMeas + 1) or (COMStatus <> 0);
+ writeln;
+ if (COMStatus <> 0) then
+  begin
+   writeln('Timeout: no measurement  (',Timeout,' sec)');
+   COMStatus := writeCOMPort(COMNo,'MS,');
+
+   if MonitorType = MonEBU then
+     LearnSMPTEPhosphorOk := false
+    else
+     LearnEBUPhosphorOk := false;
+
+   TestFailed := true;
+   EBUWhite;
+   SMPTEWhite;
+   Exit;
+  end;
+
+ COMStatus := writeCOMPort(COMNo,'MS,');
+
+ CalculateMean(MeasStr,AntalMeas,XB,YB,ZB,St);
+
+ writeln;
+ EBUWhite;
+ SMPTEWhite;
+ write(' Red:  ',XR:10:2); write(YR:10:2); writeln(ZR:10:2,'   ');
+ write(' Green: ',XG:10:2); write(YG:10:2); writeln(ZG:10:2,'   ');
+ write(' Blue:  ',XB:10:2); write(YB:10:2); writeln(ZB:10:2,'   ');
+
+ if ((MonitorType = MonEBU) and (LearnSMPTEPhosphorOk = true)) then
+  UdregnCrtMatrix(CRTMatrixAddr - 20,'SMPTE C');
+
+ if ((MonitorType = MonSMPTE) and (LearnEBUPhosphorOk = true)) then
+  UdregnCrtMatrix(CRTMatrixAddr,'EBU');
+end; {LearnPhosphor}
+
+
+Procedure SensorTotalTest;
+begin
+ WPOff;
+ Delay(100);
+
+ EBUWhite;
+ SMPTEWhite;
+
+ writeProtectYesOrNo(Silent);
+
+ if writeProtectOk then
+  begin
+   writeln(Bell,'Color sensor must NOT be write protected under calibration !!');
+   writeln(     'Write Protection is removed by Ctrl-F9');
+   Exit;
+  end;
+
+ if ReadKalStatus = 'USER' then
+  begin
+   writeln(Bell,'Color sensor is USER calibrated - continue?  Y/N');
+   if TastY <> ScanCode then
+    begin
+     writeln('Calibration cancelled');
+     Exit;
+    end
+  end;
+
+
+
+ ClearTestFlag;
+{$ifDEF IEEEBUS}
+ SupplyCurrentTest;
+ AnalogProbeTest;
+{$endif}
+ RS232Test;
+
+ if not TestFailed then
+   EnterKU_Nummer;
+
+ if TestAfbrudt then Exit;
+ if not TestFailed then
+  begin
+   InitPtvEEPROM;
+  end;
+
+ if TestFailed  then Exit;
+ if TestAfbrudt then Exit;
+
+ if not TestFailed then
+  begin
+   writeCRTNamesToEEPROM;
+   writeIdString;
+   writeDefaultGainFactor;
+   writeDefaultPreGain;
+   LearnOffset;
+  end;
+ if TestAfbrudt then Exit;
+
+ if TestFailed  then Exit;
+
+ if not TestFailed then
+   DarkCurrentTest;
+
+ if TestAfbrudt then Exit;
+ if TestFailed  then Exit;
+
+ if not TestFailed then
+   BeregnGainFactor;
+
+ if TestAfbrudt then Exit;
+ if TestFailed  then Exit;
+
+ if not TestFailed then
+   MakeSensorCalibration(NotSaveCalData);
+ if TestAfbrudt then Exit;
+ (*
+ if not TestFailed then
+   LearnPhosPhor;
+*)
+ if TestAfbrudt then Exit;
+ if not TestFailed then
+  begin
+   ReadGainFactor;
+   ReadIdString(true);
+   ReadPreGainFactor(notSilent);
+   ReadNoCRTFosfor(NotSilent);
+   ReadNoEEPROMPages;
+   ReadInternID;
+   ReadCRTNames(Silent);
+   ReadCRTMatrix(Silent);
+   ReadKMatrix(NotSilent);
+  end;
+
+ if not TestFailed then
+  if SensorVer = 93 then
+   CheckSWBaudrateShift;
+
+ TotalTestOk :=  RS232TestOk and
+                 CurrentTestOk and
+                 DarkCurrentTestOk and
+                 BeregnGainFactorOk and
+                 FilterOk and
+                 ValidKU and
+                 ReadCRTNameOk and
+                 ReadKorrMatrixOk and
+                 ReadCRTMatrixOk and
+                 ReadIDStringOk and
+                 ReadInternIDOk and
+                 ReadPreGainOk and
+                 ReadNoCRTFosforOk and
+                 ReadNoEEPROMPagesOk and
+                 MakeSensorCalibrationOk and
+(*                 LearnEBUPhosphorOk and *)
+                 LearnSMPTEPhosphorOk and
+                 (not TestFailed);
+
+  write('Total Test ');
+  TrueOrFalse(TotalTestOk);
+
+ if Analog5VTestValgt then
+  TotaltestOk :=  TotaltestOk and AnalogPos5VTestOk and AnalogNeg5VTestOk;
+ if ADRefTestValgt then
+  TotaltestOk :=  TotaltestOk and ADRefTestOk;
+
+ if TotalTestOk then
+  begin
+   writeOkToEEPROM;
+   ReadWPAddr(NotSilent);
+   WPon;                               { write protect = on }
+   ReadKalDataFromEEPROM;
+   writeln(Bell,'Print calibration data?  YES/NO  ');
+   if GetKeycode = TastY then
+     WriteCertifFileToLaser(false);
+   writeln;
+  end;
+
+  if SensorVer = 93 then
+   TotaltestOk := TotaltestOk and
+                  BaudrateShiftOk;
+
+  TotaltestOk :=  TotaltestOk and
+                  ReadKaldataOk and
+                  ReadwriteProtectOk;
+
+ write('PM5639 calibration OK ?:');
+ TrueOrFalse(FinalTestOk);
+
+ if TotalTestOk then
+   writeln('PM5639 sensor A P P R O V E D')
+  else
+   writeln('PM5639 sensor N O T  A P P R O V E D');
+end; {TotalTest}
+
+
+
+
+
+Procedure BarcoTotalTest;
+begin
+ ClrScr;
+ writeln;
+ writeln;
+ writeln('Connect Barco interface to:   Light box (LEMO plug)');
+ writeln('                              Color sensor PM5639/90 series IV');
+ writeln;
+ writeln('Press any key');
+ WaitForAnyKey;
+
+
+
+
+ ClearTestFlag;
+{$ifDEF IEEEBUS}
+ AnalogProbeTestBarco;
+{$endif}
+
+
+ BarcoMeasure;
+
+ TotalTestOk := not TestFailed;
+
+ gotoxy(25,12);
+ if TotalTestOk then
+   writeln('PM5639/02   A P P R O V E D ')
+  else
+   writeln('PM5639/02   N O T  A P P R O V E D ')
+end; {BarcoTotalTest}
+
+
+
+begin           {>>>> main program <<<<}
+
+ SelectSensor;
+ SetCBreak(true);
+ ClrScr;
+ InitWindow;
+ InitTopWindow;
+ InitBottomWindow;
+ InitMainWindow;
+ MonitorType := MonEBU;
+ SelectMonitor;
+ InitVar(MonitorType);
+ InitPC_ComPort;
+(*
+
+{$ifdef IEEEBUS}
+ InitIeeeBus;
+ InitPM5639_82Generator;
+{$endif}
+ InitI2CBus;
+
+ SaveMonitorOnTime;
+
+ RGBGenRemote;
+ SMPTEWhite;
+ EBUWhite;
+ SaveMonitorOnTime;
+{$ifdef RGBGEN}
+ DAVoltage(7.1);  {spënding fra D/A-converter til PM5639/80  (RGB-generator)}
+{$endif}
+ LampOff;
+*)
+
+
+ LightLevel := CalLightLevel[1];
+ MinValueK := CalMinValueK[1];
+ if ((SensorVer = 90) and (SensorSerie > 4)) or
+    ((SensorVer = 92) and (SensorSerie > 2)) or
+    ((SensorVer = 93) and (SensorSerie > 2)) then
+   begin
+    LightLevel := CalLightLevel[2];
+    MinValueK := CalMinValueK[2];
+   end;
+
+ if not AfslutProgram then
+ repeat
+  EmptyKeyboardBuffer;
+  TestFailed := false;
+
+  Set_Timer(SONY_Timeout*10);
+
+
+  repeat
+  until Timer_Timeout or KeyPressed;
+
+  if SensorVer <> Barco then
+   if Timer_Timeout then
+    begin
+     EBUBlack;
+     SMPTEBlack;
+     writeln('SONY-monitorer = OFF');
+    end;
+
+
+ { ------------------ PM5639   SENSORER ----------------------}
+  if SensorVer <> Barco then
+  case ScanCode of
+{$ifdef IEEEBUS}
+       F1 : begin
+             SupplyCurrentTest;
+             AnalogProbeTest;
+            end;
+{$endif}
+       F2 : EnterKU_Nummer;
+
+{       F3 : ShutdownControl;}
+
+       F4 : begin
+             RS232Test;
+              if RS232TestOk then
+               begin
+                ReadGainFactor;
+                ReadIdString(true);
+                ReadPreGainFactor(notSilent);
+                ReadWPAddr(NotSilent);
+                ReadNoCRTFosfor(NotSilent);
+                ReadNoEEPROMPages;
+                ReadInternID;
+                writeProtectYesOrNo(NotSilent);
+                writeln('Calibration status: ',ReadKalStatus);
+                ReadCalDate(NotSilent);
+                ReadRefMonitor(true);
+                writeln('Trace status: ',ReadTraceFlag);
+                writeln('Output format: ',ReadOutputFormat);
+               end; {if}
+            end;
+       F5 : LearnOffset;
+       F6 : DarkCurrentTest;
+       F7 : BeregnGainFactor;
+       F8 : LearnPhosphor;
+       F9 : MakeSensorCalibration(SaveCalData);
+      F10 : begin
+             TotalTestFlag := true;
+             SensorTotalTest;
+             TotalTestFlag := false;
+            end;
+
+   AltF1  : writePHILIPS_ID;
+   AltF3  : InitPtvEEPROM;
+   AltF5  : writeIDString;
+   AltF6  : writeDefaultGainFactor;
+   AltF7  : writeDefaultPreGain;
+   AltF8  : writeCRTNamesToEEPROM;
+   AltF9  : ReadKalDataFromEEPROM;
+
+   AltF10 : WriteCertifFileToLaser(true);
+
+   CtrlF1 : ReadCRTMatrix(NotSilent);
+   CtrlF2 : ReadKMatrix(NotSilent);
+   CtrlF3 : ReadCRTNames(NotSilent);
+   CtrlF4 : writeProtectYesOrNo(NotSilent);
+   CtrlF5 : begin
+             if MonitorType = MonEBU then
+              ShowActualXYValues(EBU_XYFilename)
+             else
+              ShowActualXYValues(SMPTE_XYFilename);
+            end;
+   CtrlF6 : ShowOffsetValues(NotSilent);
+   CtrlF8 : WPOn;
+   CtrlF9 : WPOff;
+   CtrlF10 : if SensorVer = 93 then
+               CheckSWBaudrateShift
+              else
+               write('?? ');
+
+   TastA : EnterLevel;
+   TastC : ClrScr;
+   TastG : RGBMeasure(XYCrtMatrix);
+   TastH : ShowHelpWindow;
+   TastL : ToggleLamp;
+   TastM :  begin
+              ReadKMatrix(Silent);
+              case SensorVer of
+               90,92,93 : xyYMeasure(KorrMatrix,KorrMulFactor,
+                             D6500Ref[1],D6500Ref[2],NIT_fL_Factor,1);
+               916      : xyYMeasure(KorrMatrix,KorrMulFactor,
+                             D6500Ref[1],D6500Ref[2],NIT_fL_Factor,3);
+               else
+                writeln('No sensor choosen - check command line parameter');
+              end; {case}
+            end;
+   TastO :  begin
+             ShowOffsetValues(Silent);
+              case SensorVer of
+               90,92,93  : STMeasure(Offset,ADRef,ADCounts,5,1);
+               916       : STMeasure(Offset,ADRef,ADCounts,5,3);
+              end;
+            end;
+   TastP : PowerOffOn;
+   TastR : RefMeasurements;
+   TastY : ToggleRelay;
+   AltR  : TestRelayRGB;
+   TastW : begin
+              EBUWhite;
+              SMPTEWhite;
+              SaveMonitorOnTime;
+           end;
+
+
+   Escape : AfslutProgram := true;
+     else
+      write('?? ');
+   end; {case ScanCode}
+
+
+ { ------------------ PM5639/02  Barco option ----------------------}
+  if SensorVer = Barco then
+  case ScanCode of
+{$ifdef IEEEBUS}
+      F1  :  AnalogProbeTestBarco;
+{$endif}
+      TastM,
+      F2  :  BarcoMeasure;
+
+      F10 : begin
+             TotalTestFlag := true;
+             BarcoTotalTest;
+             TotalTestFlag := false;
+            end;
+
+   TastP : PowerOffOn;
+
+   Escape : AfslutProgram := true;
+     else
+      write('?? ');
+   end; {case ScanCode}
+
+
+   writeln('*');
+
+ until AfslutProgram;
+
+
+ if IeeeFilesOpen then
+  CloseIeeeFiles;
+ Window(1,1,80,25);
+
+ if not IICBusError then
+  begin
+{$ifdef LYSKASSE}
+   Trm8574(I2CIOAddr,64,$FF,St);
+   LampOff;
+{$endif}
+{$ifdef RGBGEN}
+   EBUBlack;
+   SMPTEBlack;
+   RGBGenLocal;
+{$endif}
+  end;
+
+ Window(1,1,80,25); Color(LightGray,Black); ClrScr;
+
+ COMStatus := CloseCOMPort(COMNo);
+ if COMStatus <> 0 then
+  writeln('COM',COMNo,' port not closed correctly: ',COMStatus);
+
+end.
+

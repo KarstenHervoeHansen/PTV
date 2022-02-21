@@ -1,0 +1,150 @@
+%
+project		: PT5201
+Compagny	: PTV
+Designer	: SNJ,TSC
+Version		: 00
+File name	: EXTLOG01.tdf
+Function	: A/D interface and sync seperator
+UPDATE		: 20/3-2000; FREQLOCK input chanced to active '0'
+%
+
+TITLE "EXTLOG01";
+
+constant cmax = 1729;
+
+	SUBDESIGN EXTLOG01
+(	
+	
+	CLOCK			:	INPUT;
+	I[7..0]			:	INPUT;
+	INTERN			:	INPUT;
+	LEVEL			:	INPUT;
+	FREQLOCK		:	INPUT;
+	G				:	INPUT;
+	H0				:	INPUT;
+	CLP				:	OUTPUT;
+	NS				:	OUTPUT;
+	V1OUT			:	output;
+	ELINE			:	OUTPUT;
+%
+	SYNCSTART		:	output;
+	BURSTSTART		:	output;
+%
+)
+	
+	VARIABLE
+
+	CLP				:	DFF;	
+	NS				:	DFF;	
+	ELINE			:	DFF;	
+	V1OUT			:	TFF;
+	ES[3..0]		:	DFF;
+	LPFILT			:	DFF;
+	RESET			:	DFF;
+	AV[3..0]		:	DFF;
+	CLPHELP			:	DFF;
+	CA1				:	DFF;
+	E[10..0]		:	DFF;
+	EARLYH			:	DFF;
+	GATE			:	DFF;
+	V1				:	TFF;
+	LATEV			:	TFF;
+%
+	SYNCSTART		:	DFF;
+	BURSTSTART		:	DFF;			
+%
+BEGIN
+
+ES[3..0].clk=clock;
+ES0 = ( (I[7..0] <= 19) & !level ) # ( (I[7..0] <= 39) & level );
+ES1 = ES0;
+ES2 = ES1;
+ES3 = ES2;
+
+LPFILT.clk=clock;
+LPFILT = (           ES0 & ES1 & ES2 & ES3 )
+        # (LPFILT & !( !ES0 & !ES1 & !ES2 & !ES3 ) );
+
+RESET.clk=clock;
+RESET=ES0 & !ES1 & GATE;
+
+AV[3..0].clk = clock;
+AV0 = I[7..0]==0;
+AV1 = AV0;
+AV2 = AV1;
+AV3 = AV2;
+
+CLPHELP.CLK=clock;
+CLPHELP =( (AV[3..0]==15) & !ELINE ) # ( CLPHELP & !ELINE );
+
+% PT5210/30 SPG
+CLP.CLK=clock;
+CLP=(((CLPHELP & ELINE) # ( (AV[3..0]==15) & ELINE ) #( CLP &!ELINE))&!FREQLOCK)
+   #( !I7 & FREQLOCK );
+%
+CLP.CLK=clock;
+CLP=(((CLPHELP & ELINE) # ( (AV[3..0]==15) & ELINE ) #( CLP &!ELINE))&FREQLOCK)
+   #( !I7 & !FREQLOCK );
+
+
+
+CA1.CLK=clock;
+CA1 =(NS & RESET)
+    #( EARLYH & (E[10..0]==(cmax-4)) & G)
+    #( RESET  & (E[10..0]==(cmax-4)) & G)
+    #( RESET  & (E[10..0]==(cmax-3)) & G)
+    #(!CA1    & (E[10..0]==(cmax-2)) & G)
+    #( EARLYH & (E[10..0]==(cmax-4-12)) & !G)
+    #( RESET  & (E[10..0]==(cmax-4-12)) & !G)
+    #( RESET  & (E[10..0]==(cmax-3-12)) & !G)
+    #(!CA1    & (E[10..0]==(cmax-2-12)) & !G);
+
+ELINE.clk=clock;
+ELINE= ( (E[10..0]==0) # (E[10..0]==1) ) & !H0;
+
+E[].clk=clock;
+IF CA1 THEN
+  E[]=0;
+ELSE
+  E[]=E[]+1;
+END IF;
+
+EARLYH.CLK=clock;
+EARLYH=( G & RESET & (E[10..0]>=1700)) # ( G & EARLYH & (E[10..0]>=1700)) 
+      #(!G & RESET & (E[10..0]>=1688)) # (!G & EARLYH & (E[10..0]>=1688)); 
+
+GATE.CLK=clock;
+GATE = (GATE & !RESET)  
+     # ((E[10..0]==(cmax-18-9))  & !RESET & G ) 
+     # ((E[10..0]==(cmax-18-12-9))  & !RESET & !G); 
+
+NS.CLK=clock;
+NS = ( GATE & INTERN  & !LEVEL & (E[10..0]== (4+2)) ) 
+   # ( GATE & !INTERN & !LEVEL & (E[10..0]==(15+8)) ) 
+   # ( GATE & INTERN  & LEVEL  & (E[10..0]== (1+1+2)) ) 
+   # ( GATE & !INTERN & LEVEL  & (E[10..0]== (3+2+3)) ) 
+   # ( GATE & NS )
+   # ( !CA1 & NS )
+   # ( !V1OUT & NS & INTERN );
+
+V1.CLK=clock;
+V1 = ( !V1 & LPFILT &  (E[10..0]>=160) & (E[10..0]<192) )
+   # (  V1 & (E[10..0]==158) );
+
+LATEV.CLK=clock;
+LATEV = ( !LATEV & LPFILT & (E[10..0]>=1024) & (E[10..0]<1536) )
+      # ( LATEV  & ( E[10..0]==1022) );
+
+V1OUT.CLK=clock;
+V1OUT = ( V1OUT  & LPFILT & !LATEV & V1 & (E[10..0]>=384) & (E[10..0]<512) )
+      # ( !V1OUT & (E[10..0]==382) );
+
+% PT5220 SPG load signal to replace of dualport ram
+SYNCSTART.clk=clock;
+SYNCSTART	= ( G & (E[10..1]==860) ) # ( !G & (E[10..1]==854) & !H0 );
+BURSTSTART.clk=clock;
+BURSTSTART = (E[10..1]==87) & !H0;
+%
+END;
+
+

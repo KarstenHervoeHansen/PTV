@@ -1,0 +1,42 @@
+This directory contains all necessary files for inserting
+MBC logos into Philips4x3 NTSC picture in 8633 SDI generator.
+BASE_DATA contains CHANNElx files for complete set of pictures
+without any logos.
+
+The logos are inserted into NTSC Philips 4x3 pixture, at address 
+which begins at 4804 (see "Billeddele til PT8633").
+
+There are 3 logos to be inserted, the lowest one is some text
+which is to be inserted in a 'transparent mode', i.e. not as
+rectangular picture as usual, but as 'letters only'.
+
+Three programs were written, each for inserting particular logo.
+
+makemid.c inserts middle logo.
+
+maketop.c inserts top logo.  It also eliminates a black rectangle
+remaining in the top field after the logo has been inserted.  That
+rectangle is the rest of the black field there and is overwriten by 
+a white line taken from logo picture.
+
+makebot.c inserts bottom logo in the 'transparent mode'.  All pixels
+of logo picture which are not part of text have been replaced by red,
+using some BMP picture editor.  When inserting the logo, an algorithm
+in main() checks if given pixel is pure red.  If it is, then no 
+substitution is made.  In this way only the letters from logo are 
+transferred to picture in channelX.dat files.
+
+This is done in the following way:
+
+The logo is inserted line by line.  A helper array is constructed,
+(tranparent_help) which is used to signal which pixel in a logo line
+is pure red.  This array is filled appropriately while converting 
+a BMP line (RGB format) to YUV (function rgb_YUV()).  Then when 
+inserting logo pixels into channelX line, if given location of 
+tranparent_help[] is 0xFF, logo pixels are not inserted.
+
+
+To insert all logos run do.bat.  This will also invoke mbc2bmp.bat,
+which runs mchn2tif.exe, converting Philips 4x3 NTSC picture into 
+kbs_dump.bmp.  The last one is used to check the result.
+02.09.2002: JK

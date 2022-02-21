@@ -1,0 +1,83 @@
+#
+# filename = makefile
+#
+# makefile for Borland C++ (make 3.6)
+#
+
+#
+# invoke as: > make
+#
+
+#BC = e:\compiler\borlandc    # ESP home for Borland C++
+BC = c:\bc4    # home for Borland C++
+
+CC = $(BC)\bin\bcc
+LD = $(BC)\bin\tlink
+RM = del
+
+#
+# default .c.obj rules
+#
+.c.obj:
+   $(CC) -c -ml $(include) $(debug) $<
+
+include = -I$(BC)\include;..\..\..\include;..\..\rtxcio;..\example;
+
+# used for compiler and linker
+#debug = -v # necessary for debugging (TD or BOUNDS_CHECKER)
+
+LDFLAGS = $(debug)   # necessary for BOUNDS-CHECKER or TD
+
+#
+# main targets
+#
+all: sizes.exe rtxcgen.exe
+
+#
+# rtxcgen dependencies
+#
+target: rtxcgen.exe
+rtxcgen.exe: rtxcgen.obj defclock.obj defmbox.obj defpart.obj \
+	     defqueue.obj defres.obj defsema.obj deftask.obj \
+	     defchnls.obj defcntlr.obj defdevs.obj defiogen.obj \
+	     defclctl.obj defclent.obj defcldrv.obj
+   $(LD) $(LDFLAGS) $(BC)\LIB\c0l+@$*.rsp,$*,$*,$(BC)\LIB\cl
+
+rtxcgen.obj: rtxcgen.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h
+
+defclock.obj: defclock.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+defmbox.obj: defmbox.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+defpart.obj: defpart.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+defqueue.obj: defqueue.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+defres.obj: defres.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+defsema.obj: defsema.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+deftask.obj: deftask.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h rtxcgen.h
+
+defchnls.obj: defchnls.c
+
+defcntlr.obj: defcntlr.c
+
+defdevs.obj: defdevs.c
+
+defclctl.obj: defclctl.c
+
+defclent.obj: defclent.c
+
+defcldrv.obj: defcldrv.c
+
+#
+# sizes dependencies
+#
+sizes.exe: sizes.obj
+   $(LD) $(LDFLAGS) $(BC)\LIB\c0l $*,$*,$*,$(BC)\LIB\cl
+
+sizes.obj: sizes.c ..\..\..\include\rtxstruc.h ..\..\..\include\rtxcopts.h
+
+clean:
+	$(RM) *.obj

@@ -1,0 +1,149 @@
+%
+PT5201 I/O interface to master processor
+
+%
+constant PLDVERSION = 10;		-- version 1.0
+
+title "Audio I/O interface for PT5201";
+
+
+subdesign ioport
+(
+DM[9..0]             : bidir;    -- cpu data bus
+
+VIDEO_LOCK,                      -- Status for AESaudio-video lock (only for FS=48kHz)
+AUDIO_LOCK,                      -- Status for audio-clock locked to 27MHz ref (1=locked)
+TCXO_LOCK,                       -- Status for 27MHz locked to TXCO-ref (1=locked)
+TCXO_MOUNTED,                    -- Status for TXCO-ref (1=mounted)
+RELAYTYPE,                       -- Bistable/monostable relay mounted (1=bistable)
+AM[18..14],                      -- cpu address bus
+AM2,AM1,AM0,
+RDM,                             -- cpu read signal
+WRLM,                            -- cpu write signal
+FLASHPRG                         -- flash program signal to disable i/o-ports
+                     : input;   
+
+TIMING[9..0],                     -- set delay between AES-audio and video
+AUDIO_SELECT[8..0],               -- select type of audio signal
+AUDIO_LEVEL[4..0],                -- select level of audio signal
+BB_45MHZ,                         -- select 4.5MHZ on BB1 output
+POT_CLK,                          -- clock to AD8402 digital potemtiometer
+POT_SDI,                          -- serial data for AD8402
+POT_CSAU,                         -- chip select for AD8402 audio level control
+POT_CSCB,                         -- chip select for AD8402 TVP6000C gain control AD8402
+SEL_AES,                          -- control bistable relay to select AES-audio
+SEL_ANALOG,                       -- control bistable relay to select analog audio
+NTSC_PHASE                        -- lock AES-48kHz-audio to NTSC-video (1=NTSC  0=PAL)
+                     : output;
+    
+)
+
+variable
+TIMING_PORT[9..0]          : dffe;   -- HC574 register with clock enable
+AUDIO_SELECT_PORT[8..0]    : dffe;
+AUDIO_LEVEL_PORT[4..0]     : dffe;
+AUDIO_CONTROL_PORT[6..0]   : dffe;
+BB_CONTROL_PORT            : dffe;
+
+TIMING_BUF[9..0]           : tri;     -- HC244 buffers
+AUDIO_SELECT_BUF[8..0]     : tri;
+AUDIO_LEVEL_BUF[4..0]      : tri;
+AUDIO_CONTROL_BUF[9..0]    : tri;
+BB_CONTROL_BUF[9..0]       : tri;
+TCXO_BUF[9..0]             : tri;
+PLD_VERSION_BUF[9..0]	   : tri;
+
+CS_AUDIO_SELECT,                      -- addr = 38000h   (word addr)
+CS_AUDIO_LEVEL,                       -- addr = 38001h
+CS_TIMING,                            -- addr = 38002h
+CS_AUDIO_CONTROL,                     -- addr = 38003h
+CS_BB_CONTROL,                        -- addr = 38004h
+CS_TCXO,                              -- addr = 38005h
+CS_PLD_VERSION                        -- addr = 38007h
+                           : node; 
+
+dm_node[9..0]              : tri_state_node;   -- databus for master controller
+
+begin
+
+-- chip select
+CS_AUDIO_SELECT = (AM[18..14] == B"01110") & (AM[2..0] == B"000") & !FLASHPRG;
+CS_AUDIO_LEVEL = (AM[18..14] == B"01110") & (AM[2..0] == B"001") & !FLASHPRG;
+CS_TIMING = (AM[18..14] == B"01110") & (AM[2..0] == B"010") & !FLASHPRG;
+CS_AUDIO_CONTROL = (AM[18..14] == B"01110") & (AM[2..0] == B"011") & !FLASHPRG;
+CS_BB_CONTROL = (AM[18..14] == B"01110") & (AM[2..0] == B"100") & !FLASHPRG;
+CS_TCXO = (AM[18..14] == B"01110") & (AM[2..0] == B"101") & !FLASHPRG;
+CS_PLD_VERSION = (AM[18..14] == B"01110") & (AM[2..0] == B"111") & !FLASHPRG;
+
+
+
+-- output ports
+TIMING_PORT[].clk = WRLM; 
+TIMING_PORT[].d = DM[9..0];  
+TIMING_PORT[].ena = CS_TIMING;  
+TIMING[] = TIMING_PORT[];
+TIMING_BUF[].in = TIMING_PORT[];
+TIMING_BUF[].oe = !(RDM # !CS_TIMING);
+dm_node[9..0] = TIMING_BUF[].out;
+
+AUDIO_SELECT_PORT[].clk = WRLM; 
+AUDIO_SELECT_PORT[].d = DM[8..0];  
+AUDIO_SELECT_PORT[].ena = CS_AUDIO_SELECT;  
+AUDIO_SELECT[] = AUDIO_SELECT_PORT[];
+AUDIO_SELECT_BUF[].in = AUDIO_SELECT_PORT[];
+AUDIO_SELECT_BUF[].oe = !(RDM # !CS_AUDIO_SELECT);
+dm_node[8..0] = AUDIO_SELECT_BUF[].out;
+
+AUDIO_LEVEL_PORT[].clk = WRLM; 
+AUDIO_LEVEL_PORT[].d = DM[4..0];  
+AUDIO_LEVEL_PORT[].ena = CS_AUDIO_LEVEL;  
+AUDIO_LEVEL[] = AUDIO_LEVEL_PORT[];
+AUDIO_LEVEL_BUF[].in = AUDIO_LEVEL_PORT[];
+AUDIO_LEVEL_BUF[].oe = !(RDM # !CS_AUDIO_LEVEL);
+dm_node[4..0] = AUDIO_LEVEL_BUF[].out;
+
+AUDIO_CONTROL_PORT[].clk = WRLM; 
+AUDIO_CONTROL_PORT[].d = DM[6..0];  
+AUDIO_CONTROL_PORT[].ena = CS_AUDIO_CONTROL;  
+POT_CLK = AUDIO_CONTROL_PORT[0];
+POT_SDI = AUDIO_CONTROL_PORT[1];
+POT_CSAU = AUDIO_CONTROL_PORT[2];
+POT_CSCB = AUDIO_CONTROL_PORT[3];
+SEL_AES = AUDIO_CONTROL_PORT[4];
+SEL_ANALOG = AUDIO_CONTROL_PORT[5];
+NTSC_PHASE = AUDIO_CONTROL_PORT[6];
+AUDIO_CONTROL_BUF[6..0].in = AUDIO_CONTROL_PORT[];
+AUDIO_CONTROL_BUF[7].in = RELAYTYPE;
+AUDIO_CONTROL_BUF[8].in = AUDIO_LOCK;
+AUDIO_CONTROL_BUF[9].in = VIDEO_LOCK;
+AUDIO_CONTROL_BUF[].oe = !(RDM # !CS_AUDIO_CONTROL);
+dm_node[9..0] = AUDIO_CONTROL_BUF[].out;
+
+
+BB_CONTROL_PORT.clk = WRLM; 
+BB_CONTROL_PORT.d = DM[0];  
+BB_CONTROL_PORT.ena = CS_BB_CONTROL;  
+BB_45MHZ = BB_CONTROL_PORT;
+BB_CONTROL_BUF[0].in = BB_CONTROL_PORT;
+BB_CONTROL_BUF[9..1].in = GND;
+BB_CONTROL_BUF[].oe = !(RDM # !CS_BB_CONTROL);
+dm_node[9..0] = BB_CONTROL_BUF[].out;
+
+
+-- input ports
+PLD_VERSION_BUF[].oe = !(RDM # !CS_PLD_VERSION);
+PLD_VERSION_BUF[].in = PLDVERSION;
+dm_node[9..0] = PLD_VERSION_BUF[].out;
+
+TCXO_BUF[].oe = !(RDM # !CS_TCXO);
+TCXO_BUF[0].in = TCXO_LOCK;
+TCXO_BUF[1].in = TCXO_MOUNTED;
+TCXO_BUF[9..2].in = GND;
+dm_node[9..0] = TCXO_BUF[].out;
+
+
+
+DM[] = dm_node[];                        -- connect read-buffers to DM-databus
+
+
+end;

@@ -1,0 +1,602 @@
+OrCAD LOGIC COMPILER  v2.01 H 12/09/94  (Source file BB10ALT1.PLD)
+
+  1  |PALASM  pins: (CLK,FIELDM,FIELDG,LOADHG,LOADHM,DATAIN[7..0],LOAD1,LOAD2
+  2  |            ,RAMADDR[7..2],ENBB,ENSY,G,LINELATCH,OUTCLK,EN0,EN1,EN2,FIELDUD,HINT,line7),
+  3  |      nodes:(BB,UP,DOWN,PUP,PDOWN,H[10..0],CA1728,STOP,RAMADDR[1..0]
+  4  |            ,LOADC,TYPE[3..0],DATAIN[10..8],TYPEBUF[3..0],DBUS[10..0],
+  5   |UPWR1,UPWR2,
+  6  | pedoff,fieldlatch,flag)
+  7  
+  8   |CONDITIONING: dff(UPWR[2..1],CLK)
+  9   |UPWR1=LOAD1'
+ 10   |UPWR2=LOAD2'
+ 11  |UPWR1=LOAD1
+ 12  |UPWR2=LOAD2
+ 13  
+ 14  
+ 15  |CONDITIONING: dff(TYPEBUF[3..0],UPWR1)
+ 16  |TYPEBUF[3..0]= DATAIN[7..4] 
+ 17  
+ 18  |CONDITIONING: dff(TYPE[3..0],CLK)
+ 19  |TYPE[3..0] = ( TYPEBUF[3..0] & LINELATCH )
+ 20  |           # ( TYPE[3..0]    & LINELATCH')
+ 21  
+ 22  
+ 23  |CONDITIONING: dff(DATAIN[10..8],UPWR1)
+ 24  |DATAIN[10..8]= DATAIN[2..0]
+ 25  
+ 26  |CONDITIONING: dff(pedoff,UPWR1)
+ 27  |pedoff = DATAIN3 
+ 28  
+ 29  
+ 30  |CONDITIONING: dff(DBUS[10..0],UPWR2)
+ 31  |DBUS[10..0] = ( DATAIN[10..0] )
+ 32  
+ 33   
+ 34  |           
+ 35  |CONDITIONING: dff(LOADC,CLK)
+ 36  |LOADC= ( LOADHG & G ) # ( LOADHM & G' )
+ 37  
+ 38  |CONDITIONING: dff(H[10..0],CLK)
+ 39  |map: H[10..0]->H[10..0]
+ 40  | {
+ 41  |     n->n+1 , LOADC' & CA1728'
+ 42  |     n->0   , LOADC' & CA1728
+ 43  | }
+ 44  |H[10..0]= DBUS[10..0] & LOADC
+ 45  
+ 46  |CA1728 = ((H[10..0]==1727) & G )
+ 47  |       # ((H[10..0]==1715) & G')
+ 48  
+ 49  |flag= ((dbus[10..0]> 1727) & G )
+ 50  |    # ((dbus[10..0]> 1715) & G')
+ 51  
+ 52  |CONDITIONING: dff(fieldLATCH,CLK)
+ 53  |fieldLATCH = ((H[10..0]==1724) & G )
+ 54  |           # ((H[10..0]==1712) & G')
+ 55  
+ 56  |CONDITIONING: dff(FIELDUD,CLK)
+ 57  |FIELDUD = ( fieldlatch & ( (G & FIELDG ) # (G' & FIELDM ) ) )
+ 58  |        # ( FIELDUD & fieldlatch' )
+ 59  |        # ( flag )
+ 60  
+ 61  |CONDITIONING: tff(HINT,CLK)
+ 62  |HINT = (HINT & (H[10..0]==0)) # ( HINT' & (H[10..0]==38) )
+ 63  |
+ 64  |CONDITIONING: dff(LINELATCH,CLK)
+ 65  |LINELATCH = CA1728
+ 66  
+ 67  
+ 68  
+ 69  TYPE[3..0]	SYNC	BURST		SETUP I NTSC
+ 70  
+ 71  0		VV	NO BURST	00
+ 72  1		VU	NO BURST	00
+ 73  2		UV	NO BURST	00
+ 74  3		UU	NO BURST	00
+ 75  4		V1	NO BURST	00	NOT USED
+ 76  5		V1	NO BURST	00	NOT USED
+ 77  6		U1	NO BURST	00
+ 78  7		U1	NO BURST	00	NOT USED
+ 79  8		S1	NO BURST	00
+ 80  9		SU	NO BURST	P0
+ 81  10		S1	   BURST	00
+ 82  11		SU	   BURST	P0
+ 83  12		S1	NO BURST	0P
+ 84  13		S1	NO BURST	PP
+ 85  14		S1	   BURST	0P
+ 86  15		S1	   BURST	PP
+ 87  
+ 88  
+ 89   |vu = type[3..0]==1
+ 90   |uv = type[3..0]==2
+ 91   |vv = type[3..0]==0
+ 92   |uu = type[3..0]==3
+ 93  |VX = TYPE3' & TYPE1'
+ 94  |UX = TYPE3' & TYPE1
+ 95  |SX = TYPE3
+ 96  |
+ 97  |BURST = TYPE3 & TYPE1
+ 98  |
+ 99  |P1 = TYPE3 & TYPE0		| 9.5 
+100  |P2 = TYPE3 & TYPE2' & TYPE0	|30.0
+101  |P3 = TYPE3 & TYPE2  & TYPE0'	|41.0
+102  |P4 = TYPE3 & TYPE2 		|62.0
+103  |
+104  |XV = TYPE3' & TYPE2' & TYPE0'
+105  |XU = TYPE2' & TYPE0
+106  
+107   |VX =0| TYPE3' & TYPE1'
+108   |UX =0| TYPE3' & TYPE1
+109   |SX =1| TYPE3
+110   |
+111   |BURST = 1|TYPE3 & TYPE1
+112   |
+113   |P1 = 1|TYPE3 & TYPE0		| 9.5 
+114   |P2 = 0|TYPE3 & TYPE2' & TYPE0	|30.0
+115   |P3 = 0|TYPE3 & TYPE2  & TYPE0'	|41.0
+116   |P4 = 1|TYPE3 & TYPE2 		|62.0
+117   |
+118   |XV = 0|TYPE3' & TYPE2' & TYPE1'
+119   |XU = 0|TYPE2' & TYPE0
+120  
+121  
+122  |CONDITIONING: dff(DOWN,CLK)
+123  
+124  |DOWN = (VX & (H[10..0] ==(i+   0))      ) |  0.000 usec
+125  |     # (UX & (H[10..0] ==(i+   0))      ) |  0.000 usec
+126  |     # (SX & (H[10..0] ==(i+   0))      ) |  0.000 usec
+127  |     # (XV & (H[10..0] ==(i+ 864)) & G  ) | 32.000 usec
+128  |     # (XV & (H[10..0] ==(i+ 858)) & G' ) | 31.778 usec
+129  |     # (XU & (H[10..0] ==(i+ 864)) & G  ) | 32.000 usec
+130  |     # (XU & (H[10..0] ==(i+ 858)) & G' ) | 31.778 usec
+131  
+132  
+133  |CONDITIONING: dff(up,CLK)
+134  
+135  |UP   = (VX & (H[10..0] == (i+737 )) & G ) | 27.300 usec
+136  |     # (VX & (H[10..0] == (i+731 )) & G') | 27.078 usec
+137  |     # (UX & (H[10..0] == (i+63  ))     ) | 2.35 usec
+138  |     # (SX & (H[10..0] == (i+127 ))     ) | 4.7
+139  |     # (XV & (H[10..0] == (i+1601)) & G ) | 59.3
+140  |     # (XV & (H[10..0] == (i+1589)) & G') | 58.856
+141  |     # (XU & (H[10..0] == (i+927 )) & G ) | 34.35  usec
+142  |     # (XU & (H[10..0] == (i+921 )) & G') | 34.128 usec
+143  
+144  |CONDITIONING: dff(BB,CLK)
+145  
+146  |BB =  (BURST & (H[10..0] == (i+138+9)) & G    )
+147  |   #  (BURST & (H[10..0] == (i+139)) & G'    )
+148  
+149  
+150  |CONDITIONING: dff(pup,CLK)
+151  |PUP = (P1 & (H[10..0] == (i +  254)) & G' & pedoff')   | 9.400 usec
+152  |    # (P3 & (H[10..0] == (i + 1112)) & G' & pedoff')   |41.178 usec
+153  |
+154  |CONDITIONING: dff(PDOWN,CLK)
+155  |PDOWN = (P2 & (H[10..0] == (i+  818)) & G' & pedoff' )   |30.278 usec 
+156  |      # (P4 & (H[10..0] == (i+ 1676)) & G' & pedoff' ) |62.056 usec
+157  
+158  
+159  |CONDITIONING: ff(STOP,CLK)
+160  |
+161  |STOP= ((RAMADDR[7..0]==126) )
+162  |    # ((RAMADDR[7..0]==146) )
+163  |    # ((RAMADDR[7..0]==178) )
+164  |    # ((RAMADDR[7..0]==210) )
+165  |    # ((RAMADDR[7..0]==242) )
+166  |    # ((STOP & BB'&UP'&DOWN'&PUP'&PDOWN'))
+167  0
+168  
+169  |CONDITIONING: ff(RAMADDR[7..0],CLK)
+170  |MAP: RAMADDR[7..0]->RAMADDR[7..0]
+171  |{
+172  |  n-> 0   , BB 
+173  |  n-> 128 , DOWN 
+174  |  n-> 160 , UP 
+175  |  n-> 192 , PUP 
+176  |  n-> 224 , PDOWN 
+177  |  n-> n+1 , STOP' & BB' & up' & DOWN' & pup' & PDOWN' & ((RAMADDR[1..0])/=2)  
+178  |  n-> n+2 , STOP' & BB' & up' & DOWN' & pup' & PDOWN' & ((RAMADDR[1..0])==2)  
+179  |  n-> n   , STOP & BB'&UP'&DOWN'&PUP'&PDOWN'
+180  |} 
+181  
+182  rem denne linie brugse ikke |stopbb=h[10..0]>511
+183  |stopbb=0
+184  |CONDITIONING: ff(ENBB,CLK)
+185  |ENBB = (BB  )
+186  |     # (ENBB & ( up # DOWN # pup # PDOWN # stopbb) ' )
+187  
+188  
+189  |CONDITIONING: ff(ENsy,CLK)
+190  |ENsy = (( up # DOWN # pup # PDOWN ) )
+191  |      # ( ENsy & BB' )
+192  
+193  
+194  |CONDITIONING: ff(OUTCLK,CLK)
+195  |OUTCLK = (STOP' & (RAMADDR[1..0]==1))'
+196  |CONDITIONING: ff(EN0,CLK)
+197  |EN0 = OUTCLK
+198  |CONDITIONING: ff(EN1,CLK)
+199  |EN1  = EN0
+200  |CONDITIONING: ff(EN2,CLK)
+201  |EN2 = (OUTCLK & EN0 )'
+202  
+203  
+204  |CONDITIONING: tff(line7,CLK)
+205  |line7 =( ( G & ( h[10..0]==335 ) & line7' &  (type[3..0]==15) & pedoff )  # ( ( h[10..0]==800 ) & line7 ) ) 
+
+
+RESOLVED EXPRESSIONS (Reduction 2)
+
+Signal name      Row   Terms
+
+TYPEBUF3           1   DATAIN7  
+
+TYPEBUF2           1   DATAIN6  
+
+TYPEBUF1           1   DATAIN5  
+
+TYPEBUF0           1   DATAIN4  
+
+TYPE3              1   LINELATCH' TYPE3  
+                   2   LINELATCH  TYPEBUF3  
+
+TYPE2              1   LINELATCH' TYPE2  
+                   2   LINELATCH  TYPEBUF2  
+
+TYPE1              1   LINELATCH' TYPE1  
+                   2   LINELATCH  TYPEBUF1  
+
+TYPE0              1   LINELATCH' TYPE0  
+                   2   LINELATCH  TYPEBUF0  
+
+DATAIN10           1   DATAIN2  
+
+DATAIN9            1   DATAIN1  
+
+DATAIN8            1   DATAIN0  
+
+pedoff             1   DATAIN3  
+
+DBUS10             1   DATAIN10  
+
+DBUS9              1   DATAIN9  
+
+DBUS8              1   DATAIN8  
+
+DBUS7              1   DATAIN7  
+
+DBUS6              1   DATAIN6  
+
+DBUS5              1   DATAIN5  
+
+DBUS4              1   DATAIN4  
+
+DBUS3              1   DATAIN3  
+
+DBUS2              1   DATAIN2  
+
+DBUS1              1   DATAIN1  
+
+DBUS0              1   DATAIN0  
+
+LOADC              1   LOADHG  G  
+                   2   LOADHM  G' 
+
+H10                1   H10' H9  H8  H7  H6  H5  H4  H3  H2  H1  H0  CA1728' 
+                       LOADC' 
+                   2   H10  H9' CA1728' LOADC' 
+                   3   H10  H8' CA1728' LOADC' 
+                   4   H10  H7' CA1728' LOADC' 
+                   5   H10  H6' CA1728' LOADC' 
+                   6   H10  H5' CA1728' LOADC' 
+                   7   H10  H4' CA1728' LOADC' 
+                   8   H10  H3' CA1728' LOADC' 
+                   9   H10  H2' CA1728' LOADC' 
+                  10   H10  H1' CA1728' LOADC' 
+                  11   H10  H0' CA1728' LOADC' 
+                  12   LOADC  DBUS10  
+
+H9                 1   H9' H8  H7  H6  H5  H4  H3  H2  H1  H0  CA1728' LOADC' 
+                   2   H9  H8' CA1728' LOADC' 
+                   3   H9  H7' CA1728' LOADC' 
+                   4   H9  H6' CA1728' LOADC' 
+                   5   H9  H5' CA1728' LOADC' 
+                   6   H9  H4' CA1728' LOADC' 
+                   7   H9  H3' CA1728' LOADC' 
+                   8   H9  H2' CA1728' LOADC' 
+                   9   H9  H1' CA1728' LOADC' 
+                  10   H9  H0' CA1728' LOADC' 
+                  11   LOADC  DBUS9  
+
+H8                 1   H8' H7  H6  H5  H4  H3  H2  H1  H0  CA1728' LOADC' 
+                   2   H8  H7' CA1728' LOADC' 
+                   3   H8  H6' CA1728' LOADC' 
+                   4   H8  H5' CA1728' LOADC' 
+                   5   H8  H4' CA1728' LOADC' 
+                   6   H8  H3' CA1728' LOADC' 
+                   7   H8  H2' CA1728' LOADC' 
+                   8   H8  H1' CA1728' LOADC' 
+                   9   H8  H0' CA1728' LOADC' 
+                  10   LOADC  DBUS8  
+
+H7                 1   H7' H6  H5  H4  H3  H2  H1  H0  CA1728' LOADC' 
+                   2   H7  H6' CA1728' LOADC' 
+                   3   H7  H5' CA1728' LOADC' 
+                   4   H7  H4' CA1728' LOADC' 
+                   5   H7  H3' CA1728' LOADC' 
+                   6   H7  H2' CA1728' LOADC' 
+                   7   H7  H1' CA1728' LOADC' 
+                   8   H7  H0' CA1728' LOADC' 
+                   9   LOADC  DBUS7  
+
+H6                 1   H6' H5  H4  H3  H2  H1  H0  CA1728' LOADC' 
+                   2   H6  H5' CA1728' LOADC' 
+                   3   H6  H4' CA1728' LOADC' 
+                   4   H6  H3' CA1728' LOADC' 
+                   5   H6  H2' CA1728' LOADC' 
+                   6   H6  H1' CA1728' LOADC' 
+                   7   H6  H0' CA1728' LOADC' 
+                   8   LOADC  DBUS6  
+
+H5                 1   H5' H4  H3  H2  H1  H0  CA1728' LOADC' 
+                   2   H5  H4' CA1728' LOADC' 
+                   3   H5  H3' CA1728' LOADC' 
+                   4   H5  H2' CA1728' LOADC' 
+                   5   H5  H1' CA1728' LOADC' 
+                   6   H5  H0' CA1728' LOADC' 
+                   7   LOADC  DBUS5  
+
+H4                 1   H4' H3  H2  H1  H0  CA1728' LOADC' 
+                   2   H4  H3' CA1728' LOADC' 
+                   3   H4  H2' CA1728' LOADC' 
+                   4   H4  H1' CA1728' LOADC' 
+                   5   H4  H0' CA1728' LOADC' 
+                   6   LOADC  DBUS4  
+
+H3                 1   H3' H2  H1  H0  CA1728' LOADC' 
+                   2   H3  H2' CA1728' LOADC' 
+                   3   H3  H1' CA1728' LOADC' 
+                   4   H3  H0' CA1728' LOADC' 
+                   5   LOADC  DBUS3  
+
+H2                 1   H2' H1  H0  CA1728' LOADC' 
+                   2   H2  H1' CA1728' LOADC' 
+                   3   H2  H0' CA1728' LOADC' 
+                   4   LOADC  DBUS2  
+
+H1                 1   H1' H0  CA1728' LOADC' 
+                   2   H1  H0' CA1728' LOADC' 
+                   3   LOADC  DBUS1  
+
+H0                 1   H0' CA1728' LOADC' 
+                   2   LOADC  DBUS0  
+
+CA1728             1   G' H10  H9  H8' H7  H6' H5  H4  H3' H2' H1  H0  
+                   2   G  H10  H9  H8' H7  H6' H5  H4  H3  H2  H1  H0  
+
+flag               1   G' DBUS10  DBUS9  DBUS7  DBUS5  DBUS4  DBUS3  
+                   2   G' DBUS10  DBUS9  DBUS7  DBUS5  DBUS4  DBUS2  
+                   3   DBUS10  DBUS9  DBUS7  DBUS6  
+                   4   DBUS10  DBUS9  DBUS8  
+
+fieldlatch         1   G' H10  H9  H8' H7  H6' H5  H4  H3' H2' H1' H0' 
+                   2   G  H10  H9  H8' H7  H6' H5  H4  H3  H2  H1' H0' 
+
+FIELDUD            1   FIELDM  G' fieldlatch  
+                   2   FIELDG  G  fieldlatch  
+                   3   FIELDUD  fieldlatch' 
+                   4   flag  
+
+HINT               1   HINT' H10' H9' H8' H7' H6' H5  H4' H3' H2  H1  H0' 
+                   2   HINT  H10' H9' H8' H7' H6' H5' H4' H3' H2' H1' H0' 
+
+LINELATCH          1   CA1728  
+
+DOWN               1   G' H10' H9  H8  H7' H6  H5' H4  H3  H2' H1  H0' TYPE3' 
+                       TYPE2' 
+                   2   G' H10' H9  H8  H7' H6  H5' H4  H3  H2' H1  H0' TYPE2' 
+                       TYPE0  
+                   3   G  H10' H9  H8  H7' H6  H5  H4' H3' H2' H1' H0' TYPE3' 
+                       TYPE2' 
+                   4   G  H10' H9  H8  H7' H6  H5  H4' H3' H2' H1' H0' TYPE2' 
+                       TYPE0  
+                   5   H10' H9' H8' H7' H6' H5' H4' H3' H2' H1' H0' 
+
+UP                 1   G' H10  H9  H8' H7' H6' H5  H4  H3' H2  H1' H0  TYPE3' 
+                       TYPE2' TYPE0' 
+                   2   G  H10  H9  H8' H7' H6  H5' H4' H3' H2' H1' H0  TYPE3' 
+                       TYPE2' TYPE0' 
+                   3   G' H10' H9  H8' H7  H6  H5' H4  H3  H2' H1  H0  TYPE3' 
+                       TYPE1' 
+                   4   G' H10' H9  H8  H7  H6' H5' H4  H3  H2' H1' H0  TYPE2' 
+                       TYPE0  
+                   5   G  H10' H9  H8' H7  H6  H5  H4' H3' H2' H1' H0  TYPE3' 
+                       TYPE1' 
+                   6   G  H10' H9  H8  H7  H6' H5' H4  H3  H2  H1  H0  TYPE2' 
+                       TYPE0  
+                   7   H10' H9' H8' H7' H6' H5  H4  H3  H2  H1  H0  TYPE3' 
+                       TYPE1  
+                   8   H10' H9' H8' H7' H6  H5  H4  H3  H2  H1  H0  TYPE3  
+
+BB                 1   G' H10' H9' H8' H7  H6' H5' H4' H3  H2' H1  H0  TYPE3  
+                       TYPE1  
+                   2   G  H10' H9' H8' H7  H6' H5' H4  H3' H2' H1  H0  TYPE3  
+                       TYPE1  
+
+PUP                1   G' H10  H9' H8' H7' H6  H5' H4  H3  H2' H1' H0' TYPE3  
+                       TYPE2  TYPE0' pedoff' 
+                   2   G' H10' H9' H8' H7  H6  H5  H4  H3  H2  H1  H0' TYPE3  
+                       TYPE0  pedoff' 
+
+PDOWN              1   G' H10' H9  H8  H7' H6' H5  H4  H3' H2' H1  H0' TYPE3  
+                       TYPE2' TYPE0  pedoff' 
+                   2   G' H10  H9  H8' H7  H6' H5' H4' H3  H2  H1' H0' TYPE3  
+                       TYPE2  pedoff' 
+
+STOP               1   RAMADDR7' RAMADDR6  RAMADDR5  RAMADDR4  RAMADDR3  
+                       RAMADDR2  RAMADDR1  RAMADDR0' 
+                   2   RAMADDR7  RAMADDR4  RAMADDR3' RAMADDR2' RAMADDR1  
+                       RAMADDR0' 
+                   3   BB' UP' DOWN' PUP' PDOWN' STOP  
+
+RAMADDR7           1   RAMADDR7' RAMADDR6  RAMADDR5  RAMADDR4  RAMADDR3  
+                       RAMADDR2  BB' STOP' RAMADDR1  
+                   2   RAMADDR7  RAMADDR6' BB' 
+                   3   RAMADDR7  RAMADDR5' BB' 
+                   4   RAMADDR7  RAMADDR4' BB' 
+                   5   RAMADDR7  RAMADDR3' BB' 
+                   6   RAMADDR7  RAMADDR2' BB' 
+                   7   RAMADDR7  BB' STOP  
+                   8   RAMADDR7  BB' RAMADDR1' 
+                   9   UP  
+                  10   DOWN  
+                  11   PUP  
+                  12   PDOWN  
+
+RAMADDR6           1   RAMADDR6' RAMADDR5  RAMADDR4  RAMADDR3  RAMADDR2  BB' 
+                       UP' DOWN' STOP' RAMADDR1  
+                   2   RAMADDR6  RAMADDR5' BB' UP' DOWN' 
+                   3   RAMADDR6  RAMADDR4' BB' UP' DOWN' 
+                   4   RAMADDR6  RAMADDR3' BB' UP' DOWN' 
+                   5   RAMADDR6  RAMADDR2' BB' UP' DOWN' 
+                   6   RAMADDR6  BB' UP' DOWN' STOP  
+                   7   RAMADDR6  BB' UP' DOWN' RAMADDR1' 
+                   8   PUP  
+                   9   PDOWN  
+
+RAMADDR5           1   RAMADDR5' RAMADDR4  RAMADDR3  RAMADDR2  BB' DOWN' PUP' 
+                       STOP' RAMADDR1  
+                   2   RAMADDR5  RAMADDR4' BB' DOWN' PUP' 
+                   3   RAMADDR5  RAMADDR3' BB' DOWN' PUP' 
+                   4   RAMADDR5  RAMADDR2' BB' DOWN' PUP' 
+                   5   RAMADDR5  BB' DOWN' PUP' STOP  
+                   6   RAMADDR5  BB' DOWN' PUP' RAMADDR1' 
+                   7   UP  
+                   8   PDOWN  
+
+RAMADDR4           1   RAMADDR4' RAMADDR3  RAMADDR2  BB' UP' DOWN' PUP' PDOWN' 
+                       STOP' RAMADDR1  
+                   2   RAMADDR4  RAMADDR3' BB' UP' DOWN' PUP' PDOWN' 
+                   3   RAMADDR4  RAMADDR2' BB' UP' DOWN' PUP' PDOWN' 
+                   4   RAMADDR4  BB' UP' DOWN' PUP' PDOWN' STOP  
+                   5   RAMADDR4  BB' UP' DOWN' PUP' PDOWN' RAMADDR1' 
+
+RAMADDR3           1   RAMADDR3' RAMADDR2  BB' UP' DOWN' PUP' PDOWN' STOP' 
+                       RAMADDR1  
+                   2   RAMADDR3  RAMADDR2' BB' UP' DOWN' PUP' PDOWN' 
+                   3   RAMADDR3  BB' UP' DOWN' PUP' PDOWN' STOP  
+                   4   RAMADDR3  BB' UP' DOWN' PUP' PDOWN' RAMADDR1' 
+
+RAMADDR2           1   RAMADDR2' BB' UP' DOWN' PUP' PDOWN' STOP' RAMADDR1  
+                   2   RAMADDR2  BB' UP' DOWN' PUP' PDOWN' STOP  
+                   3   RAMADDR2  BB' UP' DOWN' PUP' PDOWN' RAMADDR1' 
+
+RAMADDR1           1   BB' UP' DOWN' PUP' PDOWN' STOP' RAMADDR1' RAMADDR0  
+                   2   BB' UP' DOWN' PUP' PDOWN' STOP  RAMADDR1  
+
+RAMADDR0           1   BB' UP' DOWN' PUP' PDOWN' STOP' RAMADDR1' RAMADDR0' 
+                   2   BB' UP' DOWN' PUP' PDOWN' STOP  RAMADDR0  
+
+ENBB               1   ENBB  UP' DOWN' PUP' PDOWN' 
+                   2   BB  
+
+ENSY               1   ENSY  BB' 
+                   2   UP  
+                   3   DOWN  
+                   4   PUP  
+                   5   PDOWN  
+
+OUTCLK             1   STOP  
+                   2   RAMADDR1  
+                   3   RAMADDR0' 
+
+EN0                1   OUTCLK  
+
+EN1                1   EN0  
+
+EN2                1   OUTCLK' 
+                   2   EN0' 
+
+line7              1   G  line7' H10' H9' H8  H7' H6  H5' H4' H3  H2  H1  H0  
+                       TYPE3  TYPE2  TYPE1  TYPE0  pedoff  
+                   2   line7  H10' H9  H8  H7' H6' H5  H4' H3' H2' H1' H0' 
+
+
+
+SIGNAL ASSIGNMENT
+
+Signal  Signal               Product       Signal
+Number   Name                 Terms       Activity
+
+  1.     CLK                     -          High    (Registered)
+  2.     FIELDM                  -          High    (Registered)
+  3.     FIELDG                  -          High    (Registered)
+  4.     LOADHG                  -          High    (Registered)
+  5.     LOADHM                  -          High    (Registered)
+  6.     DATAIN7                 -          High    (Registered)
+  7.     DATAIN6                 -          High    (Registered)
+  8.     DATAIN5                 -          High    (Registered)
+  9.     DATAIN4                 -          High    (Registered)
+ 10.     DATAIN3                 -          High    (Registered)
+ 11.     DATAIN2                 -          High    (Registered)
+ 12.     DATAIN1                 -          High    (Registered)
+ 13.     DATAIN0                 -          High    (Registered)
+ 14.     LOAD1                   -          High    (Registered)
+ 15.     LOAD2                   -          High    (Registered)
+ 16.     RAMADDR7               12          High    (Registered)
+ 17.     RAMADDR6                9          High    (Registered)
+ 18.     RAMADDR5                8          High    (Registered)
+ 19.     RAMADDR4                5          High    (Registered)
+ 20.     RAMADDR3                4          High    (Registered)
+ 21.     RAMADDR2                3          High    (Registered)
+ 22.     ENBB                    2          High    (Registered)
+ 23.     ENSY                    5          High    (Registered)
+ 24.     G                       -          High    (Registered)
+ 25.     LINELATCH               1          High    (Registered)
+ 26.     OUTCLK                  3          High    (Registered)
+ 27.     EN0                     1          High    (Registered)
+ 28.     EN1                     1          High    (Registered)
+ 29.     EN2                     2          High    (Registered)
+ 30.     FIELDUD                 4          High    (Registered)
+ 31.     HINT                    2          High    (Registered)
+ 32.     line7                   2          High    (Registered)
+ 33.     BB                      2          High    (Registered)
+ 34.     UP                      8          High    (Registered)
+ 35.     DOWN                    5          High    (Registered)
+ 36.     PUP                     2          High    (Registered)
+ 37.     PDOWN                   2          High    (Registered)
+ 38.     H10                    12          High    (Registered)
+ 39.     H9                     11          High    (Registered)
+ 40.     H8                     10          High    (Registered)
+ 41.     H7                      9          High    (Registered)
+ 42.     H6                      8          High    (Registered)
+ 43.     H5                      7          High    (Registered)
+ 44.     H4                      6          High    (Registered)
+ 45.     H3                      5          High    (Registered)
+ 46.     H2                      4          High    (Registered)
+ 47.     H1                      3          High    (Registered)
+ 48.     H0                      2          High    (Registered)
+ 49.     CA1728                  2          High     
+ 50.     STOP                    3          High    (Registered)
+ 51.     RAMADDR1                2          High    (Registered)
+ 52.     RAMADDR0                2          High    (Registered)
+ 53.     LOADC                   2          High    (Registered)
+ 54.     TYPE3                   2          High    (Registered)
+ 55.     TYPE2                   2          High    (Registered)
+ 56.     TYPE1                   2          High    (Registered)
+ 57.     TYPE0                   2          High    (Registered)
+ 58.     DATAIN10                1          High    (Registered)
+ 59.     DATAIN9                 1          High    (Registered)
+ 60.     DATAIN8                 1          High    (Registered)
+ 61.     TYPEBUF3                1          High    (Registered)
+ 62.     TYPEBUF2                1          High    (Registered)
+ 63.     TYPEBUF1                1          High    (Registered)
+ 64.     TYPEBUF0                1          High    (Registered)
+ 65.     DBUS10                  1          High    (Registered)
+ 66.     DBUS9                   1          High    (Registered)
+ 67.     DBUS8                   1          High    (Registered)
+ 68.     DBUS7                   1          High    (Registered)
+ 69.     DBUS6                   1          High    (Registered)
+ 70.     DBUS5                   1          High    (Registered)
+ 71.     DBUS4                   1          High    (Registered)
+ 72.     DBUS3                   1          High    (Registered)
+ 73.     DBUS2                   1          High    (Registered)
+ 74.     DBUS1                   1          High    (Registered)
+ 75.     DBUS0                   1          High    (Registered)
+ 76.     pedoff                  1          High    (Registered)
+ 77.     fieldlatch              2          High    (Registered)
+ 78.     flag                    4          High     
+                              ----
+                               204
+
+
+I200  No fatal errors found in source code (logic phase).
+I201  No warnings.
+
+
+I202  2/27/97  12:27 pm  (Thursday)
+I203  Memory usage 231K
+I204  Elapsed time 2 seconds
+

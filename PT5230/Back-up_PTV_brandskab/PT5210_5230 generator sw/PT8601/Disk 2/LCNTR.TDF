@@ -1,0 +1,31 @@
+INCLUDE "lpm_counter.inc";
+SUBDESIGN lcntr
+(
+	clk,preset,clear,d[10..0]		: input;
+	h[10..0],ctest,ctest2	 			: output;
+)
+VARIABLE
+	hcounter: lpm_counter WITH (LPM_WIDTH=11);
+	hclr, hclra,hclrb:		dff;
+
+	BEGIN
+	hclr.clk		= clk;
+	hclr.d			= !preset;
+	hclr.clrn		= hclrb.q;
+
+	hclra.clk		= clk;
+	hclra.d			= preset;
+
+	hclrb.clk		= clk;
+	hclrb.d			= hclra.q;
+	
+	hcounter.clock	= clk;
+	hcounter.sload	= hclr.q;
+	hcounter.sclr	= clear & !hclr.q;% rettet 960730 %
+	hcounter.data[]	= d[];
+	h[]			= hcounter.q[];
+	ctest		= hclr.q;
+	ctest2		= hclra.q;
+END;
+ 
+

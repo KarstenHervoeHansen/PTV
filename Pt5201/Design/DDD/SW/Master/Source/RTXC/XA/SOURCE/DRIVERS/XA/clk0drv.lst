@@ -1,0 +1,108 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\DRIVERS\XA\cc70e5db.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -g -O2 -err -Ic:\cxa\include -I..\..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    CLK0DRV
+                          9 ; clk0drv.c    1        /* clkdrv.c - model CLK driver task for XA using software timer 0 */
+                         10 ; clk0drv.c    2        
+                         11 ; clk0drv.c    3        /*
+                         12 ; clk0drv.c    4         *   RTXCio    
+                         13 ; clk0drv.c    5         *   Copyright (c) 
+                         14 ; clk0drv.c    6         *   Embedded System Products, Inc.
+                         15 ; clk0drv.c    7         *   ALL RIGHTS RESERVED
+                         16 ; clk0drv.c    8        */
+                         17 ; clk0drv.c    9        
+                         18 ; clk0drv.c   10        #include "periphal.h"
+                         21 ; clk0drv.c   11        
+                         22 ; clk0drv.c   12        #ifdef CLK  /* { */
+                         23 ; clk0drv.c   13        #ifdef TIMER_0  /* { */
+                         24 ; clk0drv.c   14        
+                         25 ; clk0drv.c   15        #include "rtxcapi.h"
+                         26 ; clk0drv.c   16        #include "enable.h"
+                         27 ; clk0drv.c   17        
+                         28 ; clk0drv.c   18        #include "cclock.h" /* CLKTICK */
+                         29 ; clk0drv.c   19        
+                         30 ; clk0drv.c   20        // Next line commented out by TK PTV. Instead use crystal.h
+                         31 ; clk0drv.c   21        //#define CRYSTAL 20E6 /* Change to match processor speed as needed */
+                         32 ; clk0drv.c   22        #include "crystal.h"
+                         33 ; clk0drv.c   23        
+                         34 ; clk0drv.c   24        #define PERIOD (CLKTICK / 3 * .001)
+                         35 ; clk0drv.c   25        
+                         36 ; clk0drv.c   26        /* Formula for calculating reload value for Timer 0 */
+                         37 ; clk0drv.c   27        #define RESET_TIME (unsigned short)(PERIOD / (1 / (CRYSTAL / 4)))
+                         38 ; clk0drv.c   28        
+                         39 ; clk0drv.c   29        #define HI_RESET (-RESET_TIME >> 8) & 0xFF
+                         40 ; clk0drv.c   30        #define LO_RESET (-RESET_TIME & 0xFF)
+                         41 ; clk0drv.c   31        
+                         42 ; clk0drv.c   32        long timer0cnt = 0;
+                         43 ; clk0drv.c   33        
+                         44 ; clk0drv.c   34        FRAME ks_stk * timer0c(FRAME ks_stk * frame)
+                         45 ; clk0drv.c   35        {
+                         46 ; clk0drv.c   36           timer0cnt++;
+                         47 ; clk0drv.c   37           return(KS_ISRexit(frame, 0));    /* no sema to post, just return */
+                         48 ; clk0drv.c   38        }
+                         49 ; clk0drv.c   39        
+                         50 ; clk0drv.c   40        
+                         51 ; clk0drv.c   41        /* initialization code for clock */
+                         52 ; clk0drv.c   42        void timer0_start(void)
+                         53 ; clk0drv.c   43        {
+                         54 ; clk0drv.c   44           /* Initialize Timer/Counter 0 */
+                         55 ; clk0drv.c   45           /* Timer/Counter Control Register */
+                         56 ; clk0drv.c   46           TCON |= 0x10;     /* BIT VAL    DESCR */
+                         57 ; clk0drv.c   47                             /* TF1  0   
+                         58 ; clk0drv.c   48                              * TR1  0
+                         59 ; clk0drv.c   49                              * TF0  0
+                         60 ; clk0drv.c   50                              * TR0  1   Timer 0 run control bit
+                         61 ; clk0drv.c   51                              * IE1  0
+                         62 ; clk0drv.c   52                              * IT1  0
+                         63 ; clk0drv.c   53                              * IE0  0
+                         64 ; clk0drv.c   54                              * IT0  0
+                         65 ; clk0drv.c   55                              */
+                         66 ; clk0drv.c   56        
+                         67 ; clk0drv.c   57           TH0 = HI_RESET;
+                         68 ; clk0drv.c   58           TL0 = LO_RESET;
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         69 ; clk0drv.c   59           RTH0 = HI_RESET;
+                         70 ; clk0drv.c   60           RTL0 = LO_RESET;
+                         71 ; clk0drv.c   61        
+                         72 ; clk0drv.c   62           /* Interrupt Enable Register */
+                         73 ; clk0drv.c   63           IEL |= 0x82;       /* BIT VAL    DESCR */
+                         74 ; clk0drv.c   64                             /* EA   1   Enable all interrupts
+                         75 ; clk0drv.c   65                              * --
+                         76 ; clk0drv.c   66                              * ET2  0
+                         77 ; clk0drv.c   67                              * ES   0
+                         78 ; clk0drv.c   68                              * ET1  0
+                         79 ; clk0drv.c   69                              * EX1  0
+                         80 ; clk0drv.c   70                              * ET0  1   Enable Timer/Counter interrupt
+                         81 ; clk0drv.c   71                              * EX0  0
+                         82 ; clk0drv.c   72                              */
+                         83 ; clk0drv.c   73        
+                         84 ; clk0drv.c   74           IPA0 |= TIMER0INTLVL << 4;       /* Set timer 0 priority */
+                         85 ; clk0drv.c   75        }
+                         86 ; clk0drv.c   76        #else
+                         87 ; clk0drv.c   77        void timer0_start(void)
+                         88 ; clk0drv.c   78        {
+                         89 ; clk0drv.c   79        }
+                         90 ; clk0drv.c   80        #endif  /* } TIMER_0 */
+                         91 ; clk0drv.c   81        
+                         92 ; clk0drv.c   82        #else
+                         93 ; clk0drv.c   83        void timer0_start(void)
+                         94 ; clk0drv.c   84        {
+000000                   95 CLK0DRV_PR      SEGMENT HCODE
+000000                   96         RSEG    CLK0DRV_PR
+                         97         ALIGN   1
+                         99         PUBLIC  _timer0_start
+000000                  100 _timer0_start:
+                        104 ; clk0drv.c   85        }
+000000 D680             106         RET
+                        108 ; clk0drv.c   86        #endif  /* } CLK */
+                        109 ; clk0drv.c   87        
+                        110 ; clk0drv.c   88        /* end of clkdrv.c */
+                        113         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        114         EXTRN   DATA(__lc_ue_xvwbuffer)

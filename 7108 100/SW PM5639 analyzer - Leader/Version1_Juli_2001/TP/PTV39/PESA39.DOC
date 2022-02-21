@@ -1,0 +1,114 @@
+
+(*
+
+ Indl‘sning af default data i EEPROM:
+          F›lgende data placeres i den skrivebeskyttede del af EEPROM'en:
+
+           Apparet ID: PHILIPS,944975639001,KUxxxxxx
+                       (addr: 62 - 90)
+                       xxxxxx = KU-nummer
+
+           Intern ID:  2 0 0 0
+                       (addr: 58 - 61)
+                       (data l‘ses kun ved opstart)
+
+           Kalibreringsstatus:   inden kalibrering:    --
+                                 efter kalibrering:    OK
+                                 (addr: 56 - 57)
+
+           Antal sider i EEPROM: 2
+                                 (data l‘ses kun ved opstart)
+                                 (addr: 52)
+
+           EEPROM skrivebeskyttelse: 102
+                                     (data l‘ses kun ved opstart)
+                                     (addr: 54 - 55)
+
+           Gain-konstanter: 255 255  0 64  0 16  0  4  0  1 (SW <=5.7)
+                            255 255 64 64 64 64 64 64 64 64 (SW >=5.8)
+                            de aktuelle beregnes ved kalibrering.
+                            (addr: 2 - 11)
+
+           Pregainkonstanter: 251 255 146
+                              (addr: 97 - 99)
+
+ Fielddetektor.
+            F›lsomhed: bedre end 0.1 cd/mý.
+            Kommando F? udf›res
+            Svar: nn,n     (- foran resultatet indikerer ul†st,
+                           nn,n er m†letiden i ms)
+
+
+
+ Offsetkalibrering
+            Color sensoren anbringes p† et m›rkt underlag.
+            Kommandoen MO udf›res og offsetkonstanter for de
+            5 gainomr†der udregnes og gemmes af color sensoren
+            i EEPROM i adresserne 12 - 51.
+            Default gain-konstanter skal v‘re indl‘st i EEPROM inden
+            offsetkalibrering.
+
+ Gainkalibrering
+             NB!  Offsetkalibrering skal v‘re udf›rt f›rst.
+             Der m†les i MX- og MC-mode.
+             Luminans indstilles s† m†leresultatet er < 10000.
+              Kommando FG0    Svar: "x,Y0,z"
+              Kommando FG1    Svar: "x,Y1,z"
+                Ovenst†ende fixerer gain i hhv. gain 0 og 1.
+                Korrektionsfaktor1 (K1) beregnes til Y0/Y1.
+                Der midles over mindst 10 m†linger
+              Processen gentages for:
+                Y ÷ 2500, FG1/FG2, K2 = Y1/Y2
+                Y ÷ 600 , FG2/FG3, K3 = Y2/Y3
+                Y ÷ 150 , FG3/FG4, K4 = Y3/Y4
+              Herefter kan gainfaktorerne GA1-GA4 beregnes udfra
+                GA1 = K1*16384
+                GA2 = K1*K2*4096
+                GA3 = K1*K2*K3*1024
+                GA4 = K1*K2*K3*K4*256
+                Produkterne K1 .. K1*K2*K3*K4 m† ikke afvige
+                mere end 5% fra 1,00.
+              Gainfaktorerne afrundes, opdeles i byte og skrives
+              i EEprom til adresserne 2 - 11.
+              Bem‘rk: Omgivende lys undg†s.
+
+           Max m†lev‘rdi i de 5 gainomr†der er:
+            gain 0:    65535
+            gain 1:    16384
+            gain 2:     4096
+            gain 3:     1024
+            gain 4:      256
+           Ved overflow vises m†leresultatet med et - foran.
+
+
+
+ Indl‘ring af CRT-matrix og color-ref:
+
+            Med henholdsvis r›d, gr›n og bl† sk‘rm udf›res kommandoerne
+            LR  LG  og  LB
+            Derefter gemmes matricen som nr 1 - 7 med kommandoen:
+            SC1,SC2 .. SC7
+
+            Med hvid sk‘rm udf›res kommandoen CRx,LC (x=1-7) og color-ref
+            gemmes som nr 0 - 3 med kommandoen SR0,SR1 .. SR3.
+            Dette gentages for alle 7 CRT-matricer.
+
+ Indl‘ring af setup:
+
+            Kommandoerne CR1 og RE0 udf›res. Derefter udf›res kommandoen
+            SS1,SS2 .. SS15.
+
+
+
+ Registrering af kalibrering:
+
+            Data fra adresse 2 - 102 l‘ses fra EEPROM, gemmes
+            i en fil og skrives ud p† en printer.
+
+            Papiret underskrives af operat›ren og vedl‘gges
+            color sensoren ved levering.
+
+
+*)
+
+

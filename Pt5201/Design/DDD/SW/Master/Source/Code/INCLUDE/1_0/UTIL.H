@@ -1,0 +1,41 @@
+/****************************************************************************/
+/* MODULE:                                                                  */
+/*   util.h -																															  */
+/****************************************************************************/
+/* FUNCTIONS:                                                               */
+/*  NONE                                                                    */
+/*                                                                          */
+/* TASKS:                                                                   */
+/*  NONE                                                                    */
+/*                                                                          */
+/****************************************************************************/
+/*
+ *   PTV software for PT5201
+ *   Copyright (c)
+ *   ProTeleVision Technologies A/S.
+ *   ALL RIGHTS RESERVED
+*/
+/****************************************************************************/
+
+#ifndef _UTIL_H
+#define _UTIL_H
+
+enum months		{ January = 1, February, March, April, May, June, July,
+								August, September, October, November, December };
+
+extern void None(void);
+extern UC BitPos( UC value);
+extern UC htol( char* s, UL* result);
+extern UC otol( char* s, UL* result);
+extern UC btol( char* s, UL* result);
+extern void _ultoa( UL val, char* result);
+extern size_t Cstrlen( register char code* s);
+extern char* Cstrcat( register char* to, register char code* from);
+extern void* Cmemcpy( void* d1, void code* s1, register size_t n);
+extern char* Cstrcpy( char* to, register char code* from);
+extern int Cstrcmp( register const char * s1, register char code* s2);
+extern int Cstrncmp( register const char * s1, register char code* s2, size_t len);
+extern int ValidateDate( UI year, UI month, UI day);
+extern UI ROMChecksum( UL start_addr, UL end_addr);
+
+#endif

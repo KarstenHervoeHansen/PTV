@@ -1,0 +1,734 @@
+Unit PEPUTIL;
+
+Interface
+{$D-}
+{$F+}
+{$O+}
+{$DEFINE GRAFIK}
+
+const
+ {scan codes}
+ AltI  = $17; AltH  = $23; AltN  = $31; AltO  = $18;
+ AltR  = 19;  AltS  = 31;  AltT  = 20;
+ TastA = $1E; TastB = $30; TastC = $2E; TastD = $20;
+ TastE = $12; TastF = $21; TastG = $22; TastH = $23;
+ TastI = $17; TastJ = $24; TastK = $25; TastL = $26;
+ TastM = $32; TastN = $31; TastO = $18; TastP = $19;
+ TastQ = $10; TastR = $13; TastS = $1F; TastT = $14;
+ TastU = $16; TastV = $2F; TastW = $11; TastX = $2D;
+ TastY = $15; TastZ = $2C;
+ Tast0 = $0B; Tast1 = $02; Tast2 = $03; Tast3 = $04;
+ Tast4 = $05; Tast5 = $06; Tast6 = $07; Tast7 = $08;
+ Tast8 = $09; Tast9 = $0A;
+ Escape = $01; TastSpace = $39; TastBS = $0E;
+ F1     = $3B;  F2     = $3C;  F3     = $3D;
+ F4     = $3E;  F5     = $3F;  F6     = $40;
+ F7     = $41;  F8     = $42;  F9     = $43;
+ F10    = $44;
+ ShiftF1 = $54; ShiftF2 = $55; ShiftF3 = $56;
+ ShiftF4 = $57; ShiftF5 = $58; ShiftF6 = $59;
+ ShiftF7 = $5A; ShiftF8 = $5B; ShiftF9 = $5C;
+ ShiftF10 = $5D;
+ AltF1  = $68;  AltF2  = $69;  AltF3  = $6A;
+ AltF4  = $6B;  AltF5  = $6C;  AltF6  = $6D;
+ AltF7  = $6E;  AltF8  = $6F;  AltF9  = $70;
+ AltF10 = $71;
+ CtrlF1 = $5E;  CtrlF2 = $5F;   CtrlF3 = $60;
+ CtrlF4 = $61;  CtrlF5 = $62;   CtrlF6 = $63;
+ CtrlF7 = $64;  CtrlF8 = $65;   CtrlF9 = $66;
+ CtrlF10 = $67;
+ Home    = $47;
+ CtrlHome = $77;
+ EndKey  = $4F;
+ CtrlEndKey = 117;
+ PgUp    = $49; PgDn   = $51;
+ CtrlPgUp = 132; CtrlPgDn = 118;
+ Up     = $48;
+ Down   = $50;
+ Left   = $4B; Right  = $4D;
+ CtrlUp = $8D; CtrlDown = $91;
+ CtrlLeft = $73; CtrlRight = $74;
+ RETURN = $1C;
+ Enter  = $1C;
+ GreyEnter = 224;
+ BackSp = $0E;
+ NULL   = #00;
+ BELL   = #7;
+ BS     = #8;
+ LF     = #10;
+ FF     = #12;
+ CR     = #13;
+NewLine = #13 + #10;
+ ESC    = #27;
+ SPACE  = #32;
+ Punktum = #46;
+ Ok     = 0;
+ Tal    = ['0'..'9'];
+
+ HexDigit: array[0..15] OF CHAR = '0123456789ABCDEF';
+
+ PM5548G = 118;    {IIC-addr i FMS video testplads}
+ PM5548M = 120;
+
+type        HexString = string[4];            BinString = string[16];
+            Hexbyte   = string[2];            Hexword   = string[4];
+            STR_1     = string[1];
+            STR_2     = string[2];             STR_3     = string[3];
+            STR_4     = string[4];             STR_5     = string[5];
+            STR_6     = string[6];             STR_8     = string[8];
+            STR_10    = string[10];            STR_12    = string[12];
+            STR_14    = string[14];            STR_16    = string[16];
+            STR_18    = string[18];            STR_20    = string[20];
+            STR_25    = string[25];            STR_28    = string[28];
+            STR_29    = string[29];            STR_30    = string[30];
+            STR_35    = string[35];            STR_40    = string[40];
+            STR_45    = string[45];            STR_50    = string[50];
+            STR_60    = string[60];            STR_70    = string[70];
+            STR_80    = string[80];            STR_90    = string[90];
+            STR_100   = string[100];           STR_110   = string[110];
+            STR_120   = string[120];           STR_130   = string[130];
+            STR_140   = string[140];           STR_150   = string[150];
+            STR_160   = string[160];           STR_170   = string[170];
+            STR_180   = string[180];           STR_190   = string[190];
+            STR_200   = string[200];           STR_210   = string[210];
+            STR_220   = string[220];           STR_230   = string[230];
+            STR_240   = string[240];           STR_250   = string[250];
+            STR_255   = string[255];
+
+var    LastAttr         : BYTE;
+       IeOut,
+       IeIn             : TEXT;
+       IeeeFilesOpen,
+       COM1Open,
+       COM2Open         : BOOLEAN;
+
+
+Function ScanCode : BYTE;
+Function UpString(s : string) : string;
+Procedure Beep (Hz,mS : WORD);
+Procedure EmptyKeyboardBuffer;
+Procedure FlushKeybBuf;
+Procedure CursorOff;
+Procedure CursorOn;
+Function PrinterReady(PrinterNumber: BYTE; var PrinterStatus : BYTE):BOOLEAN;
+Procedure Color(Forg,Backg : BYTE);
+Function Date: string;
+Function Dato : string;
+Function Time(format : byte): string;
+Procedure IEEE_ErrorMsg(Msg : STR_40; T:WORD);
+Procedure Write_IIC (Addr, Data : BYTE);
+Procedure Read_IIC (Addr : BYTE; var Data : BYTE);
+{Procedure ReadPM5548(Addr : BYTE; var VLMData : INTEGER);}
+Procedure OpenIeeeFiles;
+Procedure CloseIeeeFiles;
+Procedure DrawBox1(X1,Y1,X2,Y2 : BYTE);  {single lines}
+Procedure DrawBox2(X1,Y1,X2,Y2 : BYTE);  {double lines}
+Procedure WaitForAnyKey;
+Function ByteToHex(Number: BYTE): HEXstring;
+Function WordToHex(Number: WORD): HEXstring;
+Function ByteToBin(Number: BYTE): BinString;
+Function HexToByte(Hex : Hexbyte): byte;
+Function HexToWord(Hex : Hexword): word;
+Function WordToBin(Number: WORD): BinString;
+Function IntToStr(i: LONGINT): string;
+Function RealToStr(i : REAL; w,d: BYTE): string;
+Function X_To_Y(X,Y:REAL) : REAL;
+Function X_Power_Y(X,Y:INTEGER) : LONGINT;
+{$ifdef GRAFIK}
+Procedure Dannebrog(XPos,YPos: WORD);
+Procedure PhilipsLogo(XPos,YPos : WORD);
+{$endif}
+
+
+IMPLEMENTATION
+
+Uses Crt, Dos, Unit_A0, Unit_A1, Win
+  {$ifdef GRAFIK}
+  ,Graph
+  {$endif};
+
+
+
+Function ScanCode : BYTE;
+var Regs : Registers;
+begin
+ Regs.ah := $10;
+ Intr($16,Regs);
+ ScanCode := regs.ah;
+end;
+
+
+Function UpString(s : string) : string;
+const  LowerAlp = ['a'..'z'];
+var      i,l   : INTEGER;
+begin
+ l := LENGTH(s);
+  for i := 1 to l do
+    begin
+     if s[i] IN LowerAlp then s[i] := UpCase(s[i])
+      ELSE
+      CASE s[i] OF
+       'ë' : s[i] := 'í';
+       'õ' : s[i] := 'ù';
+       'Ü' : s[i] := 'è';
+      end; {case}
+    end; {do}
+  Upstring := s;
+end;
+
+Procedure Beep (Hz,mS : WORD);
+begin
+ Sound(Hz); Delay(mS); NoSound;
+end;
+
+Procedure EmptyKeyboardBuffer;
+var TailMem  : WORD ABSOLUTE $0040:$001C;
+    HeadMem  : WORD ABSOLUTE $0040:$001A;
+begin
+ HeadMem := TailMem;
+end;
+
+Procedure FlushKeybBuf;
+var TailMem  : WORD ABSOLUTE $0040:$001C;
+    HeadMem  : WORD ABSOLUTE $0040:$001A;
+begin
+ HeadMem := TailMem;
+end;
+
+Procedure CursorOff;
+var
+  Regs : registers;
+begin
+  Regs.ah := $01;
+  Regs.ch := $20;
+  Regs.cl := $00;
+  Intr($10,regs);
+end;
+
+Procedure CursorOn;
+var
+  Regs : registers;
+begin
+  Regs.ah := $01;
+  Regs.ch := $06;
+  Regs.cl := $07;
+  Intr($10,regs);
+end;
+
+Function PrinterReady(PrinterNumber: BYTE; var PrinterStatus : BYTE):BOOLEAN;
+ var Regs : Registers;
+ begin
+   Regs.ah := 2;                    {BIOS-function #2 = status}
+   Regs.dx := PrinterNumber - 1;    {dx=0: LPT1    Dx=1: LPT2}
+   Intr($17, Regs);
+   PrinterStatus := Regs.Ah;
+   PrinterReady := PrinterStatus = 144;    {bit 7,4 = 1}
+   Delay(1);
+ end;
+
+Procedure Color(Forg,Backg : BYTE);
+begin
+ TextColor(Forg); TextBackground(Backg);
+end;
+
+Function Date: string;
+var   Y, M, D, doW      : WORD;
+      Year              : string[4];
+      Month             : string[9];
+      Day               : string[2];
+  begin
+   GetDate(Y, M, D, doW);
+   Str(Y, Year);
+   Str(D, Day);
+    CASE M OF
+      1: Month := 'Januar';
+      2: Month := 'Februar';
+      3: Month := 'Marts';
+      4: Month := 'April';
+      5: Month := 'Maj';
+      6: Month := 'Juni';
+      7: Month := 'Juli';
+      8: Month := 'August';
+      9: Month := 'September';
+     10: Month := 'Oktober';
+     11: Month := 'November';
+     12: Month := 'December';
+    end;
+   Date := Day + '. ' + Month + ' ' + Year;
+end;   {Date}
+
+Function Dato : string;
+var Y,M,D,DW : word;
+    s        : string[6];
+begin
+ Getdate(Y,M,D,DW);
+ s := IntToStr(Y - 2000);
+  if (Y-2000) < 10 then
+   s := s + '0';
+  if M < 10 then
+   s := s + '0' + IntToStr(M)
+  else
+   s := s + IntToStr(M);
+  if D < 10 then
+   s := s + '0' + IntToStr(D)
+  else
+   s := s + IntToStr(D);
+   Dato := s;
+end;
+
+
+
+
+Function Time(format : byte): string;
+var   H, M, Sec, Sec100   : WORD;
+      Hour,Minute,Seconds : string[2];
+      T                   : string[10];
+   begin
+     GetTime(H, M, Sec, Sec100);
+       Str(H, Hour);
+       Str(M, Minute);
+       Str(Sec, Seconds);
+
+       if M > 9 then
+         T := Hour + ':' + Minute
+        else
+         T := Hour + ':0' + Minute;
+
+       if format > 0 then
+        begin
+         if Sec > 9 then
+           T := T + ':' + Seconds
+          else
+           T := T + ':0' + Seconds;
+        end;
+
+       Time := T;
+end;  {Time}
+
+Procedure IEEE_ErrorMsg(Msg : STR_40; T:WORD);
+begin
+ CreateWindow(35,17,3,Length(Msg) + 4,' IEEE-Interface-Error ',Red, Red,1);
+ TextColor(White);
+ Write(' ',Msg);
+ Delay(T);
+ CloseWindow;
+end;
+
+Procedure Write_IIC (Addr, Data : BYTE);
+const  Addr8591 = [144,146,148,150,152,154,156,158];
+var    Out      : STR_20;
+       a,d      : STR_3;
+       IO       : WORD;
+begin
+ Str(Data,d);
+ if Addr IN Addr8591 then
+   begin
+    Str(Addr,a);
+    Out := 'Send EOI ' + a + ',64,' + d;   {enable D/A-output: bit 6 = 1}
+   end
+  ELSE
+   begin
+    Str(Addr,a);
+    Out := 'Send EOI ' + a + ',' + d;
+   end;
+{$I-}
+ Writeln(IeOut,'CLEAR IICWR');
+ IO := IOResult;
+ Writeln(IeOut,'OUTPUT IICWR');
+ IO := IOResult;
+ Writeln(IeOut,'CLEAR IICWR');
+ if IOResult <> 0 then
+  IEEE_ErrorMsg('Ingen kontakt med I˝C-Bus (addr=12)',500);
+ Writeln(IeOut,'CLEAR IICRD');
+ IO := IOResult;
+ Writeln(IeOut,'Send LISTEN IICRD');
+ IO := IOResult;
+ Writeln(IeOut,Out);
+ IO := IOResult;
+ Writeln(IeOut,'Send UNL UNT TALK IICWR');
+ IO := IOResult;
+{$I+}
+end;
+
+
+
+Procedure Read_IIC (Addr : BYTE; var Data : BYTE);
+
+var Out   : string;
+     a    : string[3];
+     s    : string[1];
+
+begin
+ Str(Addr + 1,a);
+ Out := 'Send EOI ' + a;
+ Writeln(IeOut,'Send UNL CMD 94 LISTEN IICWR');
+ Writeln(IeOut,Out);
+ Writeln(IeOut,'Send TALK IICRD UNL CMD 62');
+ Writeln(IeOut,'ENTER IICRD#2');
+ Reset(IeIn);
+ Readln(IeIn,s);
+ Data := ORD(s[1]);
+end;
+(*
+Procedure ReadPM5548(Addr : BYTE; var VLMData : INTEGER);
+{5548G=addr 118        5548M=addr 120}
+var InIC5  : BYTE;
+begin
+ Write_IIC(Addr,$0F);    {enable sample i PM5548}
+ Delay(250);
+ Write_IIC(Addr,$8F);    {disable sample i PM5548}
+ Delay(80);
+
+ Write_IIC(116,$10);     {select decade 1}
+ Read_IIC(Addr,InIC5);
+ InIC5 := (InIC5 XOR $FF);
+ InIC5 := InIC5 and $0F;
+ VLMData := InIC5;
+
+ Write_IIC(116,$20);    {select decade 2}
+ Read_IIC(Addr,InIC5);
+ InIC5 := (InIC5 XOR $FF) and $0F;
+ VLMData := VLMData + (InIC5 * 10);
+
+ Write_IIC(116,$08);    {select decade 3}
+ Read_IIC(Addr,InIC5);
+ InIC5 := (InIC5 XOR $FF) and $0F;
+ VLMData := VLMData + (InIC5 * 100);
+
+ Write_IIC(116,$04);    {select decade 4}
+ Read_IIC(Addr,InIC5);
+ InIC5 := (InIC5 XOR $FF) and $01;
+ VLMData := VLMData + (InIC5 * 1000);
+
+ Write_IIC(116,$02);    {select polarity}
+ Read_IIC(Addr,InIC5);
+  if ((InIC5 XOR $FF) and $01) = 1 then
+    VLMData := VLMData * -1;
+ Write_IIC(Addr,$0F);    {enable sample i PM5548}
+end;
+
+  *)
+
+
+Procedure OpenIeeeFiles;
+begin
+{$I-}
+  Assign(IeOut,'IeeeOut'); Rewrite(IeOut);
+  Assign(IeIn,'IeeeIn');   Reset(IeIn);
+{$I+}
+  IeeeFilesOpen := IOResult = 0;
+end;
+
+Procedure CloseIeeeFiles;
+ begin
+  Close(IeOut); Close(IeIn);
+  IeeeFilesOpen := FALSE;
+ end;
+
+Procedure DrawBox1(X1,Y1,X2,Y2 : BYTE);
+Var n : BYTE;
+begin
+  GotoXY(X1,Y1); Write(#218);
+  for n := (X1+1) to (X2-1) do Write(#196);
+  Write(#191);
+  for n := 1 to (Y2-Y1-1) do
+   begin
+    GotoXY(X2,Y1+n);Write(#179);
+   end;
+  GotoXY(X2,Y2); Write(#217);
+  GotoXY(X1,Y1+1);
+  for n := 1 to (Y2-Y1-1) do
+   begin
+    GotoXY(X1,Y1+n);Write(#179);
+   end;
+  GotoXY(X1,Y2); Write(#192);
+  for n := (X1+1) to (X2-1) do Write(#196);
+end;
+
+Procedure DrawBox2(X1,Y1,X2,Y2 : BYTE);
+Var n : BYTE;
+begin
+  GotoXY(X1,Y1); Write(#201);
+  for n := (X1+1) to (X2-1) do Write(#205);
+  Write(#187);
+  for n := 1 to (Y2-Y1-1) do
+   begin
+    GotoXY(X2,Y1+n);Write(#186);
+   end;
+  GotoXY(X2,Y2); Write(#188);
+  GotoXY(X1,Y1+1);
+  for n := 1 to (Y2-Y1-1) do
+   begin
+    GotoXY(X1,Y1+n);Write(#186);
+   end;
+  GotoXY(X1,Y2); Write(#200);
+  for n := (X1+1) to (X2-1) do Write(#205);
+end;
+
+Procedure WaitForAnyKey;
+begin
+ EmptyKeyboardBuffer;
+ repeat until KeyPressed;
+ EmptyKeyboardBuffer;
+end;
+
+
+Function ByteToHex(Number: BYTE): HEXstring;
+var
+  d: BYTE;
+  H: HEXstring;
+begin
+  H[0]:=#2;
+  for d:=2 downto 1 do
+  begin
+    H[d]:=HexDigit[Number and 15];
+    Number:=Number shr 4;
+  end;
+  ByteToHex:=H;
+end;
+
+
+Function WordToHex(Number: WORD): HEXstring;
+var
+  d: BYTE;
+  H: HEXstring;
+begin
+  H[0]:=#4;
+  for d:=4 downto 1 do
+  begin
+    H[d]:=HexDigit[Number and 15];
+    Number:=Number shr 4;
+  end;
+  WordToHex:=H;
+end;
+
+Function HexToByte(Hex : Hexbyte): byte;
+var n,
+    H : byte;
+begin
+ Hex := Upstring(Hex);
+ H := 0;
+ for n := 1 to 2 do
+  H := H * 16 + pos(Hex[n],HexDigit) - 1;
+ HexToByte := H;
+end;
+
+Function HexToWord(Hex : Hexword): word;
+{ 4 char hex converted to a word}
+var n,
+    H : word;
+begin
+ Hex := Upstring(Hex);
+ H := 0;
+ for n := 1 to 4 do
+  H := H * 16 + pos(Hex[n],HexDigit) - 1;
+ HexToWord := H;
+end;
+
+
+
+Function ByteToBin(Number: BYTE): BinString;
+const
+  BinDigit: array[0..1] OF CHAR = '01';
+var
+  d: BYTE;
+  B: BinString;
+begin
+  B[0]:=#8;
+  for d:=8 downto 1 do
+  begin
+    B[d]:=BinDigit[Number and 1];
+    Number:=Number shr 1;
+  end;
+  ByteToBin:=B;
+end;
+
+Function WordToBin(Number: WORD): BinString;
+const
+  BinDigit: array[0..1] OF CHAR = '01';
+var
+  d: BYTE;
+  B: BinString;
+begin
+  B[0]:=#16;
+  for d:=16 downto 1 do
+  begin
+    B[d]:=BinDigit[Number and 1];
+    Number:=Number shr 1;
+  end;
+  WordToBin:=B;
+end;
+
+
+Function IntToStr(i: LONGINT): string;
+var
+  s: string[11];
+ begin
+   Str(i, s);
+   IntToStr := s;
+ end;
+
+Function RealToStr(i : REAL; w,d: BYTE): string;
+var
+  s: string[15];
+ begin
+   Str(i:w:d, s);
+   RealToStr := s;
+ end;
+
+
+
+Function X_To_Y(X,Y:REAL) : REAL;
+begin
+ X_To_Y := Exp(Y * (Ln(X)));
+end;
+
+Function X_Power_Y(X,Y:INTEGER) : LONGINT;
+var  r : LONGINT;
+     n : BYTE;
+begin
+ r := 1;
+ for n := 1 to Y do
+  r := x * r;
+ X_Power_Y := r;
+end;
+
+
+
+
+{$ifDEF GRAFIK}
+
+Procedure Dannebrog(XPos,YPos: WORD);
+var   Firkant : array [1..4] OF Pointtype;
+
+var  OldColor,
+     OldBkColor  : WORD;
+begin
+ OldColor := GetColor;
+ OldBkColor := GetBkColor;
+ SetColor(White);
+ SetLineStyle(SolidLn,0,ThickWidth);
+ MoveTo(XPos - 3,YPos);
+ LineRel(6,0);
+ MoveTo(XPos,YPos);
+ LineRel(0,80);
+ Firkant[1].X := XPos;      Firkant[1].Y := YPos + 3;
+ Firkant[2].X := XPos + 60; Firkant[2].Y := YPos + 3;
+ Firkant[3].X := XPos + 60; Firkant[3].Y := YPos + 28 + 3;
+ Firkant[4].X := XPos;      Firkant[4].Y := YPos + 28 + 3;
+ SetFillStyle(1,White);                                     {hvid dug}
+ FillPoly(SizeOf(Firkant) DIV SizeOf(Pointtype),Firkant);
+
+ Firkant[1].X := XPos + 3;   Firkant[1].Y := YPos + 3;
+ Firkant[2].X := XPos + 24;  Firkant[2].Y := YPos + 3 ;
+ Firkant[3].X := XPos + 24;  Firkant[3].Y := YPos + 11 + 3;
+ Firkant[4].X := XPos + 3;   Firkant[4].Y := YPos + 11 + 3;
+ SetColor(Red); SetFillStyle(1,Red);                        {upper-left}
+ FillPoly(SizeOf(Firkant) DIV SizeOf(Pointtype),Firkant);
+
+ Firkant[1].X := XPos + 3;   Firkant[1].Y := YPos + 17 + 3;
+ Firkant[2].X := XPos + 24;  Firkant[2].Y := YPos + 17 + 3;
+ Firkant[3].X := XPos + 24;  Firkant[3].Y := YPos + 28 + 3;
+ Firkant[4].X := XPos + 3;   Firkant[4].Y := YPos + 28 + 3;
+ SetColor(Red); SetFillStyle(1,Red);                        {lower-left}
+ FillPoly(SizeOf(Firkant) DIV SizeOf(Pointtype),Firkant);
+
+ Firkant[1].X := XPos + 32;  Firkant[1].Y := YPos + 3;
+ Firkant[2].X := XPos + 60;  Firkant[2].Y := YPos + 3 ;
+ Firkant[3].X := XPos + 60;  Firkant[3].Y := YPos + 11 + 3;
+ Firkant[4].X := XPos + 32;  Firkant[4].Y := YPos + 11 + 3;
+ SetColor(Red); SetFillStyle(1,Red);                      {upper-right}
+ FillPoly(SizeOf(Firkant) DIV SizeOf(Pointtype),Firkant);
+
+ Firkant[1].X := XPos + 32;  Firkant[1].Y := YPos + 17 + 3;
+ Firkant[2].X := XPos + 60;  Firkant[2].Y := YPos + 17 + 3;
+ Firkant[3].X := XPos + 60;  Firkant[3].Y := YPos + 28 + 3;
+ Firkant[4].X := XPos + 32;  Firkant[4].Y := YPos + 28 + 3;
+ SetColor(Red); SetFillStyle(1,Red);                      {lower-right}
+ FillPoly(SizeOf(Firkant) DIV SizeOf(Pointtype),Firkant);
+
+ SetColor(OldColor);
+ SetBkColor(OldBkColor);
+end;
+
+
+Procedure PhilipsLogo(XPos,YPos : WORD);
+begin
+SetLineStyle(SolidLn,0,NormWidth);
+MoveTo(XPos,YPos);
+MoveRel(0,90);
+LineRel(0,-90);
+LineRel(150,0);
+LineRel(0,90);
+MoveRel(-75,0);                                 {til centrum}
+Arc(GetX,GetY,180,360,75);
+Circle(GetX,GetY,70);
+MoveRel(-70,-95);
+SetTextStyle(3,HorizDir,3);
+SetUserCharSize(10,7,10,10);
+OutText('PHILIPS');
+MoveRel(-128,131); Arc(GetX,GetY,70,110,50);    {3 buer til venstre}
+MoveRel(0,-5); Arc(GetX,GetY,70,110,50);
+MoveRel(0,10); Arc(GetX,GetY,70,110,50);
+
+MoveRel(34,-71); Arc(GetX,GetY,250,290,50);
+MoveRel(0,-5); Arc(GetX,GetY,250,290,50);
+MoveRel(0,-5); Arc(GetX,GetY,250,290,50);
+
+MoveRel(34,71); Arc(GetX,GetY,70,110,50);
+MoveRel(0,5); Arc(GetX,GetY,70,110,50);
+MoveRel(0,5); Arc(GetX,GetY,70,110,50);
+
+MoveRel(34,-71); Arc(GetX,GetY,250,293,50);     {3 buer til hõjre}
+MoveRel(0,-5); Arc(GetX,GetY,250,293,50);
+MoveRel(0,-5); Arc(GetX,GetY,250,293,50);
+
+MoveRel(-90,0);   {stor stjerne õverst}
+LineRel(3,12);
+LineRel(12,3);
+LineRel(-12,3);
+LineRel(-3,12);
+LineRel(-3,-12);
+LineRel(-12,-3);
+LineRel(12,-3);
+LineRel(3,-12);
+
+MoveRel(80,50);   {stor stjerne nederst}
+LineRel(3,12);
+LineRel(12,3);
+LineRel(-12,3);
+LineRel(-3,12);
+LineRel(-3,-12);
+LineRel(-12,-3);
+LineRel(12,-3);
+LineRel(3,-12);
+
+MoveRel(-63,-60);   {lille stjerne õverst}
+LineRel(2,10);
+LineRel(10,2);
+LineRel(-10,2);
+LineRel(-2,10);
+LineRel(-2,-10);
+LineRel(-10,-2);
+LineRel(10,-2);
+LineRel(2,-10);
+
+MoveRel(46,77);   {lille stjerne nederst}
+LineRel(2,10);
+LineRel(10,2);
+LineRel(-10,2);
+LineRel(-2,10);
+LineRel(-2,-10);
+LineRel(-10,-2);
+LineRel(10,-2);
+LineRel(2,-10);
+end;
+{$endif}
+
+begin                      {initialiseringsdel af unit}
+ IeeeFilesOpen := FALSE;
+ COM1Open := FALSE;
+ COM2Open := FALSE;
+end.
+
+{$D-}

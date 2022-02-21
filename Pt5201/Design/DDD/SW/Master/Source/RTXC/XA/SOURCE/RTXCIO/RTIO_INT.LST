@@ -1,0 +1,325 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTXCIO\cc717b0b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    RTIO_INT
+                          6 ; rtio_int.c    1       /************************************************************************
+                            ****/
+                          7 ; rtio_int.c    2       /* MODULE:                                                               
+                               */
+                          8 ; rtio_int.c    3       /*   rtio_int.c - RTXCio initialization.                                 
+                               */
+                          9 ; rtio_int.c    4       /************************************************************************
+                            ****/
+                         10 ; rtio_int.c    5       /* FUNCTIONS:                                                            
+                               */
+                         11 ; rtio_int.c    6       /*   void rtxcio_init( void )                                            
+                               */
+                         12 ; rtio_int.c    7       /*   void dev_init( void )                                               
+                               */
+                         13 ; rtio_int.c    8       /************************************************************************
+                            ****/
+                         14 ; rtio_int.c    9       /*
+                         15 ; rtio_int.c   10        *   RTXCio    
+                         16 ; rtio_int.c   11        *   Copyright (c) 
+                         17 ; rtio_int.c   12        *   Embedded System Products, Inc.
+                         18 ; rtio_int.c   13        *   ALL RIGHTS RESERVED
+                         19 ; rtio_int.c   14       */
+                         20 ; rtio_int.c   15       /************************************************************************
+                            ****/
+                         21 ; rtio_int.c   16       #include "typedef.h"                            /* RTXC - type declaratio
+                            ns */
+                         22 ; rtio_int.c   17       
+                         23 ; rtio_int.c   18       #include "rtio_inc.h"                  /* RTXCio - Header file include fi
+                            le */
+                         24 ; rtio_int.c   19       
+                         25 ; rtio_int.c   20       extern const DEV_INIT_PACK  dev_init_tbl[];
+                         26 ; rtio_int.c   21       
+                         27 ; rtio_int.c   22       extern CCB_ENTRY * chnls_free;                    /* List of free channel
+                               */
+                         28 ; rtio_int.c   23                                                         /* control blocks.     
+                               */
+                         29 ; rtio_int.c   24       extern CCB_ENTRY * chnls_active;                  /* List of active chann
+                            el */
+                         30 ; rtio_int.c   25                                                         /* control blocks.     
+                               */
+                         31 ; rtio_int.c   26       extern CCB_ENTRY   channel_table[];
+                         32 ; rtio_int.c   27       
+                         33 ; rtio_int.c   28       extern PDU_HEADER * logical_dev_tbl[];               /* logical to physic
+                            al */
+                         34 ; rtio_int.c   29                                                                  /* device tabl
+                            ee */
+                         35 ; rtio_int.c   30       
+                         36 ; rtio_int.c   31       extern CNTLR_UNIT * cntlr_loc_table[];          /* Controller locator tab
+                            le */
+                         37 ; rtio_int.c   32       
+                         38 ; rtio_int.c   33       extern const DEVID  nldevs;      /* number of devices defined in applicat
+                            ion */
+                         39 ; rtio_int.c   34       extern const CHNLID  nchnls;    /* number of channels defined in applicat
+                            ion */
+                         40 ; rtio_int.c   35       extern const CNTLRID  ncntlrs; /* number of controllers defined in applic
+                            ation */
+                         41 ; rtio_int.c   36       
+                         42 ; rtio_int.c   37       void dev_init( void );
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         43 ; rtio_int.c   38       
+                         44 ; rtio_int.c   39       /*=======================================================================
+                            ===*/
+                         45 ; rtio_int.c   40       void rtxcio_init( void )
+                         46 ; rtio_int.c   41       {
+                         47         PUBLIC  _rtxcio_init
+000000                   48 RTIO_INT_PR     SEGMENT HCODE
+000000                   49         RSEG    RTIO_INT_PR
+000000                   49         RSEG    RTIO_INT_PR
+000000                   50 _rtxcio_init:
+000000 0F10              51         PUSH.W  R4
+                         52 ; rtio_int.c   42               CHNLID chnlnum;
+                         53 ; rtio_int.c   43               CCB_ENTRY *link;
+                         54 ; rtio_int.c   44       
+                         55 ; rtio_int.c   45               /*---------------------------------------------------------------
+                            ---*/
+                         56 ; rtio_int.c   46               /* Initialize the Channel control block array.                   
+                               */
+                         57 ; rtio_int.c   47               /*---------------------------------------------------------------
+                            ---*/
+                         58 ; rtio_int.c   48               chnls_active = NULLCCBE;
+000002 964842rr          59         MOV.B   ES,#SEG( _chnls_active )
+000006 9908rrrr          60         MOV.W   R0,#SOF( _chnls_active )
+00000A BB00              61         MOV.W   [R0+],#00H
+00000C BA00              62         MOV.W   [R0],#00H
+                         63 ; rtio_int.c   49               link = chnls_free = &channel_table[1];
+00000E 964842rr          64         MOV.B   ES,#SEG( _chnls_free )
+000012 9908rrrr          65         MOV.W   R0,#SOF( _chnls_free )
+000016 9B08rrrr          66         MOV.W   [R0+],#SOF( _channel_table+22 )
+00001A 9A08rrrr          67         MOV.W   [R0],#SEG( _channel_table+22 )
+00001E 9938rrrr          68         MOV.W   R3,#SEG( _channel_table+22 )
+000022 9928rrrr          69         MOV.W   R2,#SOF( _channel_table+22 )
+                         70 ; rtio_int.c   50       
+                         71 ; rtio_int.c   51               /*---------------------------------------------------------------
+                            ---*/
+                         72 ; rtio_int.c   52               /* Initialize the zero CCB_ENTRY fields of the channel table to s
+                            ome*/
+                         73 ; rtio_int.c   53               /* arbitrary number. This entry is not allocated to any applicati
+                            on */
+                         74 ; rtio_int.c   54               /* tasks! This initialization distinquishes the zeroeth entry.   
+                               */
+                         75 ; rtio_int.c   55               /*---------------------------------------------------------------
+                            ---*/
+                         76 ; rtio_int.c   56                 channel_table[0].chnl_number = 0;
+000026 964842rr          77         MOV.B   ES,#SEG( _channel_table+8 )
+00002A 9908rrrr          78         MOV.W   R0,#SOF( _channel_table+8 )
+00002E BA00              79         MOV.W   [R0],#00H
+                         80 ; rtio_int.c   57                 channel_table[0].io_deviceno = 0;
+000030 964842rr          81         MOV.B   ES,#SEG( _channel_table+10 )
+000034 9908rrrr          82         MOV.W   R0,#SOF( _channel_table+10 )
+000038 BA00              83         MOV.W   [R0],#00H
+                         84 ; rtio_int.c   58                 channel_table[0].io_command = (IOCOMMAND) 0;
+00003A 964842rr          85         MOV.B   ES,#SEG( _channel_table+12 )
+00003E 9908rrrr          86         MOV.W   R0,#SOF( _channel_table+12 )
+000042 BA00              87         MOV.W   [R0],#00H
+                         88 ; rtio_int.c   59                 channel_table[0].io_method = (IOTYPE) 0;
+000044 964842rr          89         MOV.B   ES,#SEG( _channel_table+14 )
+000048 9908rrrr          90         MOV.W   R0,#SOF( _channel_table+14 )
+00004C BA00              91         MOV.W   [R0],#00H
+                         92 ; rtio_int.c   60                 channel_table[0].io_bytespblk = 0;
+00004E 964842rr          93         MOV.B   ES,#SEG( _channel_table+16 )
+000052 9908rrrr          94         MOV.W   R0,#SOF( _channel_table+16 )
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+000056 BA00              95         MOV.W   [R0],#00H
+                         96 ; rtio_int.c   61                 channel_table[0].io_blks2transfer = 0;
+000058 964842rr          97         MOV.B   ES,#SEG( _channel_table+18 )
+00005C 9908rrrr          98         MOV.W   R0,#SOF( _channel_table+18 )
+000060 BB00              99         MOV.W   [R0+],#00H
+000062 BA00             100         MOV.W   [R0],#00H
+                        101 ; rtio_int.c   62       
+                        102 ; rtio_int.c   63               for(chnlnum=1;chnlnum<nchnls;chnlnum++, link++)
+000064 B941             103         MOV.W   R4,#01H
+000066 964842rr         104         MOV.B   ES,#SEG( _nchnls )
+00006A 9908rrrr         105         MOV.W   R0,#SOF( _nchnls )
+00006E 8A00             106         MOV.W   R0,[R0]
+000070 99040001         107         CMP.W   R0,#01H
+000074 F91A             108         BL      _4
+000074 F91A             108         BL      _4
+000076                  109 _3:
+                        110 ; rtio_int.c   64               {
+                        111 ; rtio_int.c   65                       link->chnl_number = chnlnum;
+000076 866C42           112         MOV.B   ES,R3L
+000079 8C4A08           113         MOV.W   [R2+8],R4
+                        114 ; rtio_int.c   66                       link->flink = link + 1;
+00007C 8913             115         MOV.W   R1,R3
+00007E 8902             116         MOV.W   R0,R2
+000080 99000016         117         ADD.W   R0,#016H
+000084 866C42           118         MOV.B   ES,R3L
+000087 8A0A             119         MOV.W   [R2],R0
+000089 8C1A02           120         MOV.W   [R2+2],R1
+                        121 ; rtio_int.c   67                       link->blink = NULLCCBE;
+00008C 866C42           122         MOV.B   ES,R3L
+00008F BC2004           123         MOV.W   [R2+4],#00H
+000092 BC2006           124         MOV.W   [R2+6],#00H
+000095 A941             125         ADDS.W  R4,#01H
+000097 8931             126         MOV.W   R3,R1
+000099 8920             127         MOV.W   R2,R0
+00009B 964842rr         128         MOV.B   ES,#SEG( _nchnls )
+00009F 9908rrrr         129         MOV.W   R0,#SOF( _nchnls )
+0000A3 8A00             130         MOV.W   R0,[R0]
+0000A5 4940             131         CMP.W   R4,R0
+0000A7 F1E7             132         BCS     _3
+0000A7 F1E700           132         BCS     _3
+                        133 ; rtio_int.c   68               }
+0000AA                  134 _4:
+                        135 ; rtio_int.c   69               link->chnl_number = chnlnum;
+0000AA 866C42           136         MOV.B   ES,R3L
+0000AD 8C4A08           137         MOV.W   [R2+8],R4
+                        138 ; rtio_int.c   70               link->flink = NULLCCBE;
+0000B0 866C42           139         MOV.B   ES,R3L
+0000B3 BA20             140         MOV.W   [R2],#00H
+0000B5 BC2002           141         MOV.W   [R2+2],#00H
+                        142 ; rtio_int.c   71               link->blink = NULLCCBE;
+0000B8 866C42           143         MOV.B   ES,R3L
+0000BB BC2004           144         MOV.W   [R2+4],#00H
+0000BE BC2006           145         MOV.W   [R2+6],#00H
+                        146 ; rtio_int.c   72       
+                        147 ; rtio_int.c   73               dev_init( );
+                        148 ; rtio_int.c   74       }
+0000C1 2F10             149         POP.W   R4
+                        150         JMP     _dev_init
+0000C3 FE01            +150         BR      _dev_init
+0000C3 FE0100          +150         BR      _dev_init
+                        151 ; rtio_int.c   75       
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        152 ; rtio_int.c   76       /*=======================================================================
+                            ===*/
+                        153 ; rtio_int.c   77       void dev_init( void )
+                        154 ; rtio_int.c   78       {
+                        155         PUBLIC  _dev_init
+0000C6                  156 _dev_init:
+0000C6 0F70             157         PUSH.W  R4, R5, R6
+                        158 ; rtio_int.c   79               INT i;
+                        159 ; rtio_int.c   80       
+                        160 ; rtio_int.c   81               /*---------------------------------------------------------------
+                            ---*/
+                        161 ; rtio_int.c   82               /* Initialize the Controller Locator Table                       
+                               */
+                        162 ; rtio_int.c   83               /*---------------------------------------------------------------
+                            ---*/
+                        163 ; rtio_int.c   84               for(i=0;i<ncntlrs+1;i++)
+0000C8 B900             164         MOV.W   R0,#00H
+0000CA 964842rr         165         MOV.B   ES,#SEG( _ncntlrs )
+0000CE 9918rrrr         166         MOV.W   R1,#SOF( _ncntlrs )
+0000D2 8A11             167         MOV.W   R1,[R1]
+0000D4 A911             168         ADDS.W  R1,#01H
+0000D6 99140000         169         CMP.W   R1,#00H
+0000DA FD0C             170         BLE     _8
+0000DA FD0C             170         BLE     _8
+0000DC                  171 _7:
+                        172 ; rtio_int.c   85                       cntlr_loc_table[i] = NULLCNTLR;
+0000DC 8920             173         MOV.W   R2,R0
+0000DE D922             174         ASL.W   R2,#02H
+0000E0 B930             175         MOVS.W  R3,#00H
+0000E2 964842rr         176         MOV.B   ES,#SEG( _cntlr_loc_table )
+0000E6 BD20rrrr         177         MOV.W   [R2+SOF( _cntlr_loc_table )],#00H
+0000EA BD20rrrr         178         MOV.W   [R2+SOF( _cntlr_loc_table+2 )],#00H
+0000EE A901             179         ADDS.W  R0,#01H
+0000F0 4901             180         CMP.W   R0,R1
+0000F2 FBF4             181         BLT     _7
+0000F2 FBF4             181         BLT     _7
+0000F4                  182 _8:
+                        183 ; rtio_int.c   86       
+                        184 ; rtio_int.c   87               /*---------------------------------------------------------------
+                            ---*/
+                        185 ; rtio_int.c   88               /* Initialize the logical to physical device table               
+                               */
+                        186 ; rtio_int.c   89               /*---------------------------------------------------------------
+                            ---*/
+                        187 ; rtio_int.c   90               for(i=0;i<nldevs+1;i++)
+0000F4 B900             188         MOV.W   R0,#00H
+0000F6 964842rr         189         MOV.B   ES,#SEG( _nldevs )
+0000FA 9918rrrr         190         MOV.W   R1,#SOF( _nldevs )
+0000FE 8A11             191         MOV.W   R1,[R1]
+000100 8921             192         MOV.W   R2,R1
+000102 A911             193         ADDS.W  R1,#01H
+000104 99140000         194         CMP.W   R1,#00H
+000108 FD0D             195         BLE     _10
+000108 FD0D             195         BLE     _10
+00010A                  196 _9:
+                        197 ; rtio_int.c   91                       logical_dev_tbl[i] = NULLUHEADER;
+00010A 8930             198         MOV.W   R3,R0
+00010C D932             199         ASL.W   R3,#02H
+00010E 8943             200         MOV.W   R4,R3
+000110 B950             201         MOVS.W  R5,#00H
+000112 964842rr         202         MOV.B   ES,#SEG( _logical_dev_tbl )
+000116 BD40rrrr         203         MOV.W   [R4+SOF( _logical_dev_tbl )],#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+00011A BD40rrrr         204         MOV.W   [R4+SOF( _logical_dev_tbl+2 )],#00H
+00011E A901             205         ADDS.W  R0,#01H
+000120 4901             206         CMP.W   R0,R1
+000122 FBF3             207         BLT     _9
+000122 FBF3             207         BLT     _9
+000124                  208 _10:
+                        209 ; rtio_int.c   92       
+                        210 ; rtio_int.c   93               /*---------------------------------------------------------------
+                            ---*/
+                        211 ; rtio_int.c   94               /* Initialize the PDUs, Controller table, logical device table ..
+                            .  */
+                        212 ; rtio_int.c   95               /*---------------------------------------------------------------
+                            ---*/
+                        213 ; rtio_int.c   96               for(i=1;i<=nldevs;i++)
+000124 B961             214         MOV.W   R6,#01H
+000126 99240001         215         CMP.W   R2,#01H
+00012A FB1C             216         BLT     _12
+00012A FB1C             216         BLT     _12
+00012C                  217 _11:
+                        218 ; rtio_int.c   97                    dev_init_tbl[i].devinit_func( (DEV_INIT_PACK* )&dev_init_tbl
+                            [i] );
+00012C 8906             219         MOV.W   R0,R6
+00012E E900000E         220         MULU.W  R0,#0EH
+000132 8940             221         MOV.W   R4,R0
+000134 B950             222         MOVS.W  R5,#00H
+000136 964842rr         223         MOV.B   ES,#SEG( _dev_init_tbl+6 )
+00013A 8D54rrrr         224         MOV.W   R5,[R4+SOF( _dev_init_tbl+8 )]
+00013E 8D44rrrr         225         MOV.W   R4,[R4+SOF( _dev_init_tbl+6 )]
+000142 8920             226         MOV.W   R2,R0
+000144 B930             227         MOVS.W  R3,#00H
+000146 9918rrrr         228         MOV.W   R1,#SEG( _dev_init_tbl )
+00014A 9908rrrr         229         MOV.W   R0,#SOF( _dev_init_tbl )
+00014E 0902             230         ADD.W   R0,R2
+000150 C4rrrrrr         231         FCALL   __ICALL
+000154 A961             232         ADDS.W  R6,#01H
+000156 964842rr         233         MOV.B   ES,#SEG( _nldevs )
+00015A 9908rrrr         234         MOV.W   R0,#SOF( _nldevs )
+00015E 8A00             235         MOV.W   R0,[R0]
+000160 4960             236         CMP.W   R6,R0
+000162 FDE4             237         BLE     _11
+000162 FDE4             237         BLE     _11
+000164                  238 _12:
+                        239 ; rtio_int.c   98       }
+000164 2F70             240         POP.W   R4, R5, R6
+000166 D680             241         RET
+                        242 ; rtio_int.c   99       
+                        243 ; rtio_int.c  100       /* End of the RTIO_INT.C module */
+                        245         EXTRN   HDATA(_nchnls)
+                        246         EXTRN   HDATA(_chnls_active)
+                        247         EXTRN   HDATA(_dev_init_tbl)
+                        248         EXTRN   HDATA(_channel_table)
+                        249         EXTRN   HDATA(_nldevs)
+                        250         EXTRN   HDATA(_ncntlrs)
+                        251         EXTRN   HCODE(__ICALL)
+                        252         EXTRN   HDATA(_chnls_free)
+                        253         EXTRN   HDATA(_cntlr_loc_table)
+                        254         EXTRN   HDATA(_logical_dev_tbl)
+                        255         CALLS   'rtxcio_init', 'dev_init'

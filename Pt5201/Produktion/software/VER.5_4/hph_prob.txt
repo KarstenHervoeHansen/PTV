@@ -1,0 +1,76 @@
+file: hph_prob.txt
+
+
+AutoHPH failure.
+
+
+1. In SPG software we must have an extra variable which will hold DACV74 hardware offset.  At present it is assumed that DACV74 output is 0 volts for value of 2048.  On certain egzemplars it is not 0 volts, due to too big offsets in OP Amps, DAC nonlinearities, resistor tolerances, etc. and that causes problems with HPH adjustment during the test procedure.
+   
+2. The test program must be able to measure DACV74 value for lock condition, where DACV74 output is supposed to be 0 volts.  Our extra variable (h_dacv74_offset) will hold the difference between the DACV74 value for lock condition and 2048.  The h_dacv74_offset value will be stored in NOVRAM by Master Software under test procedure.  Under reset, the Master Software will transmit this value to the SPG software, and the h_dacv74_offset variable will be properly initialized.
+   
+3. Under normal operation the h_dacv74_offset variable will be used to correct DACV74 setting.  At present we have:
+   
+   dacV74 = phdet_todac;
+   
+   With the new version of software we will have:
+   
+   dacV74 = phdet_todac + h_dacv74_offset;
+   
+   (in file lock.c, function: burstlock())
+
+
+4. So, in the SPG software we must have:
+
+   - a new variable (h_dacv74_offset),
+   - a new command to set and read this variable (GB) and 
+   - modification of burstlock() as above.      
+   
+5. In the Master Software we must have:
+
+   - new variable in GenlockCalibrationObject:
+   
+            typedef struct 
+              {
+            	UL Date;
+             
+            	UL  DACFactDate;
+            	UL  DACUserDate;
+            
+            	UI  DACFactValue;
+            	UI  DACUserValue;
+            
+            	UL  HPHZeroG;
+            	UL  PhaseG;
+            
+            	UL  HPHZeroM;
+            	UL  PhaseM;
+              int DACOffset;     // this is new  
+              } GenlockCalibrationObject;
+   
+   - a new FACTORY command (function FactGenlockUOffDAC(void)):
+
+     :FACT:GENL:DOFFSET <UI>
+     :FACT:GENL:DOFFSET?
+
+     which will set and read this value and store it in NOVRAM,
+   - a new procedure at startup, which will transmit the DACOffset member to SPG
+     after reading it from NOVRAM (in function GenlockInit()).
+     
+     
+6. In the Test Software, before HPH Calibration, we must have a procedure which
+   will:
+   - set h_dacv74_offset to 0.
+   - transmit it to SPG using new GB command,
+   - calculate h_dacv74_offset value ,
+   - transmit it to SPG using new GB command,
+   - transmit it to Master using new FACT:GENL:DOFFSET command
+
+20.11.01: JK
+
+   
+   
+        
+     
+
+
+   

@@ -1,0 +1,491 @@
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 1
+isrs.asm
+
+
+
+      1				     NAME  isrs
+      2
+      3				     ;
+      4				     ;	 RTXC	 Version 3.2
+      5				     ;	 Copyright (c) 1986-1997.
+      6				     ;	 Embedded System Products, Inc.
+      7				     ;	 ALL RIGHTS RESERVED
+      8				     ;
+      9
+     10				     ;
+     11				     ; IBM PC interrupt	service	logic
+     12				     ;
+     13
+     14				     MASM51			 ; MASM	mode is	default,
+     15								 ; MASM51 enables 5.1 extensions
+     16
+     17				     IF	CPU EQ 2
+     18					.286p
+     19				     ENDIF
+     20
+     21				     INCLUDE saveregs.inc
+1    22				     ;	 TITLE	 saveregs.inc
+1    23
+1    24				     ;
+1    25				     ;	 RTXC	 Version 3.2
+1    26				     ;	 Copyright (c) 1986-1997.
+1    27				     ;	 Embedded System Products, Inc.
+1    28				     ;	 ALL RIGHTS RESERVED
+1    29				     ;
+1    30
+1    31				     ;
+1    32				     ; RTXC register save macros
+1    33				     ;												  0
+1    34
+1    35					     include rtxcopts.inc
+2    36				     ; rtxcopts.inc - RTXC assembly time options
+2    37
+2    38				     ;
+2    39				     ; RTXC    Version 3.2
+2    40				     ; Copyright (c) 1986-1997.
+2    41				     ; Embedded	System Products, Inc.
+2    42				     ; ALL RIGHTS RESERVED
+2    43				     ;
+2    44
+2    45				     INCLUDE binding.inc
+3    46				     ; binding.inc - RTXC binding assembly time	options
+3    47
+3    48				     ;
+3    49				     ; RTXC    Version 3.2
+3    50				     ; Copyright (c) 1986-1997.
+3    51				     ; Embedded	System Products, Inc.
+3    52				     ; ALL RIGHTS RESERVED
+3    53				     ;
+3    54
+3    55				     ;
+3    56				     ; choose _far or _near equ	1
+3    57				     ;
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 2
+isrs.asm
+
+
+
+3    58				     ; __HUGE__	requires ks_stk_far equ	1
+3    59				     ;
+3    60	      =0000		     ks_stk_near equ 0
+3    61	      =0001		     ks_stk_far	 equ 1
+3    62
+3    63	      =0000		     FPU = 0   ; 0=no extended context,	1=extended context, e.g., FPU
+3    64
+3    65	      =0200		     RTXCSTKSZ = 512   ; can be	changed	as needed
+3    66						       ; NOTE: RTXCSTKSZ must match definition in binding.h
+3    67
+3    68				     ; End of file - binding.inc
+3    69
+2    70
+2    71				     ; End of file - rtxcopts.inc  ; RTXC binding options
+2    72
+1    73
+1    74				     saveregs MACRO
+1    75					 LOCAL skip,eom
+1    76					     push    ds	  ; save ds on stack
+1    77					     push    es	  ; save es on stack
+1    78
+1    79				     IF	CPU EQ 0
+1    80					     push    ax	 ; start of "pusha"
+1    81					     push    cx
+1    82					     push    dx
+1    83					     push    bx
+1    84					     push    sp	 ; sp -	not really used
+1    85					     push    bp
+1    86					     push    si
+1    87					     push    di	 ; end of "pusha"
+1    88				     ENDIF
+1    89				     IF	CPU EQ 2
+1    90					     pusha
+1    91				     ENDIF
+1    92				     IF	CPU EQ 3
+1    93					     PUSHSTATE
+1    94					     .386
+1    95					     pushad
+1    96					     POPSTATE
+1    97				     ENDIF
+1    98
+1    99					     mov     ds,cs:DEFSEG ; force ds to	SEG _isrcnt
+1   100					     inc     _isrcnt ; track interrupt level
+1   101					     cmp     _isrcnt,1 ; if not	at 1st level
+1   102					     jne     skip	; then no stack	switch
+1   103					     mov     si,OFFSET DGROUP:_rtxcstk ; else
+1   104					     mov     ax,SEG    DGROUP:_rtxcstk
+1   105					     mov     es,ax
+1   106					     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+1   107					     mov     es:0[si],sp
+1   108					     mov     ss,ax
+1   109					     mov     sp,si
+1   110					     jmp     eom
+1   111				     skip:
+1   112					     push    ss	   ; pass ss:sp	on stack
+1   113					     mov     ax,sp ; compatible	80286/8088 push	sp sequence
+1   114					     add     ax,2  ; note: push	sp executes differently	on 8088	vs 80286
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 3
+isrs.asm
+
+
+
+1   115					     push    ax	   ;   same code will run on 8088/80286
+1   116				     eom:
+1   117					     cld	  ; clear direction for	C routines
+1   118					 ENDM
+1   119
+1   120				     ;
+1   121				     ; fast C register save macros - used only by kernel _ks
+1   122				     ;
+1   123				     ; this may	vary from one compiler to another
+1   124				     ;
+1   125				     ; skip saving volatile C registers	(es,ax,cx,dx,bx,sp) and	adjust
+1   126				     ; the frame as needed
+1   127				     ;
+1   128
+1   129				     fastsave MACRO
+1   130					     push    ds	  ; save ds on stack
+1   131
+1   132				     IFDEF __HUGE__ ; {
+1   133					     mov     ds,cs:DEFSEG ; force ds to	SEG _isrcnt
+1   134				     ENDIF ; } __HUGE__
+1   135
+1   136					     inc     _isrcnt ; track interrupt level (now := 1)
+1   137
+1   138				     IF	CPU EQ 0
+1   139					     push    es
+1   140
+1   141							    ; start of pusha
+1   142					     push    ss
+1   143					     push    cx
+1   144				     ;	     push    dx
+1   145				     ;	     push    bx
+1   146				     ;	     push    sp
+1   147					     sub     sp,6  ; faster than 3 x push
+1   148					     push    bp
+1   149					     push    si
+1   150					     push    di
+1   151				     ;			     ; end of pusha
+1   152				     ELSE ; CPU	EQ 2 or	3
+1   153					     push    es
+1   154
+1   155				     IF	CPU EQ 2
+1   156				     IF	ks_stk_far EQ 1
+1   157					     mov ax, ss	   ; store stack segment in ax,	stack offset is	in cx
+1   158				     ENDIF
+1   159					     pusha
+1   160				     ENDIF
+1   161				     IF	CPU EQ 3
+1   162					     PUSHSTATE
+1   163					     .386
+1   164					     pushad
+1   165					     POPSTATE
+1   166				     ENDIF
+1   167				     ENDIF
+1   168
+1   169				     IF	ks_stk_far EQ 1
+1   170					     mov     si,OFFSET DGROUP:_rtxcstk
+1   171					     mov     ax,SEG    DGROUP:_rtxcstk
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 4
+isrs.asm
+
+
+
+1   172					     mov     es,ax
+1   173					     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+1   174					     mov     es:0[si],sp
+1   175					     mov     ss,ax
+1   176					     mov     sp,si
+1   177				     ENDIF
+1   178
+1   179				     IF	ks_stk_near EQ 1
+1   180					     mov     si,OFFSET DGROUP:_rtxcstk
+1   181					     mov     [si],sp
+1   182					     mov     sp,si
+1   183				     ENDIF
+1   184
+1   185					     sti	 ; enable interrupts
+1   186					 ENDM
+1   187
+1   188
+1   189				     ;
+1   190				     ; this is the normal exit path from the kernel
+1   191				     ; it is performed with interrupts disabled
+1   192				     ; cexit is	a macro, to be called after calls to all C interrupt handlers
+1   193				     ;
+1   194				     ; DS is also known	to be == DGROUP
+1   195				     ;
+1   196				     cexit MACRO
+1   197					     dec     _isrcnt  ;	decrement isr level
+1   198					     mov     sp,ax    ;	restore	ss:sp from returned value dx:ax
+1   199					     mov     ss,dx
+1   200
+1   201				     IF	CPU EQ 0
+1   202					     pop     di	     ; start of	"popa"
+1   203					     pop     si
+1   204					     pop     bp
+1   205				     ;	     add     sp,2    ; ignore mid push sp
+1   206					     pop     bx	     ; this is faster than "add	sp,2", bx overwritten
+1   207					     pop     bx
+1   208					     pop     dx
+1   209					     pop     cx
+1   210					     pop     ax	     ; end of "popa"
+1   211				     ENDIF
+1   212				     IF	CPU EQ 2
+1   213					     popa
+1   214				     ENDIF
+1   215				     IF	CPU EQ 3
+1   216					     PUSHSTATE
+1   217					     .386
+1   218					     popad
+1   219					     POPSTATE
+1   220				     ENDIF
+1   221
+1   222					     pop     es
+1   223					     pop     ds
+1   224
+1   225					     iret	     ; note: 16	bit ccr	even in	386 mode
+1   226					ENDM
+1   227
+1   228				     ; End of file - saveregs.inc
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 5
+isrs.asm
+
+
+
+1   229
+    230
+    231				     INCLUDE isrs.inc
+1   232				     ;	     TITLE   isrs.inc
+1   233
+1   234				     ;
+1   235				     ;	 RTXC	 Version 3.2
+1   236				     ;	 Copyright (c) 1986-1997.
+1   237				     ;	 Embedded System Products, Inc.
+1   238				     ;	 ALL RIGHTS RESERVED
+1   239				     ;
+1   240
+1   241				     ;
+1   242				     ; IBM PC interrupt	service	definition switch
+1   243				     ;
+1   244
+1   245	      =0001		     clk = 1   ; enable	periodic clock service
+1   246	      =0000		     com = 0
+1   247	      =0000		     prn = 0
+1   248	      =0000		     prtsc = 0
+1   249	      =0001		     brk = 1
+1   250	      =0000		     dvz = 0
+1   251
+1   252				     ; End of file - isrs.inc
+1   253
+    254
+    255				     EXTRN _rtxcstk:BYTE ; saveregs use
+    256
+    257	0000			     RTXC_TEXT SEGMENT BYTE PUBLIC 'CODE'
+    258	0000			     RTXC_TEXT ENDS
+    259
+    260	0000			     _CONST SEGMENT WORD PUBLIC	'CONST'
+    261	0000			     _CONST ENDS
+    262
+    263	0000			     _DATA SEGMENT WORD	PUBLIC 'DATA'
+    264	0000			     _DATA ENDS
+    265
+    266	0000			     _BSS SEGMENT WORD PUBLIC 'BSS'
+    267	0000			     _BSS ENDS
+    268
+    269				     DGROUP GROUP _CONST, _BSS,	_DATA
+    270
+    271				     ASSUME CS:	RTXC_TEXT, DS: DGROUP, SS: DGROUP, ES: DGROUP
+    272
+    273				     EXTRN _isrcnt:BYTE	; nesting level	counter
+    274
+    275				     IF	clk eq 1
+    276				     EXTRN _clkc:FAR
+    277				     ENDIF
+    278
+    279				     EXTRN _int232:FAR
+    280
+    281				     IF	prn EQ 1
+    282				     EXTRN _prnc:FAR
+    283				     ENDIF
+    284
+    285				     IF	prtsc EQ 1
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 6
+isrs.asm
+
+
+
+    286				     EXTRN _prtscc:FAR
+    287				     ENDIF
+    288
+    289				     IF	dvz EQ 1
+    290				     EXTRN _dvzc:FAR
+    291				     ENDIF
+    292
+    293	0000			     RTXC_TEXT SEGMENT
+    294
+    295	0000  0000s		     DEFSEG DW SEG _isrcnt	    ; NOTE: must be in CODE segment
+    296								     ; used in context save logic
+    297
+    298				     ;
+    299				     ; interrupt service for periodic clock interrupt
+    300				     ;
+    301				     IF	clk EQ 1
+    302					    PUBLIC  _isvcclk
+    303	0002			     _isvcclk PROC FAR
+    304					     saveregs	   ; save register set on stack
+1   305	0002  1E			     push    ds	  ; save ds on stack
+1   306	0003  06			     push    es	  ; save es on stack
+1   307	0004  60			     pusha
+1   308	0005  2E: 8E 1E	0000r		     mov     ds,cs:DEFSEG ; force ds to	SEG _isrcnt
+1   309	000A  FE 06 0000e		     inc     _isrcnt ; track interrupt level
+1   310	000E  80 3E 0000e 01		     cmp     _isrcnt,1 ; if not	at 1st level
+1   311	0013  75 16			     jne     ??0000	  ; then no stack switch
+1   312	0015  BE 0000e			     mov     si,OFFSET DGROUP:_rtxcstk ; else
+1   313	0018  B8 0000s			     mov     ax,SEG    DGROUP:_rtxcstk
+1   314	001B  8E C0			     mov     es,ax
+1   315	001D  26: 8C 54	02		     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+1   316	0021  26: 89 24			     mov     es:0[si],sp
+1   317	0024  8E D0			     mov     ss,ax
+1   318	0026  8B E6			     mov     sp,si
+1   319	0028  EB 08 90			     jmp     ??0001
+1   320	002B			     ??0000:
+1   321	002B  16			     push    ss	   ; pass ss:sp	on stack
+1   322	002C  8B C4			     mov     ax,sp ; compatible	80286/8088 push	sp sequence
+1   323	002E  05 0002			     add     ax,2  ; note: push	sp executes differently	on 8088	vs 80286
+1   324	0031  50			     push    ax	   ;   same code will run on 8088/80286
+1   325	0032			     ??0001:
+1   326	0032  FC			     cld	  ; clear direction for	C routines
+    327	0033  9A 00000000se		     call    _clkc ; call C interrupt handler
+    328					     cexit	   ; goto common exit logic
+1   329	0038  FE 0E 0000e		     dec     _isrcnt  ;	decrement isr level
+1   330	003C  8B E0			     mov     sp,ax    ;	restore	ss:sp from returned value dx:ax
+1   331	003E  8E D2			     mov     ss,dx
+1   332	0040  61			     popa
+1   333	0041  07			     pop     es
+1   334	0042  1F			     pop     ds
+1   335	0043  CF			     iret	     ; note: 16	bit ccr	even in	386 mode
+    336	0044			     _isvcclk ENDP
+    337				     ENDIF
+    338
+    339				     ;
+    340				     ; interrupt service for ^C	(BREAK)	from PC	keyboard
+    341				     ;
+    342				     IF	brk EQ 1
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 7
+isrs.asm
+
+
+
+    343				     EXTRN _brkflag:BYTE
+    344					    PUBLIC  _isvcbrk
+    345	0044			     _isvcbrk PROC FAR
+    346	0044  1E			     push    ds
+    347	0045  53			     push    bx	 ; make	room for isrcnt++ & setup DS
+    348
+    349				     IFDEF __HUGE__ ; {
+    350					     mov     bx,SEG _isrcnt
+    351				     ELSE ; } HUGE {
+    352	0046  BB 0000s			     mov     bx,SEG DGROUP:_isrcnt
+    353				     ENDIF ; } HUGE
+    354
+    355	0049  8E DB			     mov     ds,bx
+    356
+    357				     IFDEF __HUGE__ ; {
+    358					     mov     _brkflag,1	;set flag to be	recognized by null task
+    359				     ELSE ; } HUGE {
+    360	004B  C6 06 0000e 01		     mov     DGROUP:_brkflag,1 ;set flag to be recognized by null task
+    361				     ENDIF ; } HUGE
+    362
+    363	0050  5B			     pop     bx
+    364	0051  1F			     pop     ds
+    365	0052  CF			     iret
+    366	0053			     _isvcbrk ENDP
+    367				     ENDIF
+    368
+    369				     ;
+    370				     ; interrupt service for COM interrupt
+    371				     ;
+    372					    PUBLIC  _isvccom
+    373	0053			     _isvccom PROC FAR
+    374					     saveregs
+1   375	0053  1E			     push    ds	  ; save ds on stack
+1   376	0054  06			     push    es	  ; save es on stack
+1   377	0055  60			     pusha
+1   378	0056  2E: 8E 1E	0000r		     mov     ds,cs:DEFSEG ; force ds to	SEG _isrcnt
+1   379	005B  FE 06 0000e		     inc     _isrcnt ; track interrupt level
+1   380	005F  80 3E 0000e 01		     cmp     _isrcnt,1 ; if not	at 1st level
+1   381	0064  75 16			     jne     ??0002	  ; then no stack switch
+1   382	0066  BE 0000e			     mov     si,OFFSET DGROUP:_rtxcstk ; else
+1   383	0069  B8 0000s			     mov     ax,SEG    DGROUP:_rtxcstk
+1   384	006C  8E C0			     mov     es,ax
+1   385	006E  26: 8C 54	02		     mov     es:2[si],ss   ; save current ss:sp	on new RTXCSTK
+1   386	0072  26: 89 24			     mov     es:0[si],sp
+1   387	0075  8E D0			     mov     ss,ax
+1   388	0077  8B E6			     mov     sp,si
+1   389	0079  EB 08 90			     jmp     ??0003
+1   390	007C			     ??0002:
+1   391	007C  16			     push    ss	   ; pass ss:sp	on stack
+1   392	007D  8B C4			     mov     ax,sp ; compatible	80286/8088 push	sp sequence
+1   393	007F  05 0002			     add     ax,2  ; note: push	sp executes differently	on 8088	vs 80286
+1   394	0082  50			     push    ax	   ;   same code will run on 8088/80286
+1   395	0083			     ??0003:
+1   396	0083  FC			     cld	  ; clear direction for	C routines
+    397	0084  9A 00000000se		     call    _int232
+    398					     cexit
+1   399	0089  FE 0E 0000e		     dec     _isrcnt  ;	decrement isr level
+Turbo Assembler	 Version 3.0	    25/10/99 14:05:03	    Page 8
+isrs.asm
+
+
+
+1   400	008D  8B E0			     mov     sp,ax    ;	restore	ss:sp from returned value dx:ax
+1   401	008F  8E D2			     mov     ss,dx
+1   402	0091  61			     popa
+1   403	0092  07			     pop     es
+1   404	0093  1F			     pop     ds
+1   405	0094  CF			     iret	     ; note: 16	bit ccr	even in	386 mode
+    406	0095			     _isvccom ENDP
+    407
+    408				     ;
+    409				     ; interrupt service for PRN (LPT) interrupt
+    410				     ;
+    411				     IF	prn EQ 1
+    412					    PUBLIC  _isvcprn
+    413				     _isvcprn PROC FAR
+    414					     saveregs
+    415					     call    _prnc
+    416					     cexit
+    417				     _isvcprn ENDP
+    418				     ENDIF
+    419
+    420				     ;
+    421				     ; interrupt service for PrtSc (Print Screen) interrupt
+    422				     ;
+    423				     IF	prtsc EQ 1
+    424					    PUBLIC  _isvcprtsc
+    425				     _isvcprtsc	PROC FAR
+    426					     saveregs
+    427					     call    _prtscc
+    428					     cexit
+    429				     _isvcprtsc	ENDP
+    430				     ENDIF
+    431
+    432				     ;
+    433				     ; interrupt service for divide-by-zero interrupt
+    434				     ;
+    435				     IF	dvz EQ 1
+    436					    PUBLIC  _isvcdvz
+    437				     _isvcdvz PROC FAR
+    438					     saveregs
+    439					     call    _dvzc
+    440					     cexit
+    441				     _isvcdvz ENDP
+    442				     ENDIF
+    443
+    444				     ;
+    445				     ; add more	interrupt service code here
+    446				     ;
+    447
+    448	0095			     RTXC_TEXT ENDS
+    449
+    450				     END
+

@@ -1,0 +1,79 @@
+%/* FILE NAME        lcntwdr.TDF                                            */%
+% * PURPOSE          Subdesign file for 8633 V63 generator      .           */%
+% *                  Line Counter                                           * %
+% *                  Modified for moving TDC Logo similar to 8603/905       */%
+% * TEST                                                                    */%
+% * LAST UPDT:       07.10.2002                                             */%
+% * NOTES:                                                                  */%
+% *                                                                         */%
+% */                                                                        */%
+
+SUBDESIGN lcntwdr
+  (
+  clk       :input;
+  preset    :input;
+  d[10..0]  :input;  % offset register data V71 and V72 %
+  syssel    :input;
+  16x9      :input;
+  movebit   :input;
+
+  h[10..0]  :output; % Horizontal Counter %
+  noth5     :output;
+  ctest     :output;
+  window    :output;
+  )
+
+VARIABLE
+  h[10..0]  :DFF;
+  hclr      :DFF;
+  window    :DFFE;
+  rstwindow :DFF;
+
+BEGIN
+  hclr.clk     = clk;
+  hclr.d       = preset;
+
+  window.clk   = clk;
+
+  h[10..0].clk = clk;
+
+  IF hclr.q == 1 THEN 
+    h[10..0].d = d[10..0];
+  ELSIF (h[10..0].q == 1727)  THEN
+    h[].d = 0;  
+  ELSIF (h[10..0].q == 1687) & (syssel == 1) THEN
+    h[10..0].d = 1700;
+  ELSE
+    h[10..0].d = h[10..0].q+1;
+  END IF;
+  
+  ctest = !h3.q;
+
+%/*  JK change: hard coded values  same as 8603/905  */%
+
+  rstwindow.clk = clk;
+  rstwindow.d   = ((h[].q == 1046) # (16x9 & h[].q == 986));
+
+  window.d    = VCC;
+  window.ena  = (!16x9 & movebit & h[].q == 596) # (movebit & 16x9 & h[].q == 658); 
+  window.clrn = !rstwindow.q;
+
+  noth5       = !h5.q ;
+
+
+
+%/* Equations below are OK for longer window */%
+
+%/*
+  rstwindow.clk = clk;
+  rstwindow.d   = ((h[].q == 1126) # (16x9 & h[].q == 986));
+
+  window.d    = VCC;
+  window.ena  = (!16x9 & movebit & h[].q == 516) # (movebit & 16x9 & h[].q == 658); 
+  window.clrn = !rstwindow.q;
+
+  noth5       = !h5.q ;
+*/%
+END;
+ 
+

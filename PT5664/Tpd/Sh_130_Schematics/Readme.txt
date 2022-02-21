@@ -1,0 +1,1 @@
+Se under 117-PCB for diagrammer, placeringstegninger, m.m

@@ -1,0 +1,1241 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -Ic:\cxa\rtxc\xa\include -I. -Ml
+;          -O2 -s
+$CASE
+$NOZPAGE
+	NAME	RS232ERR
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "rs232err.c"
+; rs232err.c    1	/***************************************************************************/
+; rs232err.c    2	/*	Copyright ProTeleVision Technologies A/S, BRONDBY 1998						*/
+; rs232err.c    3	/*	Project:		PT5230 Digital Video Generator										*/
+; rs232err.c    4	/*	Module:		RS232ERR.C																	*/
+; rs232err.c    5	/*	Author:		Kim Engedahl, DEV															*/
+; rs232err.c    6	/*	Org. date:	960713																		*/
+; rs232err.c    7	/*	Rev. date:	980616, KEn, DEV															*/
+; rs232err.c    8	/*	Status:		Version 1.0																	*/
+; rs232err.c    9	/*																									*/
+; rs232err.c   10	/*	This module contains the following functions:									*/
+; rs232err.c   11	/*																									*/
+; rs232err.c   12	/*		void ResetErrorEventQueue();														*/
+; rs232err.c   13	/*		bit UpdateQUESTRegister();															*/
+; rs232err.c   14	/*		bit UpdateOPERRegister();															*/
+; rs232err.c   15	/*		UC UpdateESRRegister();																*/
+; rs232err.c   16	/*		void UpdateSTBRegister();															*/
+; rs232err.c   17	/*		int ReadErrorEventQueue();															*/
+; rs232err.c   18	/*		void SaveErrorEventQueue( int ErrorType);										*/
+; rs232err.c   19	/*																									*/
+; rs232err.c   20	/*	Changes:																						*/
+; rs232err.c   21	/* 980616: Released as 4008 002 06812													*/
+; rs232err.c   22	/* 980514: Released as 4008 002 06811													*/
+; rs232err.c   23	/***************************************************************************/
+; rs232err.c   24	
+; rs232err.c   25	/***************************************************************************/
+; rs232err.c   26	// Include files:
+; rs232err.c   27	
+; rs232err.c   28	//#include <xa.h>
+; rs232err.c   29	#include <string.h>
+	SYMB	FILE, "c:\\cxa\\include\\string.h"
+	SYMB	TYPE, 257, "size_t", 'T', #18
+	SYMB	ENDF
+; rs232err.c   30	#include <stdio.h>
+	SYMB	FILE, "c:\\cxa\\include\\stdio.h"
+	SYMB	FILE, "c:\\cxa\\include\\stdarg.h"
+	SYMB	ENDF
+	SYMB	TYPE, 258, 'n', #2, 130
+	SYMB	TYPE, 259, 'P', #258
+	SYMB	TYPE, 260, "_iobuf", 'S', 14,\
+		 "_ptr", #259, 0,\
+		 "_cnt", #16, 4,\
+		 "_base", #259, 6,\
+		 "_flag", #2, 10,\
+		 "_file", #2, 11,\
+		 "_bufsiz", #16, 12
+	SYMB	TYPE, 261, "FILE", 'T', #260
+	SYMB	TYPE, 262, 'n', #1, 130
+	SYMB	TYPE, 263, 'P', #262
+	SYMB	TYPE, 264, 'Z', #263, 0
+	SYMB	TYPE, 266, "va_list", 'T', #264
+	SYMB	TYPE, 267, "fpos_t", 'T', #7
+	SYMB	ENDF
+; rs232err.c   31	#include <stdlib.h>
+	SYMB	FILE, "c:\\cxa\\include\\stdlib.h"
+	SYMB	FILE, "c:\\cxa\\include\\limits.h"
+	SYMB	ENDF
+	SYMB	TYPE, 268, 'S', 4,\
+		 "quot", #16, 0,\
+		 "rem", #16, 2
+	SYMB	TYPE, 269, "div_t", 'T', #268
+	SYMB	TYPE, 270, 'S', 8,\
+		 "quot", #6, 0,\
+		 "rem", #6, 4
+	SYMB	TYPE, 271, "ldiv_t", 'T', #270
+	SYMB	TYPE, 272, "wchar_t", 'T', #5
+	SYMB	ENDF
+; rs232err.c   32	
+; rs232err.c   33	//#include "mas.h"
+; rs232err.c   34	
+; rs232err.c   35	#include "define.h"
+	SYMB	FILE, "define.h"
+	SYMB	ENDF
+; rs232err.c   36	#include "rs232err.h"
+	SYMB	FILE, "rs232err.h"
+	SYMB	ENDF
+; rs232err.c   37	
+; rs232err.c   38	char code NoErrTxt[]							= "No error";
+RS232ERR_RO	SEGMENT	HCODE ROMDATA
+	RSEG	RS232ERR_RO
+	SYMB	TYPE, 273, 'Z', #2, -1
+	SYMB	IDEN, "NoErrTxt", _NoErrTxt, #273, 129, 0
+	SYMB	ALAB, _NoErrTxt, #273
+	PUBLIC	_NoErrTxt
+_NoErrTxt:
+; rs232err.c   39	char code CmdErrTxt[]						= "Command error";
+	DB	04EH,06FH,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "CmdErrTxt", _CmdErrTxt, #273, 129, 0
+	SYMB	ALAB, _CmdErrTxt, #273
+	PUBLIC	_CmdErrTxt
+_CmdErrTxt:
+	DB	043H,06FH,06DH,06DH,061H,06EH,064H,020H,065H,072H,072H,06FH
+; rs232err.c   40	char code InvalidCharTxt[]					= "Invalid character";
+	DB	072H,000H
+	SYMB	IDEN, "InvalidCharTxt", _InvalidCharTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidCharTxt, #273
+	PUBLIC	_InvalidCharTxt
+_InvalidCharTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,063H,068H,061H,072H
+; rs232err.c   41	char code SyntaxErrTxt[]					= "Syntax error";
+	DB	061H,063H,074H,065H,072H,000H
+	SYMB	IDEN, "SyntaxErrTxt", _SyntaxErrTxt, #273, 129, 0
+	SYMB	ALAB, _SyntaxErrTxt, #273
+	PUBLIC	_SyntaxErrTxt
+_SyntaxErrTxt:
+	DB	053H,079H,06EH,074H,061H,078H,020H,065H,072H,072H,06FH,072H
+; rs232err.c   42	char code InvalidSeparatorTxt[]			= "Invalid separator";
+	DB	000H
+	SYMB	IDEN, "InvalidSeparatorTxt", _InvalidSeparatorTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidSeparatorTxt, #273
+	PUBLIC	_InvalidSeparatorTxt
+_InvalidSeparatorTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,073H,065H,070H,061H
+; rs232err.c   43	char code DataTypeErrTxt[]					= "Data type error";
+	DB	072H,061H,074H,06FH,072H,000H
+	SYMB	IDEN, "DataTypeErrTxt", _DataTypeErrTxt, #273, 129, 0
+	SYMB	ALAB, _DataTypeErrTxt, #273
+	PUBLIC	_DataTypeErrTxt
+_DataTypeErrTxt:
+	DB	044H,061H,074H,061H,020H,074H,079H,070H,065H,020H,065H,072H
+; rs232err.c   44	char code ParNotAllowedTxt[]				= "Parameter not allowed";
+	DB	072H,06FH,072H,000H
+	SYMB	IDEN, "ParNotAllowedTxt", _ParNotAllowedTxt, #273, 129, 0
+	SYMB	ALAB, _ParNotAllowedTxt, #273
+	PUBLIC	_ParNotAllowedTxt
+_ParNotAllowedTxt:
+	DB	050H,061H,072H,061H,06DH,065H,074H,065H,072H,020H,06EH,06FH
+; rs232err.c   45	char code MissingParTxt[]					= "Missing parameter";
+	DB	074H,020H,061H,06CH,06CH,06FH,077H,065H,064H,000H
+	SYMB	IDEN, "MissingParTxt", _MissingParTxt, #273, 129, 0
+	SYMB	ALAB, _MissingParTxt, #273
+	PUBLIC	_MissingParTxt
+_MissingParTxt:
+	DB	04DH,069H,073H,073H,069H,06EH,067H,020H,070H,061H,072H,061H
+; rs232err.c   46	char code CmdHeaderErrTxt[]				= "Command header error";
+	DB	06DH,065H,074H,065H,072H,000H
+	SYMB	IDEN, "CmdHeaderErrTxt", _CmdHeaderErrTxt, #273, 129, 0
+	SYMB	ALAB, _CmdHeaderErrTxt, #273
+	PUBLIC	_CmdHeaderErrTxt
+_CmdHeaderErrTxt:
+	DB	043H,06FH,06DH,06DH,061H,06EH,064H,020H,068H,065H,061H,064H
+; rs232err.c   47	char code HdrSeparatorErrTxt[]			= "Header separator error";
+	DB	065H,072H,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "HdrSeparatorErrTxt", _HdrSeparatorErrTxt, #273, 129, 0
+	SYMB	ALAB, _HdrSeparatorErrTxt, #273
+	PUBLIC	_HdrSeparatorErrTxt
+_HdrSeparatorErrTxt:
+	DB	048H,065H,061H,064H,065H,072H,020H,073H,065H,070H,061H,072H
+; rs232err.c   48	char code PrgmMnemonicTooLongTxt[]		= "Program mnemonic too long";
+	DB	061H,074H,06FH,072H,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "PrgmMnemonicTooLongTxt", _PrgmMnemonicTooLongTxt, #273, 129, 0
+	SYMB	ALAB, _PrgmMnemonicTooLongTxt, #273
+	PUBLIC	_PrgmMnemonicTooLongTxt
+_PrgmMnemonicTooLongTxt:
+	DB	050H,072H,06FH,067H,072H,061H,06DH,020H,06DH,06EH,065H,06DH
+	DB	06FH,06EH,069H,063H,020H,074H,06FH,06FH,020H,06CH,06FH,06EH
+; rs232err.c   49	char code UndefinedHeaderTxt[]			= "Undefined header";
+	DB	067H,000H
+	SYMB	IDEN, "UndefinedHeaderTxt", _UndefinedHeaderTxt, #273, 129, 0
+	SYMB	ALAB, _UndefinedHeaderTxt, #273
+	PUBLIC	_UndefinedHeaderTxt
+_UndefinedHeaderTxt:
+	DB	055H,06EH,064H,065H,066H,069H,06EH,065H,064H,020H,068H,065H
+; rs232err.c   50	char code HdrSuffixOutOfRangeTxt[]		= "Header suffix out of range";
+	DB	061H,064H,065H,072H,000H
+	SYMB	IDEN, "HdrSuffixOutOfRangeTxt", _HdrSuffixOutOfRangeTxt, #273, 129, 0
+	SYMB	ALAB, _HdrSuffixOutOfRangeTxt, #273
+	PUBLIC	_HdrSuffixOutOfRangeTxt
+_HdrSuffixOutOfRangeTxt:
+	DB	048H,065H,061H,064H,065H,072H,020H,073H,075H,066H,066H,069H
+	DB	078H,020H,06FH,075H,074H,020H,06FH,066H,020H,072H,061H,06EH
+; rs232err.c   51	
+; rs232err.c   52	char code NumericDataErrTxt[]				= "Numeric data error";
+	DB	067H,065H,000H
+	SYMB	IDEN, "NumericDataErrTxt", _NumericDataErrTxt, #273, 129, 0
+	SYMB	ALAB, _NumericDataErrTxt, #273
+	PUBLIC	_NumericDataErrTxt
+_NumericDataErrTxt:
+	DB	04EH,075H,06DH,065H,072H,069H,063H,020H,064H,061H,074H,061H
+; rs232err.c   53	char code InvalidCharInNumberTxt[]		= "Invalid character in number";
+	DB	020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "InvalidCharInNumberTxt", _InvalidCharInNumberTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidCharInNumberTxt, #273
+	PUBLIC	_InvalidCharInNumberTxt
+_InvalidCharInNumberTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,063H,068H,061H,072H
+	DB	061H,063H,074H,065H,072H,020H,069H,06EH,020H,06EH,075H,06DH
+; rs232err.c   54	char code ExponentTooLargeTxt[]			= "Exponent too large";
+	DB	062H,065H,072H,000H
+	SYMB	IDEN, "ExponentTooLargeTxt", _ExponentTooLargeTxt, #273, 129, 0
+	SYMB	ALAB, _ExponentTooLargeTxt, #273
+	PUBLIC	_ExponentTooLargeTxt
+_ExponentTooLargeTxt:
+	DB	045H,078H,070H,06FH,06EH,065H,06EH,074H,020H,074H,06FH,06FH
+; rs232err.c   55	char code TooManyDigitsTxt[]				= "Too many digits";
+	DB	020H,06CH,061H,072H,067H,065H,000H
+	SYMB	IDEN, "TooManyDigitsTxt", _TooManyDigitsTxt, #273, 129, 0
+	SYMB	ALAB, _TooManyDigitsTxt, #273
+	PUBLIC	_TooManyDigitsTxt
+_TooManyDigitsTxt:
+	DB	054H,06FH,06FH,020H,06DH,061H,06EH,079H,020H,064H,069H,067H
+; rs232err.c   56	char code NumericDataNotAllowedTxt[]	= "Numeric data not allowed";
+	DB	069H,074H,073H,000H
+	SYMB	IDEN, "NumericDataNotAllowedTxt", _NumericDataNotAllowedTxt, #273, 129, 0
+	SYMB	ALAB, _NumericDataNotAllowedTxt, #273
+	PUBLIC	_NumericDataNotAllowedTxt
+_NumericDataNotAllowedTxt:
+	DB	04EH,075H,06DH,065H,072H,069H,063H,020H,064H,061H,074H,061H
+	DB	020H,06EH,06FH,074H,020H,061H,06CH,06CH,06FH,077H,065H,064H
+; rs232err.c   57	char code SuffixErrTxt[]					= "Suffix error";
+	DB	000H
+	SYMB	IDEN, "SuffixErrTxt", _SuffixErrTxt, #273, 129, 0
+	SYMB	ALAB, _SuffixErrTxt, #273
+	PUBLIC	_SuffixErrTxt
+_SuffixErrTxt:
+	DB	053H,075H,066H,066H,069H,078H,020H,065H,072H,072H,06FH,072H
+; rs232err.c   58	char code InvalidSuffixErrTxt[]			= "Invalid suffix";
+	DB	000H
+	SYMB	IDEN, "InvalidSuffixErrTxt", _InvalidSuffixErrTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidSuffixErrTxt, #273
+	PUBLIC	_InvalidSuffixErrTxt
+_InvalidSuffixErrTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,073H,075H,066H,066H
+; rs232err.c   59	char code SuffixTooLongTxt[]				= "Suffix too long";
+	DB	069H,078H,000H
+	SYMB	IDEN, "SuffixTooLongTxt", _SuffixTooLongTxt, #273, 129, 0
+	SYMB	ALAB, _SuffixTooLongTxt, #273
+	PUBLIC	_SuffixTooLongTxt
+_SuffixTooLongTxt:
+	DB	053H,075H,066H,066H,069H,078H,020H,074H,06FH,06FH,020H,06CH
+; rs232err.c   60	char code SuffixNotAllowedTxt[]			= "Suffix not allowed";
+	DB	06FH,06EH,067H,000H
+	SYMB	IDEN, "SuffixNotAllowedTxt", _SuffixNotAllowedTxt, #273, 129, 0
+	SYMB	ALAB, _SuffixNotAllowedTxt, #273
+	PUBLIC	_SuffixNotAllowedTxt
+_SuffixNotAllowedTxt:
+	DB	053H,075H,066H,066H,069H,078H,020H,06EH,06FH,074H,020H,061H
+; rs232err.c   61	
+; rs232err.c   62	char code CharErrTxt[]						= "Character data error";
+	DB	06CH,06CH,06FH,077H,065H,064H,000H
+	SYMB	IDEN, "CharErrTxt", _CharErrTxt, #273, 129, 0
+	SYMB	ALAB, _CharErrTxt, #273
+	PUBLIC	_CharErrTxt
+_CharErrTxt:
+	DB	043H,068H,061H,072H,061H,063H,074H,065H,072H,020H,064H,061H
+; rs232err.c   63	char code InvalidCharDataTxt[]			= "Invalid character data";
+	DB	074H,061H,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "InvalidCharDataTxt", _InvalidCharDataTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidCharDataTxt, #273
+	PUBLIC	_InvalidCharDataTxt
+_InvalidCharDataTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,063H,068H,061H,072H
+; rs232err.c   64	char code CharDataTooLongTxt[]			= "Character data too long";
+	DB	061H,063H,074H,065H,072H,020H,064H,061H,074H,061H,000H
+	SYMB	IDEN, "CharDataTooLongTxt", _CharDataTooLongTxt, #273, 129, 0
+	SYMB	ALAB, _CharDataTooLongTxt, #273
+	PUBLIC	_CharDataTooLongTxt
+_CharDataTooLongTxt:
+	DB	043H,068H,061H,072H,061H,063H,074H,065H,072H,020H,064H,061H
+; rs232err.c   65	char code CharDataNotAllowedTxt[]		= "Character data not allowed";
+	DB	074H,061H,020H,074H,06FH,06FH,020H,06CH,06FH,06EH,067H,000H
+	SYMB	IDEN, "CharDataNotAllowedTxt", _CharDataNotAllowedTxt, #273, 129, 0
+	SYMB	ALAB, _CharDataNotAllowedTxt, #273
+	PUBLIC	_CharDataNotAllowedTxt
+_CharDataNotAllowedTxt:
+	DB	043H,068H,061H,072H,061H,063H,074H,065H,072H,020H,064H,061H
+	DB	074H,061H,020H,06EH,06FH,074H,020H,061H,06CH,06CH,06FH,077H
+; rs232err.c   66	
+; rs232err.c   67	char code StringDataErrTxt[]				= "String data error";
+	DB	065H,064H,000H
+	SYMB	IDEN, "StringDataErrTxt", _StringDataErrTxt, #273, 129, 0
+	SYMB	ALAB, _StringDataErrTxt, #273
+	PUBLIC	_StringDataErrTxt
+_StringDataErrTxt:
+	DB	053H,074H,072H,069H,06EH,067H,020H,064H,061H,074H,061H,020H
+; rs232err.c   68	char code InvalidStringDataTxt[]			= "Invalid string data";
+	DB	065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "InvalidStringDataTxt", _InvalidStringDataTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidStringDataTxt, #273
+	PUBLIC	_InvalidStringDataTxt
+_InvalidStringDataTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,073H,074H,072H,069H
+; rs232err.c   69	char code StringDataNotAllowedTxt[]		= "String data not allowed";
+	DB	06EH,067H,020H,064H,061H,074H,061H,000H
+	SYMB	IDEN, "StringDataNotAllowedTxt", _StringDataNotAllowedTxt, #273, 129, 0
+	SYMB	ALAB, _StringDataNotAllowedTxt, #273
+	PUBLIC	_StringDataNotAllowedTxt
+_StringDataNotAllowedTxt:
+	DB	053H,074H,072H,069H,06EH,067H,020H,064H,061H,074H,061H,020H
+; rs232err.c   70	
+; rs232err.c   71	char code BlockDataErrTxt[]				= "Block data error";
+	DB	06EH,06FH,074H,020H,061H,06CH,06CH,06FH,077H,065H,064H,000H
+	SYMB	IDEN, "BlockDataErrTxt", _BlockDataErrTxt, #273, 129, 0
+	SYMB	ALAB, _BlockDataErrTxt, #273
+	PUBLIC	_BlockDataErrTxt
+_BlockDataErrTxt:
+	DB	042H,06CH,06FH,063H,06BH,020H,064H,061H,074H,061H,020H,065H
+; rs232err.c   72	char code InvalidBlockDataTxt[]			= "Invalid block data";
+	DB	072H,072H,06FH,072H,000H
+	SYMB	IDEN, "InvalidBlockDataTxt", _InvalidBlockDataTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidBlockDataTxt, #273
+	PUBLIC	_InvalidBlockDataTxt
+_InvalidBlockDataTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,062H,06CH,06FH,063H
+; rs232err.c   73	char code BlockDataNotAllowedTxt[]		= "Block data not allowed";
+	DB	06BH,020H,064H,061H,074H,061H,000H
+	SYMB	IDEN, "BlockDataNotAllowedTxt", _BlockDataNotAllowedTxt, #273, 129, 0
+	SYMB	ALAB, _BlockDataNotAllowedTxt, #273
+	PUBLIC	_BlockDataNotAllowedTxt
+_BlockDataNotAllowedTxt:
+	DB	042H,06CH,06FH,063H,06BH,020H,064H,061H,074H,061H,020H,06EH
+; rs232err.c   74	
+; rs232err.c   75	char code ExpressionErrTxt[]				= "Expression error";
+	DB	06FH,074H,020H,061H,06CH,06CH,06FH,077H,065H,064H,000H
+	SYMB	IDEN, "ExpressionErrTxt", _ExpressionErrTxt, #273, 129, 0
+	SYMB	ALAB, _ExpressionErrTxt, #273
+	PUBLIC	_ExpressionErrTxt
+_ExpressionErrTxt:
+	DB	045H,078H,070H,072H,065H,073H,073H,069H,06FH,06EH,020H,065H
+; rs232err.c   76	
+; rs232err.c   77	char code ExecErrTxt[]						= "Execution error";
+	DB	072H,072H,06FH,072H,000H
+	SYMB	IDEN, "ExecErrTxt", _ExecErrTxt, #273, 129, 0
+	SYMB	ALAB, _ExecErrTxt, #273
+	PUBLIC	_ExecErrTxt
+_ExecErrTxt:
+	DB	045H,078H,065H,063H,075H,074H,069H,06FH,06EH,020H,065H,072H
+; rs232err.c   78	char code CmdProtectedTxt[]				= "Command protected";
+	DB	072H,06FH,072H,000H
+	SYMB	IDEN, "CmdProtectedTxt", _CmdProtectedTxt, #273, 129, 0
+	SYMB	ALAB, _CmdProtectedTxt, #273
+	PUBLIC	_CmdProtectedTxt
+_CmdProtectedTxt:
+	DB	043H,06FH,06DH,06DH,061H,06EH,064H,020H,070H,072H,06FH,074H
+; rs232err.c   79	
+; rs232err.c   80	char code ParErrTxt[]						= "Parameter error";
+	DB	065H,063H,074H,065H,064H,000H
+	SYMB	IDEN, "ParErrTxt", _ParErrTxt, #273, 129, 0
+	SYMB	ALAB, _ParErrTxt, #273
+	PUBLIC	_ParErrTxt
+_ParErrTxt:
+	DB	050H,061H,072H,061H,06DH,065H,074H,065H,072H,020H,065H,072H
+; rs232err.c   81	char code SettingsErrTxt[]					= "Settings conflict";
+	DB	072H,06FH,072H,000H
+	SYMB	IDEN, "SettingsErrTxt", _SettingsErrTxt, #273, 129, 0
+	SYMB	ALAB, _SettingsErrTxt, #273
+	PUBLIC	_SettingsErrTxt
+_SettingsErrTxt:
+	DB	053H,065H,074H,074H,069H,06EH,067H,073H,020H,063H,06FH,06EH
+; rs232err.c   82	char code DataOutOfRangeTxt[]				= "Data out of range";
+	DB	066H,06CH,069H,063H,074H,000H
+	SYMB	IDEN, "DataOutOfRangeTxt", _DataOutOfRangeTxt, #273, 129, 0
+	SYMB	ALAB, _DataOutOfRangeTxt, #273
+	PUBLIC	_DataOutOfRangeTxt
+_DataOutOfRangeTxt:
+	DB	044H,061H,074H,061H,020H,06FH,075H,074H,020H,06FH,066H,020H
+; rs232err.c   83	char code TooMuchDataTxt[]					= "Too much data";
+	DB	072H,061H,06EH,067H,065H,000H
+	SYMB	IDEN, "TooMuchDataTxt", _TooMuchDataTxt, #273, 129, 0
+	SYMB	ALAB, _TooMuchDataTxt, #273
+	PUBLIC	_TooMuchDataTxt
+_TooMuchDataTxt:
+	DB	054H,06FH,06FH,020H,06DH,075H,063H,068H,020H,064H,061H,074H
+; rs232err.c   84	char code IllegalParValueTxt[]			= "Illegal parameter value";
+	DB	061H,000H
+	SYMB	IDEN, "IllegalParValueTxt", _IllegalParValueTxt, #273, 129, 0
+	SYMB	ALAB, _IllegalParValueTxt, #273
+	PUBLIC	_IllegalParValueTxt
+_IllegalParValueTxt:
+	DB	049H,06CH,06CH,065H,067H,061H,06CH,020H,070H,061H,072H,061H
+; rs232err.c   85	
+; rs232err.c   86	char code InvalidVersionTxt[]				= "Invalid version";
+	DB	06DH,065H,074H,065H,072H,020H,076H,061H,06CH,075H,065H,000H
+	SYMB	IDEN, "InvalidVersionTxt", _InvalidVersionTxt, #273, 129, 0
+	SYMB	ALAB, _InvalidVersionTxt, #273
+	PUBLIC	_InvalidVersionTxt
+_InvalidVersionTxt:
+	DB	049H,06EH,076H,061H,06CH,069H,064H,020H,076H,065H,072H,073H
+; rs232err.c   87	char code HardwareMissingTxt[]			= "Hardware Missing";
+	DB	069H,06FH,06EH,000H
+	SYMB	IDEN, "HardwareMissingTxt", _HardwareMissingTxt, #273, 129, 0
+	SYMB	ALAB, _HardwareMissingTxt, #273
+	PUBLIC	_HardwareMissingTxt
+_HardwareMissingTxt:
+	DB	048H,061H,072H,064H,077H,061H,072H,065H,020H,04DH,069H,073H
+; rs232err.c   88	
+; rs232err.c   89	char code DeviceSpecificErrTxt[]			= "Device-specific error";
+	DB	073H,069H,06EH,067H,000H
+	SYMB	IDEN, "DeviceSpecificErrTxt", _DeviceSpecificErrTxt, #273, 129, 0
+	SYMB	ALAB, _DeviceSpecificErrTxt, #273
+	PUBLIC	_DeviceSpecificErrTxt
+_DeviceSpecificErrTxt:
+	DB	044H,065H,076H,069H,063H,065H,02DH,073H,070H,065H,063H,069H
+; rs232err.c   90	char code QueueOverflowTxt[]				= "Queue overflow";
+	DB	066H,069H,063H,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "QueueOverflowTxt", _QueueOverflowTxt, #273, 129, 0
+	SYMB	ALAB, _QueueOverflowTxt, #273
+	PUBLIC	_QueueOverflowTxt
+_QueueOverflowTxt:
+	DB	051H,075H,065H,075H,065H,020H,06FH,076H,065H,072H,066H,06CH
+; rs232err.c   91	char code CommunicationErrTxt[]			= "Communication error";
+	DB	06FH,077H,000H
+	SYMB	IDEN, "CommunicationErrTxt", _CommunicationErrTxt, #273, 129, 0
+	SYMB	ALAB, _CommunicationErrTxt, #273
+	PUBLIC	_CommunicationErrTxt
+_CommunicationErrTxt:
+	DB	043H,06FH,06DH,06DH,075H,06EH,069H,063H,061H,074H,069H,06FH
+; rs232err.c   92	char code ParityErrMessageTxt[]			= "Parity error in program message";
+	DB	06EH,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "ParityErrMessageTxt", _ParityErrMessageTxt, #273, 129, 0
+	SYMB	ALAB, _ParityErrMessageTxt, #273
+	PUBLIC	_ParityErrMessageTxt
+_ParityErrMessageTxt:
+	DB	050H,061H,072H,069H,074H,079H,020H,065H,072H,072H,06FH,072H
+	DB	020H,069H,06EH,020H,070H,072H,06FH,067H,072H,061H,06DH,020H
+; rs232err.c   93	char code FramingErrMessageTxt[]			= "Framing error in program message";
+	DB	06DH,065H,073H,073H,061H,067H,065H,000H
+	SYMB	IDEN, "FramingErrMessageTxt", _FramingErrMessageTxt, #273, 129, 0
+	SYMB	ALAB, _FramingErrMessageTxt, #273
+	PUBLIC	_FramingErrMessageTxt
+_FramingErrMessageTxt:
+	DB	046H,072H,061H,06DH,069H,06EH,067H,020H,065H,072H,072H,06FH
+	DB	072H,020H,069H,06EH,020H,070H,072H,06FH,067H,072H,061H,06DH
+; rs232err.c   94	char code InputBufferOverrunTxt[]		= "Input buffer overrun";
+	DB	020H,06DH,065H,073H,073H,061H,067H,065H,000H
+	SYMB	IDEN, "InputBufferOverrunTxt", _InputBufferOverrunTxt, #273, 129, 0
+	SYMB	ALAB, _InputBufferOverrunTxt, #273
+	PUBLIC	_InputBufferOverrunTxt
+_InputBufferOverrunTxt:
+	DB	049H,06EH,070H,075H,074H,020H,062H,075H,066H,066H,065H,072H
+; rs232err.c   95	
+; rs232err.c   96	char code QueryErrTxt[]						= "Query error";
+	DB	020H,06FH,076H,065H,072H,072H,075H,06EH,000H
+	SYMB	IDEN, "QueryErrTxt", _QueryErrTxt, #273, 129, 0
+	SYMB	ALAB, _QueryErrTxt, #273
+	PUBLIC	_QueryErrTxt
+_QueryErrTxt:
+; rs232err.c   97	char code QueryInterruptedTxt[]			= "Query INTERRUPTED";
+	DB	051H,075H,065H,072H,079H,020H,065H,072H,072H,06FH,072H,000H
+	SYMB	IDEN, "QueryInterruptedTxt", _QueryInterruptedTxt, #273, 129, 0
+	SYMB	ALAB, _QueryInterruptedTxt, #273
+	PUBLIC	_QueryInterruptedTxt
+_QueryInterruptedTxt:
+	DB	051H,075H,065H,072H,079H,020H,049H,04EH,054H,045H,052H,052H
+; rs232err.c   98	char code QueryUnterminatedTxt[]			= "Query UNTERMINATED";
+	DB	055H,050H,054H,045H,044H,000H
+	SYMB	IDEN, "QueryUnterminatedTxt", _QueryUnterminatedTxt, #273, 129, 0
+	SYMB	ALAB, _QueryUnterminatedTxt, #273
+	PUBLIC	_QueryUnterminatedTxt
+_QueryUnterminatedTxt:
+	DB	051H,075H,065H,072H,079H,020H,055H,04EH,054H,045H,052H,04DH
+; rs232err.c   99	char code QueryDeadlockedTxt[]			= "Query DEADLOCKED";
+	DB	049H,04EH,041H,054H,045H,044H,000H
+	SYMB	IDEN, "QueryDeadlockedTxt", _QueryDeadlockedTxt, #273, 129, 0
+	SYMB	ALAB, _QueryDeadlockedTxt, #273
+	PUBLIC	_QueryDeadlockedTxt
+_QueryDeadlockedTxt:
+	DB	051H,075H,065H,072H,079H,020H,044H,045H,041H,044H,04CH,04FH
+; rs232err.c  100	
+; rs232err.c  101	
+; rs232err.c  102	struct ERROR_STRUCT code ErrorTxt_Array[LastErrorCode] = {
+	DB	043H,04BH,045H,044H,000H
+	SYMB	TYPE, 275, 'n', #2, 129
+	SYMB	TYPE, 276, 'P', #275
+	SYMB	TYPE, 277, "ERROR_STRUCT", 'S', 6,\
+		 "ErrorNo", #16, 0,\
+		 "ErrorTxt", #276, 2
+	SYMB	TYPE, 278, 'Z', #277, 47
+	SYMB	IDEN, "ErrorTxt_Array", _ErrorTxt_Array, #278, 129, 0
+	SYMB	ALAB, _ErrorTxt_Array, #278
+	PUBLIC	_ErrorTxt_Array
+	ALIGN	1
+_ErrorTxt_Array:
+	DW	00000H
+	DD	_NoErrTxt
+	DW	0FF9CH
+	DD	_CmdErrTxt
+	DW	0FF9BH
+	DD	_InvalidCharTxt
+	DW	0FF9AH
+	DD	_SyntaxErrTxt
+	DW	0FF99H
+	DD	_InvalidSeparatorTxt
+	DW	0FF98H
+	DD	_DataTypeErrTxt
+	DW	0FF94H
+	DD	_ParNotAllowedTxt
+	DW	0FF93H
+	DD	_MissingParTxt
+	DW	0FF92H
+	DD	_CmdHeaderErrTxt
+	DW	0FF91H
+	DD	_HdrSeparatorErrTxt
+	DW	0FF90H
+	DD	_PrgmMnemonicTooLongTxt
+	DW	0FF8FH
+	DD	_UndefinedHeaderTxt
+	DW	0FF8EH
+	DD	_HdrSuffixOutOfRangeTxt
+	DW	0FF88H
+	DD	_NumericDataErrTxt
+	DW	0FF87H
+	DD	_InvalidCharInNumberTxt
+	DW	0FF85H
+	DD	_ExponentTooLargeTxt
+	DW	0FF84H
+	DD	_TooManyDigitsTxt
+	DW	0FF83H
+	DD	_NumericDataNotAllowedTxt
+	DW	0FF7EH
+	DD	_SuffixErrTxt
+	DW	0FF7DH
+	DD	_InvalidSuffixErrTxt
+	DW	0FF7AH
+	DD	_SuffixTooLongTxt
+	DW	0FF76H
+	DD	_SuffixNotAllowedTxt
+	DW	0FF74H
+	DD	_CharErrTxt
+	DW	0FF6AH
+	DD	_StringDataErrTxt
+	DW	0FF69H
+	DD	_InvalidStringDataTxt
+	DW	0FF62H
+	DD	_StringDataNotAllowedTxt
+	DW	0FF60H
+	DD	_BlockDataErrTxt
+	DW	0FF5FH
+	DD	_InvalidBlockDataTxt
+	DW	0FF56H
+	DD	_ExpressionErrTxt
+	DW	0FF38H
+	DD	_ExecErrTxt
+	DW	0FF35H
+	DD	_CmdProtectedTxt
+	DW	0FF24H
+	DD	_ParErrTxt
+	DW	0FF23H
+	DD	_SettingsErrTxt
+	DW	0FF22H
+	DD	_DataOutOfRangeTxt
+	DW	0FF21H
+	DD	_TooMuchDataTxt
+	DW	0FF20H
+	DD	_IllegalParValueTxt
+	DW	0FF17H
+	DD	_InvalidVersionTxt
+	DW	0FF0FH
+	DD	_HardwareMissingTxt
+	DW	0FED4H
+	DD	_DeviceSpecificErrTxt
+	DW	0FEA2H
+	DD	_QueueOverflowTxt
+	DW	0FE98H
+	DD	_CommunicationErrTxt
+	DW	0FE97H
+	DD	_ParityErrMessageTxt
+	DW	0FE96H
+	DD	_FramingErrMessageTxt
+	DW	0FE95H
+	DD	_InputBufferOverrunTxt
+	DW	0FE70H
+	DD	_QueryErrTxt
+	DW	0FE66H
+	DD	_QueryInterruptedTxt
+	DW	0FE5CH
+	DD	_QueryUnterminatedTxt
+	DW	0FE52H
+; rs232err.c  103		{    0, NoErrTxt },						// NoErr
+; rs232err.c  104		{ -100, CmdErrTxt },						// CmdErr
+; rs232err.c  105		{ -101, InvalidCharTxt },				// InvalidChar
+; rs232err.c  106		{ -102, SyntaxErrTxt },					// SyntaxErr
+; rs232err.c  107		{ -103, InvalidSeparatorTxt },		// InvalidSeparator
+; rs232err.c  108		{ -104, DataTypeErrTxt },				// DataTypeErr
+; rs232err.c  109		{ -108, ParNotAllowedTxt },			// ParNotAllowed
+; rs232err.c  110		{ -109, MissingParTxt },				// Missingpar
+; rs232err.c  111		{ -110, CmdHeaderErrTxt },				// CmdHeaderErr
+; rs232err.c  112		{ -111, HdrSeparatorErrTxt },			// HdrSeparatorErr
+; rs232err.c  113		{ -112, PrgmMnemonicTooLongTxt },	// PrgmMnemonicTooLong
+; rs232err.c  114		{ -113, UndefinedHeaderTxt },			// UndefinedHeader
+; rs232err.c  115		{ -114, HdrSuffixOutOfRangeTxt },	// HdrSufficOutOfrange
+; rs232err.c  116	
+; rs232err.c  117		{ -120, NumericDataErrTxt },			// NumericDataErr
+; rs232err.c  118		{ -121, InvalidCharInNumberTxt },	//	InvalidCharinNUmber
+; rs232err.c  119		{ -123, ExponentTooLargeTxt },		// ExponentTooLarge
+; rs232err.c  120		{ -124, TooManyDigitsTxt },			// TooManyDigits
+; rs232err.c  121		{ -125, NumericDataNotAllowedTxt },	// NumericDataNotAllowed
+; rs232err.c  122		{ -130, SuffixErrTxt },					// SuffixErr
+; rs232err.c  123		{ -131, InvalidSuffixErrTxt },		// InvalidSuffixErr
+; rs232err.c  124		{ -134, SuffixTooLongTxt },			// SuffixTooLong
+; rs232err.c  125		{ -138, SuffixNotAllowedTxt },		// SuffixNotAllowed
+; rs232err.c  126	
+; rs232err.c  127		{ -140, CharErrTxt },					// CharErr
+; rs232err.c  128	
+; rs232err.c  129		{ -150, StringDataErrTxt },			// StringDataErr
+; rs232err.c  130		{ -151, InvalidStringDataTxt },		// InvalidStringData
+; rs232err.c  131		{ -158, StringDataNotAllowedTxt },	// StringDataNotAllowed
+; rs232err.c  132	
+; rs232err.c  133		{ -160, BlockDataErrTxt },				// BlockDataErr
+; rs232err.c  134		{ -161, InvalidBlockDataTxt },		// InvalidBlockData
+; rs232err.c  135	
+; rs232err.c  136		{ -170, ExpressionErrTxt },			// ExpressionErr
+; rs232err.c  137	
+; rs232err.c  138		{ -200, ExecErrTxt },					// ExecErr
+; rs232err.c  139		{ -203, CmdProtectedTxt },				// CmdProtected
+; rs232err.c  140	
+; rs232err.c  141		{ -220, ParErrTxt },						// ParErr
+; rs232err.c  142		{ -221, SettingsErrTxt },						// SettingsErr
+; rs232err.c  143		{ -222, DataOutOfRangeTxt },			// DataOutOfRange
+; rs232err.c  144		{ -223, TooMuchDataTxt },				// TooMuchData
+; rs232err.c  145		{ -224, IllegalParValueTxt },			// IllegalParValue
+; rs232err.c  146	
+; rs232err.c  147		{ -233, InvalidVersionTxt },			// InvalidVersion
+; rs232err.c  148	
+; rs232err.c  149		{ -241, HardwareMissingTxt },			// HardwareMissing
+; rs232err.c  150	
+; rs232err.c  151		{ -300, DeviceSpecificErrTxt },		// DeviceSpecificErr
+; rs232err.c  152		{ -350, QueueOverflowTxt },			// QueueOverflow
+; rs232err.c  153		{ -360, CommunicationErrTxt },		// CommunicationErr
+; rs232err.c  154		{ -361, ParityErrMessageTxt },		// ParityErrMessage
+; rs232err.c  155		{ -362, FramingErrMessageTxt },		// FramingErrMessage
+; rs232err.c  156		{ -363, InputBufferOverrunTxt },		// InputBufferOverrunErr
+; rs232err.c  157		{ -400, QueryErrTxt },					// QueryErr
+; rs232err.c  158		{ -410, QueryInterruptedTxt },		// QueryInterrupted
+; rs232err.c  159		{ -420, QueryUnterminatedTxt },		// QueryUnterminated
+; rs232err.c  160		{ -430, QueryDeadlockedTxt }			// QueryDeadlocked
+; rs232err.c  161	};
+; rs232err.c  162	
+; rs232err.c  163	UC STBReg;										// Status Byte
+; rs232err.c  164	UC SREReg;										// Service Request Enable Register
+; rs232err.c  165	
+; rs232err.c  166	UC ESRReg;										// Event Status Register
+; rs232err.c  167	UC ESEReg; 										// Event Status Enable Register
+; rs232err.c  168	
+; rs232err.c  169	UI QuestConditionReg;						// Questionable Condition Register
+; rs232err.c  170	UI QuestNtransReg;							// Questionable NTransition Register
+; rs232err.c  171	UI QuestPtransReg;							// Questionable PTransition Register
+; rs232err.c  172	UI QuestEventReg;								// Questionable Event Register
+; rs232err.c  173	UI QuestEnableReg;							// Questionable Enable Register
+; rs232err.c  174	
+; rs232err.c  175	UI OperConditionReg;							// Operation Condition Register
+; rs232err.c  176	UI OperNtransReg;								// Operation NTransition Register
+; rs232err.c  177	UI OperPtransReg;								// Operation PTransition Register
+; rs232err.c  178	UI OperEventReg;								// Operation Event Register
+; rs232err.c  179	UI OperEnableReg;								// Operation Enable Register
+; rs232err.c  180	
+; rs232err.c  181	int SCPIError;									// Current SCPI error
+; rs232err.c  182	
+; rs232err.c  183	static int ErrorEventQueue[QUEUE_SIZE];
+; rs232err.c  184	
+; rs232err.c  185	static int QueueHead = 0;
+	DD	_QueryDeadlockedTxt
+RS232ERR_INI_FA	SEGMENT	HDATA INSEGMENT INIT
+	RSEG	RS232ERR_INI_FA
+	SYMB	IDEN, "QueueHead", _QueueHead, #16, 130, 4
+	ALIGN	1
+_QueueHead:
+; rs232err.c  186	static int QueueTail = 0;
+	DW	00000H
+	SYMB	IDEN, "QueueTail", _QueueTail, #16, 130, 4
+	ALIGN	1
+_QueueTail:
+; rs232err.c  187	
+; rs232err.c  188	/***************************************************************************/
+; rs232err.c  189	/*	ResetErrorEventQueue												 	    RS232ERR.C	*/
+; rs232err.c  190	/*																									*/
+; rs232err.c  191	/* Author:		Kim Engedahl, DEV, 941124	    										*/
+; rs232err.c  192	/* Revised:		970630				     													*/
+; rs232err.c  193	/*																									*/
+; rs232err.c  194	/*	Function:	Clear all entries in the error/event queue						*/
+; rs232err.c  195	/*	Remarks:		Note! It is only the pointers which is reset						*/
+; rs232err.c  196	/*	Returns:		-																				*/
+; rs232err.c  197	/*	Updates:		-																				*/
+; rs232err.c  198	/***************************************************************************/
+; rs232err.c  199	void ResetErrorEventQueue() {
+	DW	00000H
+RS232ERR_PR	SEGMENT	HCODE
+	RSEG	RS232ERR_PR
+	ALIGN	1
+	SYMB	LINE, 199
+	PUBLIC	_ResetErrorEventQueue
+_ResetErrorEventQueue:
+	SYMB	TYPE, 280, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "ResetErrorEventQueue", _ResetErrorEventQueue, #280, 0, 0, 0
+	SYMB	ALAB, _ResetErrorEventQueue, #280
+; rs232err.c  200	
+; rs232err.c  201		QueueHead = QueueTail = 0;
+	SYMB	LINE, 201
+	MOV.B	ES,#SEG( _QueueTail )
+	MOV.W	R0,#SOF( _QueueTail )
+	MOV.W	[R0],#00H
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R0,#SOF( _QueueHead )
+	MOV.W	[R0],#00H
+; rs232err.c  202	
+; rs232err.c  203		UpdateSTBRegister();
+	SYMB	LINE, 203
+	CALL	_UpdateSTBRegister
+; rs232err.c  204	}
+	SYMB	LINE, 204
+	RET
+	SYMB	EFUN
+; rs232err.c  205	
+; rs232err.c  206	/***************************************************************************/
+; rs232err.c  207	/*	ReadErrorEventQueue												 	    RS232ERR.C	*/
+; rs232err.c  208	/*																									*/
+; rs232err.c  209	/* Author:		Kim Engedahl, DEV, 941124	    										*/
+; rs232err.c  210	/* Revised:		970630				     													*/
+; rs232err.c  211	/*																									*/
+; rs232err.c  212	/*	Function:	Read the OLDEST entry in the error queue							*/
+; rs232err.c  213	/*	Remarks:		-																				*/
+; rs232err.c  214	/*	Returns:		Error code if queue > 0, otherwise 0, ie. No error				*/
+; rs232err.c  215	/*	Updates:		-																				*/
+; rs232err.c  216	/***************************************************************************/
+; rs232err.c  217	int ReadErrorEventQueue() {
+	ALIGN	1
+	SYMB	LINE, 217
+	PUBLIC	_ReadErrorEventQueue
+_ReadErrorEventQueue:
+	SYMB	TYPE, 281, 'X', 12, #16, 30, 0
+	SYMB	GFUN, "ReadErrorEventQueue", _ReadErrorEventQueue, #281, 0, 0, 16
+	SYMB	ALAB, _ReadErrorEventQueue, #281
+	PUSH.W	R4
+	SYMB	SOFF, 2
+	SYMB	IDEN, "tmp", -1, #16, 130, 5
+	SYMB	LTIM, "tmp", -1, 0, 69
+; rs232err.c  218	
+; rs232err.c  219		register int tmp = NoErr;
+	SYMB	LINE, 219
+	MOV.W	R4,#00H
+	SYMB	LTIM, "tmp", 18, 0, 205
+; rs232err.c  220	
+; rs232err.c  221		if ( QueueHead != QueueTail) {					// If Queue is not empty
+	SYMB	LINE, 221
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R1,#SOF( _QueueHead )
+	MOV.W	R1,[R1]
+	MOV.B	ES,#SEG( _QueueTail )
+	MOV.W	R0,#SOF( _QueueTail )
+	MOV.W	R0,[R0]
+	CMP.W	R1,R0
+	BEQ	_3
+; rs232err.c  222	
+; rs232err.c  223			QueueTail = ( QueueTail+1) % QUEUE_SIZE;
+	SYMB	LINE, 223
+	ADDS.W	R0,#01H
+	MOV.W	R1,R0
+	SEXT.W	R1
+	DIV.D	R0,#020H
+	MOV.B	ES,#SEG( _QueueTail )
+	MOV.W	R0,#SOF( _QueueTail )
+	MOV.W	[R0],R1
+; rs232err.c  224	
+; rs232err.c  225			tmp = ErrorEventQueue[QueueTail];
+	SYMB	LINE, 225
+	ASL.W	R1,#01H
+	MOV.W	R0,R1
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _ErrorEventQueue )
+	MOV.W	R0,[R0+SOF( _ErrorEventQueue )]
+	MOV.W	R4,R0
+	SYMB	LTIM, "tmp", 18, 0, 77
+	SYMB	LTIM, "tmp", 18, 0, 205
+; rs232err.c  226		}
+	SYMB	LINE, 226
+_3:
+; rs232err.c  227	
+; rs232err.c  228		UpdateSTBRegister();
+	SYMB	LINE, 228
+	CALL	_UpdateSTBRegister
+; rs232err.c  229	
+; rs232err.c  230		return( tmp);
+	SYMB	LINE, 230
+	MOV.W	R0,R4
+	SYMB	LTIM, "tmp", 18, 0, 77
+	SYMB	LTIM, "tmp", 2, 0, 205
+; rs232err.c  231	}
+	SYMB	LINE, 231
+	POP.W	R4
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "tmp", 2, 0, 77
+	SYMB	EFUN
+; rs232err.c  232	
+; rs232err.c  233	/***************************************************************************/
+; rs232err.c  234	/*	SaveErrorEventQueue												 	    RS232ERR.C	*/
+; rs232err.c  235	/*																									*/
+; rs232err.c  236	/* Author:		Kim Engedahl, DEV, 941124	    										*/
+; rs232err.c  237	/* Revised:		970630				     													*/
+; rs232err.c  238	/*																									*/
+; rs232err.c  239	/*	Function:	Save the new error code in the error queue						*/
+; rs232err.c  240	/*	Remarks:		-																				*/
+; rs232err.c  241	/*	Returns:		-																				*/
+; rs232err.c  242	/*	Updates:		-																				*/
+; rs232err.c  243	/***************************************************************************/
+; rs232err.c  244	void SaveErrorEventQueue( int ErrorType) {
+	ALIGN	1
+	SYMB	LINE, 244
+	PUBLIC	_SaveErrorEventQueue
+_SaveErrorEventQueue:
+	SYMB	TYPE, 282, 'X', 12, #1, 30, 1, #16
+	SYMB	GFUN, "SaveErrorEventQueue", _SaveErrorEventQueue, #282, 0, 0, 48
+	SYMB	ALAB, _SaveErrorEventQueue, #282
+	PUSH.W	R4, R5
+	SYMB	SOFF, 4
+	SYMB	LTIM, "ErrorType", 2, 0, 2253
+	SYMB	IDEN, "ErrorType", 2, #16, 0, 2061
+; rs232err.c  245	
+; rs232err.c  246		if ((( QueueHead+1) % QUEUE_SIZE) != QueueTail) { // If queue not full
+	SYMB	LINE, 246
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R1,#SOF( _QueueHead )
+	MOV.W	R1,[R1]
+	ADDS.W	R1,#01H
+	MOV.W	R2,R1
+	MOV.W	R3,R2
+	SEXT.W	R3
+	DIV.D	R2,#020H
+	MOV.B	ES,#SEG( _QueueTail )
+	MOV.W	R2,#SOF( _QueueTail )
+	MOV.W	R2,[R2]
+	CMP.W	R3,R2
+	BEQ	_5
+; rs232err.c  247	
+; rs232err.c  248			QueueHead = ( ++QueueHead) % QUEUE_SIZE;
+	SYMB	LINE, 248
+	MOV.W	R2,R1
+	MOV.W	R4,R2
+	MOV.W	R5,R4
+	SEXT.W	R5
+	DIV.D	R4,#020H
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R1,#SOF( _QueueHead )
+	MOV.W	[R1],R2
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R1,#SOF( _QueueHead )
+	MOV.W	[R1],R5
+; rs232err.c  249	
+; rs232err.c  250			ErrorEventQueue[QueueHead] = ErrorType;
+	SYMB	LINE, 250
+	ASL.W	R5,#01H
+	MOV.W	R4,R5
+	MOVS.W	R5,#00H
+	MOV.B	ES,#SEG( _ErrorEventQueue )
+	MOV.W	[R4+SOF( _ErrorEventQueue )],R0
+; rs232err.c  251		}
+	SYMB	LINE, 251
+	BR	_6
+_5:
+; rs232err.c  252		else
+; rs232err.c  253			ErrorEventQueue[QueueHead] = QueueOverflow;
+	SYMB	LINE, 253
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R0,#SOF( _QueueHead )
+	MOV.W	R0,[R0]
+	SYMB	LTIM, "ErrorType", 2, 0, 2125
+	ASL.W	R0,#01H
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( _ErrorEventQueue )
+	MOV.W	[R0+SOF( _ErrorEventQueue )],#027H
+_6:
+; rs232err.c  254	
+; rs232err.c  255		UpdateSTBRegister();
+	SYMB	LINE, 255
+	CALL	_UpdateSTBRegister
+; rs232err.c  256	}
+	SYMB	LINE, 256
+	POP.W	R4, R5
+	SYMB	SOFF, 0
+	RET
+	SYMB	EFUN
+; rs232err.c  257	
+; rs232err.c  258	/***************************************************************************/
+; rs232err.c  259	/*	UpdateQUESTRegister												 	    RS232ERR.C	*/
+; rs232err.c  260	/*																									*/
+; rs232err.c  261	/* Author:		Kim Engedahl, DEV, 970630	    										*/
+; rs232err.c  262	/* Revised:		970630				     													*/
+; rs232err.c  263	/*																									*/
+; rs232err.c  264	/*	Function:	Update the content of the Questionable status register		*/
+; rs232err.c  265	/*	Remarks:		-																				*/
+; rs232err.c  266	/*	Returns:		A sum bit																	*/
+; rs232err.c  267	/*	Updates:		-																				*/
+; rs232err.c  268	/***************************************************************************/
+; rs232err.c  269	bit UpdateQUESTRegister() {
+	ALIGN	1
+	SYMB	LINE, 269
+	PUBLIC	_UpdateQUESTRegister
+_UpdateQUESTRegister:
+	SYMB	TYPE, 283, 'X', 12, #2, 30, 0
+	SYMB	GFUN, "UpdateQUESTRegister", _UpdateQUESTRegister, #283, 0, 0, 0
+	SYMB	ALAB, _UpdateQUESTRegister, #283
+; rs232err.c  270	
+; rs232err.c  271		QuestConditionReg=0;				// 1. Condition, ie. directly hardware etc.
+	SYMB	LINE, 271
+	MOV.B	ES,#SEG( _QuestConditionReg )
+	MOV.W	R0,#SOF( _QuestConditionReg )
+	MOV.W	[R0],#00H
+; rs232err.c  272		QuestPtransReg=0;					// 2. Positive transition
+	SYMB	LINE, 272
+	MOV.B	ES,#SEG( _QuestPtransReg )
+	MOV.W	R0,#SOF( _QuestPtransReg )
+	MOV.W	[R0],#00H
+; rs232err.c  273		QuestNtransReg=0;					// 3. Negative transition
+	SYMB	LINE, 273
+	MOV.B	ES,#SEG( _QuestNtransReg )
+	MOV.W	R0,#SOF( _QuestNtransReg )
+	MOV.W	[R0],#00H
+; rs232err.c  274		QuestEventReg=0;					// 4. Event section
+	SYMB	LINE, 274
+	MOV.B	ES,#SEG( _QuestEventReg )
+	MOV.W	R0,#SOF( _QuestEventReg )
+	MOV.W	[R0],#00H
+; rs232err.c  275		QuestEnableReg=0;					// 5. Enable section
+	SYMB	LINE, 275
+	MOV.B	ES,#SEG( _QuestEnableReg )
+	MOV.W	R0,#SOF( _QuestEnableReg )
+	MOV.W	[R0],#00H
+; rs232err.c  276	
+; rs232err.c  277		return( FALSE);
+	SYMB	LINE, 277
+	MOV.B	R0L,#00H
+; rs232err.c  278	}
+	SYMB	LINE, 278
+	RET
+	SYMB	EFUN
+; rs232err.c  279	
+; rs232err.c  280	/***************************************************************************/
+; rs232err.c  281	/*	UpdateOPERRegister												 	    RS232ERR.C	*/
+; rs232err.c  282	/*																									*/
+; rs232err.c  283	/* Author:		Kim Engedahl, DEV, 970630	    										*/
+; rs232err.c  284	/* Revised:		970630				     													*/
+; rs232err.c  285	/*																									*/
+; rs232err.c  286	/*	Function:	Update the content of the Operation status register			*/
+; rs232err.c  287	/*	Remarks:		-																				*/
+; rs232err.c  288	/*	Returns:		A sum bit																	*/
+; rs232err.c  289	/*	Updates:		-																				*/
+; rs232err.c  290	/***************************************************************************/
+; rs232err.c  291	bit UpdateOPERRegister() {
+	ALIGN	1
+	SYMB	LINE, 291
+	PUBLIC	_UpdateOPERRegister
+_UpdateOPERRegister:
+	SYMB	TYPE, 284, 'X', 12, #2, 30, 0
+	SYMB	GFUN, "UpdateOPERRegister", _UpdateOPERRegister, #284, 0, 0, 0
+	SYMB	ALAB, _UpdateOPERRegister, #284
+; rs232err.c  292	
+; rs232err.c  293		OperConditionReg=0;				// 1. Condition, ie. directly hardware etc.
+	SYMB	LINE, 293
+	MOV.B	ES,#SEG( _OperConditionReg )
+	MOV.W	R0,#SOF( _OperConditionReg )
+	MOV.W	[R0],#00H
+; rs232err.c  294		OperPtransReg=0;					// 2. Positive transition
+	SYMB	LINE, 294
+	MOV.B	ES,#SEG( _OperPtransReg )
+	MOV.W	R0,#SOF( _OperPtransReg )
+	MOV.W	[R0],#00H
+; rs232err.c  295		OperNtransReg=0;					// 3. Negative transition
+	SYMB	LINE, 295
+	MOV.B	ES,#SEG( _OperNtransReg )
+	MOV.W	R0,#SOF( _OperNtransReg )
+	MOV.W	[R0],#00H
+; rs232err.c  296		OperEventReg=0;					// 4. Event section
+	SYMB	LINE, 296
+	MOV.B	ES,#SEG( _OperEventReg )
+	MOV.W	R0,#SOF( _OperEventReg )
+	MOV.W	[R0],#00H
+; rs232err.c  297		OperEnableReg=0;					// 5. Enable section
+	SYMB	LINE, 297
+	MOV.B	ES,#SEG( _OperEnableReg )
+	MOV.W	R0,#SOF( _OperEnableReg )
+	MOV.W	[R0],#00H
+; rs232err.c  298	
+; rs232err.c  299		return( FALSE);
+	SYMB	LINE, 299
+	MOV.B	R0L,#00H
+; rs232err.c  300	}
+	SYMB	LINE, 300
+	RET
+	SYMB	EFUN
+; rs232err.c  301	
+; rs232err.c  302	/***************************************************************************/
+; rs232err.c  303	/*	UpdateESRRegister													 	    RS232ERR.C	*/
+; rs232err.c  304	/*																									*/
+; rs232err.c  305	/* Author:		Kim Engedahl, DEV, 970630	    										*/
+; rs232err.c  306	/* Revised:		970630				     													*/
+; rs232err.c  307	/*																									*/
+; rs232err.c  308	/*	Function:	Update the content of the ESR register								*/
+; rs232err.c  309	/*	Remarks:		-																				*/
+; rs232err.c  310	/*	Returns:		The content of the ESR register										*/
+; rs232err.c  311	/*	Updates:		-																				*/
+; rs232err.c  312	/***************************************************************************/
+; rs232err.c  313	UC UpdateESRRegister() {
+	ALIGN	1
+	SYMB	LINE, 313
+	PUBLIC	_UpdateESRRegister
+_UpdateESRRegister:
+	SYMB	TYPE, 285, 'X', 12, #3, 30, 0
+	SYMB	GFUN, "UpdateESRRegister", _UpdateESRRegister, #285, 0, 0, 0
+	SYMB	ALAB, _UpdateESRRegister, #285
+; rs232err.c  314											// Bit 7: Power On
+; rs232err.c  315											// Bit 6: User request
+; rs232err.c  316											// Bit 5: Command error
+; rs232err.c  317											// Bit 4: Execution error
+; rs232err.c  318											// Bit 3: Device dependent error
+; rs232err.c  319											// Bit 2: Queue error
+; rs232err.c  320											// Bit 1: Request control
+; rs232err.c  321											// Bit 0: Operation complete
+; rs232err.c  322		return( ESRReg);
+	SYMB	LINE, 322
+	MOV.B	ES,#SEG( _ESRReg )
+	MOV.W	R0,#SOF( _ESRReg )
+	MOV.B	R0L,[R0]
+; rs232err.c  323	}
+	SYMB	LINE, 323
+	RET
+	SYMB	EFUN
+; rs232err.c  324	
+; rs232err.c  325	/***************************************************************************/
+; rs232err.c  326	/*	UpdateSTBRegister													 	    RS232ERR.C	*/
+; rs232err.c  327	/*																									*/
+; rs232err.c  328	/* Author:		Kim Engedahl, DEV, 970630	    										*/
+; rs232err.c  329	/* Revised:		970630				     													*/
+; rs232err.c  330	/*																									*/
+; rs232err.c  331	/*	Function:	Update the content of the Status Byte register					*/
+; rs232err.c  332	/*	Remarks:		This command also updates the ESR register, the	operation-	*/
+; rs232err.c  333	/*					register and the questionable register.							*/
+; rs232err.c  334	/*	Returns:		-																				*/
+; rs232err.c  335	/*	Updates:		STBReg, ESRReg, QUESTReg & OPERReg									*/
+; rs232err.c  336	/***************************************************************************/
+; rs232err.c  337	void UpdateSTBRegister() {
+	ALIGN	1
+	SYMB	LINE, 337
+	PUBLIC	_UpdateSTBRegister
+_UpdateSTBRegister:
+	SYMB	TYPE, 286, 'X', 12, #1, 30, 0
+	SYMB	GFUN, "UpdateSTBRegister", _UpdateSTBRegister, #286, 0, 0, 0
+	SYMB	ALAB, _UpdateSTBRegister, #286
+; rs232err.c  338	
+; rs232err.c  339		STBReg &= 0x07;							// Clear the MSS-, ESR- & MAV-bit &
+	SYMB	LINE, 339
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R0,#SOF( _STBReg )
+	MOV.B	R0L,[R0]
+	AND.B	R0L,#07H
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+; rs232err.c  340														//  operation & questionable bits
+; rs232err.c  341		if ( UpdateOPERRegister())
+	SYMB	LINE, 341
+	CALL	_UpdateOPERRegister
+	OR.B	R0L,R0L
+	BEQ	_8
+; rs232err.c  342			STBReg |= 0x80;
+	SYMB	LINE, 342
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R0,#SOF( _STBReg )
+	MOV.B	R0L,[R0]
+	OR.B	R0L,#080H
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+_8:
+; rs232err.c  343	
+; rs232err.c  344		if ( STBReg & SREReg & 0xBF)			//	Calculate the MSS bit(6) in STB
+	SYMB	LINE, 344
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R0,#SOF( _STBReg )
+	MOV.B	R0L,[R0]
+	MOV.B	ES,#SEG( _SREReg )
+	MOV.W	R1,#SOF( _SREReg )
+	MOV.B	R0H,[R1]
+	AND.B	R0H,R0L
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+	AND.B	R0H,#0BFH
+	BEQ	_9
+; rs232err.c  345			STBReg |= 0x40;
+	SYMB	LINE, 345
+	OR.B	R0L,#040H
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+_9:
+; rs232err.c  346	
+; rs232err.c  347		if ( UpdateESRRegister() & ESEReg)	//	Calculate the ESB bit(5) in STB
+	SYMB	LINE, 347
+	CALL	_UpdateESRRegister
+	MOV.B	ES,#SEG( _ESEReg )
+	MOV.W	R1,#SOF( _ESEReg )
+	MOV.B	R0H,[R1]
+	AND.B	R0L,R0H
+	BEQ	_10
+; rs232err.c  348			STBReg |= 0x20;
+	SYMB	LINE, 348
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R0,#SOF( _STBReg )
+	MOV.B	R0L,[R0]
+	OR.B	R0L,#020H
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+_10:
+; rs232err.c  349	
+; rs232err.c  350		if ( QueueHead != QueueTail)			//	Calculate the MAV bit(4) in STB
+	SYMB	LINE, 350
+	MOV.B	ES,#SEG( _QueueHead )
+	MOV.W	R0,#SOF( _QueueHead )
+	MOV.W	R0,[R0]
+	MOV.B	ES,#SEG( _QueueTail )
+	MOV.W	R1,#SOF( _QueueTail )
+	MOV.W	R1,[R1]
+	CMP.W	R0,R1
+	BEQ	_11
+; rs232err.c  351			STBReg |= 0x10;
+	SYMB	LINE, 351
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R0,#SOF( _STBReg )
+	MOV.B	R0L,[R0]
+	OR.B	R0L,#010H
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+_11:
+; rs232err.c  352	
+; rs232err.c  353		if ( UpdateQUESTRegister())
+	SYMB	LINE, 353
+	CALL	_UpdateQUESTRegister
+	OR.B	R0L,R0L
+	BEQ	_12
+; rs232err.c  354			STBReg |= 0x08;
+	SYMB	LINE, 354
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R0,#SOF( _STBReg )
+	MOV.B	R0L,[R0]
+	OR.B	R0L,#08H
+	MOV.B	ES,#SEG( _STBReg )
+	MOV.W	R1,#SOF( _STBReg )
+	MOV.B	[R1],R0L
+_12:
+; rs232err.c  355	}
+	SYMB	LINE, 355
+	RET
+	SYMB	EFUN
+	SYMB	ENDF
+
+	SYMB	IDEN, "QuestPtransReg", _QuestPtransReg, #18, 130, 0
+	SYMB	ALAB, _QuestPtransReg, #18
+RS232ERR_CLR_FA	SEGMENT	HDATA INSEGMENT CLEAR
+	RSEG	RS232ERR_CLR_FA
+	PUBLIC	_QuestPtransReg
+	ALIGN	1
+_QuestPtransReg:	DS	2
+	SYMB	IDEN, "OperEnableReg", _OperEnableReg, #18, 130, 0
+	SYMB	ALAB, _OperEnableReg, #18
+	PUBLIC	_OperEnableReg
+	ALIGN	1
+_OperEnableReg:	DS	2
+	SYMB	IDEN, "OperPtransReg", _OperPtransReg, #18, 130, 0
+	SYMB	ALAB, _OperPtransReg, #18
+	PUBLIC	_OperPtransReg
+	ALIGN	1
+_OperPtransReg:	DS	2
+	SYMB	IDEN, "ESRReg", _ESRReg, #3, 130, 0
+	SYMB	ALAB, _ESRReg, #3
+	PUBLIC	_ESRReg
+_ESRReg:	DS	1
+	SYMB	IDEN, "STBReg", _STBReg, #3, 130, 0
+	SYMB	ALAB, _STBReg, #3
+	PUBLIC	_STBReg
+_STBReg:	DS	1
+	SYMB	IDEN, "ESEReg", _ESEReg, #3, 130, 0
+	SYMB	ALAB, _ESEReg, #3
+	PUBLIC	_ESEReg
+_ESEReg:	DS	1
+	SYMB	IDEN, "OperEventReg", _OperEventReg, #18, 130, 0
+	SYMB	ALAB, _OperEventReg, #18
+	PUBLIC	_OperEventReg
+	ALIGN	1
+_OperEventReg:	DS	2
+	SYMB	IDEN, "SREReg", _SREReg, #3, 130, 0
+	SYMB	ALAB, _SREReg, #3
+	PUBLIC	_SREReg
+_SREReg:	DS	1
+	SYMB	IDEN, "OperNtransReg", _OperNtransReg, #18, 130, 0
+	SYMB	ALAB, _OperNtransReg, #18
+	PUBLIC	_OperNtransReg
+	ALIGN	1
+_OperNtransReg:	DS	2
+	SYMB	IDEN, "QuestNtransReg", _QuestNtransReg, #18, 130, 0
+	SYMB	ALAB, _QuestNtransReg, #18
+	PUBLIC	_QuestNtransReg
+	ALIGN	1
+_QuestNtransReg:	DS	2
+	SYMB	IDEN, "QuestEnableReg", _QuestEnableReg, #18, 130, 0
+	SYMB	ALAB, _QuestEnableReg, #18
+	PUBLIC	_QuestEnableReg
+	ALIGN	1
+_QuestEnableReg:	DS	2
+	SYMB	TYPE, 287, 'Z', #16, 31
+	SYMB	IDEN, "ErrorEventQueue", _ErrorEventQueue, #287, 130, 4
+	ALIGN	1
+_ErrorEventQueue:	DS	64
+	SYMB	IDEN, "QuestConditionReg", _QuestConditionReg, #18, 130, 0
+	SYMB	ALAB, _QuestConditionReg, #18
+	PUBLIC	_QuestConditionReg
+	ALIGN	1
+_QuestConditionReg:	DS	2
+	SYMB	IDEN, "OperConditionReg", _OperConditionReg, #18, 130, 0
+	SYMB	ALAB, _OperConditionReg, #18
+	PUBLIC	_OperConditionReg
+	ALIGN	1
+_OperConditionReg:	DS	2
+	SYMB	IDEN, "SCPIError", _SCPIError, #16, 130, 0
+	SYMB	ALAB, _SCPIError, #16
+	PUBLIC	_SCPIError
+	ALIGN	1
+_SCPIError:	DS	2
+	SYMB	IDEN, "QuestEventReg", _QuestEventReg, #18, 130, 0
+	SYMB	ALAB, _QuestEventReg, #18
+	PUBLIC	_QuestEventReg
+	ALIGN	1
+_QuestEventReg:	DS	2
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'ResetErrorEventQueue', 'UpdateSTBRegister'
+	CALLS	'ReadErrorEventQueue', 'UpdateSTBRegister'
+	CALLS	'SaveErrorEventQueue', 'UpdateSTBRegister'
+	CALLS	'UpdateSTBRegister', 'UpdateOPERRegister'
+	CALLS	'UpdateSTBRegister', 'UpdateESRRegister'
+	CALLS	'UpdateSTBRegister', 'UpdateQUESTRegister'
+	END

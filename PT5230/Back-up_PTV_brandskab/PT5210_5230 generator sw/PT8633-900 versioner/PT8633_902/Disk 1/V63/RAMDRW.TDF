@@ -1,0 +1,108 @@
+%Tilføjelse af bevægeligt vindue til Philips PM5644 billdede%
+%+ tilføjet klik i lyd når pulsen "rammer" venstre side af tekstfelt%
+
+SUBDESIGN ramdrw
+
+(
+	clk, count_enable, oe				: INPUT;
+	klik, adjust,frameb,framea,bbcklik	: INPUT;
+	window,hsync,field2,s1,s0,mres,16x9	: INPUT;
+	moveklik							: INPUT;
+	test,abu[14..0],klika					: OUTPUT;
+)
+
+VARIABLE
+	tnode[14..0] 				: TRI_STATE_NODE;
+	hsound[13..0],adjust1		: DFF;
+	offset[10..0],klikb,test	: DFF;
+	ramtekst[10..0],rst			: DFF;
+	updown,klika				: DFFE; 
+
+BEGIN
+	hsound[13..0].clk  = clk;
+	hsound[13..0].clrn = !adjust;
+
+	offset[].clk	= s0;  %Movebit eller field-pulse%
+
+	ramtekst[].clk	= clk;
+
+	adjust1.clk	 = clk;
+	adjust1.d	 = adjust;
+
+	rst.clk 	 = s0;
+	rst.d		 = (!16x9 & offset[].q==346) # (16x9 & offset[].q==594);%612%	
+
+	updown.clk   = s0;
+	updown.d	 = VCC;
+	updown.ena	 = (offset[]==930);%940%
+	updown.clrn	 = !rst.q;
+
+	klika.clk    = s0 %hsync%;
+	klika.ena	     = VCC;
+%	klika.ena	 = (offset[]==544) & moveklik;
+	klika.clrn	 = !(offset[]==528);%
+	klika.d	 = (offset[]==858) & updown;%874 980929 ?%
+%	klika.clrn	 = !field2(offset[]==648 # offset[]==632);%
+
+	test.clk	= s0;
+	test.d		= (offset[]==634) & updown;
+%	test.clrn	= !(offset[]==808);%
+
+	klikb.clk    = hsync;
+%	klikb.d	     = (klika.q) # (klik & !moveklik);%%klik%
+	klikb.d	     = (!klika.q & moveklik) # (klik & !moveklik);%beep%
+
+
+    IF updown==1 THEN
+	  offset[].d  =offset[].q-8;
+     ELSIF offset[].q==0 THEN
+	  offset[].d  =634;%center:634 max:338 min: 938% 
+	 ELSE	
+ 	  offset[].d  =offset[].q+8; 
+	END IF; 	
+    offset[].clrn = mres; 
+
+	IF count_enable==1 THEN
+		IF (hsound[13..0].q ==12031 ) THEN  %12031% %2815%
+		  hsound[13..0].d  = 512;
+		ELSE
+		  hsound[13..0].d  = hsound[13..0].q+1;
+		END IF;
+	  ELSE
+		  hsound[8..0].d   = hsound[8..0].q;
+		  hsound9.d 	   = hsound9.q # adjust1.q;
+		  hsound[13..10].d = hsound[13..10].q;
+	END IF;
+
+	IF hsync==1 THEN   %tæller til ramtekst (bevægelse)%
+%		ramtekst10.d 	  = GND;
+		ramtekst10.d 	  = bluebit;%
+		ramtekst[10..0].d  = offset[10..0];
+	   ELSIF window==1 THEN
+		ramtekst[10..0].d = ramtekst[].q+1;
+	   ELSE
+		ramtekst[10..0].d = ramtekst[].q;
+	END IF;
+	
+
+		  %special-klik til bevægeligt DR logo:%
+
+	tnode14	= TRI(!window & (klik & framea # frameb & %bbc%klik), !oe); 
+	tnode13	= TRI(hsound13 # window, !oe);
+	tnode12	= TRI(hsound12 # window, !oe);
+	tnode11	= TRI(hsound11 # window, !oe);
+	tnode10	= TRI((!window & hsound10) # (window & ramtekst10), !oe);
+	tnode9	= TRI((!window & hsound9) # (window & ramtekst9), !oe);
+	tnode8	= TRI((!window & hsound8) # (window & ramtekst8), !oe);
+	tnode7	= TRI((!window & hsound7) # (window & ramtekst7), !oe);
+	tnode6	= TRI((!window & hsound6) # (window & ramtekst6), !oe);
+	tnode5	= TRI((!window & hsound5) # (window & ramtekst5), !oe);
+	tnode4	= TRI((!window & hsound4) # (window & ramtekst4), !oe);
+	tnode3	= TRI((!window & hsound3) # (window & ramtekst3), !oe);
+	tnode2	= TRI((!window & hsound2) # (window & ramtekst2), !oe);
+	tnode1	= TRI((!window & hsound1) # (window & ramtekst1), !oe);
+	tnode0	= TRI((!window & hsound0) # (window & ramtekst0), !oe);
+ 	abu[14..0]		= tnode[14..0];
+END;
+
+

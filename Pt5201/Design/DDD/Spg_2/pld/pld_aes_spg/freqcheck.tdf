@@ -1,0 +1,37 @@
+SUBDESIGN FREQCHECK
+%
+project		: PT5201
+Compagny	: PTV
+Designer	: PF
+Version		: 01
+File name	: FREQCHECK.tdf
+Function	: Check of freq for 10MHz lock
+UPDATE		: 
+%
+(
+CLK27M,							-- 27 MHz clock
+FREQ			: input;		-- 5MHz freq to be checked (10MHz signal is divided by 2 giving 5MHz)
+FREQ_FAIL		: output;		-- status signal (0=ok   1=fail)
+)
+
+variable
+refcnt[12..0]	: dff;
+wincnt[9..0]	: dffe;
+okFF			: dffe;
+
+begin
+refcnt[].clk = CLK27M;
+refcnt[] = refcnt[] + 1;
+
+wincnt[].clk = FREQ;
+wincnt[].clrn = refcnt[12];		-- 5MHz signal counts to 758 when refcnt-bit12 is high
+wincnt[] = wincnt[] + 1;
+
+okFF.clk = CLK27M;
+okFF.d = ((wincnt[] < 761) & (wincnt[] > 756));
+okFF.ena = refcnt[] == H"1FFF";
+FREQ_FAIL = !okFF;
+end;
+
+
+

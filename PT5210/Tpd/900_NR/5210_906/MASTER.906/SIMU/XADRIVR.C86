@@ -1,0 +1,499 @@
+/***************************************************************************/
+/*	Copyright PHILIPS TV TEST EQUIPMENT A/S, BRONDBY 1997							*/
+/*	Project:		PT5210 VariTime digital sync generator								*/
+/*	Module:		XADRIVR.C																	*/
+/*	Author:		P.H.Seerden, Application note: AN95040								*/
+/*	Org. date:	950105, P.H.Seerden, Philips Semiconductors B.V.				*/
+/*	Rev. date:	971014, KEn	DEV															*/
+/*	Status:		Version 0.3																	*/
+/*																									*/
+/*	This module contains the following functions:									*/
+/*																									*/
+/*	Changes:																						*/
+/* 971014 Errors in the parity handling corrected									*/
+/* 971010 Optimized Udr_InitializeUart() & Udr_LoopbackTest()					*/
+/* 971008 Added Udr_LoopbackTest()														*/
+/* 970625 declaration of delay altered to static int								*/
+/* 970303 Added UDR_PARITY & UDR_FRAMING etc.										*/
+/* 970226 Now driver ALWAYS use 8 databit, 1 RX- & 2 TX-stopbit				*/
+/* 970217 Removed parameters in Udr_InitializeUart									*/
+/***************************************************************************/
+
+#include <stdlib.h>
+#include <xa.h>
+
+#include "mas.h"
+#include "52sync.h"
+
+#include "tables.h"
+#include "xaexprt.h"
+#include "xadrivr.h"
+#include "rs232err.h"
+#include "util.h"
+
+near char rxBufHead;						// Index to next available slot in buffer
+near char rxBufTail;						// Index to next slot emptied from buffer
+near char txBufHead;						// Index to next available slot in buffer
+near char txBufTail;						// Index to next slot emptied from buffer
+
+static char rxBuf[UDR_RXBUFSIZE];	// Driver Receive Buffer
+static char txBuf[UDR_TXBUFSIZE];	// Driver Transmit Buffer
+
+static bit trxStopped;					// TRUE: transmitter disabled
+static bit trxEmpty;						// TRUE: transmitter not busy
+
+static char rcvStopped;					// TRUE: remote sender stopped
+static char rcvChar;						// Temp. holds the received character
+static bit rcvParity;					// Temp. holds the parity of the received
+												//  character
+
+static UC UART_Parity;					// User selected parity
+static UC UART_Databit;					// User selected no of databits
+static bit UART_Handshake;				// User selected handshake
+												//  TRUE: handshake is RTS/CTS
+												//  FALSE: handshake is XON/XOFF
+
+static int delay;							// Delay equal to 1 stop bit	
+
+/***************************************************************************/
+/*	Udr_InitializeUart														  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Initialize HW registers of Uart										*/
+/*	Remarks:		-																				*/
+/*	Returns:    Nothing																		*/
+/* Updates:		-																				*/
+/***************************************************************************/
+void Udr_InitializeUart( UC Baudrate, UC Databit, UC Parity, UC Handshake) {
+
+	int tmp;
+
+	UART_Parity = Parity;
+	UART_Databit = Databit;
+	UART_Handshake = Handshake;		// 1: RTS/CTS, 0: XON/XOFF
+}
+
+/***************************************************************************/
+/*	Udr_Uart_RX_Interrupt													  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Interrupt routine for the serial RX-communication				*/
+/*	Remarks:		-																				*/
+/*	Returns:    Nothing																		*/
+/* Updates:		-																				*/
+/***************************************************************************/
+void Udr_Uart_RX_Interrupt( void) {
+/*
+	if ( S0STAT & 0x0E) {
+		if ( FE0) 									// If framing error..
+			rcvChar = UDR_FRAMING;
+
+		if ( BR0) 									// If break detect error..
+			rcvChar = UDR_BREAK;
+
+		if ( OE0) 									// If overrun error..
+			rcvChar = UDR_OVERRUN;
+
+		S0STAT &= 0xF1;							// Reset ALL of above errors
+	}
+	else {
+		rcvChar = S0BUF;							// Read received character
+		rcvParity = GetParity( rcvChar);
+
+		switch ( UART_Parity) {
+			case UDR_NONE:
+				if ( UART_Databit == UDR_DATA7)
+					rcvChar &= 0x7F;
+				break;
+
+			case UDR_ODD:
+				if ( UART_Databit == UDR_DATA8) {
+					if ( !( rcvParity ^ R0B8))
+						rcvChar = UDR_PARITY;
+				}
+				else {
+					if ( !rcvParity)
+						rcvChar = UDR_PARITY;
+					else
+						rcvChar &= 0x7F;
+				}
+				break;
+
+			case UDR_EVEN:
+				if ( UART_Databit == UDR_DATA8) {
+					if ( rcvParity ^ R0B8)
+						rcvChar = UDR_PARITY;
+				}
+				else {
+					if ( rcvParity)
+						rcvChar = UDR_PARITY;
+					else
+						rcvChar &= 0x7F;
+				}
+				break;
+		}
+	}
+	RI0 = 0;					 							// Clear Interrupt flag RI0
+
+	if ( rcvChar == LOCK) {							// If local lockout switchover..
+		if ( SerialRemoteLockoutOn)
+			SerialRemoteLockoutOn = FALSE;
+		else
+			SerialRemoteLockoutOn = TRUE;
+	}
+	else {
+		if ( UART_Handshake == UDR_RTS_CTS) {		// if RTS/CTS Handshake..
+
+			if ( Udr_FreeSpaceInRxBuf() <= UDR_FLOWSPACE) {
+																// stop the remote sender
+				RTS_OFF;										// set RTS  (active low)
+				rcvStopped = TRUE;
+			}
+
+			rxBufHead = ( ++rxBufHead) % UDR_RXBUFSIZE;
+			rxBuf[rxBufHead] = rcvChar;
+		}
+		else {											// .. if it is XON/XOFF handshake
+			if ( rcvChar == XOFF)					// If received character is XOFF
+			trxStopped = TRUE;						//  then disable the transmitter
+			else {
+				if ( rcvChar == XON) {				// If received character is XON
+					trxStopped = FALSE;				//  then enable the transmitter
+					TI0 = 1;								// Generate TI to (re)start
+				}											//   transmission
+				else {
+					if ( Udr_FreeSpaceInRxBuf() <= UDR_FLOWSPACE) {
+
+						rcvStopped = TRUE;			// Stop the remote sender
+						trxEmpty = FALSE;
+
+						waitus( delay);				// Wait for one stop bit
+						S0BUF = XOFF;					// send XOFF
+				}
+
+					rxBufHead = ( ++rxBufHead) % UDR_RXBUFSIZE;
+					rxBuf[rxBufHead] = rcvChar;
+				}
+			}
+		}
+	}
+*/
+}
+
+/***************************************************************************/
+/*	Udr_Uart_TX_Interrupt													  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Interrupt routine for the serial TX-communication				*/
+/*	Remarks:		-																				*/
+/*	Returns:    Nothing																		*/
+/* Updates:		-																				*/
+/***************************************************************************/
+void Udr_Uart_TX_Interrupt( void) {
+
+/*	TI0 = 0;									 		// Clear Interrupt flag TI in S0CON
+
+	if ( UART_Handshake == UDR_RTS_CTS) {	// if RTS/CTS Handshake..
+		if ( INT0 == 1)
+			trxStopped = TRUE;
+	}
+
+	if ( !trxStopped && ( txBufTail != txBufHead)) {
+
+		txBufTail = ( ++txBufTail) % UDR_TXBUFSIZE;
+
+		waitus( delay);							// Wait for one stop bit
+
+		if ( UART_Databit == UDR_DATA8)
+			Set_8Bit_Parity( txBuf[txBufTail]);
+
+		S0BUF = txBuf[txBufTail];
+	}
+	else
+		trxEmpty = TRUE;
+*/
+}
+
+/***************************************************************************/
+/*	Udr_CTS_Interrupt															  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Interrupt routine for the CTS interrupt line						*/
+/*	Remarks:		This routine is executed after a status change from passive	*/
+/*					to active on the CTS Interrupt line (INT0)						*/
+/*	Returns:    Nothing																		*/
+/* Updates:		-																				*/
+/***************************************************************************/
+void Udr_CTS_Interrupt( void) {
+}
+
+/***************************************************************************/
+/*	Udr_ReceiveByte															  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Read one character from the receive data buffer					*/
+/*	Remarks:		-																				*/
+/*	Returns:    UDR_OK: if new char available, UDR_EOF: if buffer is empty	*/
+/* Updates:		-																				*/
+/***************************************************************************/
+char Udr_ReceiveByte( char *c) {
+
+/*	if ( rxBufHead != rxBufTail) {					// If rx buffer is not empty
+
+		rxBufTail = ( rxBufTail+1) % UDR_RXBUFSIZE;
+
+		if ( UART_Handshake == UDR_RTS_CTS) {
+
+			if ( rcvStopped && ( Udr_FreeSpaceInRxBuf() > UDR_FLOWSPACE)) {
+				RTS_ON;										// activate RTS  (active low)
+				rcvStopped = FALSE;	  					// start incoming stream again
+			}
+		}
+		else {
+			if ( rcvStopped && ( Udr_FreeSpaceInRxBuf() > ( UDR_FLOWSPACE+2))) {
+											 
+				rcvStopped = FALSE; 						// start incoming stream again
+				trxEmpty	= FALSE;
+
+				waitus( delay);							// Wait for one stop bit
+				S0BUF = XON;								// send XON
+			}
+		}
+		*c = rxBuf[rxBufTail];
+
+		return( UDR_OK);
+	}
+
+	return( UDR_EOF);
+*/
+}
+
+/***************************************************************************/
+/*	Udr_FreeSpaceInRxBuf														  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Calculate free space in receive buffer								*/
+/*	Remarks:		-																				*/
+/*	Returns:    No of free bytes in receive buffer									*/
+/* Updates:		-																				*/
+/***************************************************************************/
+char Udr_FreeSpaceInRxBuf( void) {
+/*
+	if ( rxBufHead >= rxBufTail)
+		return( UDR_RXBUFSIZE + rxBufTail - rxBufHead);
+	else
+		return( rxBufTail - rxBufHead);
+*/
+}
+
+/***************************************************************************/
+/*	Udr_SendByte																  XADRIVR.C */
+/*																									*/
+/* Author:		P.H.Seerden/Kim Engedahl, DEV											*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Write one character to the transmit data buffer					*/
+/*	Remarks:		-																				*/
+/*	Returns:    UDR_OK: if no error, UDR_OVL: if buffer is full					*/
+/* Updates:		-																				*/
+/***************************************************************************/
+char Udr_SendByte( char ch) {
+/*
+	feed_dog;
+																 // If buffer is not full..
+	if ((( txBufHead+1) % UDR_TXBUFSIZE) != txBufTail) {
+	
+		if ( UART_Databit == UDR_DATA7)
+			Set_7Bit_Parity( &ch);
+			
+		txBufHead = ( ++txBufHead) % UDR_TXBUFSIZE;
+		txBuf[txBufHead] = ch;
+
+		if ( trxEmpty && !trxStopped) {
+
+			trxEmpty = FALSE;
+			txBufTail = ( ++txBufTail) % UDR_TXBUFSIZE;
+
+			waitus( delay);								// Wait for one stop bit
+
+			if ( UART_Databit == UDR_DATA8)
+				Set_8Bit_Parity( txBuf[txBufTail]);
+
+			S0BUF = txBuf[txBufTail];
+		}
+		return( UDR_OK);
+	}
+	return( UDR_OVL);
+*/
+}
+
+/***************************************************************************/
+/*	GetParity																 		UTIL.C51	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 960828	    										*/
+/* Revised:		971014				     													*/
+/*																									*/
+/*	Function:	Check the parity of a 8-bit character								*/
+/*	Remarks:																						*/
+/*	Returns:		-------																		*/
+/*	Updates:		-------																		*/
+/***************************************************************************/
+bit GetParity( char ch) {
+
+	UC cnt;
+	char j;
+
+	for ( cnt = 0, j = 1; j != 0; j <<= 1)
+		if ( ch & j)
+			cnt++;
+
+	if ( cnt & 0x01)
+		return( 1);
+
+	return( 0);
+}
+
+/***************************************************************************/
+/*	Set_7Bit_Parity														 		UTIL.C51	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 960828	    										*/
+/* Revised:		971014				     													*/
+/*																									*/
+/*	Function:	Find and set/clear the parity of a 7-bit character.			*/
+/*	Remarks:		Parity is set/cleared in the 8th bit								*/
+/*	Returns:		-------																		*/
+/*	Updates:		-------																		*/
+/***************************************************************************/
+void Set_7Bit_Parity( char* ch) {
+
+	UC cnt;
+	char j;
+
+	if ( UART_Parity == UDR_NONE)
+		*ch |= '\x80';							// MUST be one, used as stop bit
+	else {
+		for ( cnt = 0, j = 1; j != '\x80'; j <<= 1) 
+			if ( *ch & j)
+				cnt++;
+
+		if ( UART_Parity == UDR_ODD) {
+			if ( cnt & 0x01)
+				*ch &= '\x7F';
+			else
+				*ch |= '\x80';
+		}
+		else {
+			if ( cnt & 0x01)
+				*ch |= '\x80';
+			else
+				*ch &= '\x7F';
+		}
+	}
+}
+
+/***************************************************************************/
+/*	Set_8Bit_Parity														 		UTIL.C51	*/
+/*																									*/
+/* Author:		Kim Engedahl, DEV, 960828	    										*/
+/* Revised:		971014				     													*/
+/*																									*/
+/*	Function:	Find and set/clear the parity of a 8-bit character.			*/
+/*	Remarks:		Parity is set/cleared in the register T0B8						*/
+/*	Returns:		-------																		*/
+/*	Updates:		-------																		*/
+/***************************************************************************/
+void Set_8Bit_Parity( char ch) {
+
+	UC T0B8;
+	UC cnt;
+	char j;
+
+	if ( UART_Parity == UDR_NONE)
+		return;
+
+	for ( cnt = 0, j = 1; j != 0; j <<= 1)
+		if ( ch & j)
+			cnt++;
+
+	if ( UART_Parity == UDR_ODD) {
+		if ( cnt & 0x01)
+			T0B8 = 0;
+		else
+			T0B8 = 1;
+	}
+	else {
+		if ( cnt & 0x01)
+			T0B8 = 1;
+		else
+			T0B8 = 0;
+	}
+}
+
+/***************************************************************************/
+/*	Udr_RS232LoopbackTest													  XADRIVR.C */
+/*																									*/
+/* Author:		Kim Engedahl, DEV															*/
+/* Revised:		971010, KEn, DEV															*/
+/*																									*/
+/*	Function:	Test if loopback connector is present								*/
+/*	Remarks:		-																				*/
+/*	Returns:    Nothing																		*/
+/* Updates:		-																				*/
+/***************************************************************************/
+bit Udr_RS232LoopbackTest( void) {
+/*
+	UC present = FALSE;
+
+	ETI0 = 0;										// Disable serial TxD interrupt
+	ERI0 = 0;										// Disable serial RxD interrupt
+	EX0 = 0;											// Disable CTS interrupt
+
+	TXD0 = 0;										// TxD = 0
+	INT1 = 0;										// RTS = 0
+
+	waitms( 1);
+	feed_dog;										// 
+	if (( RXD0 == 0) && ( INT0 == 0)) {
+		TXD0 = 0;									// TxD = 0
+		INT1 = 1;									// RTS = 1
+
+		waitms( 1);
+		feed_dog;
+		if (( RXD0 == 0) && ( INT0 == 1)) {
+			TXD0 = 1;								// TxD = 1
+			INT1 = 0;								// RTS = 0
+
+			waitms( 1);
+			feed_dog;
+			if (( RXD0 == 1) && ( INT0 == 0)) {
+				TXD0 = 1;							// TxD = 1
+				INT1 = 1;							// RTS = 1
+
+				waitms( 1);
+				feed_dog;
+				if (( RXD0 == 1) && ( INT0 == 1))
+					present = TRUE;
+			}
+		}
+	}
+																// Re-initialize UART
+	Udr_InitializeUart( UDR_BAUD_9600, UDR_DATA8, UDR_NONE, UDR_RTS_CTS);
+
+	if ( present)
+		return( TRUE);
+
+*/
+	return( FALSE);
+}

@@ -1,0 +1,215 @@
+#
+#   RTXC    Version 3.2
+#   Copyright (c) 1986-1998.
+#   Embedded System Products, Inc.
+#   ALL RIGHTS RESERVED
+#
+
+#
+# filename = makefile
+#
+# makefile for Borland C++ v5.0x using Borland make v4.0
+#
+
+#
+# Tool Directories
+#
+BC = c:\programs\bc4
+#BC = c:\bc5      # root path for Borland C++ distribution
+                 # ** $(BC)/bin not necessary to be in PATH **
+                 # typically LIB=$(BC)\lib and INCLUDE=$(BC)\include
+                 # defined in environment or $(BC)\bin\turbo.cfg file
+                 #
+
+#
+# Tools
+#
+CC = $(BC)\bin\bcc    # C Compiler
+AS = $(BC)\bin\tasm   # Assembler
+AR = $(BC)\bin\tlib   # Librarian
+LD = $(BC)\bin\tlink  # Linker
+RM = del		    # Delete - remove intermediate files	
+
+#
+# Paths
+#
+INC = ..\..\Include   # Include directory
+LIB = ..\..\Lib	    # Library directory	
+TMP = .               # scratch files in local directory, slower but reliable
+
+
+
+MODEL = __LARGE__   # normal model, use with large model application
+#MODEL = __HUGE__   # huge model, only if application requires HUGE model
+
+#
+# .c.obj default rules
+#
+.c.obj:
+   $(CC) $(CCFLAGS) $*.c
+   $(AS) $(ASFLAGS) $(TMP)\$*.asm
+   $(RM) $(TMP)\$*.asm
+   $(AR) $(LIB)\librtxc -+$*.obj
+   $(RM) $(LIB)\librtxc.bak
+
+#
+# .asm.obj default rules
+#
+.asm.obj:
+   $(AS) $(ASFLAGS) $*.asm
+   $(AR) $(LIB)\librtxc -+$*.obj
+   $(RM) $(LIB)\librtxc.bak
+
+#
+# cpu type
+#
+#cccpu = -1-  # 8088/8086
+cccpu = -1   # 80186 (+ 80286/386/486)
+#cccpu = -3 -DCPU386  # 80386/486 - BCC 3.1 **ONLY** (32 bit math)
+
+#ascpu = 0    # 8088, also need cccpu = -1- above
+ascpu = 2    # 80186 (+ 80286/...), also need cccpu = -1 above
+#ascpu = 3    # 80386/486 also need cccpu = -3 above
+
+#
+# fpu type
+#
+ccfp = -f-   # NO fp code at all in kernel even with FPU support
+
+asfp =       # NO fp code at all in kernel even with FPU support
+
+warn = -w    # enabled
+#warn = -w-   # minimal warnings
+
+# used by compiler and linker
+#ccdebug =    # disabled
+ccdebug = -v # enabled
+
+#
+# register variables
+# -r-  None
+# -rd  Only with register keyword
+# -r   Automatic (cannot be used with OMF file output)
+
+#
+# Include Paths
+#
+include = -I$(INC)
+
+#
+# note: RTXC is built using compact (-mc) model.  Furthermore, all RTXC
+#       modules reside in same named (-zC) code segment, RTXC_TEXT.  This
+#       provides a single code segment containing all of RTXC and supporting
+#       pieces.
+#
+#       -mc  compact model
+#       -mh  huge model
+#       -k-  suppress stack frame (useful only for call tracebacks)
+#       -G   optimize for speed instead of size
+#       -O-  disable optimizer
+#       -Oi  inline functions (fast but code is larger)
+#       -O2  C++ 3.0 - fastest code
+#       -a   align structure sizes (helpful if odd sized structs)
+#       -Z   alias optimizer (use with caution - rtxc qualified OK)
+#       -S   output mixed C and assembly language file - not object
+#
+!if $(MODEL) == __LARGE__ ## STD/LARGE MODEL FOLLOWS
+CCFLAGS = -c -mc -a2 -k- -G -O2 -Oi -Z -r- $(ccfp) $(cccpu) $(warn) $(ccdebug) \
+          $(include) -zCRTXC_TEXT -S -o$(TMP)\$*.asm 
+!else ## HUGE MODEL FOLLOWS
+CCFLAGS = -c -mh -a2 -k- -G -O2 -Oi -Z -r- $(ccfp) $(cccpu) $(warn) $(ccdebug) \
+          $(include) -zCRTXC_TEXT -Dnear= -Dfar= -Dhuge=
+!endif
+
+#
+# Note: The RTXC Application Interface functions are compiled using
+#       large (-ml) model.  This is true for all RTXC functions called
+#       directly by user application code.  Despite large model option,
+#       the code object is forced in the RTXC_TEXT segment.  This is
+#       done to isolate RTXC from the application.
+#
+
+#
+# Note: The -O2-p (Maximum speed optimization BUT with No copy propagation)
+#       switch is IMPORTANT and required if using INLINE KS() calls.
+#
+!if $(MODEL) == __LARGE__ ## STD/LARGE MODEL WITH INLINE ASM FOLLOWS
+CCFLAGS2 = -c -ml -a2 -k- -G -O2-p -Oi -Z -r- $(ccfp) $(cccpu) $(warn) $(ccdebug) \
+           $(include) -zCRTXC_TEXT -S -o$(TMP)\$*.asm
+!else ## HUGE MODEL FOLLOWS
+CCFLAGS2 = -c -mh -a2 -k- -G -O2-p -Z -r- $(ccfp) $(cccpu) $(warn) $(ccdebug) \
+           $(include) -zCRTXC_TEXT -Dnear= -Dfar= -Dhuge= -S -o$(TMP)\$*.asm
+!endif
+
+!if $(MODEL) == __LARGE__ ## STD/LARGE MODEL FOLLOWS
+CCFLAGS3 = -c -ml -a2 -k- -G -O2-p -Oi -Z -r- $(ccfp) $(cccpu) $(warn) $(ccdebug) \
+           $(include) -zCRTXC_TEXT
+!else ## HUGE MODEL FOLLOWS
+CCFLAGS3 = -c -mh -a2 -k- -G -O2-p -Z -r- $(ccfp) $(cccpu) $(warn) $(ccdebug) \
+           $(include) -zCRTXC_TEXT -Dnear= -Dfar= -Dhuge=
+!endif
+
+# tasm options
+#
+# -l   listing enabled
+# -c   cross reference in listing
+# -n   suppress symbol table in listing
+# -x   show false conditionals
+#
+# note: tasm may be called after bcc (with -S) in order to view mixed C +
+#       assembly listings when aslist is defined.  Alternatively, -B -Etasm.exe
+#       -Tl will produce .lst file but NOT mixed C/asm listings - at least
+#       not for me.
+#
+#aslist=
+aslist=-l -n -x -t
+
+asdebug =
+#asdebug = -zi
+
+#
+# -ml = case sensitive symbols
+#
+ASFLAGS = -ml -dCPU=$(ascpu) -d$(MODEL) $(asfp) $(asdebug) $(aslist) $(include) 
+
+#
+# RTXC library
+#
+librtxc.lib: rtxc.obj rtxcapi.obj rtxcinit.obj rtxcasm.obj setvect.obj
+
+#
+# RTXC (compact/huge) model
+#
+rtxc.obj: rtxc.c $(INC)\rtxcopts.h $(INC)\enable.h
+
+rtxcinit.obj: rtxcinit.c $(INC)\rtxcopts.h
+
+#
+# RTXC assembly language source
+#
+rtxcasm.obj: rtxcasm.asm $(INC)\saveregs.inc $(INC)\rtxcopts.inc
+
+#
+# RTXC (large/huge) model interface subroutines
+#
+rtxcapi.obj: rtxcapi.c $(INC)\rtxcopts.h
+   $(CC) $(CCFLAGS2) $*.c
+   $(AS) $(ASFLAGS) $(TMP)\$*.asm
+   $(RM) $(TMP)\$*.asm
+   $(AR) $(LIB)\librtxc -+$*.obj
+   $(RM) $(LIB)\librtxc.bak
+
+setvect.obj: setvect.c
+   $(CC) $(CCFLAGS3) $*.c
+   $(AR) $(LIB)\librtxc -+$*.obj
+   $(RM) $(LIB)\librtxc.bak
+
+
+#
+# Clean Directory - remove intermediate files
+#
+clean:
+        $(RM) *.bak
+        $(RM) *.lst
+        $(RM) *.obj
+

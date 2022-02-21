@@ -1,0 +1,163 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+U:\Pt5201\Design\DDD\SW\Master\Source\MAKE\1_1\temp\xa\tim0drv.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -A1 -Cxag3 -e -g -Ic:\cxa\include -I..\..\rtxcdef\xa
+                          3 ;          -I..\..\rtxc\xa\include -I..\..\code\include\1_0 -I..\..\app_spec\xa
+                          4 ;          -Ml -O2 -s
+                          6 $NOZPAGE
+                          7         NAME    TIM0DRV
+                         11 ; tim0drv.c    1        /************************************************************************
+                            ****/
+                         12 ; tim0drv.c    2        /* MODULE:                                                               
+                               */
+                         13 ; tim0drv.c    3        /*  tim0drv.c - timer/counter 0 driver                                   
+                                            */
+                         14 ; tim0drv.c    4        /************************************************************************
+                            ****/
+                         15 ; tim0drv.c    5        /* FUNCTIONS:                                                            
+                               */
+                         16 ; tim0drv.c    6        /*                                                                       
+                               */
+                         17 ; tim0drv.c    7        /*                                                                       
+                               */
+                         18 ; tim0drv.c    8        /* TASKS:                                                                
+                               */
+                         19 ; tim0drv.c    9        /*                                                                       
+                               */
+                         20 ; tim0drv.c   10        /* NOTES:                                                                
+                               */
+                         21 ; tim0drv.c   11        /*                                                                       
+                               */
+                         22 ; tim0drv.c   12        /************************************************************************
+                            ****/
+                         23 ; tim0drv.c   13        /*
+                         24 ; tim0drv.c   14         *   PTV software for PT5201
+                         25 ; tim0drv.c   15         *   Copyright (c) 
+                         26 ; tim0drv.c   16         *   ProTeleVision Technologies A/S.
+                         27 ; tim0drv.c   17         *   ALL RIGHTS RESERVED
+                         28 ; tim0drv.c   18        */
+                         29 ; tim0drv.c   19        /************************************************************************
+                            ****/
+                         30 ; tim0drv.c   20        
+                         31 ; tim0drv.c   21        #include "define.h"
+                         34 ; tim0drv.c   22        #include "tim0drv.h"
+                         39 ; tim0drv.c   23        
+                         40 ; tim0drv.c   24        /* =================== */
+                         41 ; tim0drv.c   25        /* TMOD - bit settings */
+                         42 ; tim0drv.c   26        /* ------------------- */
+                         43 ; tim0drv.c   27        /* TIMER 0             */
+                         44 ; tim0drv.c   28        /* ------------------- */
+                         45 ; tim0drv.c   29        #define T0_GATE (0 << 3)   /* disable gate control */
+                         46 ; tim0drv.c   30        #define T0_CT   (1 << 2)   /* cleared for timer operation */
+                         47 ; tim0drv.c   31        #define T0_M1   (0 << 1)   /* 16-bit auto-reload */
+                         48 ; tim0drv.c   32        #define T0_M0   (1 << 0)   /* 16-bit auto-reload */
+                         49 ; tim0drv.c   33        
+                         50 ; tim0drv.c   34        #define T0_TMOD  (T0_GATE | T0_CT | T0_M1 | T0_M0)
+                         51 ; tim0drv.c   35        
+                         52 ; tim0drv.c   36        /* ------------------- */
+                         53 ; tim0drv.c   37        /* TIMER 1             */
+                         54 ; tim0drv.c   38        /* ------------------- */
+                         55 ; tim0drv.c   39        #define T1_GATE (0 << 7)   /* not applicable - OR in a zero (0) */
+                         56 ; tim0drv.c   40        #define T1_CT   (0 << 6)   /* not applicable - OR in a zero (0) */
+                         57 ; tim0drv.c   41        #define T1_M1   (0 << 5)   /* not applicable - OR in a zero (0) */
+                         58 ; tim0drv.c   42        #define T1_M0   (0 << 4)   /* not applicable - OR in a zero (0) */
+                         59 ; tim0drv.c   43        
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         60 ; tim0drv.c   44        #define T1_TMOD  (T1_GATE | T1_CT | T1_M1 | T1_M0)
+                         61 ; tim0drv.c   45        
+                         62 ; tim0drv.c   46        #define xTMOD  (T0_TMOD | T1_TMOD)
+                         63 ; tim0drv.c   47        /* =================== */
+                         64 ; tim0drv.c   48        
+                         65 ; tim0drv.c   49        /* =================== */
+                         66 ; tim0drv.c   50        /* TCON - bit settings */
+                         67 ; tim0drv.c   51        /* ------------------- */
+                         68 ; tim0drv.c   52        /* TIMER 0             */
+                         69 ; tim0drv.c   53        /* ------------------- */
+                         70 ; tim0drv.c   54        #define T0_TF0  (0 << 5)   /* overflow flag - manipulated by hardware */
+                         71 ; tim0drv.c   55        #define T0_TR0  (1 << 4)   /* run control bit - enabled */
+                         72 ; tim0drv.c   56        #define T0_IE0  (0 << 1)   /* not applicable - OR in a zero (0) */
+                         73 ; tim0drv.c   57        #define T0_IT0  (0 << 0)   /* not applicable - OR in a zero (0) */
+                         74 ; tim0drv.c   58        
+                         75 ; tim0drv.c   59        #define T0_CON (T0_TF0 | T0_TR0 | T0_IE0 | T0_IT0)
+                         76 ; tim0drv.c   60        
+                         77 ; tim0drv.c   61        
+                         78 ; tim0drv.c   62        /* ------------------- */
+                         79 ; tim0drv.c   63        /* TIMER 1             */
+                         80 ; tim0drv.c   64        /* ------------------- */
+                         81 ; tim0drv.c   65        #define T1_TF1  (0 << 7)   /* not applicable - OR in a zero (0) */
+                         82 ; tim0drv.c   66        #define T1_TR1  (0 << 6)   /* not applicable - OR in a zero (0) */
+                         83 ; tim0drv.c   67        #define T1_IE1  (0 << 3)   /* interrupt edge flag */
+                         84 ; tim0drv.c   68        #define T1_IT1  (1 << 2)   /* interrupt type control bit - enabled */
+                         85 ; tim0drv.c   69        
+                         86 ; tim0drv.c   70        #define T1_CON (T1_TF1 | T1_TR1 | T1_IE1 | T1_IT1)
+                         87 ; tim0drv.c   71        
+                         88 ; tim0drv.c   72        #define xTCON (T0_CON | T1_CON)
+                         89 ; tim0drv.c   73        /* =================== */
+                         90 ; tim0drv.c   74        
+                         91 ; tim0drv.c   75        /************************************************************************
+                            **/
+                         92 ; tim0drv.c   76        /* tim0_init                                                             
+                                                                                                                             
+                                                                     TIM0_DRV.C     */
+                         93 ; tim0drv.c   77        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                         94 ; tim0drv.c   78        /* Author:              Kim Engedahl, DEV, 000330                        
+                                                                                                                             
+                                                    */
+                         95 ; tim0drv.c   79        /* Revised:             000330, KEn, DEV                                 
+                                                                                                                             
+                                                            */
+                         96 ; tim0drv.c   80        /*                                                                       
+                                                                                                                             
+                                                                                                                             
+                                                    */
+                         97 ; tim0drv.c   81        /* Function:                                                             
+                                                                                                                             
+                                                                                                            */
+                         98 ; tim0drv.c   82        /* Remarks:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                         99 ; tim0drv.c   83        /* Returns:                                                              
+                                                                                                                             
+                                                                                                                            *
+                            /
+                        100 ; tim0drv.c   84        /* Updates:                                                              
+                                                                                                                             
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                                                                                                                            *
+                            /
+                        101 ; tim0drv.c   85        /************************************************************************
+                            **/
+                        102 ; tim0drv.c   86        void tim0_init( void)
+                        103 ; tim0drv.c   87        {
+000000                  104 TIM0DRV_PR      SEGMENT HCODE
+000000                  105         RSEG    TIM0DRV_PR
+                        106         ALIGN   1
+                        108         PUBLIC  _tim0_init
+000000                  109 _tim0_init:
+                        113 ; tim0drv.c   88          /* Timer/Counter Mode Control Register */
+                        114 ; tim0drv.c   89          TMOD &= 0xF0;   /* clear timer0 settings */
+000000 96455CF0         116         AND.B   045CH,#0F0H
+                        117 ; tim0drv.c   90          TMOD |= xTMOD;
+000004 96465C05         119         OR.B    045CH,#05H
+                        120 ; tim0drv.c   91          
+                        121 ; tim0drv.c   92          /* Timer/Counter Control Register */
+                        122 ; tim0drv.c   93          TCON &= 0xCB;   /* clear timer0 settings */
+000008 964510CB         124         AND.B   0410H,#0CBH
+                        125 ; tim0drv.c   94          TCON |= xTCON;
+00000C 96461014         127         OR.B    0410H,#014H
+                        128 ; tim0drv.c   95        }
+000010 D680             130         RET
+                        134         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        135         EXTRN   DATA(__lc_ue_xvwbuffer)

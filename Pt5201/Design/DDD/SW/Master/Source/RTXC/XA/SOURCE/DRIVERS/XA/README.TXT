@@ -1,0 +1,1 @@
+CLKTICK must be the same as in project.

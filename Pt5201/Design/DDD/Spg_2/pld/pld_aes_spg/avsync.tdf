@@ -1,0 +1,119 @@
+CONSTANT TIM = 100;
+SUBDESIGN AVSYNC
+% 
+Audio-video sync logic for AES generator in PT5201
+991123 PF
+%
+
+(
+CLK27M,                        -- 27MHz master clock
+F8_G,                          -- video G-sync signal
+FF_M,                          -- video M-sync signal
+XZPRE,                         -- AES preamble pulse
+NTSC_PHASE,                    -- phase lock select (1=NTSC  0=PAL)
+TIMING[9..0],                  -- Timing of aes-signal (0 -> 20.4us)
+SYNC_OFF                       -- audio/video sync check set to off when 44.1kHz sample freq selected
+                        : input;
+
+XX, YY,                        -- test/debug signal outputs
+AUD_RESET,                     -- async reset of aes-counter
+VIDLOCK                       -- audio-video lock flag (1=locked  0=unlocked)
+                        : output;
+
+)
+variable
+p_count[9..0]           : dffe;
+m_count[2..0]           : dff;
+q3ff,
+q4ff                    : dff;
+phff,
+q1ff,
+q2ff,
+audlockff               : dffe;
+
+M10,
+T,
+CHECK
+
+                : node;
+
+begin
+
+p_count[].clk = CLK27M;              -- phase counter
+if NTSC_PHASE == VCC then
+ p_count[].clrn = M10;              -- asynchronous reset
+else
+ p_count[].clrn = F8_g;
+end if;
+p_count[].ena = !(p_count[8] & p_count[9]);       -- enable control of counter
+p_count[] = p_count[] +1;
+
+
+m_count[].clk = FF_M;                -- NTSC 5 frame counter
+M10 = m_count[] == 0;
+if m_count[] == 4 then
+  m_count[].d = B"0";
+ else
+  m_count[] = m_count[] + 1;
+end if;	
+
+
+phff.clk = CLK27M;                           -- M phase flip-flop
+phff.d = !XZPRE;
+phff.ena = CHECK;
+phff.clrn = M10;
+
+q1ff.clk = CLK27M;
+q1ff.d = T;
+q1ff.ena = q2ff;
+
+q2ff.clk = CLK27M;
+q2ff.d = phff;
+q2ff.ena = !q2ff;
+q2ff.clrn = !q3ff;
+
+q3ff.clk = CLK27M;
+q3ff.d = q1ff;
+
+q4ff.clk = CLK27M;
+q4ff.d = T;
+
+audlockff.clk = CLK27M;
+audlockff.clrn = !SYNC_OFF;
+audlockff.ena = CHECK;
+audlockff.d = XZPRE;
+VIDLOCK = audlockff;
+
+
+if NTSC_PHASE == VCC then
+  AUD_RESET = q1ff & !SYNC_OFF;
+ else
+  AUD_RESET = q4ff & !SYNC_OFF;
+end if;
+
+
+if NTSC_PHASE == VCC then
+  CHECK = ((TIMING[] + 9) == p_count[]);
+ else
+  CHECK = ((TIMING[] + 10) == p_count[]);
+end if;
+
+T = TIMING[] == p_count[];
+
+if NTSC_PHASE == VCC then
+  XX = M10;
+ else
+  XX = F8_G;
+end if;
+
+YY = CHECK;
+
+
+end;
+
+
+
+
+
+
+

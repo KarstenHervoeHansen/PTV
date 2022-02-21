@@ -1,0 +1,77 @@
+#
+# filename = makefile
+#
+# makefile for Borland C++ (make 4.0)
+#
+
+#
+# invoke as: > make
+#
+
+#BC = c:\bc5    # home for Borland C++ 5.0x
+BC = d:\bc5    # home for Borland C++ 5.0x
+
+CC = $(BC)\bin\bcc
+LD = $(BC)\bin\tlink
+RM = del
+CP = copy
+
+INC = ..\..\..\Include
+
+#
+# default .c.obj rules
+#
+.c.obj:
+   $(CC) -c -ml $(include) $(debug) $<
+
+include = -I$(BC)\include;$(INC);
+
+# used for compiler and linker
+#debug = -v # necessary for debugging (TD or BOUNDS_CHECKER)
+
+LDFLAGS = $(debug)   # necessary for BOUNDS-CHECKER or TD
+
+#
+# main targets
+#
+all: rtxcgen.exe sizes.exe
+
+#
+# rtxcgen dependencies
+#
+rtxcgen.exe: rtxcgen.obj defclock.obj defmbox.obj defpart.obj \
+	     defqueue.obj defres.obj defsema.obj deftask.obj
+   $(LD) $(LDFLAGS) c0l+@$*.rsp,$*,$*,cl
+   $(CP) rtxcgen.exe ..\..\..\Bin\rtxcgen.exe
+
+rtxcgen.obj: rtxcgen.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h
+
+defclock.obj: defclock.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+defmbox.obj: defmbox.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+defpart.obj: defpart.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+defqueue.obj: defqueue.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+defres.obj: defres.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+defsema.obj: defsema.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+deftask.obj: deftask.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h rtxcgen.h
+
+#
+# sizes dependencies
+#
+sizes.exe: sizes.obj
+   $(LD) $(LDFLAGS) c0l $*,$*,$*,cl
+   $(CP) sizes.exe ..\..\..\Bin\sizes.exe
+
+sizes.obj: sizes.c $(INC)\rtxstruc.h $(INC)\rtxcopts.h
+
+clean:
+	$(RM) *.obj
+	$(RM) *.bak
+	$(RM) *.lst
+	$(RM) *.map
+	$(RM) sizes.exe

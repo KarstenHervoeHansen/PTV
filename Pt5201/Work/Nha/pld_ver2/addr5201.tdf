@@ -1,0 +1,38 @@
+% Adressedekoder til PT 5201 inclusive resetkredsløb der får
+  mastercontroller til at starte som 16 bit controller.
+  000204/NHa.
+%
+
+SUBDESIGN addr5201
+(
+	clk,psenm,wrl,wrh,rd,reset,alem						: INPUT;
+	boot,ps												: INPUT;
+	am[18..0],ctsin 									: INPUT;
+	clkstatus,hoffset,a18out,we_prom,oe_prom,ce_prom	: OUTPUT;
+	we_boot,oe_boot,ce_boot,nvramen,ramen	 	 		: OUTPUT;
+	cts,sramcs,sramoe,sramwe,engain,enled,enbutton		: OUTPUT;
+	tstled												: OUTPUT;
+)
+
+BEGIN
+	clkstatus = !(boot & (am[18..0]==H"35000") & !wrl);
+	hoffset   = !(boot & (am[18..0]==H"35002") & !wrl);
+	a18out    = (am18 & boot) # (!boot & !am18);
+	we_prom   = !((am18 XOR !boot) & !am17 & !wrl);
+	oe_prom   = gnd;
+	ce_prom   = !((am18 XOR !boot) & !psenm) & (rd # ps) ;
+	we_boot   = vcc;
+	oe_boot   = gnd;
+	ce_boot   = !((am18 XOR boot) & am16 & !psenm) & (rd # ps);
+	nvramen   = vcc;
+	ramen     = gnd;
+	cts       = ctsin ;
+	sramcs    = !boot %# (ps & !(ps & !am18 & am17 & !am16 & psenm))%;
+	sramoe    = GND;
+	sramwe    = !boot # !(!am18 # am17 # !am16 # psenm);
+	engain 	  = !(boot & am[18..0]==H"35004" & wrl & psenm);
+	enled	  = !(boot & am[18..0]==H"35006" & wrl & psenm);
+	enbutton  = !(boot & am[18..0]==H"35004" & rd & psenm);
+	tstled    = !(boot & am[18..0]==H"3500A" & wrl & psenm);
+END;
+

@@ -1,0 +1,363 @@
+#include <xa.h>
+#include <absacc.h>
+#include <string.h>
+#include <conio.h>
+#include <dos.h>
+
+#include "52sync.h"
+#include "disp_drv.h"
+#include "mas.h"
+
+#define MaxDisplayCharNo		40
+
+#define DispX 2
+#define DispY 16
+
+UC Line1Pos = 0;
+UC Line2Pos = 0;
+
+char CGTable[] = { '!', '<', '|', '>', 'E', 'P', '^', '_', '%', 'U',
+					  's', 'i', 'r', 'p', 's', 'e', '0', '1', '2', '3',
+					  '4', '5', '6', '7', '8', '9', '±'};
+
+char address[8];
+
+/***************************************************************************/
+/*	LCD Commands, (for the L4042): 														*/
+/*	Clear display - ALL memory (RAM) is erased									01	*/
+/*	Cursor home 1st char. on 1st line												02	*/
+/*	Direction of cursor with next character entry;									*/
+/*		left																					04	*/
+/*		right																					06	*/
+/*	Display shift with data entry;														*/
+/*		left																					07	*/
+/*		right																					05	*/
+/*	Cursor;																						*/
+/*		ON																						0E	*/
+/*		OFF																					0C	*/
+/*		Blink																					0D	*/
+/*		Shift left																			10	*/
+/*		Shift right																			14	*/
+/*	Display control "ON"																	0E	*/
+/*	Display control "OFF"																0A	*/
+/*		(when display off ALL memory is retained in memory)						*/
+/*	Display shift with no data entry;													*/
+/*		left																					18	*/
+/*		right																					1C	*/
+/***************************************************************************/
+
+extern void ClearDisplay();
+extern void CursorOff();
+extern void ClearLN1();
+extern void ClearLN2();
+
+void WriteDispCmd( UC cmd) {
+}
+
+void Init_Display() {
+
+	textcolor( WHITE);
+	textbackground( BLACK);
+	clrscr();
+	gotoxy( 46, 16);
+	printf( "  PRESET  OUTPUTS         GENLOCK");
+	gotoxy( 46, 17);
+	printf( "    F6       F7              F8");
+
+	gotoxy( 1, 1);
+	printf( " PRESS FUNCTION KEYS TO SELECT:                       KIM's PRIVATE DATA\n");
+	printf( " F1:  SDI Black 3&4 Option    \n");
+	printf( " F2:  Analog Signal Option    \n");
+	printf( " F3:  SDI Signal Option       \n");
+	printf( " F4:  AES/EBU Option          \n\n");
+
+
+	printf( " F9:  MASTER reset\n");
+	printf( " F10: FACTORY reset\n");
+
+	gotoxy( 30, 2);
+/*	if ( TypeOfUnitsPresent & SDIBlkMask)
+		printf( "ON ");
+	else              */
+		printf( "OFF");
+
+	gotoxy( 30, 3);
+/*	if ( TypeOfUnitsPresent & AnalogSignalMask)
+		printf( "ON ");
+	else*/
+		printf( "OFF");
+
+	gotoxy( 30, 4);
+/*	if ( TypeOfUnitsPresent & SDISignalMask)
+		printf( "ON ");
+	else*/
+		printf( "OFF");
+
+	gotoxy( 30, 5);
+/*	if ( TypeOfUnitsPresent & AES_EBUSignalMask)
+		printf( "ON ");
+	else*/
+		printf( "OFF");
+
+
+	gotoxy( 1, 23);
+	printf( " To operate use the arrow-keys and ENTER to execute\n");
+	printf( " Press ESC to exit");
+
+	textcolor( BLACK);
+	textbackground( GREEN);
+
+	CursorOff();
+
+//	ClearDisplay();
+
+	gotoxy( DispX, DispY);
+//	cprintf( "PM5689 Power-up diagnose ...");
+
+/*	delay( 1500);*/
+
+	gotoxy( DispX, DispY + 1);
+//	cprintf( "       Internal Test Passed");
+
+/*	delay( 2000);*/
+
+	ClearDisplay();
+
+	gotoxy( DispX, DispY);
+//	cprintf( "PM5689 NICAM Monitor");
+
+	gotoxy( DispX, DispY + 1);
+//	cprintf( "SYSTEM: IF    VERSION:  3.0A");
+
+/*	delay( 1500);*/
+
+	Line1Pos = Line2Pos = 0;
+}
+
+void ClearDisplay() {
+
+	ClearLN1();
+	ClearLN2();
+	Line1Pos = Line2Pos = 0;
+}
+
+void WriteAddressLN1( UC pos) {
+
+	Line1Pos = pos;
+}
+
+
+void WriteAddressLN2( UC pos) {
+
+	Line2Pos = pos;
+}
+
+void WriteChar1( char val) {
+
+	gotoxy( DispX + Line1Pos, DispY);
+
+	if ( val < 8)
+		putch( address[val]);
+	else
+		putch( val);
+
+	Line1Pos++;
+}
+
+void WriteChar2( char val) {
+
+	gotoxy( DispX + Line2Pos, DispY + 1);
+
+	if ( val < 8)
+		putch( address[val]);
+	else
+		putch( val);
+
+	Line2Pos++;
+}
+
+void WriteChar3( char val) {
+
+	gotoxy( DispX + Line2Pos, DispY + 2);
+
+	if ( val < 8)
+		putch( address[val]);
+	else
+		putch( val);
+
+	Line2Pos++;
+}
+
+void ClearLN1() {
+
+	UC i;
+
+	WriteAddressLN1( 0);
+
+	for ( i=0; i< MaxDisplayCharNo; i++)
+		WriteChar1( ' ');
+
+	WriteAddressLN1( 0);
+}
+
+void ClearLN2() {
+
+	UC i;
+
+	WriteAddressLN2( 0);
+
+	for ( i=0; i< MaxDisplayCharNo; i++)
+		WriteChar2( ' ');
+
+	WriteAddressLN2( 0);
+}
+
+void ClearToPosLN1( UC pos) {
+
+	while ( Line1Pos < pos)
+		WriteChar1( ' ');
+}
+
+void ClearToPosLN2( UC pos) {
+
+	while ( Line2Pos < pos)
+		WriteChar2( ' ');
+}
+
+void ClearRestLN1() {
+
+	while ( Line1Pos < MaxDisplayCharNo)
+		WriteChar1( ' ');
+}
+
+void ClearRestLN2() {
+
+	while ( Line2Pos < MaxDisplayCharNo)
+		WriteChar2( ' ');
+}
+
+void WriteCharLN1( char pos, char val) {
+
+	WriteAddressLN1( pos);
+
+	WriteChar1( val);
+}
+
+void WriteCharLN2( char pos, char val) {
+
+	WriteAddressLN2( pos);
+
+	WriteChar2( val);
+}
+
+void WriteCodeLN1( char pos, char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);
+
+	WriteAddressLN1( pos);
+
+	while ( tmp = *LineTxt++)
+		WriteChar1( tmp);
+}
+
+void WriteCodeLN2( char pos, char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);
+
+	WriteAddressLN2( pos);
+
+	while ( tmp = *LineTxt++)
+		WriteChar2( tmp);
+}
+
+void WriteCode1( char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);;
+
+	while ( tmp = *LineTxt++)
+		WriteChar1( tmp);
+}
+
+void WriteCode2( char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);;
+
+	while ( tmp = *LineTxt++)
+		WriteChar2( tmp);
+}
+
+void WriteTxtLN1( char pos, char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);
+
+	WriteAddressLN1( pos);
+
+	while ( tmp = *LineTxt++)
+		WriteChar1( tmp);
+}
+
+void WriteTxtLN2( char pos, char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);
+
+	WriteAddressLN2( pos);
+
+	while ( tmp = *LineTxt++)
+		WriteChar2( tmp);
+}
+
+void WriteTxt1( char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);;
+
+	while ( tmp = *LineTxt++)
+		WriteChar1( tmp);
+}
+
+void WriteTxt2( char* LineTxt) {
+
+	UC tmp = strlen( LineTxt);;
+
+	while ( tmp = *LineTxt++)
+		WriteChar2( tmp);
+}
+
+
+void CursorOn( bit BlinkOn) {
+	struct REGPACK regs;
+
+	regs.r_ax = 0x0100;
+	regs.r_cx = 0x0607;
+	intr( 0x10, &regs);
+
+	if ( BlinkOn)
+		WriteDispCmd( 0x0F);
+	else
+		WriteDispCmd( 0x0E);
+}
+
+
+void CursorOff() {
+
+	struct REGPACK regs;
+
+	regs.r_ax = 0x0100;
+	regs.r_cx = 0x2000;
+	intr( 0x10, &regs);
+}
+
+
+void WriteCGChar( UC Address, UC Data) {
+
+	address[Address] = CGTable[Data];
+}
+
+void CharBlinkLN2( UC Pos, UC status) {
+
+
+	gotoxy( DispX, DispY + 2);
+	printf( "                                                       ");
+	gotoxy( DispX + Pos, DispY + 2);
+	if ( status)
+		printf( "-");
+}

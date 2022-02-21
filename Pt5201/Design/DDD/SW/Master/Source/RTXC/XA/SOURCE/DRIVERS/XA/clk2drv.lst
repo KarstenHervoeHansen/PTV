@@ -1,0 +1,102 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\DRIVERS\XA\cc70e60b.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -g -O2 -err -Ic:\cxa\include -I..\..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    CLK2DRV
+                          9 ; clk2drv.c    1        /* clk2drv.c - model CLK driver task for 8XC251 using software timer 2 */
+                            
+                         10 ; clk2drv.c    2        
+                         11 ; clk2drv.c    3        /*
+                         12 ; clk2drv.c    4         *   RTXCio    
+                         13 ; clk2drv.c    5         *   Copyright (c) 
+                         14 ; clk2drv.c    6         *   Embedded System Products, Inc.
+                         15 ; clk2drv.c    7         *   ALL RIGHTS RESERVED
+                         16 ; clk2drv.c    8        */
+                         17 ; clk2drv.c    9        
+                         18 ; clk2drv.c   10        
+                         19 ; clk2drv.c   11        #include "rtxcapi.h"
+                        146 ; clk2drv.c   12        #include "periphal.h"
+                        149 ; clk2drv.c   13        
+                        150 ; clk2drv.c   14        #ifdef CLK /* { */
+                        151 ; clk2drv.c   15        #ifdef TIMER_2 /* { */
+                        152 ; clk2drv.c   16        
+                        153 ; clk2drv.c   17        #include "enable.h"
+                        154 ; clk2drv.c   18        
+                        155 ; clk2drv.c   19        #include "cclock.h" /* CLKTICK */
+                        156 ; clk2drv.c   20        
+                        157 ; clk2drv.c   21        /*-----------------------------------------------------------------*/
+                        158 ; clk2drv.c   22        /* A clock period is the number of ticks (CLKTICK) per one
+                        159 ; clk2drv.c   23           millisecond (.001).                                             */
+                        160 ; clk2drv.c   24        #define PERIOD (CLKTICK * .001)
+                        161 ; clk2drv.c   25        /*-----------------------------------------------------------------*/
+                        162 ; clk2drv.c   26        
+                        163 ; clk2drv.c   27        /*-----------------------------------------------------------------*/
+                        164 ; clk2drv.c   28        /* The XTAL frequency is 20 MHz.                                   */
+                        165 ; clk2drv.c   29        // Next line commented out by TK PTV. Instead use crystal.h
+                        166 ; clk2drv.c   30        //#define CRYSTAL 20E6 /* Change to match processor speed as needed */
+                        167 ; clk2drv.c   31        #include "crystal.h"
+                        168 ; clk2drv.c   32        /*-----------------------------------------------------------------*/
+                        169 ; clk2drv.c   33        
+                        170 ; clk2drv.c   34        /*-----------------------------------------------------------------*/
+                        171 ; clk2drv.c   35        /* The timer register is incremented once every peripheral cycle
+                        172 ; clk2drv.c   36           which is once every four oscillator cycles.                     */
+                        173 ; clk2drv.c   37        #define DIVIDE_DOWN 4
+                        174 ; clk2drv.c   38        /*-----------------------------------------------------------------*/
+                        175 ; clk2drv.c   39        
+                        176 ; clk2drv.c   40        /* Formula for calculating reload value for Timer 2 */
+                        177 ; clk2drv.c   41        #define RESET_TIME (0x0FFFF - (unsigned short)(PERIOD / (1 / (CRYSTAL / D
+                            IVIDE_DOWN ))))
+                        178 ; clk2drv.c   42        #define HI_RESET (RESET_TIME >> 8) & 0xFF
+                        179 ; clk2drv.c   43        #define LO_RESET (RESET_TIME & 0xFF)
+                        180 ; clk2drv.c   44        
+                        181 ; clk2drv.c   45        long timer2cnt = 0;
+                        182 ; clk2drv.c   46        
+                        183 ; clk2drv.c   47        FRAME ks_stk * timer2c(FRAME ks_stk * frame)
+                        184 ; clk2drv.c   48        {
+                        185 ; clk2drv.c   49                SWR7=0;
+                        186 ; clk2drv.c   50           timer2cnt++;
+                        187 ; clk2drv.c   51           TF2 = 0;
+                        188 ; clk2drv.c   52           KS_ISRtick();
+                        189 ; clk2drv.c   53           return(KS_ISRexit(frame, 0 ));
+                        190 ; clk2drv.c   54        }
+                        191 ; clk2drv.c   55        
+                        192 ; clk2drv.c   56        /* initialization code for clock */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                        193 ; clk2drv.c   57        void timer2_start(void)
+                        194 ; clk2drv.c   58        {
+                        195 ; clk2drv.c   59           SWE |= 0x40;
+                        196 ; clk2drv.c   60        }
+                        197 ; clk2drv.c   61        
+                        198 ; clk2drv.c   62        #else
+                        199 ; clk2drv.c   63        void timer2_start(void)
+                        200 ; clk2drv.c   64        {
+                        201 ; clk2drv.c   65           KS_nop();
+                        202 ; clk2drv.c   66        }
+                        203 ; clk2drv.c   67        #endif /* end of TIMER_2 */
+                        204 ; clk2drv.c   68        
+                        205 ; clk2drv.c   69        #else
+                        206 ; clk2drv.c   70        void timer2_start(void)
+                        207 ; clk2drv.c   71        {
+000000                  208 CLK2DRV_PR      SEGMENT HCODE
+000000                  209         RSEG    CLK2DRV_PR
+                        210         ALIGN   1
+                        212         PUBLIC  _timer2_start
+000000                  213 _timer2_start:
+                        217 ; clk2drv.c   72           KS_nop();
+                        219         CALL    _KS_nop
+000000 C4rrrrrr        +219 ;       FCALL   _KS_nop
+                        220 ; clk2drv.c   73        }
+000004 D680             222         RET
+                        224 ; clk2drv.c   74        #endif /* end of CLK */
+                        225 ; clk2drv.c   75        
+                        226 ; clk2drv.c   76        /* end of clk2drv.c */
+                        231         EXTRN   HCODE(_KS_nop)
+                        232         EXTRN   DATA(__lc_ub_xvwbuffer)
+                        233         EXTRN   DATA(__lc_ue_xvwbuffer)
+                        234         CALLS   'timer2_start', 'KS_nop'

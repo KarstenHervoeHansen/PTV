@@ -1,0 +1,68 @@
+INCLUDE "lpm_add_sub.inc";
+
+SUBDESIGN vidgen2a
+(
+	clk,cd[9..0],yd[9..0],noth0,sd[9..0]:	INPUT;
+	adden,checksum:							INPUT;
+	3or4,sb[2..0],hload,d0,d1:				INPUT;
+	hdout[9..0],adjust:						OUTPUT;
+)
+
+VARIABLE  
+	hd[9..0],hdout[9..0]: 	DFF;
+	sum[8..0]:				DFFE;
+	chkadd: 				lpm_add_sub WITH (LPM_WIDTH=9);
+	
+BEGIN
+ 	hd[].clk	 	= clk;
+ 	hdout[].clk 	= clk;
+
+	sum[].clk	= clk;
+	sum[].ena	= adden;
+	sum[].clrn	= !hload;
+	sum[].d		= chkadd.result[];
+
+	chkadd.dataa[]	= hd[8..0];
+	chkadd.datab[]	= sum[8..0];
+	chkadd.cin		= GND;
+
+	adjust 	=  (sd1 & !sd2);
+
+IF checksum == 1 THEN
+	  hdout[8..0].d		= sum[8..0].q;
+	  hdout9.d			= !(sum8.q);
+    ELSE
+	  hdout[9..0]		= hd[].q;
+END IF;
+
+	CASE sb[] IS
+		WHEN 1 => 			%ANC-flag%
+		 hd[].d=H"0"; 
+		WHEN 2 => 			%ANC-flag%
+		 hd[].d=H"3FF"; 
+		WHEN 3 => 			%ANC-flag%
+		 hd[].d=H"3FF"; 
+		WHEN 4 => 			%lydgruppe%
+		   CASE d[1..0] IS 	
+		 WHEN 0 => hd[].d=H"2FF"; %gruppe 1% 
+		 WHEN 1 => hd[].d=H"1FD"; %gruppe 2%
+		 WHEN 2 => hd[].d=H"1FB"; %gruppe 3%
+		 WHEN 3 => hd[].d=H"2F9"; %gruppe 4%
+		END CASE;
+		WHEN 5 =>			%bloknr.%
+		 hd[].d=H"200"; 
+		WHEN 6 => 			%Data count%
+		 hd[].d=(3or4 & H"230") # (!3or4 & H"224"); 
+		WHEN 7 =>
+		 hd[].d = sd[9..0];
+		WHEN OTHERS =>
+		 IF noth0 == 1 THEN
+	  	  hd[9..0].d = (yd[]);
+		 ELSE
+	  	  hd[9..0].d = (cd[]);
+		 END IF;
+	END CASE;
+
+END;
+
+

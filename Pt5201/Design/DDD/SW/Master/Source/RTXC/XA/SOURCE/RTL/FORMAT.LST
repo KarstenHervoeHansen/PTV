@@ -1,0 +1,1970 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+D:\PROJECT\pt5201\master\source\RTXC\XA\SOURCE\RTL\cc7140ab.src
+ADDR   CODE            LINE SOURCELINE
+                          1 ; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+                          2 ; options: -e -gn -O2 -err -Ic:\cxa\\include -I..\..\include -s -Cxag3 -Ml
+                          4 $NOZPAGE
+                          5         NAME    FORMAT
+                          6 ; format.c    1 /* format.c - output formatter */
+                          7 ; format.c    2 
+                          8 ; format.c    3 /*
+                          9 ; format.c    4  *   RTXCio    
+                         10 ; format.c    5  *   Copyright (c) 
+                         11 ; format.c    6  *   Embedded System Products, Inc.
+                         12 ; format.c    7  *   ALL RIGHTS RESERVED
+                         13 ; format.c    8 */
+                         14 ; format.c    9 /*==========================================================================*/
+                         15 ; format.c   10 /* NOTE: This is for internal use in RTXCbug only                           */
+                         16 ; format.c   11 /*==========================================================================*/
+                         17 ; format.c   12 /* modification history
+                         18 ; format.c   13  *
+                         19 ; format.c   14  * 09/12/94  wld  added support for S[0] and L[0] (minimum width)
+                         20 ; format.c   15  * 12/03/94  wld  vararg support - major changes
+                         21 ; format.c   16  * 12/03/94  wld  fixed Fw.d parse bug
+                         22 ; format.c   17  *
+                         23 ; format.c   18  * outstanding issues
+                         24 ; format.c   19  *
+                         25 ; format.c   20  * varargs - dummy va_arg calls and arguments
+                         26 ; format.c   21  * get_int() varargs issue
+                         27 ; format.c   22  *
+                         28 ; format.c   23 */
+                         29 ; format.c   24 
+                         30 ; format.c   25 #include <string.h>
+                         31 ; format.c   26 
+                         32 ; format.c   27 #include <stdarg.h>
+                         33 ; format.c   28 
+                         34 ; format.c   29 /* CONFIG */
+                         35 ; format.c   30 #define LONG     /* indicates long supported, suppress on microcontrollers */
+                         36 ; format.c   31 #define xFLOAT   /* indicates Fx.x/Dx.x supported, suppress on most */
+                         37 ; format.c   32 #define RADIX    /* indicates non-decimal radix support */
+                         38 ; format.c   33 
+                         39 ; format.c   34 #ifndef NULL
+                         40 ; format.c   35 #define NULL 0
+                         41 ; format.c   36 #endif
+                         42 ; format.c   37 
+                         43 ; format.c   38 #define ESC '\x1B'
+                         44 ; format.c   39 
+                         45 ; format.c   40 /* itoa() on some systems does not support radix */
+                         46 ; format.c   41 extern void itoa(int, char *, int);
+                         47 ; format.c   42 
+                         48 ; format.c   43 /* uitoa() on some systems is itostr() */
+                         49 ; format.c   44 extern void uitoa(unsigned int, char *, int);
+                         50 ; format.c   45 
+                         51 ; format.c   46 #ifdef LONG
+                         52 ; format.c   47 /* ltoa() on some systems does not support radix */
+                         53 ; format.c   48 extern void ltoa(long, char *, int);
+                         54 ; format.c   49 
+                         55 ; format.c   50 /* ultoa() on some systems is ltostr() */
+                         56 ; format.c   51 extern void ultoa(unsigned long, char *, int);
+                         57 ; format.c   52 
+                         58 ; format.c   53 #else
+                         59 ; format.c   54 
+                         60 ; format.c   55 #include <stdlib.h>
+                         61 ; format.c   56 extern void uitoa(unsigned int, char *, int);
+                         62 ; format.c   57 
+                         63 ; format.c   58 #endif
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+                         64 ; format.c   59 
+                         65 ; format.c   60 typedef unsigned long ULONG;
+                         66 ; format.c   61 
+                         67 ; format.c   62 static int get_int(char **);
+                         68 ; format.c   63 
+                         69 ; format.c   64 #ifdef FLOAT
+                         70 ; format.c   65 
+                         71 ; format.c   66 #define FLOATLESS
+                         72 ; format.c   67 
+                         73 ; format.c   68 #ifdef FLOATLESS
+                         74 ; format.c   69 static long ftomsig(float *);
+                         75 ; format.c   70 static long dtomsig(double *);
+                         76 ; format.c   71 
+                         77 ; format.c   72 static long ftolsig(float  *, char, long);
+                         78 ; format.c   73 static long dtolsig(double *, char, long);
+                         79 ; format.c   74 #endif
+                         80 ; format.c   75 #endif
+                         81 ; format.c   76 
+                         82 ; format.c   77 #ifdef FLOAT
+                         83 ; format.c   78 static const long mul[] =
+                         84 ; format.c   79 {
+                         85 ; format.c   80    1,
+                         86 ; format.c   81    10,
+                         87 ; format.c   82    100,
+                         88 ; format.c   83    1000,
+                         89 ; format.c   84    10000,
+                         90 ; format.c   85    100000,
+                         91 ; format.c   86    1000000,
+                         92 ; format.c   87    10000000,
+                         93 ; format.c   88    100000000
+                         94 ; format.c   89 };
+                         95 ; format.c   90 
+                         96 ; format.c   91 static const double r_off[] =        /* round off */
+                         97 ; format.c   92 {
+                         98 ; format.c   93    0.5,
+                         99 ; format.c   94    0.05,
+                        100 ; format.c   95    0.005,
+                        101 ; format.c   96    0.0005,
+                        102 ; format.c   97    0.00005,
+                        103 ; format.c   98    0.000005,
+                        104 ; format.c   99    0.0000005,
+                        105 ; format.c  100    0.00000005,
+                        106 ; format.c  101    0.000000005
+                        107 ; format.c  102 };
+                        108 ; format.c  103 #endif
+                        109 ; format.c  104 
+                        110 ; format.c  105 int formatv(char *fmt, char *buffer, va_list arg_ptr);
+                        111 ; format.c  106 
+                        112 ; format.c  107 /*
+                        113 ; format.c  108  * version to allow interface such as formatv("(I2,I1)", buffer, &i, &j);
+                        114 ; format.c  109 */
+                        115 ; format.c  110 int formatv(char *fmt, char *buffer, va_list arg_ptr)
+                        116 ; format.c  111 {
+                        117         PUBLIC  _formatv
+000000                  118 FORMAT_PR       SEGMENT HCODE
+000000                  119         RSEG    FORMAT_PR
+000000                  119         RSEG    FORMAT_PR
+000000                  120 _formatv:
+000000 0F70             121         PUSH.W  R4, R5, R6
+000002 99720054         122         SUB.W   R7,#054H
+000006 8C1F1E           123         MOV.W   [R7+30],R1
+000009 8C0F1C           124         MOV.W   [R7+28],R0
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+                        125 ; format.c  112    int i;
+                        126 ; format.c  113    int space;
+                        127 ; format.c  114    char fill_char = ' ';
+00000C 94781620         128         MOV.B   [R7+22],#020H
+                        129 ; format.c  115    struct stack
+                        130 ; format.c  116    {
+                        131 ; format.c  117       int rep;
+                        132 ; format.c  118       char *pos;
+                        133 ; format.c  119    } stk[3];
+                        134 ; format.c  120 
+                        135 ; format.c  121    struct stack *stkptr = &stk[0];
+000010 9128rr           136         MOV.B   R1L,#SEG( __lc_bs )
+000013 7133             137         XOR.B   R1H,R1H
+000015 400720           138         LEA     R0,R7+32
+000018 8C1F14           139         MOV.W   [R7+20],R1
+00001B 8C0F12           140         MOV.W   [R7+18],R0
+                        141 ; format.c  122    char *tb_ptr, *str_ptr, delim, temp;
+                        142 ; format.c  123    char temp_buff[34]; /* room for (Z-,R2,UL34) */
+                        143 ; format.c  124    char *sol_ptr = buffer;
+00001E 8C3F1A           144         MOV.W   [R7+26],R3
+000021 8C2F18           145         MOV.W   [R7+24],R2
+000024 8C3F10           146         MOV.W   [R7+16],R3
+000027 8C2F0E           147         MOV.W   [R7+14],R2
+                        148 ; format.c  125    int rep_fctr = 1;
+00002A BC710C           149         MOV.W   [R7+12],#01H
+                        150 ; format.c  126 #ifdef RADIX
+                        151 ; format.c  127    int radix = 10;
+00002D 9968000A         152         MOV.W   R6,#0AH
+                        153 ; format.c  128 #endif
+                        154 ; format.c  129    int length = 0;
+000031 BC700A           155         MOV.W   [R7+10],#00H
+                        156 ; format.c  130    int n;
+                        157 ; format.c  131 #ifdef FLOAT
+                        158 ; format.c  132    long l_sig, m_sig;
+                        159 ; format.c  133    char DOUBLE; /* Dw.d vs Fw.d mode */
+                        160 ; format.c  134    struct flot /* floating point structure */
+                        161 ; format.c  135    {
+                        162 ; format.c  136       char width;     /* field length */
+                        163 ; format.c  137       char dec_pt;    /* no. of positions after dec pt */
+                        164 ; format.c  138    } flt;
+                        165 ; format.c  139 #ifndef FLOATLESS
+                        166 ; format.c  140    float float_val;
+                        167 ; format.c  141    double double_val;
+                        168 ; format.c  142 #else
+                        169 ; format.c  143    float  *float_ptr;
+                        170 ; format.c  144    double *double_ptr;
+                        171 ; format.c  145 #endif
+                        172 ; format.c  146 #endif
+                        173 ; format.c  147 
+                        174 ; format.c  148    stkptr->pos = NULL;            /* initialize stack */
+000034 BC7024           175         MOV.W   [R7+36],#00H
+000037 BC7022           176         MOV.W   [R7+34],#00H
+                        177 ; format.c  149    stkptr->rep = 0;
+00003A BC7020           178         MOV.W   [R7+32],#00H
+00003A BC702000         178         MOV.W   [R7+32],#00H
+                        179 ; format.c  150 
+                        180 ; format.c  151    for(;;)
+00003E                  181 _3:
+00003E                  181 _3:
+00003E                  182 _4:
+00003E                  182 _4:
+00003E                  183 _5:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+00003E                  183 _5:
+00003E                  184 _6:
+00003E                  184 _6:
+00003E                  185 _7:
+00003E                  185 _7:
+00003E                  186 _8:
+00003E                  186 _8:
+00003E                  187 _9:
+00003E                  187 _9:
+00003E                  188 _10:
+00003E                  188 _10:
+00003E                  189 _11:
+00003E                  189 _11:
+00003E                  190 _12:
+00003E                  190 _12:
+00003E                  191 _13:
+00003E                  191 _13:
+00003E                  192 _14:
+00003E                  192 _14:
+00003E                  193 _15:
+00003E                  193 _15:
+00003E                  194 _16:
+00003E                  194 _16:
+00003E                  195 _17:
+00003E                  195 _17:
+00003E                  196 _18:
+00003E                  196 _18:
+00003E                  197 _19:
+00003E                  197 _19:
+00003E                  198 _20:
+00003E                  198 _20:
+00003E                  199 _21:
+00003E                  199 _21:
+00003E                  200 _22:
+00003E                  200 _22:
+00003E                  201 _23:
+00003E                  201 _23:
+00003E                  202 _24:
+00003E                  202 _24:
+00003E                  203 _25:
+00003E                  203 _25:
+00003E                  204 _26:
+00003E                  204 _26:
+00003E                  205 _27:
+00003E                  205 _27:
+00003E                  206 _28:
+                        207 ; format.c  152    {
+                        208 ; format.c  153       switch(*fmt)
+00003E 8C171E           209         MOV.W   R1,[R7+30]
+000041 8C071C           210         MOV.W   R0,[R7+28]
+000044 862C42           211         MOV.B   ES,R1L
+000047 8200             212         MOV.B   R0L,[R0]
+000049 910428           213         CMP.B   R0L,#028H
+00004C F37A             214         BEQ     _29
+00004E 910429           215         CMP.B   R0L,#029H
+                        216         BEQ     _30
+000051 F202            +216 ;       BNE     _LG_2
+000053 D50092          +216 ;       JMP.L   _30
+000053 D50092          +216 ;       JMP.L   _30
+000056                 +216 _LG_2:
+000056 91042A           217         CMP.B   R0L,#02AH
+                        218         BEQ     _32
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+000059 F202            +218 ;       BNE     _LG_4
+00005B D500BD          +218 ;       JMP.L   _32
+00005B D500BD          +218 ;       JMP.L   _32
+00005E                 +218 _LG_4:
+00005E 910430           219         CMP.B   R0L,#030H
+                        220         BEQ     _42
+000061 F202            +220 ;       BNE     _LG_6
+000063 D500D0          +220 ;       JMP.L   _42
+000063 D500D0          +220 ;       JMP.L   _42
+000066                 +220 _LG_6:
+000066 910431           221         CMP.B   R0L,#031H
+                        222         BEQ     _42
+000069 F202            +222 ;       BNE     _LG_8
+00006B D500CC          +222 ;       JMP.L   _42
+00006B D500CC          +222 ;       JMP.L   _42
+00006E                 +222 _LG_8:
+00006E 910432           223         CMP.B   R0L,#032H
+                        224         BEQ     _42
+000071 F202            +224 ;       BNE     _LG_10
+000073 D500C8          +224 ;       JMP.L   _42
+000073 D500C8          +224 ;       JMP.L   _42
+000076                 +224 _LG_10:
+000076 910433           225         CMP.B   R0L,#033H
+                        226         BEQ     _42
+000079 F202            +226 ;       BNE     _LG_12
+00007B D500C4          +226 ;       JMP.L   _42
+00007B D500C4          +226 ;       JMP.L   _42
+00007E                 +226 _LG_12:
+00007E 910434           227         CMP.B   R0L,#034H
+                        228         BEQ     _42
+000081 F202            +228 ;       BNE     _LG_14
+000083 D500C0          +228 ;       JMP.L   _42
+000083 D500C0          +228 ;       JMP.L   _42
+000086                 +228 _LG_14:
+000086 910435           229         CMP.B   R0L,#035H
+                        230         BEQ     _42
+000089 F202            +230 ;       BNE     _LG_16
+00008B D500BC          +230 ;       JMP.L   _42
+00008B D500BC          +230 ;       JMP.L   _42
+00008E                 +230 _LG_16:
+00008E 910436           231         CMP.B   R0L,#036H
+                        232         BEQ     _42
+000091 F202            +232 ;       BNE     _LG_18
+000093 D500B8          +232 ;       JMP.L   _42
+000093 D500B8          +232 ;       JMP.L   _42
+000096                 +232 _LG_18:
+000096 910437           233         CMP.B   R0L,#037H
+                        234         BEQ     _42
+000099 F202            +234 ;       BNE     _LG_20
+00009B D500B4          +234 ;       JMP.L   _42
+00009B D500B4          +234 ;       JMP.L   _42
+00009E                 +234 _LG_20:
+00009E 910438           235         CMP.B   R0L,#038H
+                        236         BEQ     _42
+0000A1 F202            +236 ;       BNE     _LG_22
+0000A3 D500B0          +236 ;       JMP.L   _42
+0000A3 D500B0          +236 ;       JMP.L   _42
+0000A6                 +236 _LG_22:
+0000A6 910439           237         CMP.B   R0L,#039H
+                        238         BEQ     _42
+0000A9 F202            +238 ;       BNE     _LG_24
+0000AB D500AC          +238 ;       JMP.L   _42
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+0000AB D500AC          +238 ;       JMP.L   _42
+0000AE                 +238 _LG_24:
+0000AE 910450           239         CMP.B   R0L,#050H
+                        240         BEQ     _43
+0000B1 F202            +240 ;       BNE     _LG_26
+0000B3 D500B1          +240 ;       JMP.L   _43
+0000B3 D500B1          +240 ;       JMP.L   _43
+0000B6                 +240 _LG_26:
+0000B6 91044E           241         CMP.B   R0L,#04EH
+                        242         BEQ     _44
+0000B9 F202            +242 ;       BNE     _LG_28
+0000BB D500C8          +242 ;       JMP.L   _44
+0000BB D500C8          +242 ;       JMP.L   _44
+0000BE                 +242 _LG_28:
+0000BE 91044F           243         CMP.B   R0L,#04FH
+                        244         BEQ     _45
+0000C1 F202            +244 ;       BNE     _LG_30
+0000C3 D500DC          +244 ;       JMP.L   _45
+0000C3 D500DC          +244 ;       JMP.L   _45
+0000C6                 +244 _LG_30:
+0000C6 910451           245         CMP.B   R0L,#051H
+                        246         BEQ     _49
+0000C9 F202            +246 ;       BNE     _LG_32
+0000CB D50139          +246 ;       JMP.L   _49
+0000CB D50139          +246 ;       JMP.L   _49
+0000CE                 +246 _LG_32:
+0000CE 91045A           247         CMP.B   R0L,#05AH
+                        248         BEQ     _50
+0000D1 F202            +248 ;       BNE     _LG_34
+0000D3 D50151          +248 ;       JMP.L   _50
+0000D3 D50151          +248 ;       JMP.L   _50
+0000D6                 +248 _LG_34:
+0000D6 910454           249         CMP.B   R0L,#054H
+                        250         BEQ     _51
+0000D9 F202            +250 ;       BNE     _LG_36
+0000DB D50166          +250 ;       JMP.L   _51
+0000DB D50166          +250 ;       JMP.L   _51
+0000DE                 +250 _LG_36:
+0000DE 91042C           251         CMP.B   R0L,#02CH
+                        252         BEQ     _54
+0000E1 F202            +252 ;       BNE     _LG_38
+0000E3 D50194          +252 ;       JMP.L   _54
+0000E3 D50194          +252 ;       JMP.L   _54
+0000E6                 +252 _LG_38:
+0000E6 910455           253         CMP.B   R0L,#055H
+                        254         BEQ     _55
+0000E9 F202            +254 ;       BNE     _LG_40
+0000EB D5019A          +254 ;       JMP.L   _55
+0000EB D5019A          +254 ;       JMP.L   _55
+0000EE                 +254 _LG_40:
+0000EE 91044C           255         CMP.B   R0L,#04CH
+                        256         BEQ     _60
+0000F1 F202            +256 ;       BNE     _LG_42
+0000F3 D50214          +256 ;       JMP.L   _60
+0000F3 D50214          +256 ;       JMP.L   _60
+0000F6                 +256 _LG_42:
+0000F6 910442           257         CMP.B   R0L,#042H
+                        258         BEQ     _61
+0000F9 F202            +258 ;       BNE     _LG_44
+0000FB D5022A          +258 ;       JMP.L   _61
+0000FB D5022A          +258 ;       JMP.L   _61
+0000FE                 +258 _LG_44:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+0000FE 910469           259         CMP.B   R0L,#069H
+                        260         BEQ     _62
+000101 F202            +260 ;       BNE     _LG_46
+000103 D50240          +260 ;       JMP.L   _62
+000103 D50240          +260 ;       JMP.L   _62
+000106                 +260 _LG_46:
+000106 910449           261         CMP.B   R0L,#049H
+                        262         BEQ     _63
+000109 F202            +262 ;       BNE     _LG_48
+00010B D50255          +262 ;       JMP.L   _63
+00010B D50255          +262 ;       JMP.L   _63
+00010E                 +262 _LG_48:
+00010E 910458           263         CMP.B   R0L,#058H
+                        264         BEQ     _82
+000111 F202            +264 ;       BNE     _LG_50
+000113 D50316          +264 ;       JMP.L   _82
+000113 D50316          +264 ;       JMP.L   _82
+000116                 +264 _LG_50:
+000116 91042F           265         CMP.B   R0L,#02FH
+                        266         BEQ     _87
+000119 F202            +266 ;       BNE     _LG_52
+00011B D5034F          +266 ;       JMP.L   _87
+00011B D5034F          +266 ;       JMP.L   _87
+00011E                 +266 _LG_52:
+00011E 910452           267         CMP.B   R0L,#052H
+                        268         BEQ     _88
+000121 F202            +268 ;       BNE     _LG_54
+000123 D50367          +268 ;       JMP.L   _88
+000123 D50367          +268 ;       JMP.L   _88
+000126                 +268 _LG_54:
+000126 910453           269         CMP.B   R0L,#053H
+                        270         BEQ     _91
+000129 F202            +270 ;       BNE     _LG_56
+00012B D5039B          +270 ;       JMP.L   _91
+00012B D5039B          +270 ;       JMP.L   _91
+00012E                 +270 _LG_56:
+00012E 910448           271         CMP.B   R0L,#048H
+                        272         BEQ     _100
+000131 F202            +272 ;       BNE     _LG_58
+000133 D50427          +272 ;       JMP.L   _100
+000133 D50427          +272 ;       JMP.L   _100
+000136                 +272 _LG_58:
+000136 910427           273         CMP.B   R0L,#027H
+                        274         BEQ     _101
+000139 F202            +274 ;       BNE     _LG_60
+00013B D50426          +274 ;       JMP.L   _101
+00013B D50426          +274 ;       JMP.L   _101
+00013E                 +274 _LG_60:
+                        275         BR      _104
+00013E D5045B          +275         JMP.L   _104
+00013E D5045B00        +275         JMP.L   _104
+                        276 ; format.c  154       {
+                        277 ; format.c  155          case '(':
+000142                  278 _29:
+                        279 ; format.c  156             (++stkptr)->pos = ++fmt;
+000142 9C701C0001       280         ADD.W   [R7+28],#01H
+000147 8C3714           281         MOV.W   R3,[R7+20]
+00014A 8C2712           282         MOV.W   R2,[R7+18]
+00014D 99200006         283         ADD.W   R2,#06H
+000151 8C171E           284         MOV.W   R1,[R7+30]
+000154 8C071C           285         MOV.W   R0,[R7+28]
+000157 866C42           286         MOV.B   ES,R3L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+00015A 8C0A02           287         MOV.W   [R2+2],R0
+00015D 8C1A04           288         MOV.W   [R2+4],R1
+000160 8C3F14           289         MOV.W   [R7+20],R3
+000163 8C2F12           290         MOV.W   [R7+18],R2
+                        291 ; format.c  157             stkptr->rep = rep_fctr;
+000166 8C3714           292         MOV.W   R3,[R7+20]
+000169 8C2712           293         MOV.W   R2,[R7+18]
+00016C 8C070C           294         MOV.W   R0,[R7+12]
+00016F 866C42           295         MOV.B   ES,R3L
+000172 8A0A             296         MOV.W   [R2],R0
+                        297 ; format.c  158             rep_fctr = 1;            /* reset rep_fctr to default */
+000174 BC710C           298         MOV.W   [R7+12],#01H
+                        299 ; format.c  159             break;
+                        300         BR      _28
+000177 D5FF62          +300         JMP.L   _28
+000177 D5FF62          +300         JMP.L   _28
+                        301 ; format.c  160 
+                        302 ; format.c  161          case ')':
+00017A                  303 _30:
+                        304 ; format.c  162             if ( --stkptr->rep > 0 )
+00017A 8C1714           305         MOV.W   R1,[R7+20]
+00017D 8C0712           306         MOV.W   R0,[R7+18]
+000180 862C42           307         MOV.B   ES,R1L
+000183 8A00             308         MOV.W   R0,[R0]
+000185 A90F             309         ADDS.W  R0,#0FH
+000187 8C3714           310         MOV.W   R3,[R7+20]
+00018A 8C2712           311         MOV.W   R2,[R7+18]
+00018D 866C42           312         MOV.B   ES,R3L
+000190 8A0A             313         MOV.W   [R2],R0
+000192 99040000         314         CMP.W   R0,#00H
+000196 FD0C             315         BLE     _31
+                        316 ; format.c  163                fmt = stkptr->pos;
+000198 8C1714           317         MOV.W   R1,[R7+20]
+00019B 8C0712           318         MOV.W   R0,[R7+18]
+00019E 862C42           319         MOV.B   ES,R1L
+0001A1 8C1004           320         MOV.W   R1,[R0+4]
+0001A4 8C0002           321         MOV.W   R0,[R0+2]
+0001A7 8C1F1E           322         MOV.W   [R7+30],R1
+0001AA 8C0F1C           323         MOV.W   [R7+28],R0
+                        324         BR      _27
+0001AD D5FF47          +324         JMP.L   _27
+0001AD D5FF47          +324         JMP.L   _27
+0001B0                  325 _31:
+                        326 ; format.c  164             else
+                        327 ; format.c  165             {
+                        328 ; format.c  166                if ( (--stkptr)->pos == NULL )
+0001B0 8C1714           329         MOV.W   R1,[R7+20]
+0001B3 8C0712           330         MOV.W   R0,[R7+18]
+0001B6 99020006         331         SUB.W   R0,#06H
+0001BA 8C1F14           332         MOV.W   [R7+20],R1
+0001BD 8C0F12           333         MOV.W   [R7+18],R0
+0001C0 862C42           334         MOV.B   ES,R1L
+0001C3 8C1004           335         MOV.W   R1,[R0+4]
+0001C6 8C0002           336         MOV.W   R0,[R0+2]
+0001C9 6910             337         OR.W    R1,R0
+                        338         BEQ     _105
+0001CB F202            +338 ;       BNE     _LG_64
+0001CD D5041D          +338 ;       JMP.L   _105
+0001CD D5041D          +338 ;       JMP.L   _105
+0001D0                 +338 _LG_64:
+                        339 ; format.c  167                {
+                        340 ; format.c  168                   va_end(arg_ptr);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+                        341 ; format.c  169                   return(length);
+                        342 ; format.c  170                }
+                        343 ; format.c  171                else
+                        344 ; format.c  172                   fmt++;
+0001D0 9C701C0001       345         ADD.W   [R7+28],#01H
+                        346 ; format.c  173             }
+                        347 ; format.c  174             break;
+                        348         BR      _26
+0001D5 D5FF33          +348         JMP.L   _26
+0001D5 D5FF33          +348         JMP.L   _26
+                        349 ; format.c  175 
+                        350 ; format.c  176          case '*':
+0001D8                  351 _32:
+                        352 ; format.c  177             fmt++;
+0001D8 9C701C0001       353         ADD.W   [R7+28],#01H
+                        354 ; format.c  178             rep_fctr = *(va_arg(arg_ptr, int *));
+0001DD 8C1760           355         MOV.W   R1,[R7+96]
+0001E0 8C075E           356         MOV.W   R0,[R7+94]
+0001E3 862C42           357         MOV.B   ES,R1L
+0001E6 8A20             358         MOV.W   R2,[R0]
+0001E8 8C3002           359         MOV.W   R3,[R0+2]
+0001EB 866C42           360         MOV.B   ES,R3L
+0001EE 8C3202           361         MOV.W   R3,[R2+2]
+0001F1 8A22             362         MOV.W   R2,[R2]
+0001F3 866C42           363         MOV.B   ES,R3L
+0001F6 8A22             364         MOV.W   R2,[R2]
+0001F8 8C2F0C           365         MOV.W   [R7+12],R2
+0001FB 862C42           366         MOV.B   ES,R1L
+0001FE 9A000004         367         ADD.W   [R0],#04H
+                        368 ; format.c  179             break;
+                        369         BR      _25
+000202 D5FF1D          +369         JMP.L   _25
+000202 D5FF1D00        +369         JMP.L   _25
+                        370 ; format.c  180 
+                        371 ; format.c  181          case '0':
+                        372 ; format.c  182          case '1':           /* repetition factors */
+                        373 ; format.c  183          case '2':
+                        374 ; format.c  184          case '3':
+                        375 ; format.c  185          case '4':
+                        376 ; format.c  186          case '5':
+                        377 ; format.c  187          case '6':
+                        378 ; format.c  188          case '7':
+                        379 ; format.c  189          case '8':
+                        380 ; format.c  190          case '9':
+000206                  381 _42:
+                        382 ; format.c  191             rep_fctr = get_int(&fmt);
+000206 9128rr           383         MOV.B   R1L,#SEG( __lc_bs )
+000209 7133             384         XOR.B   R1H,R1H
+00020B 40071C           385         LEA     R0,R7+28
+00020E C5040A           386         CALL    _get_int
+000211 8C0F0C           387         MOV.W   [R7+12],R0
+                        388 ; format.c  192             break;
+                        389         BR      _24
+000214 D5FF14          +389         JMP.L   _24
+000214 D5FF1400        +389         JMP.L   _24
+                        390 ; format.c  193 
+                        391 ; format.c  194          case 'P':                      /* pass ptr to new buffer */
+000218                  392 _43:
+                        393 ; format.c  195             fmt++;
+000218 8C171E           394         MOV.W   R1,[R7+30]
+00021B 8C071C           395         MOV.W   R0,[R7+28]
+00021E 99000001         396         ADD.W   R0,#01H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+000222 8C1F1E           397         MOV.W   [R7+30],R1
+000225 8C0F1C           398         MOV.W   [R7+28],R0
+                        399 ; format.c  196             buffer = va_arg(arg_ptr, char *);
+000228 8C1760           400         MOV.W   R1,[R7+96]
+00022B 8C075E           401         MOV.W   R0,[R7+94]
+00022E 862C42           402         MOV.B   ES,R1L
+000231 8A20             403         MOV.W   R2,[R0]
+000233 8C3002           404         MOV.W   R3,[R0+2]
+000236 866C42           405         MOV.B   ES,R3L
+000239 8C3202           406         MOV.W   R3,[R2+2]
+00023C 8A22             407         MOV.W   R2,[R2]
+00023E 8C3F1A           408         MOV.W   [R7+26],R3
+000241 8C2F18           409         MOV.W   [R7+24],R2
+000244 862C42           410         MOV.B   ES,R1L
+000247 9A000004         411         ADD.W   [R0],#04H
+                        412 ; format.c  197             break;
+                        413         BR      _23
+00024B D5FEF8          +413         JMP.L   _23
+00024B D5FEF8          +413         JMP.L   _23
+                        414 ; format.c  198 
+                        415 ; format.c  199          case 'N':                      /* null character */
+00024E                  416 _44:
+                        417 ; format.c  200             fmt++;
+00024E 8C171E           418         MOV.W   R1,[R7+30]
+000251 8C071C           419         MOV.W   R0,[R7+28]
+000254 99000001         420         ADD.W   R0,#01H
+000258 8C1F1E           421         MOV.W   [R7+30],R1
+00025B 8C0F1C           422         MOV.W   [R7+28],R0
+                        423 ; format.c  201             *buffer++ = '\0';
+00025E 8C171A           424         MOV.W   R1,[R7+26]
+000261 8C0718           425         MOV.W   R0,[R7+24]
+000264 862C42           426         MOV.B   ES,R1L
+000267 B200             427         MOV.B   [R0],#00H
+000269 99000001         428         ADD.W   R0,#01H
+00026D 8C1F1A           429         MOV.W   [R7+26],R1
+000270 8C0F18           430         MOV.W   [R7+24],R0
+                        431 ; format.c  202             length++;
+000273 8C070A           432         MOV.W   R0,[R7+10]
+000276 A901             433         ADDS.W  R0,#01H
+000278 8C0F0A           434         MOV.W   [R7+10],R0
+                        435 ; format.c  203             break;
+                        436         BR      _22
+00027B D5FEE0          +436         JMP.L   _22
+00027B D5FEE0          +436         JMP.L   _22
+                        437 ; format.c  204 
+                        438 ; format.c  205          case 'O':                      /* output */
+00027E                  439 _45:
+                        440 ; format.c  206             str_ptr = va_arg(arg_ptr, char *);
+00027E 8C1760           441         MOV.W   R1,[R7+96]
+000281 8C075E           442         MOV.W   R0,[R7+94]
+000284 862C42           443         MOV.B   ES,R1L
+000287 8A40             444         MOV.W   R4,[R0]
+000289 8C5002           445         MOV.W   R5,[R0+2]
+00028C 86AC42           446         MOV.B   ES,R5L
+00028F 8C5402           447         MOV.W   R5,[R4+2]
+000292 8A44             448         MOV.W   R4,[R4]
+000294 8C5F08           449         MOV.W   [R7+8],R5
+000297 8C4F06           450         MOV.W   [R7+6],R4
+00029A 8C5708           451         MOV.W   R5,[R7+8]
+00029D 8C4706           452         MOV.W   R4,[R7+6]
+0002A0 862C42           453         MOV.B   ES,R1L
+0002A3 9A000004         454         ADD.W   [R0],#04H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        455 ; format.c  207 
+                        456 ; format.c  208             fmt++;
+0002A7 9C701C0001       457         ADD.W   [R7+28],#01H
+                        458 ; format.c  209             if (*fmt == '*')
+0002AC 8C371E           459         MOV.W   R3,[R7+30]
+0002AF 8C271C           460         MOV.W   R2,[R7+28]
+0002B2 866C42           461         MOV.B   ES,R3L
+0002B5 92242A           462         CMP.B   [R2],#02AH
+0002B8 F212             463         BNE     _46
+                        464 ; format.c  210             {
+                        465 ; format.c  211                fmt++;
+0002BA 9C701C0001       466         ADD.W   [R7+28],#01H
+                        467 ; format.c  212                n = *(va_arg(arg_ptr, int *));
+0002BF 862C42           468         MOV.B   ES,R1L
+0002C2 8A20             469         MOV.W   R2,[R0]
+0002C4 8C3002           470         MOV.W   R3,[R0+2]
+0002C7 866C42           471         MOV.B   ES,R3L
+0002CA 8C3202           472         MOV.W   R3,[R2+2]
+0002CD 8A22             473         MOV.W   R2,[R2]
+0002CF 866C42           474         MOV.B   ES,R3L
+0002D2 8A22             475         MOV.W   R2,[R2]
+0002D4 862C42           476         MOV.B   ES,R1L
+0002D7 9A000004         477         ADD.W   [R0],#04H
+                        478 ; format.c  213             }
+0002DB FE08             479         BR      _47
+0002DB FE0800           479         BR      _47
+0002DE                  480 _46:
+                        481 ; format.c  214             else
+                        482 ; format.c  215                n = get_int(&fmt);
+0002DE 9128rr           483         MOV.B   R1L,#SEG( __lc_bs )
+0002E1 7133             484         XOR.B   R1H,R1H
+0002E3 40071C           485         LEA     R0,R7+28
+0002E6 C5039E           486         CALL    _get_int
+0002E9 8920             487         MOV.W   R2,R0
+0002E9 892000           487         MOV.W   R2,R0
+0002EC                  488 _47:
+                        489 ; format.c  216 
+                        490 ; format.c  217             length += n;
+0002EC 8C070A           491         MOV.W   R0,[R7+10]
+0002EF 0902             492         ADD.W   R0,R2
+0002F1 8C0F0A           493         MOV.W   [R7+10],R0
+                        494 ; format.c  218             for (i = 1; i <= n; i++)
+0002F4 B901             495         MOV.W   R0,#01H
+0002F6 99240001         496         CMP.W   R2,#01H
+                        497         BLT     _21
+0002FA FA02            +497 ;       BGE     _LG_68
+0002FC D5FEA0          +497 ;       JMP.L   _21
+0002FC D5FEA000        +497 ;       JMP.L   _21
+000300                 +497 _LG_68:
+000300                 +497 _LG_68:
+000300                  498 _48:
+                        499 ; format.c  219                *buffer++ = *str_ptr++;
+000300 8C5708           500         MOV.W   R5,[R7+8]
+000303 8C4706           501         MOV.W   R4,[R7+6]
+000306 86AC42           502         MOV.B   ES,R5L
+000309 8224             503         MOV.B   R1L,[R4]
+00030B 8C571A           504         MOV.W   R5,[R7+26]
+00030E 8C4718           505         MOV.W   R4,[R7+24]
+000311 86AC42           506         MOV.B   ES,R5L
+000314 822C             507         MOV.B   [R4],R1L
+000316 8C5708           508         MOV.W   R5,[R7+8]
+000319 8C4706           509         MOV.W   R4,[R7+6]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+00031C 99400001         510         ADD.W   R4,#01H
+000320 8C5F08           511         MOV.W   [R7+8],R5
+000323 8C4F06           512         MOV.W   [R7+6],R4
+000326 8C571A           513         MOV.W   R5,[R7+26]
+000329 8C4718           514         MOV.W   R4,[R7+24]
+00032C 99400001         515         ADD.W   R4,#01H
+000330 8C5F1A           516         MOV.W   [R7+26],R5
+000333 8C4F18           517         MOV.W   [R7+24],R4
+000336 A901             518         ADDS.W  R0,#01H
+000338 4902             519         CMP.W   R0,R2
+00033A FDE2             520         BLE     _48
+                        521 ; format.c  220             break;
+                        522         BR      _20
+00033C D5FE80          +522         JMP.L   _20
+00033C D5FE8000        +522         JMP.L   _20
+                        523 ; format.c  221 
+                        524 ; format.c  222          case 'Q':                      /* query length */
+000340                  525 _49:
+                        526 ; format.c  223             fmt++;
+000340 8C171E           527         MOV.W   R1,[R7+30]
+000343 8C071C           528         MOV.W   R0,[R7+28]
+000346 99000001         529         ADD.W   R0,#01H
+00034A 8C1F1E           530         MOV.W   [R7+30],R1
+00034D 8C0F1C           531         MOV.W   [R7+28],R0
+                        532 ; format.c  224             *(va_arg(arg_ptr, int *)) = length;
+000350 8C1760           533         MOV.W   R1,[R7+96]
+000353 8C075E           534         MOV.W   R0,[R7+94]
+000356 862C42           535         MOV.B   ES,R1L
+000359 8A20             536         MOV.W   R2,[R0]
+00035B 8C3002           537         MOV.W   R3,[R0+2]
+00035E 866C42           538         MOV.B   ES,R3L
+000361 8C3202           539         MOV.W   R3,[R2+2]
+000364 8A22             540         MOV.W   R2,[R2]
+000366 8C470A           541         MOV.W   R4,[R7+10]
+000369 866C42           542         MOV.B   ES,R3L
+00036C 8A4A             543         MOV.W   [R2],R4
+00036E 862C42           544         MOV.B   ES,R1L
+000371 9A000004         545         ADD.W   [R0],#04H
+                        546 ; format.c  225             break;
+                        547         BR      _19
+000375 D5FE63          +547         JMP.L   _19
+000375 D5FE63          +547         JMP.L   _19
+                        548 ; format.c  226 
+                        549 ; format.c  227          case 'Z':                      /* zero suppress mode */
+000378                  550 _50:
+                        551 ; format.c  228             fill_char = (*++fmt == '-') ? '0' : ' ';
+000378 9C701C0001       552         ADD.W   [R7+28],#01H
+00037D 8C171E           553         MOV.W   R1,[R7+30]
+000380 8C071C           554         MOV.W   R0,[R7+28]
+000383 862C42           555         MOV.B   ES,R1L
+000386 92042D           556         CMP.B   [R0],#02DH
+000389 F203             557         BNE     _106
+00038B 910830           558         MOV.B   R0L,#030H
+00038E FE02             559         BR      _107
+00038E FE02             559         BR      _107
+000390                  560 _106:
+000390 910820           561         MOV.B   R0L,#020H
+000390 91082000         561         MOV.B   R0L,#020H
+000394                  562 _107:
+000394 840F16           563         MOV.B   [R7+22],R0L
+                        564 ; format.c  229             fmt++;
+000397 8C171E           565         MOV.W   R1,[R7+30]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  13
+
+ADDR   CODE            LINE SOURCELINE
+00039A 8C071C           566         MOV.W   R0,[R7+28]
+00039D 99000001         567         ADD.W   R0,#01H
+0003A1 8C1F1E           568         MOV.W   [R7+30],R1
+0003A4 8C0F1C           569         MOV.W   [R7+28],R0
+                        570 ; format.c  230             break;
+                        571         BR      _18
+0003A7 D5FE4A          +571         JMP.L   _18
+0003A7 D5FE4A          +571         JMP.L   _18
+                        572 ; format.c  231 
+                        573 ; format.c  232          case 'T':                     /* tabs */
+0003AA                  574 _51:
+                        575 ; format.c  233             fmt++;
+0003AA 9C701C0001       576         ADD.W   [R7+28],#01H
+                        577 ; format.c  234             if (*fmt == '*')
+0003AF 8C171E           578         MOV.W   R1,[R7+30]
+0003B2 8C071C           579         MOV.W   R0,[R7+28]
+0003B5 862C42           580         MOV.B   ES,R1L
+0003B8 92042A           581         CMP.B   [R0],#02AH
+0003BB F215             582         BNE     _52
+                        583 ; format.c  235             {
+                        584 ; format.c  236                fmt++;
+0003BD 9C701C0001       585         ADD.W   [R7+28],#01H
+                        586 ; format.c  237                n = *(va_arg(arg_ptr, int *));
+0003C2 8C1760           587         MOV.W   R1,[R7+96]
+0003C5 8C075E           588         MOV.W   R0,[R7+94]
+0003C8 862C42           589         MOV.B   ES,R1L
+0003CB 8A20             590         MOV.W   R2,[R0]
+0003CD 8C3002           591         MOV.W   R3,[R0+2]
+0003D0 866C42           592         MOV.B   ES,R3L
+0003D3 8C3202           593         MOV.W   R3,[R2+2]
+0003D6 8A22             594         MOV.W   R2,[R2]
+0003D8 866C42           595         MOV.B   ES,R3L
+0003DB 8A22             596         MOV.W   R2,[R2]
+0003DD 862C42           597         MOV.B   ES,R1L
+0003E0 9A000004         598         ADD.W   [R0],#04H
+                        599 ; format.c  238             }
+0003E4 FE07             600         BR      _53
+0003E4 FE07             600         BR      _53
+0003E6                  601 _52:
+                        602 ; format.c  239             else
+                        603 ; format.c  240                n = get_int(&fmt);
+0003E6 9128rr           604         MOV.B   R1L,#SEG( __lc_bs )
+0003E9 7133             605         XOR.B   R1H,R1H
+0003EB 40071C           606         LEA     R0,R7+28
+0003EE C5031A           607         CALL    _get_int
+0003F1 8920             608         MOV.W   R2,R0
+0003F1 892000           608         MOV.W   R2,R0
+0003F4                  609 _53:
+                        610 ; format.c  241 
+                        611 ; format.c  242             buffer = sol_ptr + n - 1;
+0003F4 8922             612         MOV.W   R2,R2
+0003F6 9839             613         SEXT.W  R3
+0003F8 8C1710           614         MOV.W   R1,[R7+16]
+0003FB 8C070E           615         MOV.W   R0,[R7+14]
+0003FE 0902             616         ADD.W   R0,R2
+000400 99020001         617         SUB.W   R0,#01H
+000404 8C1F1A           618         MOV.W   [R7+26],R1
+000407 8C0F18           619         MOV.W   [R7+24],R0
+                        620 ; format.c  243             break;
+                        621         BR      _17
+00040A D5FE19          +621         JMP.L   _17
+00040A D5FE1900        +621         JMP.L   _17
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  14
+
+ADDR   CODE            LINE SOURCELINE
+                        622 ; format.c  244 
+                        623 ; format.c  245          case ',':
+00040E                  624 _54:
+                        625 ; format.c  246             fmt++;
+00040E 8C171E           626         MOV.W   R1,[R7+30]
+000411 8C071C           627         MOV.W   R0,[R7+28]
+000414 99000001         628         ADD.W   R0,#01H
+000418 8C1F1E           629         MOV.W   [R7+30],R1
+00041B 8C0F1C           630         MOV.W   [R7+28],R0
+                        631 ; format.c  247             break;
+                        632         BR      _16
+00041E D5FE0F          +632         JMP.L   _16
+00041E D5FE0F00        +632         JMP.L   _16
+                        633 ; format.c  248 
+                        634 ; format.c  249          case 'U':                   /* unsigned */
+000422                  635 _55:
+                        636 ; format.c  250             switch(*++fmt)
+000422 9C701C0001       637         ADD.W   [R7+28],#01H
+000427 8C171E           638         MOV.W   R1,[R7+30]
+00042A 8C071C           639         MOV.W   R0,[R7+28]
+00042D 862C42           640         MOV.B   ES,R1L
+000430 8240             641         MOV.B   R2L,[R0]
+000432 8C1F1E           642         MOV.W   [R7+30],R1
+000435 8C0F1C           643         MOV.W   [R7+28],R0
+000438 91444C           644         CMP.B   R2L,#04CH
+00043B F30A             645         BEQ     _56
+00043D 914469           646         CMP.B   R2L,#069H
+000440 F321             647         BEQ     _57
+000442 914449           648         CMP.B   R2L,#049H
+000445 F339             649         BEQ     _58
+000447 914442           650         CMP.B   R2L,#042H
+00044A F34F             651         BEQ     _59
+                        652         BR      _71
+00044C D500CD          +652         JMP.L   _71
+00044C D500CD00        +652         JMP.L   _71
+                        653 ; format.c  251             {
+                        654 ; format.c  252 #ifdef LONG
+                        655 ; format.c  253                case 'L':
+000450                  656 _56:
+                        657 ; format.c  254                   ultoa(*(va_arg(arg_ptr, unsigned long *)), temp_buff, radix);
+000450 8C5760           658         MOV.W   R5,[R7+96]
+000453 8C475E           659         MOV.W   R4,[R7+94]
+000456 86AC42           660         MOV.B   ES,R5L
+000459 8A04             661         MOV.W   R0,[R4]
+00045B 8C1402           662         MOV.W   R1,[R4+2]
+00045E 862C42           663         MOV.B   ES,R1L
+000461 8C1002           664         MOV.W   R1,[R0+2]
+000464 8A00             665         MOV.W   R0,[R0]
+000466 862C42           666         MOV.B   ES,R1L
+000469 8C1002           667         MOV.W   R1,[R0+2]
+00046C 8A00             668         MOV.W   R0,[R0]
+00046E 9168rr           669         MOV.B   R3L,#SEG( __lc_bs )
+000471 7177             670         XOR.B   R3H,R3H
+000473 402732           671         LEA     R2,R7+50
+                        672         CALL    _ultoa
+000476 C4rrrrrr        +672 ;       FCALL   _ultoa
+00047A 86AC42           673         MOV.B   ES,R5L
+00047D 9A400004         674         ADD.W   [R4],#04H
+                        675 ; format.c  255                   break;
+                        676         BR      _71
+000481 D500B2          +676         JMP.L   _71
+000481 D500B2          +676         JMP.L   _71
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  15
+
+ADDR   CODE            LINE SOURCELINE
+                        677 ; format.c  256 #endif
+                        678 ; format.c  257 
+                        679 ; format.c  258                case 'i':
+000484                  680 _57:
+                        681 ; format.c  259                   uitoa((unsigned int)*(va_arg(arg_ptr, unsigned short *)),
+                        682 ; format.c  260                         temp_buff, radix);
+000484 8C5760           683         MOV.W   R5,[R7+96]
+000487 8C475E           684         MOV.W   R4,[R7+94]
+00048A 86AC42           685         MOV.B   ES,R5L
+00048D 8A04             686         MOV.W   R0,[R4]
+00048F 8C1402           687         MOV.W   R1,[R4+2]
+000492 862C42           688         MOV.B   ES,R1L
+000495 8C1002           689         MOV.W   R1,[R0+2]
+000498 8A00             690         MOV.W   R0,[R0]
+00049A 862C42           691         MOV.B   ES,R1L
+00049D 8A00             692         MOV.W   R0,[R0]
+00049F 9168rr           693         MOV.B   R3L,#SEG( __lc_bs )
+0004A2 7177             694         XOR.B   R3H,R3H
+0004A4 402732           695         LEA     R2,R7+50
+0004A7 8916             696         MOV.W   R1,R6
+                        697         CALL    _uitoa
+0004A9 C4rrrrrr        +697 ;       FCALL   _uitoa
+0004AD 86AC42           698         MOV.B   ES,R5L
+0004B0 9A400004         699         ADD.W   [R4],#04H
+                        700 ; format.c  261                   break;
+                        701         BR      _71
+0004B4 D50099          +701         JMP.L   _71
+0004B4 D5009900        +701         JMP.L   _71
+                        702 ; format.c  262 
+                        703 ; format.c  263                case 'I':
+0004B8                  704 _58:
+                        705 ; format.c  264                   uitoa(*(va_arg(arg_ptr, unsigned int *)), temp_buff, radix);
+0004B8 8C5760           706         MOV.W   R5,[R7+96]
+0004BB 8C475E           707         MOV.W   R4,[R7+94]
+0004BE 86AC42           708         MOV.B   ES,R5L
+0004C1 8A04             709         MOV.W   R0,[R4]
+0004C3 8C1402           710         MOV.W   R1,[R4+2]
+0004C6 862C42           711         MOV.B   ES,R1L
+0004C9 8C1002           712         MOV.W   R1,[R0+2]
+0004CC 8A00             713         MOV.W   R0,[R0]
+0004CE 862C42           714         MOV.B   ES,R1L
+0004D1 8A00             715         MOV.W   R0,[R0]
+0004D3 9168rr           716         MOV.B   R3L,#SEG( __lc_bs )
+0004D6 7177             717         XOR.B   R3H,R3H
+0004D8 402732           718         LEA     R2,R7+50
+0004DB 8916             719         MOV.W   R1,R6
+                        720         CALL    _uitoa
+0004DD C4rrrrrr        +720 ;       FCALL   _uitoa
+0004E1 86AC42           721         MOV.B   ES,R5L
+0004E4 9A400004         722         ADD.W   [R4],#04H
+                        723 ; format.c  265                   break;
+0004E8 FE7F             724         BR      _71
+0004E8 FE7F             724         BR      _71
+                        725 ; format.c  266 
+                        726 ; format.c  267                case 'B':
+0004EA                  727 _59:
+                        728 ; format.c  268                   uitoa((unsigned int)*(va_arg(arg_ptr, unsigned char *)),
+                        729 ; format.c  269                         temp_buff, radix);
+0004EA 8C5760           730         MOV.W   R5,[R7+96]
+0004ED 8C475E           731         MOV.W   R4,[R7+94]
+0004F0 86AC42           732         MOV.B   ES,R5L
+0004F3 8A04             733         MOV.W   R0,[R4]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  16
+
+ADDR   CODE            LINE SOURCELINE
+0004F5 8C1402           734         MOV.W   R1,[R4+2]
+0004F8 862C42           735         MOV.B   ES,R1L
+0004FB 8C1002           736         MOV.W   R1,[R0+2]
+0004FE 8A00             737         MOV.W   R0,[R0]
+000500 862C42           738         MOV.B   ES,R1L
+000503 8200             739         MOV.B   R0L,[R0]
+000505 B110             740         MOVS.B  R0H,#00H
+000507 9168rr           741         MOV.B   R3L,#SEG( __lc_bs )
+00050A 7177             742         XOR.B   R3H,R3H
+00050C 402732           743         LEA     R2,R7+50
+00050F 8916             744         MOV.W   R1,R6
+                        745         CALL    _uitoa
+000511 C4rrrrrr        +745 ;       FCALL   _uitoa
+000515 86AC42           746         MOV.B   ES,R5L
+000518 9A400004         747         ADD.W   [R4],#04H
+                        748 ; format.c  270                   break;
+                        749 ; format.c  271 
+                        750 ; format.c  272             }
+                        751 ; format.c  273             goto FILL_BUFF;
+00051C FE65             752         BR      _71
+00051C FE65             752         BR      _71
+                        753 ; format.c  274 
+                        754 ; format.c  275 #ifdef LONG
+                        755 ; format.c  276          case 'L':                   /* long to ascii */
+00051E                  756 _60:
+                        757 ; format.c  277             ltoa( *(va_arg(arg_ptr, long *)), temp_buff, radix);
+00051E 8C5760           758         MOV.W   R5,[R7+96]
+000521 8C475E           759         MOV.W   R4,[R7+94]
+000524 86AC42           760         MOV.B   ES,R5L
+000527 8A04             761         MOV.W   R0,[R4]
+000529 8C1402           762         MOV.W   R1,[R4+2]
+00052C 862C42           763         MOV.B   ES,R1L
+00052F 8C1002           764         MOV.W   R1,[R0+2]
+000532 8A00             765         MOV.W   R0,[R0]
+000534 862C42           766         MOV.B   ES,R1L
+000537 8C1002           767         MOV.W   R1,[R0+2]
+00053A 8A00             768         MOV.W   R0,[R0]
+00053C 9168rr           769         MOV.B   R3L,#SEG( __lc_bs )
+00053F 7177             770         XOR.B   R3H,R3H
+000541 402732           771         LEA     R2,R7+50
+                        772         CALL    _ltoa
+000544 C4rrrrrr        +772 ;       FCALL   _ltoa
+000548 86AC42           773         MOV.B   ES,R5L
+00054B 9A400004         774         ADD.W   [R4],#04H
+                        775 ; format.c  278             goto FILL_BUFF;
+00054F FE4C             776         BR      _71
+00054F FE4C00           776         BR      _71
+                        777 ; format.c  279 #endif
+                        778 ; format.c  280 
+                        779 ; format.c  281          case 'B':                   /* byte to ascii */
+000552                  780 _61:
+                        781 ; format.c  282             itoa((int)*(va_arg(arg_ptr, signed char *)), temp_buff, radix);
+000552 8C5760           782         MOV.W   R5,[R7+96]
+000555 8C475E           783         MOV.W   R4,[R7+94]
+000558 86AC42           784         MOV.B   ES,R5L
+00055B 8A04             785         MOV.W   R0,[R4]
+00055D 8C1402           786         MOV.W   R1,[R4+2]
+000560 862C42           787         MOV.B   ES,R1L
+000563 8C1002           788         MOV.W   R1,[R0+2]
+000566 8A00             789         MOV.W   R0,[R0]
+000568 862C42           790         MOV.B   ES,R1L
+00056B 8200             791         MOV.B   R0L,[R0]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  17
+
+ADDR   CODE            LINE SOURCELINE
+00056D 9019             792         SEXT.B  R0H
+00056F 9168rr           793         MOV.B   R3L,#SEG( __lc_bs )
+000572 7177             794         XOR.B   R3H,R3H
+000574 402732           795         LEA     R2,R7+50
+000577 8916             796         MOV.W   R1,R6
+                        797         CALL    _itoa
+000579 C4rrrrrr        +797 ;       FCALL   _itoa
+00057D 86AC42           798         MOV.B   ES,R5L
+000580 9A400004         799         ADD.W   [R4],#04H
+                        800 ; format.c  283             goto FILL_BUFF;
+000584 FE31             801         BR      _71
+000584 FE31             801         BR      _71
+                        802 ; format.c  284 
+                        803 ; format.c  285          case 'i':                   /* short to ascii */
+000586                  804 _62:
+                        805 ; format.c  286             itoa((int)*(va_arg(arg_ptr, short *)), temp_buff, radix);
+000586 8C5760           806         MOV.W   R5,[R7+96]
+000589 8C475E           807         MOV.W   R4,[R7+94]
+00058C 86AC42           808         MOV.B   ES,R5L
+00058F 8A04             809         MOV.W   R0,[R4]
+000591 8C1402           810         MOV.W   R1,[R4+2]
+000594 862C42           811         MOV.B   ES,R1L
+000597 8C1002           812         MOV.W   R1,[R0+2]
+00059A 8A00             813         MOV.W   R0,[R0]
+00059C 862C42           814         MOV.B   ES,R1L
+00059F 8A00             815         MOV.W   R0,[R0]
+0005A1 9168rr           816         MOV.B   R3L,#SEG( __lc_bs )
+0005A4 7177             817         XOR.B   R3H,R3H
+0005A6 402732           818         LEA     R2,R7+50
+0005A9 8916             819         MOV.W   R1,R6
+                        820         CALL    _itoa
+0005AB C4rrrrrr        +820 ;       FCALL   _itoa
+0005AF 86AC42           821         MOV.B   ES,R5L
+0005B2 9A400004         822         ADD.W   [R4],#04H
+                        823 ; format.c  287             goto FILL_BUFF;
+0005B6 FE18             824         BR      _71
+0005B6 FE18             824         BR      _71
+                        825 ; format.c  288 
+                        826 ; format.c  289          case 'I':                   /* integer to ascii */
+0005B8                  827 _63:
+                        828 ; format.c  290             itoa( *(va_arg(arg_ptr, int *)), temp_buff, radix);
+0005B8 8C5760           829         MOV.W   R5,[R7+96]
+0005BB 8C475E           830         MOV.W   R4,[R7+94]
+0005BE 86AC42           831         MOV.B   ES,R5L
+0005C1 8A04             832         MOV.W   R0,[R4]
+0005C3 8C1402           833         MOV.W   R1,[R4+2]
+0005C6 862C42           834         MOV.B   ES,R1L
+0005C9 8C1002           835         MOV.W   R1,[R0+2]
+0005CC 8A00             836         MOV.W   R0,[R0]
+0005CE 862C42           837         MOV.B   ES,R1L
+0005D1 8A00             838         MOV.W   R0,[R0]
+0005D3 9168rr           839         MOV.B   R3L,#SEG( __lc_bs )
+0005D6 7177             840         XOR.B   R3H,R3H
+0005D8 402732           841         LEA     R2,R7+50
+0005DB 8916             842         MOV.W   R1,R6
+                        843         CALL    _itoa
+0005DD C4rrrrrr        +843 ;       FCALL   _itoa
+0005E1 86AC42           844         MOV.B   ES,R5L
+0005E4 9A400004         845         ADD.W   [R4],#04H
+0005E4 9A400004         845         ADD.W   [R4],#04H
+                        846 ; format.c  291 
+                        847 ; format.c  292 FILL_BUFF:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  18
+
+ADDR   CODE            LINE SOURCELINE
+0005E8                  848 _71:
+                        849 ; format.c  293             fmt++;
+0005E8 9C701C0001       850         ADD.W   [R7+28],#01H
+                        851 ; format.c  294             if (*fmt == '*')
+0005ED 8C171E           852         MOV.W   R1,[R7+30]
+0005F0 8C071C           853         MOV.W   R0,[R7+28]
+0005F3 862C42           854         MOV.B   ES,R1L
+0005F6 92042A           855         CMP.B   [R0],#02AH
+0005F9 F215             856         BNE     _72
+                        857 ; format.c  295             {
+                        858 ; format.c  296                fmt++;
+0005FB 9C701C0001       859         ADD.W   [R7+28],#01H
+                        860 ; format.c  297                n = *(va_arg(arg_ptr, int *));
+000600 8C1760           861         MOV.W   R1,[R7+96]
+000603 8C075E           862         MOV.W   R0,[R7+94]
+000606 862C42           863         MOV.B   ES,R1L
+000609 8A40             864         MOV.W   R4,[R0]
+00060B 8C5002           865         MOV.W   R5,[R0+2]
+00060E 86AC42           866         MOV.B   ES,R5L
+000611 8C5402           867         MOV.W   R5,[R4+2]
+000614 8A44             868         MOV.W   R4,[R4]
+000616 86AC42           869         MOV.B   ES,R5L
+000619 8A44             870         MOV.W   R4,[R4]
+00061B 862C42           871         MOV.B   ES,R1L
+00061E 9A000004         872         ADD.W   [R0],#04H
+                        873 ; format.c  298             }
+000622 FE07             874         BR      _73
+000622 FE07             874         BR      _73
+000624                  875 _72:
+                        876 ; format.c  299             else
+                        877 ; format.c  300                n = get_int(&fmt);
+000624 9128rr           878         MOV.B   R1L,#SEG( __lc_bs )
+000627 7133             879         XOR.B   R1H,R1H
+000629 40071C           880         LEA     R0,R7+28
+00062C C501FB           881         CALL    _get_int
+00062F 8940             882         MOV.W   R4,R0
+00062F 894000           882         MOV.W   R4,R0
+000632                  883 _73:
+                        884 ; format.c  301 
+                        885 ; format.c  302             space = strlen(temp_buff);
+000632 9128rr           886         MOV.B   R1L,#SEG( __lc_bs )
+000635 7133             887         XOR.B   R1H,R1H
+000637 400732           888         LEA     R0,R7+50
+                        889         CALL    _strlen
+00063A C4rrrrrr        +889 ;       FCALL   _strlen
+00063E 8950             890         MOV.W   R5,R0
+                        891 ; format.c  303 
+                        892 ; format.c  304             if (n == 0) /* as needed (under test) */
+000640 6944             893         OR.W    R4,R4
+000642 F207             894         BNE     _74
+000644 9128rr           895         MOV.B   R1L,#SEG( __lc_bs )
+000647 7133             896         XOR.B   R1H,R1H
+000649 400732           897         LEA     R0,R7+50
+                        898 ; format.c  305                n = strlen(temp_buff);
+                        899         CALL    _strlen
+00064C C4rrrrrr        +899 ;       FCALL   _strlen
+000650 8940             900         MOV.W   R4,R0
+000650 8940             900         MOV.W   R4,R0
+000652                  901 _74:
+                        902 ; format.c  306 
+                        903 ; format.c  307             length += n;
+000652 8C070A           904         MOV.W   R0,[R7+10]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  19
+
+ADDR   CODE            LINE SOURCELINE
+000655 0904             905         ADD.W   R0,R4
+000657 8C0F0A           906         MOV.W   [R7+10],R0
+                        907 ; format.c  308 
+                        908 ; format.c  309             if (n >= space)          /* enough room */
+00065A 4945             909         CMP.W   R4,R5
+00065C FB5C             910         BLT     _80
+                        911 ; format.c  310             {
+                        912 ; format.c  311                temp = n - space;
+00065E 8905             913         MOV.W   R0,R5
+000660 8C0F08           914         MOV.W   [R7+8],R0
+000663 8128             915         MOV.B   R1L,R4L
+000665 2120             916         SUB.B   R1L,R0L
+                        917 ; format.c  312                tb_ptr = temp_buff;
+000667 9168rr           918         MOV.B   R3L,#SEG( __lc_bs )
+00066A 7177             919         XOR.B   R3H,R3H
+00066C 402732           920         LEA     R2,R7+50
+00066F 8C3F06           921         MOV.W   [R7+6],R3
+000672 8C2F04           922         MOV.W   [R7+4],R2
+                        923 ; format.c  313                if (*tb_ptr == '-')  /* if neg, put - sign first */
+000675 840732           924         MOV.B   R0L,[R7+50]
+000678 91042D           925         CMP.B   R0L,#02DH
+00067B F211             926         BNE     _76
+                        927 ; format.c  314                   if (fill_char == '0')
+00067D 94741630         928         CMP.B   [R7+22],#030H
+000681 F20E             929         BNE     _76
+                        930 ; format.c  315                   {
+                        931 ; format.c  316                      *buffer++ = *tb_ptr;
+000683 8C371A           932         MOV.W   R3,[R7+26]
+000686 8C2718           933         MOV.W   R2,[R7+24]
+000689 866C42           934         MOV.B   ES,R3L
+00068C 820A             935         MOV.B   [R2],R0L
+00068E 99200001         936         ADD.W   R2,#01H
+000692 8C3F1A           937         MOV.W   [R7+26],R3
+000695 8C2F18           938         MOV.W   [R7+24],R2
+                        939 ; format.c  317                      *tb_ptr = '0';
+000698 94783230         940         MOV.B   [R7+50],#030H
+                        941 ; format.c  318                      temp--;
+00069C A12F             942         ADDS.B  R1L,#0FH
+00069C A12F             942         ADDS.B  R1L,#0FH
+                        943 ; format.c  319                   }
+                        944 ; format.c  320                for (i = 1; i <= temp; i++)
+00069E                  945 _76:
+00069E B901             946         MOV.W   R0,#01H
+0006A0 8122             947         MOV.B   R1L,R1L
+0006A2 9039             948         SEXT.B  R1H
+0006A4 99140001         949         CMP.W   R1,#01H
+0006A8 FB11             950         BLT     _78
+0006A8 FB11             950         BLT     _78
+0006AA                  951 _77:
+                        952 ; format.c  321                   *buffer++ = fill_char;
+0006AA 8C571A           953         MOV.W   R5,[R7+26]
+0006AD 8C4718           954         MOV.W   R4,[R7+24]
+0006B0 844716           955         MOV.B   R2L,[R7+22]
+0006B3 86AC42           956         MOV.B   ES,R5L
+0006B6 824C             957         MOV.B   [R4],R2L
+0006B8 8935             958         MOV.W   R3,R5
+0006BA 8924             959         MOV.W   R2,R4
+0006BC 99200001         960         ADD.W   R2,#01H
+0006C0 8C3F1A           961         MOV.W   [R7+26],R3
+0006C3 8C2F18           962         MOV.W   [R7+24],R2
+0006C6 A901             963         ADDS.W  R0,#01H
+0006C8 4901             964         CMP.W   R0,R1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  20
+
+ADDR   CODE            LINE SOURCELINE
+0006CA FDEF             965         BLE     _77
+0006CA FDEF             965         BLE     _77
+0006CC                  966 _78:
+                        967 ; format.c  322                for (i = 1; i <= space; i++)
+0006CC B901             968         MOV.W   R0,#01H
+0006CE 9C74080001       969         CMP.W   [R7+8],#01H
+                        970         BLT     _15
+0006D3 FA02            +970 ;       BGE     _LG_98
+0006D5 D5FCB3          +970 ;       JMP.L   _15
+0006D5 D5FCB3          +970 ;       JMP.L   _15
+0006D8                 +970 _LG_98:
+0006D8                 +970 _LG_98:
+0006D8                  971 _79:
+                        972 ; format.c  323                   *buffer++ = *tb_ptr++;
+0006D8 8C3706           973         MOV.W   R3,[R7+6]
+0006DB 8C2704           974         MOV.W   R2,[R7+4]
+0006DE 866C42           975         MOV.B   ES,R3L
+0006E1 8222             976         MOV.B   R1L,[R2]
+0006E3 8C571A           977         MOV.W   R5,[R7+26]
+0006E6 8C4718           978         MOV.W   R4,[R7+24]
+0006E9 86AC42           979         MOV.B   ES,R5L
+0006EC 822C             980         MOV.B   [R4],R1L
+0006EE 8C3706           981         MOV.W   R3,[R7+6]
+0006F1 8C2704           982         MOV.W   R2,[R7+4]
+0006F4 99200001         983         ADD.W   R2,#01H
+0006F8 8C3F06           984         MOV.W   [R7+6],R3
+0006FB 8C2F04           985         MOV.W   [R7+4],R2
+0006FE 8935             986         MOV.W   R3,R5
+000700 8924             987         MOV.W   R2,R4
+000702 99200001         988         ADD.W   R2,#01H
+000706 8C3F1A           989         MOV.W   [R7+26],R3
+000709 8C2F18           990         MOV.W   [R7+24],R2
+00070C A901             991         ADDS.W  R0,#01H
+00070E 4C0708           992         CMP.W   R0,[R7+8]
+000711 FDE3             993         BLE     _79
+                        994 ; format.c  324             }
+                        995         BR      _14
+000713 D5FC94          +995         JMP.L   _14
+000713 D5FC94          +995         JMP.L   _14
+000716                  996 _80:
+                        997 ; format.c  325             else  /* not enough room to print integer */
+                        998 ; format.c  326             {
+                        999 ; format.c  327                for (i = 1; i <= n; i++)
+000716 B901            1000         MOV.W   R0,#01H
+000718 99440001        1001         CMP.W   R4,#01H
+                       1002         BLT     _13
+00071C FA02           +1002 ;       BGE     _LG_102
+00071E D5FC8F         +1002 ;       JMP.L   _13
+00071E D5FC8F00       +1002 ;       JMP.L   _13
+000722                +1002 _LG_102:
+000722                +1002 _LG_102:
+000722                 1003 _81:
+                       1004 ; format.c  328                   *buffer++ = '*';
+000722 8C371A          1005         MOV.W   R3,[R7+26]
+000725 8C2718          1006         MOV.W   R2,[R7+24]
+000728 866C42          1007         MOV.B   ES,R3L
+00072B 92282A          1008         MOV.B   [R2],#02AH
+00072E 99200001        1009         ADD.W   R2,#01H
+000732 8C3F1A          1010         MOV.W   [R7+26],R3
+000735 8C2F18          1011         MOV.W   [R7+24],R2
+000738 A901            1012         ADDS.W  R0,#01H
+00073A 4904            1013         CMP.W   R0,R4
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  21
+
+ADDR   CODE            LINE SOURCELINE
+00073C FDF2            1014         BLE     _81
+                       1015 ; format.c  329             }
+                       1016 ; format.c  330             break;
+                       1017         BR      _12
+00073E D5FC7F         +1017         JMP.L   _12
+00073E D5FC7F00       +1017         JMP.L   _12
+                       1018 ; format.c  331 
+                       1019 ; format.c  332 #ifdef FLOAT
+                       1020 ; format.c  333          case 'D':
+                       1021 ; format.c  334          case 'F':
+                       1022 ; format.c  335             DOUBLE = (*fmt == 'D') ? 1 : 0;
+                       1023 ; format.c  336             fmt++;
+                       1024 ; format.c  337             if (DOUBLE)
+                       1025 ; format.c  338             {
+                       1026 ; format.c  339 #ifndef FLOATLESS
+                       1027 ; format.c  340                double_val = *(va_arg(arg_ptr, double *));
+                       1028 ; format.c  341                m_sig = (long)double_val;
+                       1029 ; format.c  342 #else
+                       1030 ; format.c  343                double_ptr = va_arg(arg_ptr, double *);
+                       1031 ; format.c  344                m_sig = dtomsig(double_ptr);
+                       1032 ; format.c  345 #endif
+                       1033 ; format.c  346             }
+                       1034 ; format.c  347             else /* since float */
+                       1035 ; format.c  348             {
+                       1036 ; format.c  349 #ifndef FLOATLESS
+                       1037 ; format.c  350                float_val = *(va_arg(arg_ptr, float *));
+                       1038 ; format.c  351                m_sig = (long) float_val;
+                       1039 ; format.c  352 #else
+                       1040 ; format.c  353                float_ptr = va_arg(arg_ptr, float *);
+                       1041 ; format.c  354                m_sig = ftomsig(float_ptr);
+                       1042 ; format.c  355 #endif
+                       1043 ; format.c  356             }
+                       1044 ; format.c  357 
+                       1045 ; format.c  358             flt.width = get_int(&fmt); /* needs fixing */
+                       1046 ; format.c  359             length += flt.width;
+                       1047 ; format.c  360             if (*fmt++ == '.')
+                       1048 ; format.c  361                flt.dec_pt = get_int(&fmt); /* needs fixing */
+                       1049 ; format.c  362             else
+                       1050 ; format.c  363                flt.dec_pt = 0;
+                       1051 ; format.c  364             ltoa(m_sig, temp_buff, 10);
+                       1052 ; format.c  365             space = strlen(temp_buff);
+                       1053 ; format.c  366             if (space >  flt.width - flt.dec_pt - 1) /* not enough room */
+                       1054 ; format.c  367             {
+                       1055 ; format.c  368                temp = flt.width - flt.dec_pt - 1;
+                       1056 ; format.c  369                for (i = 1; i <= temp; i++)
+                       1057 ; format.c  370                   *buffer++ = '*';
+                       1058 ; format.c  371                *buffer++ = '.';
+                       1059 ; format.c  372                for (i = 1; i <= flt.dec_pt; i++)
+                       1060 ; format.c  373                   *buffer++ = '*';
+                       1061 ; format.c  374             }
+                       1062 ; format.c  375             else  /* since enough room */
+                       1063 ; format.c  376             {
+                       1064 ; format.c  377                temp = flt.width - flt.dec_pt - 1 - space;
+                       1065 ; format.c  378                tb_ptr = temp_buff;
+                       1066 ; format.c  379                if (*tb_ptr == '-')
+                       1067 ; format.c  380                   if (fill_char == '0')
+                       1068 ; format.c  381                   {
+                       1069 ; format.c  382                      *buffer++ = *tb_ptr;
+                       1070 ; format.c  383                      *tb_ptr = '0';
+                       1071 ; format.c  384                      temp--;
+                       1072 ; format.c  385                   }
+                       1073 ; format.c  386                for (i = 1; i <= temp; i++)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  22
+
+ADDR   CODE            LINE SOURCELINE
+                       1074 ; format.c  387                   *buffer++ = fill_char;
+                       1075 ; format.c  388                for (i = 1; i <= space; i++)
+                       1076 ; format.c  389                   *buffer++ = *tb_ptr++;
+                       1077 ; format.c  390                *buffer++ = '.';
+                       1078 ; format.c  391                temp = flt.dec_pt;
+                       1079 ; format.c  392 #ifndef FLOATLESS
+                       1080 ; format.c  393                if (DOUBLE)
+                       1081 ; format.c  394                {
+                       1082 ; format.c  395                  if (double_val < 0)
+                       1083 ; format.c  396                  {
+                       1084 ; format.c  397                     double_val = -double_val;
+                       1085 ; format.c  398                     m_sig = -m_sig;
+                       1086 ; format.c  399                  }
+                       1087 ; format.c  400                  l_sig =(long)(mul[temp] * (double_val + r_off[temp] - m_sig));
+                       1088 ; format.c  401                }
+                       1089 ; format.c  402                else
+                       1090 ; format.c  403                {
+                       1091 ; format.c  404                  if (float_val < 0)
+                       1092 ; format.c  405                  {
+                       1093 ; format.c  406                     float_val = -float_val;
+                       1094 ; format.c  407                     m_sig = -m_sig;
+                       1095 ; format.c  408                  }
+                       1096 ; format.c  409                  l_sig =(long)(mul[temp] * (float_val + r_off[temp] - m_sig));
+                       1097 ; format.c  410                }
+                       1098 ; format.c  411 #else
+                       1099 ; format.c  412                if (DOUBLE)
+                       1100 ; format.c  413                {
+                       1101 ; format.c  414                   l_sig = dtolsig(double_ptr, temp, m_sig);
+                       1102 ; format.c  415                }
+                       1103 ; format.c  416                else
+                       1104 ; format.c  417                {
+                       1105 ; format.c  418                   l_sig = ftolsig(float_ptr, temp, m_sig);
+                       1106 ; format.c  419                }
+                       1107 ; format.c  420 #endif
+                       1108 ; format.c  421 
+                       1109 ; format.c  422                ltoa( (long) l_sig, temp_buff, 10);
+                       1110 ; format.c  423                space = strlen(temp_buff);                    /* 9-15-87 */
+                       1111 ; format.c  424                if (space < flt.dec_pt)
+                       1112 ; format.c  425                {
+                       1113 ; format.c  426                   temp = flt.dec_pt - space;
+                       1114 ; format.c  427                   for (i = 1; i <= temp; i++)
+                       1115 ; format.c  428                      *buffer++ = '0';
+                       1116 ; format.c  429                }
+                       1117 ; format.c  430                else
+                       1118 ; format.c  431                   space = flt.dec_pt;
+                       1119 ; format.c  432                tb_ptr = temp_buff;
+                       1120 ; format.c  433                for (i = 1; i <= space; i++)
+                       1121 ; format.c  434                   *buffer++ = *tb_ptr++;                      /* to here  */
+                       1122 ; format.c  435             }
+                       1123 ; format.c  436 
+                       1124 ; format.c  437             break;
+                       1125 ; format.c  438 
+                       1126 ; format.c  439 #endif
+                       1127 ; format.c  440 
+                       1128 ; format.c  441          case 'X':                         /* spaces */
+000742                 1129 _82:
+                       1130 ; format.c  442             fmt++;
+000742 9C701C0001      1131         ADD.W   [R7+28],#01H
+                       1132 ; format.c  443             if (*fmt == '*')
+000747 8C171E          1133         MOV.W   R1,[R7+30]
+00074A 8C071C          1134         MOV.W   R0,[R7+28]
+00074D 862C42          1135         MOV.B   ES,R1L
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  23
+
+ADDR   CODE            LINE SOURCELINE
+000750 92042A          1136         CMP.B   [R0],#02AH
+000753 F215            1137         BNE     _83
+                       1138 ; format.c  444             {
+                       1139 ; format.c  445                fmt++;
+000755 9C701C0001      1140         ADD.W   [R7+28],#01H
+                       1141 ; format.c  446                n = *(va_arg(arg_ptr, int *));
+00075A 8C1760          1142         MOV.W   R1,[R7+96]
+00075D 8C075E          1143         MOV.W   R0,[R7+94]
+000760 862C42          1144         MOV.B   ES,R1L
+000763 8A20            1145         MOV.W   R2,[R0]
+000765 8C3002          1146         MOV.W   R3,[R0+2]
+000768 866C42          1147         MOV.B   ES,R3L
+00076B 8C3202          1148         MOV.W   R3,[R2+2]
+00076E 8A22            1149         MOV.W   R2,[R2]
+000770 866C42          1150         MOV.B   ES,R3L
+000773 8A22            1151         MOV.W   R2,[R2]
+000775 862C42          1152         MOV.B   ES,R1L
+000778 9A000004        1153         ADD.W   [R0],#04H
+                       1154 ; format.c  447             }
+00077C FE07            1155         BR      _84
+00077C FE07            1155         BR      _84
+00077E                 1156 _83:
+                       1157 ; format.c  448             else
+                       1158 ; format.c  449                n = get_int(&fmt);
+00077E 9128rr          1159         MOV.B   R1L,#SEG( __lc_bs )
+000781 7133            1160         XOR.B   R1H,R1H
+000783 40071C          1161         LEA     R0,R7+28
+000786 C5014E          1162         CALL    _get_int
+000789 8920            1163         MOV.W   R2,R0
+000789 892000          1163         MOV.W   R2,R0
+00078C                 1164 _84:
+                       1165 ; format.c  450 
+                       1166 ; format.c  451             for (i = 1; i <= n; i++)
+00078C B901            1167         MOV.W   R0,#01H
+00078E 99240001        1168         CMP.W   R2,#01H
+000792 FB0E            1169         BLT     _86
+000792 FB0E            1169         BLT     _86
+000794                 1170 _85:
+                       1171 ; format.c  452                *buffer++ = ' ';
+000794 8C571A          1172         MOV.W   R5,[R7+26]
+000797 8C4718          1173         MOV.W   R4,[R7+24]
+00079A 86AC42          1174         MOV.B   ES,R5L
+00079D 924820          1175         MOV.B   [R4],#020H
+0007A0 99400001        1176         ADD.W   R4,#01H
+0007A4 8C5F1A          1177         MOV.W   [R7+26],R5
+0007A7 8C4F18          1178         MOV.W   [R7+24],R4
+0007AA A901            1179         ADDS.W  R0,#01H
+0007AC 4902            1180         CMP.W   R0,R2
+0007AE FDF2            1181         BLE     _85
+0007AE FDF2            1181         BLE     _85
+0007B0                 1182 _86:
+                       1183 ; format.c  453             length += n;
+0007B0 8C070A          1184         MOV.W   R0,[R7+10]
+0007B3 0920            1185         ADD.W   R2,R0
+0007B5 8C2F0A          1186         MOV.W   [R7+10],R2
+                       1187 ; format.c  454             break;
+                       1188         BR      _11
+0007B8 D5FC42         +1188         JMP.L   _11
+0007B8 D5FC4200       +1188         JMP.L   _11
+                       1189 ; format.c  455 
+                       1190 ; format.c  456          case '/':                       /* new line */
+0007BC                 1191 _87:
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  24
+
+ADDR   CODE            LINE SOURCELINE
+                       1192 ; format.c  457             *buffer++ = '\n', length++;
+0007BC 8C171A          1193         MOV.W   R1,[R7+26]
+0007BF 8C0718          1194         MOV.W   R0,[R7+24]
+0007C2 862C42          1195         MOV.B   ES,R1L
+0007C5 92080A          1196         MOV.B   [R0],#0AH
+0007C8 99000001        1197         ADD.W   R0,#01H
+0007CC 8C270A          1198         MOV.W   R2,[R7+10]
+0007CF A921            1199         ADDS.W  R2,#01H
+0007D1 8C2F0A          1200         MOV.W   [R7+10],R2
+                       1201 ; format.c  458             sol_ptr = buffer;
+0007D4 8C1F1A          1202         MOV.W   [R7+26],R1
+0007D7 8C0F18          1203         MOV.W   [R7+24],R0
+0007DA 8C1F10          1204         MOV.W   [R7+16],R1
+0007DD 8C0F0E          1205         MOV.W   [R7+14],R0
+                       1206 ; format.c  459             fmt++;
+0007E0 8C171E          1207         MOV.W   R1,[R7+30]
+0007E3 8C071C          1208         MOV.W   R0,[R7+28]
+0007E6 99000001        1209         ADD.W   R0,#01H
+0007EA 8C1F1E          1210         MOV.W   [R7+30],R1
+0007ED 8C0F1C          1211         MOV.W   [R7+28],R0
+                       1212 ; format.c  460             break;
+                       1213         BR      _10
+0007F0 D5FC26         +1213         JMP.L   _10
+0007F0 D5FC2600       +1213         JMP.L   _10
+                       1214 ; format.c  461 
+                       1215 ; format.c  462 #ifdef RADIX
+                       1216 ; format.c  463          case 'R':                      /* radix */
+0007F4                 1217 _88:
+                       1218 ; format.c  464             fmt++;
+0007F4 9C701C0001      1219         ADD.W   [R7+28],#01H
+                       1220 ; format.c  465             if (*fmt == '*')
+0007F9 8C171E          1221         MOV.W   R1,[R7+30]
+0007FC 8C071C          1222         MOV.W   R0,[R7+28]
+0007FF 862C42          1223         MOV.B   ES,R1L
+000802 92042A          1224         CMP.B   [R0],#02AH
+000805 F21B            1225         BNE     _89
+                       1226 ; format.c  466             {
+                       1227 ; format.c  467                fmt++;
+000807 8C171E          1228         MOV.W   R1,[R7+30]
+00080A 8C071C          1229         MOV.W   R0,[R7+28]
+00080D 99000001        1230         ADD.W   R0,#01H
+000811 8C1F1E          1231         MOV.W   [R7+30],R1
+000814 8C0F1C          1232         MOV.W   [R7+28],R0
+                       1233 ; format.c  468                n = *(va_arg(arg_ptr, int *));
+000817 8C1760          1234         MOV.W   R1,[R7+96]
+00081A 8C075E          1235         MOV.W   R0,[R7+94]
+00081D 862C42          1236         MOV.B   ES,R1L
+000820 8A20            1237         MOV.W   R2,[R0]
+000822 8C3002          1238         MOV.W   R3,[R0+2]
+000825 866C42          1239         MOV.B   ES,R3L
+000828 8C3202          1240         MOV.W   R3,[R2+2]
+00082B 8A22            1241         MOV.W   R2,[R2]
+00082D 866C42          1242         MOV.B   ES,R3L
+000830 8A22            1243         MOV.W   R2,[R2]
+000832 862C42          1244         MOV.B   ES,R1L
+000835 9A000004        1245         ADD.W   [R0],#04H
+                       1246 ; format.c  469             }
+000839 FE08            1247         BR      _90
+000839 FE0800          1247         BR      _90
+00083C                 1248 _89:
+                       1249 ; format.c  470             else
+                       1250 ; format.c  471                n = get_int(&fmt);
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  25
+
+ADDR   CODE            LINE SOURCELINE
+00083C 9128rr          1251         MOV.B   R1L,#SEG( __lc_bs )
+00083F 7133            1252         XOR.B   R1H,R1H
+000841 40071C          1253         LEA     R0,R7+28
+000844 C500EF          1254         CALL    _get_int
+000847 8920            1255         MOV.W   R2,R0
+000847 892000          1255         MOV.W   R2,R0
+00084A                 1256 _90:
+                       1257 ; format.c  472 
+                       1258 ; format.c  473             if ( n >= 2 && n <= 36 )
+00084A 99240002        1259         CMP.W   R2,#02H
+                       1260         BLT     _9
+00084E FA02           +1260 ;       BGE     _LG_114
+000850 D5FBF6         +1260 ;       JMP.L   _9
+000850 D5FBF600       +1260 ;       JMP.L   _9
+000854                +1260 _LG_114:
+000854 99240024        1261         CMP.W   R2,#024H
+                       1262         BGT     _8
+000858 FD02           +1262 ;       BLE     _LG_116
+00085A D5FBF1         +1262 ;       JMP.L   _8
+00085A D5FBF100       +1262 ;       JMP.L   _8
+00085E                +1262 _LG_116:
+                       1263 ; format.c  474                radix = n;
+00085E 8962            1264         MOV.W   R6,R2
+                       1265 ; format.c  475             break;
+                       1266         BR      _7
+000860 D5FBEE         +1266         JMP.L   _7
+000860 D5FBEE00       +1266         JMP.L   _7
+                       1267 ; format.c  476 #endif
+                       1268 ; format.c  477 
+                       1269 ; format.c  478          case 'S':
+000864                 1270 _91:
+                       1271 ; format.c  479             str_ptr = va_arg(arg_ptr, char *);
+000864 8C1760          1272         MOV.W   R1,[R7+96]
+000867 8C075E          1273         MOV.W   R0,[R7+94]
+00086A 862C42          1274         MOV.B   ES,R1L
+00086D 8A20            1275         MOV.W   R2,[R0]
+00086F 8C3002          1276         MOV.W   R3,[R0+2]
+000872 866C42          1277         MOV.B   ES,R3L
+000875 8C3202          1278         MOV.W   R3,[R2+2]
+000878 8A22            1279         MOV.W   R2,[R2]
+00087A 8C3F08          1280         MOV.W   [R7+8],R3
+00087D 8C2F06          1281         MOV.W   [R7+6],R2
+000880 8C3F04          1282         MOV.W   [R7+4],R3
+000883 8C2F02          1283         MOV.W   [R7+2],R2
+000886 862C42          1284         MOV.B   ES,R1L
+000889 9A000004        1285         ADD.W   [R0],#04H
+                       1286 ; format.c  480 
+                       1287 ; format.c  481             fmt++;
+00088D 9C701C0001      1288         ADD.W   [R7+28],#01H
+                       1289 ; format.c  482             if (*fmt == '*')
+000892 8C371E          1290         MOV.W   R3,[R7+30]
+000895 8C271C          1291         MOV.W   R2,[R7+28]
+000898 866C42          1292         MOV.B   ES,R3L
+00089B 92242A          1293         CMP.B   [R2],#02AH
+00089E F212            1294         BNE     _92
+                       1295 ; format.c  483             {
+                       1296 ; format.c  484                fmt++;
+0008A0 9C701C0001      1297         ADD.W   [R7+28],#01H
+                       1298 ; format.c  485                n = *(va_arg(arg_ptr, int *));
+0008A5 862C42          1299         MOV.B   ES,R1L
+0008A8 8A20            1300         MOV.W   R2,[R0]
+0008AA 8C3002          1301         MOV.W   R3,[R0+2]
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  26
+
+ADDR   CODE            LINE SOURCELINE
+0008AD 866C42          1302         MOV.B   ES,R3L
+0008B0 8C3202          1303         MOV.W   R3,[R2+2]
+0008B3 8A22            1304         MOV.W   R2,[R2]
+0008B5 866C42          1305         MOV.B   ES,R3L
+0008B8 8A22            1306         MOV.W   R2,[R2]
+0008BA 862C42          1307         MOV.B   ES,R1L
+0008BD 9A000004        1308         ADD.W   [R0],#04H
+                       1309 ; format.c  486             }
+0008C1 FE08            1310         BR      _93
+0008C1 FE0800          1310         BR      _93
+0008C4                 1311 _92:
+                       1312 ; format.c  487             else
+                       1313 ; format.c  488                n = get_int(&fmt);
+0008C4 9128rr          1314         MOV.B   R1L,#SEG( __lc_bs )
+0008C7 7133            1315         XOR.B   R1H,R1H
+0008C9 40071C          1316         LEA     R0,R7+28
+0008CC C500AB          1317         CALL    _get_int
+0008CF 8920            1318         MOV.W   R2,R0
+0008CF 892000          1318         MOV.W   R2,R0
+0008D2                 1319 _93:
+                       1320 ; format.c  489 
+                       1321 ; format.c  490             i = 0;
+0008D2 B940            1322         MOV.W   R4,#00H
+                       1323 ; format.c  491             if (n == 0)
+0008D4 8952            1324         MOV.W   R5,R2
+0008D6 6922            1325         OR.W    R2,R2
+0008D8 F206            1326         BNE     _94
+0008DA 8C1708          1327         MOV.W   R1,[R7+8]
+0008DD 8C0706          1328         MOV.W   R0,[R7+6]
+                       1329 ; format.c  492               n = strlen(str_ptr);
+                       1330         CALL    _strlen
+0008E0 C4rrrrrr       +1330 ;       FCALL   _strlen
+0008E4 8950            1331         MOV.W   R5,R0
+0008E4 8950            1331         MOV.W   R5,R0
+0008E6                 1332 _94:
+                       1333 ; format.c  493             while (*str_ptr && i < n)
+0008E6 8C1708          1334         MOV.W   R1,[R7+8]
+0008E9 8C0706          1335         MOV.W   R0,[R7+6]
+0008EC 862C42          1336         MOV.B   ES,R1L
+0008EF 8200            1337         MOV.B   R0L,[R0]
+0008F1 F32A            1338         BEQ     _98
+0008F3 99540000        1339         CMP.W   R5,#00H
+0008F7 FD27            1340         BLE     _98
+0008F7 FD2700          1340         BLE     _98
+0008FA                 1341 _95:
+                       1342 ; format.c  494                *buffer++ = *str_ptr++, i++, length++;
+0008FA 8C1704          1343         MOV.W   R1,[R7+4]
+0008FD 8C0702          1344         MOV.W   R0,[R7+2]
+000900 862C42          1345         MOV.B   ES,R1L
+000903 8200            1346         MOV.B   R0L,[R0]
+000905 8C371A          1347         MOV.W   R3,[R7+26]
+000908 8C2718          1348         MOV.W   R2,[R7+24]
+00090B 866C42          1349         MOV.B   ES,R3L
+00090E 820A            1350         MOV.B   [R2],R0L
+000910 8C1704          1351         MOV.W   R1,[R7+4]
+000913 8C0702          1352         MOV.W   R0,[R7+2]
+000916 99000001        1353         ADD.W   R0,#01H
+00091A 8C1F04          1354         MOV.W   [R7+4],R1
+00091D 8C0F02          1355         MOV.W   [R7+2],R0
+000920 99200001        1356         ADD.W   R2,#01H
+000924 8C3F1A          1357         MOV.W   [R7+26],R3
+000927 8C2F18          1358         MOV.W   [R7+24],R2
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  27
+
+ADDR   CODE            LINE SOURCELINE
+00092A A941            1359         ADDS.W  R4,#01H
+00092C 8C070A          1360         MOV.W   R0,[R7+10]
+00092F A901            1361         ADDS.W  R0,#01H
+000931 8C0F0A          1362         MOV.W   [R7+10],R0
+000934 8C1704          1363         MOV.W   R1,[R7+4]
+000937 8C0702          1364         MOV.W   R0,[R7+2]
+00093A 862C42          1365         MOV.B   ES,R1L
+00093D 8200            1366         MOV.B   R0L,[R0]
+00093F F303            1367         BEQ     _98
+000941 4945            1368         CMP.W   R4,R5
+000943 FBDB            1369         BLT     _95
+000943 FBDB00          1369         BLT     _95
+000946                 1370 _98:
+                       1371 ; format.c  495             while (i++ < n)
+000946 8904            1372         MOV.W   R0,R4
+000948 8914            1373         MOV.W   R1,R4
+00094A A901            1374         ADDS.W  R0,#01H
+00094C 8A5F            1375         MOV.W   [R7],R5
+00094E 4915            1376         CMP.W   R1,R5
+                       1377         BGE     _6
+000950 FB02           +1377 ;       BLT     _LG_130
+000952 D5FB75         +1377 ;       JMP.L   _6
+000952 D5FB7500       +1377 ;       JMP.L   _6
+000956                +1377 _LG_130:
+000956                +1377 _LG_130:
+000956                 1378 _99:
+                       1379 ; format.c  496                *buffer++ = ' ', length++;
+000956 8C371A          1380         MOV.W   R3,[R7+26]
+000959 8C2718          1381         MOV.W   R2,[R7+24]
+00095C 866C42          1382         MOV.B   ES,R3L
+00095F 922820          1383         MOV.B   [R2],#020H
+000962 8953            1384         MOV.W   R5,R3
+000964 8942            1385         MOV.W   R4,R2
+000966 99400001        1386         ADD.W   R4,#01H
+00096A 8C5F1A          1387         MOV.W   [R7+26],R5
+00096D 8C4F18          1388         MOV.W   [R7+24],R4
+000970 8C170A          1389         MOV.W   R1,[R7+10]
+000973 A911            1390         ADDS.W  R1,#01H
+000975 8C1F0A          1391         MOV.W   [R7+10],R1
+000978 8910            1392         MOV.W   R1,R0
+00097A A901            1393         ADDS.W  R0,#01H
+00097C 4A17            1394         CMP.W   R1,[R7]
+00097E FBEB            1395         BLT     _99
+                       1396 ; format.c  497             break;
+                       1397         BR      _5
+000980 D5FB5E         +1397         JMP.L   _5
+000980 D5FB5E00       +1397         JMP.L   _5
+                       1398 ; format.c  498 
+                       1399 ; format.c  499          case 'H':
+000984                 1400 _100:
+                       1401 ; format.c  500             fmt++;
+000984 9C701C0001      1402         ADD.W   [R7+28],#01H
+000984 9C701C000100    1402         ADD.W   [R7+28],#01H
+                       1403 ; format.c  501          case '\'':
+00098A                 1404 _101:
+                       1405 ; format.c  502             delim = *fmt++;
+00098A 8C171E          1406         MOV.W   R1,[R7+30]
+00098D 8C071C          1407         MOV.W   R0,[R7+28]
+000990 862C42          1408         MOV.B   ES,R1L
+000993 8200            1409         MOV.B   R0L,[R0]
+000995 9C701C0001      1410         ADD.W   [R7+28],#01H
+                       1411 ; format.c  503             while (*fmt != delim)
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  28
+
+ADDR   CODE            LINE SOURCELINE
+00099A 8C371E          1412         MOV.W   R3,[R7+30]
+00099D 8C271C          1413         MOV.W   R2,[R7+28]
+0009A0 866C42          1414         MOV.B   ES,R3L
+0009A3 420A            1415         CMP.B   [R2],R0L
+0009A5 F31E            1416         BEQ     _103
+0009A5 F31E00          1416         BEQ     _103
+0009A8                 1417 _102:
+                       1418 ; format.c  504                *buffer++ = *fmt++, length++;
+0009A8 8C371E          1419         MOV.W   R3,[R7+30]
+0009AB 8C271C          1420         MOV.W   R2,[R7+28]
+0009AE 866C42          1421         MOV.B   ES,R3L
+0009B1 8212            1422         MOV.B   R0H,[R2]
+0009B3 8C371A          1423         MOV.W   R3,[R7+26]
+0009B6 8C2718          1424         MOV.W   R2,[R7+24]
+0009B9 866C42          1425         MOV.B   ES,R3L
+0009BC 821A            1426         MOV.B   [R2],R0H
+0009BE 99200001        1427         ADD.W   R2,#01H
+0009C2 8C3F1A          1428         MOV.W   [R7+26],R3
+0009C5 8C2F18          1429         MOV.W   [R7+24],R2
+0009C8 9C701C0001      1430         ADD.W   [R7+28],#01H
+0009CD 8C170A          1431         MOV.W   R1,[R7+10]
+0009D0 A911            1432         ADDS.W  R1,#01H
+0009D2 8C1F0A          1433         MOV.W   [R7+10],R1
+0009D5 8C371E          1434         MOV.W   R3,[R7+30]
+0009D8 8C271C          1435         MOV.W   R2,[R7+28]
+0009DB 866C42          1436         MOV.B   ES,R3L
+0009DE 420A            1437         CMP.B   [R2],R0L
+0009E0 F2E3            1438         BNE     _102
+0009E0 F2E3            1438         BNE     _102
+0009E2                 1439 _103:
+                       1440 ; format.c  505             fmt++;
+0009E2 8C171E          1441         MOV.W   R1,[R7+30]
+0009E5 8C071C          1442         MOV.W   R0,[R7+28]
+0009E8 99000001        1443         ADD.W   R0,#01H
+0009EC 8C1F1E          1444         MOV.W   [R7+30],R1
+0009EF 8C0F1C          1445         MOV.W   [R7+28],R0
+                       1446 ; format.c  506             break;
+                       1447         BR      _4
+0009F2 D5FB25         +1447         JMP.L   _4
+0009F2 D5FB2500       +1447         JMP.L   _4
+                       1448 ; format.c  507 
+                       1449 ; format.c  508          default:
+0009F6                 1450 _104:
+                       1451 ; format.c  509             fmt++;
+0009F6 8C171E          1452         MOV.W   R1,[R7+30]
+0009F9 8C071C          1453         MOV.W   R0,[R7+28]
+0009FC 99000001        1454         ADD.W   R0,#01H
+000A00 8C1F1E          1455         MOV.W   [R7+30],R1
+000A03 8C0F1C          1456         MOV.W   [R7+28],R0
+                       1457         BR      _3
+000A06 D5FB1B         +1457         JMP.L   _3
+000A06 D5FB1B00       +1457         JMP.L   _3
+000A0A                 1458 _105:
+000A0A 8C1760          1459         MOV.W   R1,[R7+96]
+000A0D 8C075E          1460         MOV.W   R0,[R7+94]
+000A10 862C42          1461         MOV.B   ES,R1L
+000A13 BA00            1462         MOV.W   [R0],#00H
+000A15 BC0002          1463         MOV.W   [R0+2],#00H
+000A18 8C070A          1464         MOV.W   R0,[R7+10]
+                       1465 ; format.c  510             break;
+                       1466 ; format.c  511 
+                       1467 ; format.c  512       } /* end of switch */
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  29
+
+ADDR   CODE            LINE SOURCELINE
+                       1468 ; format.c  513 
+                       1469 ; format.c  514    } /* end of for(;;) */
+                       1470 ; format.c  515 
+                       1471 ; format.c  516 }
+000A1B 99700054        1472         ADD.W   R7,#054H
+000A1F 2F70            1473         POP.W   R4, R5, R6
+000A21 D680            1474         RET
+000A21 D68000          1474         RET
+                       1475 ; format.c  517 
+                       1476 ; format.c  518 static int get_int(char **fmt_ptr)
+                       1477 ; format.c  519 {
+000A24                 1478 _get_int:
+000A24 0F70            1479         PUSH.W  R4, R5, R6
+                       1480 ; format.c  520    char *fmt2 = *fmt_ptr;
+000A26 862C42          1481         MOV.B   ES,R1L
+000A29 8A40            1482         MOV.W   R4,[R0]
+000A2B 8C5002          1483         MOV.W   R5,[R0+2]
+000A2E 8935            1484         MOV.W   R3,R5
+000A30 8924            1485         MOV.W   R2,R4
+                       1486 ; format.c  521    int n = 0;
+000A32 B960            1487         MOV.W   R6,#00H
+                       1488 ; format.c  522 
+                       1489 ; format.c  523    while ( (*fmt2 >= '0') && (*fmt2 <= '9') )
+000A34 86AC42          1490         MOV.B   ES,R5L
+000A37 924430          1491         CMP.B   [R4],#030H
+000A3A FB19            1492         BLT     _140
+000A3C 86AC42          1493         MOV.B   ES,R5L
+000A3F 924439          1494         CMP.B   [R4],#039H
+000A42 FC15            1495         BGT     _140
+000A42 FC15            1495         BGT     _140
+000A44                 1496 _137:
+                       1497 ; format.c  524    {
+                       1498 ; format.c  525       n = 10 * n + (*fmt2 - '0');
+000A44 8946            1499         MOV.W   R4,R6
+000A46 E940000A        1500         MULU.W  R4,#0AH
+000A4A 866C42          1501         MOV.B   ES,R3L
+000A4D 82A2            1502         MOV.B   R5L,[R2]
+000A4F 90B9            1503         SEXT.B  R5H
+000A51 0945            1504         ADD.W   R4,R5
+000A53 99420030        1505         SUB.W   R4,#030H
+000A57 8964            1506         MOV.W   R6,R4
+                       1507 ; format.c  526       fmt2++;
+000A59 99200001        1508         ADD.W   R2,#01H
+000A5D 866C42          1509         MOV.B   ES,R3L
+000A60 922430          1510         CMP.B   [R2],#030H
+000A63 FB05            1511         BLT     _140
+000A65 866C42          1512         MOV.B   ES,R3L
+000A68 922439          1513         CMP.B   [R2],#039H
+000A6B FDEC            1514         BLE     _137
+000A6B FDEC00          1514         BLE     _137
+                       1515 ; format.c  527    }
+000A6E                 1516 _140:
+                       1517 ; format.c  528    *fmt_ptr = fmt2;
+000A6E 862C42          1518         MOV.B   ES,R1L
+000A71 8A28            1519         MOV.W   [R0],R2
+000A73 8C3802          1520         MOV.W   [R0+2],R3
+                       1521 ; format.c  529 
+                       1522 ; format.c  530    return(n);
+000A76 8906            1523         MOV.W   R0,R6
+                       1524 ; format.c  531 }
+000A78 2F70            1525         POP.W   R4, R5, R6
+000A7A D680            1526         RET
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  30
+
+ADDR   CODE            LINE SOURCELINE
+                       1527 ; format.c  532 
+                       1528 ; format.c  533 #ifdef FLOAT
+                       1529 ; format.c  534 static long dtomsig(double *ptr)
+                       1530 ; format.c  535 {
+                       1531 ; format.c  536    return (long)*ptr;
+                       1532 ; format.c  537 }
+                       1533 ; format.c  538 
+                       1534 ; format.c  539 static long ftomsig(float *ptr)
+                       1535 ; format.c  540 {
+                       1536 ; format.c  541    return (long)*ptr;
+                       1537 ; format.c  542 }
+                       1538 ; format.c  543 
+                       1539 ; format.c  544 
+                       1540 ; format.c  545 static long dtolsig(double *ptr, char temp, long msig)
+                       1541 ; format.c  546 {
+                       1542 ; format.c  547    if (*ptr < 0.0)
+                       1543 ; format.c  548    {
+                       1544 ; format.c  549       *ptr = -(*ptr);
+                       1545 ; format.c  550       msig = -msig;
+                       1546 ; format.c  551    }
+                       1547 ; format.c  552 
+                       1548 ; format.c  553    return (long)(mul[temp] * (*ptr + r_off[temp] - msig));
+                       1549 ; format.c  554 }
+                       1550 ; format.c  555 
+                       1551 ; format.c  556 static long ftolsig(float *ptr, char temp, long msig)
+                       1552 ; format.c  557 {
+                       1553 ; format.c  558    if (*ptr < 0.0)
+                       1554 ; format.c  559    {
+                       1555 ; format.c  560       *ptr = -(*ptr);
+                       1556 ; format.c  561       msig = -msig;
+                       1557 ; format.c  562    }
+                       1558 ; format.c  563 
+                       1559 ; format.c  564    return (long)(mul[temp] * (*ptr + r_off[temp] - msig));
+                       1560 ; format.c  565 }
+                       1561 ; format.c  566 #endif
+                       1562 ; format.c  567 
+                       1563 ; format.c  568 /* end of file - format.c */
+                       1565         EXTRN   HCODE(_strlen)
+                       1566         EXTRN   HCODE(_itoa)
+                       1567         EXTRN   HCODE(_ltoa)
+                       1568         EXTRN   HCODE(_uitoa)
+                       1569         EXTRN   HCODE(_ultoa)
+                       1570         EXTRN   IDATA(__lc_bs)
+                       1571         CALLS   'formatv', 'FORMAT?get_int'
+                       1572         CALLS   'formatv', 'ultoa'
+                       1573         CALLS   'formatv', 'uitoa'
+                       1574         CALLS   'formatv', 'ltoa'
+                       1575         CALLS   'formatv', 'itoa'
+                       1576         CALLS   'formatv', 'FORMAT?get_int'
+                       1577         CALLS   'formatv', 'strlen'
+                       1578         CALLS   'formatv', 'FORMAT?get_int'
+                       1579         CALLS   'formatv', 'strlen'

@@ -1,0 +1,54 @@
+SUBDESIGN hdecode
+(
+	clk,syssel,da[10..0],s2, sound, 3or4:		INPUT;
+	upint,cb,hsync,addenable,checksum,count:	OUTPUT;
+	ramdata:									OUTPUT;
+)
+
+VARIABLE
+	hsync,checksum,pause:					DFF;
+	cb,addenable,count,ramdata,hint:		DFFE;
+
+BEGIN
+	%hint.clk	= hsync; 
+	hint.clrn	= !da6;
+	hint.d		= vcc;%
+
+	hint.clk	= clk;	%processor-interrupt%
+	hint.d		= VCC; 
+	hint.ena	= (da[10..0] == 1486);
+	hint.clrn	= !(da[10..0] == 1392);
+
+	cb.clk	= clk; 			%colorbar enable%
+	cb.d	= VCC;
+	cb.ena	= (s2 & da[10..0]==04);
+	cb.clrn = !(s2 & (da[10..0]==1428));
+
+	checksum.clk	= clk;	%placering af checksum%
+	checksum.d 		= (	3or4 & da[10..0] == 1497 # 
+						!3or4 & da[10..0] == 1485);
+
+	addenable.clk	= clk; 	%checksums addder enable%
+	addenable.d		= VCC;
+	addenable.ena	= (sound & da[10..0]==1447);
+	addenable.clrn	= !((3or4 & da[10..0] == 1498) # 
+						(!3or4 & da[10..0] == 1486));
+
+	pause.clk		= clk; 	%ekstra reset til ramdata ?!%
+	pause.d			= (!3or4 & (da[10..0] == 1486) # (3or4 & (da[10..0] == 1498)));
+
+	ramdata.clk		= clk; 	%data fra ram%
+	ramdata.d		= VCC;
+	ramdata.ena		= (sound & da[10..0]==1448 # s2 & da[10..0]==04);
+	ramdata.clrn	= !((s2 & da[10..0]==1428) # pause);
+		
+	count.clk	= clk; 		%lydtæller%
+	count.d	= VCC;
+	count.ena	= (sound & da[10..0] == 1449);
+	count.clrn= !(3or4 & da[10..0] == 1498 # !3or4 & da[10..0] == 1486);
+
+	hsync.clk	=clk; 		%load-pulse til adressedekoder%
+	hsync.d		=(da[10..0]==1439);
+	upint	= hint;
+END;
+

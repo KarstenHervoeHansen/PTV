@@ -1,0 +1,84 @@
+INCLUDE "par2ser";
+
+SUBDESIGN SRAM
+% 
+SRAM interface for AES generator
+990623 PF
+%
+(
+DATA[7..0],
+D[7..0]        : bidir;
+
+ADDR[16..0],
+COUNT[16..0],
+PLOAD,
+CLK6144M,
+RD,
+WE,
+CS_AUDIORAM,
+PLAY_AUDIO,
+WCLK_SEL,
+DIS_WCLK_XLR,
+WCLK
+               : input;
+
+A[16..0],
+WE_SRAM,
+OE_SRAM,
+CS_SRAM,
+SER_DATA_BNC,
+SER_DATA_XLR,
+WCLK_BNC        : output;
+
+
+)
+variable
+abuf[7..0],
+bbuf[7..0]     : tri;
+
+sdata          : node;
+
+shreg : par2ser;
+
+begin
+% data bus buffer %
+D[] = abuf[].out;
+abuf[].in = DATA[];
+DATA[] = bbuf[].out;
+bbuf[].in = D[];
+abuf[].oe = !(CS_AUDIORAM # PLAY_AUDIO) & RD;
+bbuf[].oe = !(CS_AUDIORAM # PLAY_AUDIO) & !RD;
+
+% sram addr selector %
+if PLAY_AUDIO == VCC then
+ A[] = COUNT[];
+else
+ A[] = ADDR[];
+end if;
+
+% sram control signals %
+WE_SRAM = WE # PLAY_AUDIO;
+OE_SRAM = RD & !PLAY_AUDIO;
+CS_SRAM = CS_AUDIORAM & !PLAY_AUDIO;
+
+% serialize audio data %
+shreg.(clk,pload,din[]) = (CLK6144M, PLOAD, D[]);
+
+if WCLK_SEL == VCC then
+  sdata = WCLK;
+ else
+  sdata = shreg.(qq);
+end if;
+
+SER_DATA_BNC = sdata & PLAY_AUDIO;
+SER_DATA_XLR = !DIS_WCLK_XLR & SER_DATA_BNC;
+WCLK_BNC = WCLK;
+
+end;
+
+
+
+
+
+
+

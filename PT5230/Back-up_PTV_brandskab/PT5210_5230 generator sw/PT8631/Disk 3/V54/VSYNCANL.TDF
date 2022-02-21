@@ -1,0 +1,32 @@
+SUBDESIGN vsyncanl
+(
+	clk,vg,vm,hload,vdly,syssel:	INPUT;
+	vpulse,gfield,mfield:			OUTPUT;
+)
+VARIABLE 
+	g4,g3,g2,g1:	DFFE;
+
+BEGIN
+	vpulse = (vg & !syssel) # (vm & syssel);
+
+	g1.clk	= hload;
+	g1.d	= vpulse;
+	g1.clrn = !gfield & !syssel # !mfield & syssel;
+
+	g2.clk	= !hload;
+	g2.d	= vpulse;
+	g2.clrn = !gfield & !syssel # !mfield & syssel;
+
+	g3.clk	= hload;
+	g3.d	= g2.q;
+	g3.clrn = !gfield & !syssel # !mfield & syssel;
+
+	g4.clk	= hload;
+	g4.d	= g3.q & vdly # g1 & !vdly;
+
+    gfield = g4.q;
+	mfield = g4.q;
+
+END;
+
+

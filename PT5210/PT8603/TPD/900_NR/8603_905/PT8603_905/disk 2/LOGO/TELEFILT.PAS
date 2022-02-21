@@ -1,0 +1,303 @@
+{ Programmet bruges til at filtrere logo til TELEDANMARK. Log ligger i
+  filerne logoy.dt, logou.dt og logov.dat. hver linie er 512 samples.
+  Resultatet afleveres i filerne channel1.dat, channel2.dat og channel3.dat.
+  Her ligger resultatet efter udtynding, s†ledes at filerne har den halve
+  st›rrelse af de oprindelige logo-filer.
+  971205 NHa.
+}
+PROGRAM  TELEFILT;
+
+USES     CRT;
+
+CONST    Bufsize2=512; {Liniel‘ngde i logox.dat-filer (word)}
+         Bufsize=256;  {Liniel‘ngde i shannelx.dat-filer (word)}
+
+TYPE     Segtype=ARRAY [1..Bufsize2] OF WORD;
+         Segtype2=ARRAY [1..Bufsize2] OF REAL;
+
+         VAR
+
+         I,Antal, Numread1, Numread2, Numread3    :WORD;
+         Name                                     :STRING;
+         Numread, Numreadx                        :WORD;
+         Block                                    :LONGINT;
+         P1,P2,P3,P4,P5,P6                        :^Segtype;
+         Tempo                                    :^Segtype2;
+         F1,F2,F3,F4,F5,F6                        :FILE;
+         Filter_uv,Filter_logo                    : ARRAY[1..32] OF REAL;
+         Nfolde,Nfolde2                           :INTEGER;
+         Ch                                       : CHAR;
+
+{ *********************************************************** }
+
+PROCEDURE Logo_fold;
+
+VAR   I,Ii          : INTEGER;
+      Scala,Sum     : REAL;
+      Temp          : ARRAY[1..512] OF REAL;
+
+BEGIN
+{ Foldning:
+  Folder de to funktioner, Tempo^[] og Filter_logo[]
+  Resultatet afleveres i Tempo^[] efter en tur i Temp[] (real array)}
+
+   FOR Ii:=1 TO 512 DO
+     Temp[Ii]:=0;
+
+   Scala:=0;
+   FOR Ii:=1 TO Nfolde2 DO                  {'SKALERING TIL 1 GANGS}
+          Scala:=Scala + Filter_logo[Ii];   {FORST’RKNING EFTER FOLDNING}
+
+   FOR I:=Nfolde2+1 TO 512-Nfolde2 DO
+     BEGIN
+       Sum:=0;
+       FOR Ii:=1 TO Nfolde2 DO
+         BEGIN
+           Sum:=Sum + Tempo^[(I-Ii)]*Filter_logo[Ii]/Scala;
+         END;
+       Temp[I]:=Sum;
+      END;
+
+   FOR I:=512-2*Nfolde2 DOWNTO 1+TRUNC(Nfolde2/2) DO   {Flytter data p† plads }
+     BEGIN
+       Tempo^[I]:=Temp[I+TRUNC(Nfolde2 DIV 2)];
+     END;
+END;
+
+{ *********************************************************** }
+
+PROCEDURE Logo_uv_fold;
+
+VAR   I,Ii          : INTEGER;
+      Scala,Sum     : REAL;
+      Temp          : ARRAY[1..512] OF REAL;
+
+BEGIN
+{ Foldning:
+  Folder de to funktioner, Tempo^[] og Filter_uv[]
+  Resultatet afleveres i Tempo^[] efter en tur i Temp[] (real array)}
+
+   FOR Ii:=1 TO 512 DO
+     Temp[Ii]:=0;
+
+   Scala:=0;
+   FOR Ii:=1 TO Nfolde DO                 {'SKALERING TIL 1 GANGS}
+          Scala:=Scala + Filter_uv[Ii];   {FORST’RKNING EFTER FOLDNING}
+
+   FOR I:=Nfolde+1 TO 512-Nfolde DO
+     BEGIN
+       Sum:=0;
+       FOR Ii:=1 TO Nfolde DO
+         BEGIN
+           Sum:=Sum + Tempo^[(I-Ii)]*Filter_uv[Ii]/Scala;
+         END;
+       Temp[I]:=Sum;
+      END;
+
+   FOR I:=512-2*Nfolde DOWNTO 3+TRUNC(Nfolde/2+2) DO   {Flytter data p† plads }
+     BEGIN
+       Tempo^[I]:=Temp[I+TRUNC(Nfolde2 DIV 2)+4];
+     END;
+END;
+
+{ *********************************************************** }
+
+PROCEDURE Makelogo;
+
+VAR   I          : INTEGER;
+      Y          : REAL;
+      U          : WORD;
+
+    BEGIN
+      FOR I:=1 TO Bufsize2 DO
+       BEGIN
+         Tempo^[I]:=0;
+       END;
+
+      FOR I:=1 TO 512 DO    {Logo i Y-kanalen}
+        BEGIN
+          Tempo^[I]:=P4^[I];
+        END;
+
+      Logo_fold;
+
+      FOR I:=1 TO 256 DO
+        P1^[I]:=ROUND(Tempo^[3*I]);
+
+      FOR I:=1 TO 88 DO
+       BEGIN
+        P1^[I+167]:=P1^[I];
+        P1^[I]:=P1^[100];
+       END;
+       P1^[256]:=P1^[100];
+
+      FOR I:=1 TO 512 DO    {Logo i U-kanalen}
+        BEGIN
+          Tempo^[I]:=P5^[I];
+        END;
+
+      Logo_uv_fold;
+
+      FOR I:=1 TO 256 DO
+        P2^[I]:=ROUND(Tempo^[3*I]);
+
+      FOR I:=1 TO 88 DO
+       BEGIN
+        P2^[I+167]:=P2^[I];
+        P2^[I]:=P2^[100];
+       END;
+       P2^[256]:=P2^[100];
+
+      FOR I:=1 TO 512 DO    {Logo i V-kanalen}
+        BEGIN
+          Tempo^[I]:=P6^[I];
+        END;
+
+      Logo_uv_fold;
+
+      FOR I:=1 TO 256 DO
+        P3^[I]:=ROUND(Tempo^[3*I]);
+
+      FOR I:=1 TO 88 DO
+       BEGIN
+        P3^[I+167]:=P3^[I];
+        P3^[I]:=P3^[100];
+       END;
+       P3^[256]:=P3^[100];
+
+    END;
+{ *********************************************************** }
+
+PROCEDURE Fileopen;
+    BEGIN    ASSIGN (F1,'CHANNEL1.DAT');
+             Rewrite (F1,2);
+             ASSIGN (F2,'CHANNEL2.DAT');
+             REwrite (F2,2);
+             ASSIGN (F3,'CHANNEL3.DAT');
+             REwrite (F3,2);
+             ASSIGN (F4,'LOGOY.DAT');
+             RESET (F4,2);
+             ASSIGN (F5,'LOGOU.DAT');
+             RESET (F5,2);
+             ASSIGN (F6,'LOGOV.DAT');
+             RESET (F6,2);
+    END;
+
+{ *********************************************************** }
+
+{ Her hentes 1 block (linie) med data fra logo-filerne logoy/u/v.dat}
+
+PROCEDURE Logoload(Block:LONGINT; VAR Numreadx:WORD);
+
+    BEGIN
+          SEEK (F4,Block*Bufsize2);
+          BLOCKREAD(F4, P4^, Bufsize2, Numread);
+          SEEK (F5,Block*Bufsize2);
+          BLOCKREAD(F5, P5^, Bufsize2, Numread);
+          SEEK (F6,Block*Bufsize2);
+          BLOCKREAD(F6, P6^, Bufsize2, Numread);
+          Numreadx:=Numread;
+   END;
+{ *********************************************************** }
+
+PROCEDURE Make_Logo_Filter; {Filter til Y-delen af logo}
+
+VAR   I,C                   : INTEGER;
+      Y,Yr,Ys,Ampl,Glampl   : REAL;
+
+BEGIN
+     Yr:=180E-9;
+     Ys:=27E6;
+     Glampl :=0;
+     C:=TRUNC(1.03734*Yr*Ys);
+     FOR I:=1 TO 20 DO
+       Filter_logo[I]:=0;
+
+     FOR I:=-C TO C DO
+       BEGIN
+         Y:=(I)/Yr/Ys/2.07468+0.5;
+         Ampl:=(Y-SIN(2*PI*Y)/(2*PI));
+         Filter_logo[1+C+I]:=Ampl-Glampl;
+         Glampl:=Ampl;
+       END;
+       Filter_logo[1+C+I+1]:=1-Glampl;
+       WRITELN( 1+C+I+1,Filter_logo[1+C+I+1] );
+       Nfolde2:=2*(I+1);    { Antal, der skal foldes med}
+       Writeln('Nfolde2  ',Nfolde2,'  ',I)
+END;
+
+{ *********************************************************** }
+
+PROCEDURE Make_uv_Filter; {Filter til chroma-delen af logo}
+
+VAR   I,C                   : INTEGER;
+      Y,Yr,Ys,Ampl,Glampl   : REAL;
+
+BEGIN
+     Yr:=300E-9;
+     Ys:=27E6;
+     Glampl :=0;
+     C:=TRUNC(1.03734*Yr*Ys);
+     FOR I:=1 TO 20 DO
+       Filter_uv[I]:=0;
+
+     FOR I:=-C TO C DO
+       BEGIN
+         Y:=(I)/Yr/Ys/2.07468+0.5;
+         Ampl:=(Y-SIN(2*PI*Y)/(2*PI));
+         Filter_uv[1+C+I]:=Ampl-Glampl;
+         Glampl:=Ampl;
+       END;
+       Filter_uv[1+C+I+1]:=1-Glampl;
+       WRITELN( 1+C+I+1,Filter_uv[1+C+I+1] );
+       Nfolde:=2*(I+1);    { Antal, der skal foldes med}
+       Writeln('Nfolde  ',Nfolde,'  ',I)
+END;
+
+{ *********************************************************** }
+
+{ Her gemmes 1 block af de 3 CHANNEL#'filer }
+
+PROCEDURE Filesave(Block:LONGINT);
+    BEGIN
+          SEEK (F1,Block*Bufsize );
+          BLOCKWRITE(F1, P1^, Bufsize);
+          SEEK (F2,Block*Bufsize );
+          BLOCKWRITE(F2, P2^, Bufsize);
+          SEEK (F3,Block*Bufsize );
+          BLOCKWRITE(F3, P3^, Bufsize);
+    END;
+
+{ *********************************************************** }
+
+    BEGIN    NEW (P1);
+             NEW (P2);
+             NEW (P3);
+             NEW (P4);
+             NEW (P5);
+             NEW (P6);
+             NEW (Tempo);
+
+             Fileopen;
+
+             Make_uv_Filter;   {Filter til key-bit}
+             Make_Logo_Filter;  {Filter til logo}
+
+             Numreadx:=512;
+
+
+             Block:=0;      {1. Linie med logo}
+
+             FOR I:=1 TO 44 DO  {21/32 linier til logo}
+               BEGIN
+               Logoload(Block,Numread);
+               Makelogo;     { Udtynder og filtrerer logo }
+               Filesave(Block);
+               INC (Block);
+               writeln ('Linie nr= ',I);
+               END;
+             writeln ('Slut ');
+    END.
+
+
+

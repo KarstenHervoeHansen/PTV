@@ -1,0 +1,696 @@
+; XA C compiler v2.0 r2                   SN00085795-Ccz (c) 1998 TASKING, Inc.
+; options: -IC:\cxa\include -Ml -Cxag3 -Sd -A1 -O1 -DWritableSector=0
+;          -DBootProgram=1 -g
+$CASE
+$NOZPAGE
+	NAME	LOADER
+	SYMB	TOOL, "XA C compiler v2.0", 1
+	SYMB	TYPE, 256, "bit", 'g', 0, 1
+	SYMB	FILE, "loader.c"
+	SYMB	FILE, "system.h"
+	SYMB	ENDF
+	SYMB	FILE, "loader.h"
+	SYMB	TYPE, 257, "byte", 'T', #3
+	SYMB	ENDF
+	SYMB	FILE, "flash.h"
+	SYMB	TYPE, 258, "word", 'T', #5
+	SYMB	TYPE, 259, "dword", 'T', #7
+	SYMB	ENDF
+	SYMB	FILE, "xadrivr.h"
+	SYMB	ENDF
+	SYMB	FILE, "xaexprt.h"
+	SYMB	ENDF
+	SYMB	FILE, "util.h"
+	SYMB	ENDF
+LOADER_RO	SEGMENT	HCODE ROMDATA
+	RSEG	LOADER_RO
+	SYMB	TYPE, 260, 'Z', #2, -1
+	SYMB	IDEN, "_LO_EnteringLoaderTxt", __LO_EnteringLoaderTxt, #260, 129, 0
+	SYMB	ALAB, __LO_EnteringLoaderTxt, #260
+	PUBLIC	__LO_EnteringLoaderTxt
+__LO_EnteringLoaderTxt:
+	DB	045H,04EH,054H,045H,052H,049H,04EH,047H,020H,04CH,04FH,041H
+	DB	044H,045H,052H,020H,053H,054H,041H,054H,045H,00DH,00AH,000H
+	SYMB	IDEN, "_LO_LeavingLoaderTxt", __LO_LeavingLoaderTxt, #260, 129, 0
+	SYMB	ALAB, __LO_LeavingLoaderTxt, #260
+	PUBLIC	__LO_LeavingLoaderTxt
+__LO_LeavingLoaderTxt:
+	DB	04CH,045H,041H,056H,049H,04EH,047H,020H,04CH,04FH,041H,044H
+	DB	045H,052H,020H,053H,054H,041H,054H,045H,00DH,00AH,000H
+	SYMB	IDEN, "_LO_CharNotValidTxt", __LO_CharNotValidTxt, #260, 129, 0
+	SYMB	ALAB, __LO_CharNotValidTxt, #260
+	PUBLIC	__LO_CharNotValidTxt
+__LO_CharNotValidTxt:
+	DB	043H,048H,041H,052H,020H,04EH,04FH,054H,020H,056H,041H,04CH
+	DB	049H,044H,00DH,00AH,000H
+	SYMB	IDEN, "_LO_RecLengthErrorTxt", __LO_RecLengthErrorTxt, #260, 129, 0
+	SYMB	ALAB, __LO_RecLengthErrorTxt, #260
+	PUBLIC	__LO_RecLengthErrorTxt
+__LO_RecLengthErrorTxt:
+	DB	052H,045H,043H,020H,04CH,045H,04EH,047H,054H,048H,020H,045H
+	DB	052H,052H,04FH,052H,00DH,00AH,000H
+	SYMB	IDEN, "_LO_RecTypeErrorTxt", __LO_RecTypeErrorTxt, #260, 129, 0
+	SYMB	ALAB, __LO_RecTypeErrorTxt, #260
+	PUBLIC	__LO_RecTypeErrorTxt
+__LO_RecTypeErrorTxt:
+	DB	052H,045H,043H,020H,054H,059H,050H,045H,020H,045H,052H,052H
+	DB	04FH,052H,00DH,00AH,000H
+	SYMB	IDEN, "_LO_ChecksumErrorTxt", __LO_ChecksumErrorTxt, #260, 129, 0
+	SYMB	ALAB, __LO_ChecksumErrorTxt, #260
+	PUBLIC	__LO_ChecksumErrorTxt
+__LO_ChecksumErrorTxt:
+	DB	043H,048H,045H,043H,04BH,053H,055H,04DH,020H,045H,052H,052H
+	DB	04FH,052H,00DH,00AH,000H
+LOADER_PR	SEGMENT	HCODE
+	RSEG	LOADER_PR
+	ALIGN	1
+	SYMB	LINE, 63
+	PUBLIC	_IntelLoader
+_IntelLoader:
+	SYMB	TYPE, 262, 'X', 12, #257, 30, 1, #2
+	SYMB	GFUN, "IntelLoader", _IntelLoader, #262, 0, 0, 112
+	SYMB	ALAB, _IntelLoader, #262
+	PUSH.W	R4, R5, R6
+	SYMB	SOFF, 6
+	SYMB	IDEN, "inchr", -1, #2, 130, 2053
+	SYMB	LTIM, "inchr", -1, 0, 2117
+	SYMB	IDEN, "tmp", -1, #257, 130, 5
+	SYMB	LTIM, "tmp", -1, 0, 69
+	SYMB	IDEN, "retry", -1, #257, 130, 5
+	SYMB	LTIM, "retry", -1, 0, 69
+	SYMB	IDEN, "value", -1, #257, 130, 5
+	SYMB	LTIM, "value", -1, 0, 69
+	SYMB	IDEN, "error", -1, #257, 130, 5
+	SYMB	LTIM, "error", -1, 0, 69
+	SYMB	LINE, 68
+	CMP.B	R0L,#03AH
+	BNE	_3
+	SYMB	LINE, 69
+	MOV.B	_Checksum,#00H
+	MOV.B	_CharCnt,#00H
+	MOV.B	_ByteCnt,#00H
+	SYMB	LINE, 70
+	MOV.B	_RecLength,#00H
+	MOV.B	_RecByte,#00H
+	MOV.W	_RecWord,#00H
+	SYMB	LINE, 72
+	MOV.B	_State,#01H
+	SYMB	LINE, 74
+	MOV.B	R0L,#05H
+	BR	_75
+	SYMB	LINE, 75
+_3:
+	SYMB	LINE, 77
+	MOV.B	R5L,#00H
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 79
+	CMP.B	R0L,#061H
+	BLT	_4
+	CMP.B	R0L,#066H
+	BLE	_7
+_4:
+	CMP.B	R0L,#041H
+	BLT	_5
+	CMP.B	R0L,#046H
+	BLE	_7
+_5:
+	CMP.B	R0L,#030H
+	BLT	_73
+	CMP.B	R0L,#039H
+	BGT	_73
+_7:
+	SYMB	LINE, 80
+	CMP.B	R0L,#030H
+	BLT	_9
+	CMP.B	R0L,#039H
+	BGT	_9
+	SYMB	LINE, 81
+	SUB.B	R0L,#030H
+	SYMB	LTIM, "value", 0, 0, 205
+	BR	_10
+_9:
+	SYMB	LTIM, "value", 0, 0, 77
+	SYMB	LINE, 83
+	CMP.B	R0L,#061H
+	BLT	_88
+	MOVS.W	R1,#01H
+	BR	_90
+_88:
+	MOVS.W	R1,#00H
+_90:
+	OR.W	R1,R1
+	BEQ	_76
+	CMP.B	R0L,#07AH
+	BGT	_91
+	MOVS.W	R1,#01H
+	BR	_93
+_91:
+	MOVS.W	R1,#00H
+_93:
+	OR.W	R1,R1
+_76:
+	BEQ	_77
+	AND.B	R0L,#0DFH
+	BR	_78
+_77:
+_78:
+	SUB.B	R0L,#037H
+	SYMB	LTIM, "value", 0, 0, 205
+_10:
+	SYMB	LINE, 85
+	MOV.B	R0H,_CharCnt
+	ADDS.B	_CharCnt,#01H
+	AND.B	R0H,#01H
+	BNE	_11
+	SYMB	LINE, 86
+	MOV.B	_RecByte,R0L
+	BR	_73
+_11:
+	SYMB	LTIM, "value", 0, 0, 77
+	SYMB	LTIM, "value", 0, 0, 205
+	SYMB	LINE, 88
+	MOV.B	R0H,_RecByte
+	ASL.B	R0H,#04H
+	MOV.B	_RecByte,R0H
+	SYMB	LINE, 89
+	ADD.B	_RecByte,R0L
+	SYMB	LINE, 91
+	MOV.B	R1L,_RecByte
+	ADD.B	_Checksum,R1L
+	SYMB	LINE, 93
+	CMP.B	_State,#01H
+	BEQ	_12
+	CMP.B	_State,#02H
+	BEQ	_13
+	CMP.B	_State,#03H
+	BEQ	_14
+	CMP.B	_State,#04H
+	BEQ	_27
+	CMP.B	_State,#07H
+	BEQ	_42
+	CMP.B	_State,#05H
+	BEQ	_43
+	CMP.B	_State,#06H
+	BEQ	_44
+	CMP.B	_State,#08H
+	BEQ	_45
+	BR	_73
+	SYMB	LINE, 97
+_12:
+	MOV.B	_RecByte,R1L
+	SYMB	LINE, 98
+	MOV.B	_RecLength,_RecByte
+	SYMB	LINE, 100
+	MOV.B	_ByteCnt,#00H
+	SYMB	LINE, 102
+	ADDS.B	_State,#01H
+	SYMB	LINE, 103
+	BR	_73
+	SYMB	LINE, 105
+_13:
+	SYMB	LINE, 106
+	MOV.W	R0,_RecWord
+	SYMB	LTIM, "value", 0, 0, 77
+	ASL.W	R0,#08H
+	MOV.W	_RecWord,R0
+	SYMB	LINE, 107
+	MOV.B	_RecByte,R1L
+	MOV.B	R0L,_RecByte
+	MOVS.B	R0H,#00H
+	ADD.W	_RecWord,R0
+	SYMB	LINE, 109
+	ADDS.B	_ByteCnt,#01H
+	CMP.B	_ByteCnt,#02H
+	BNE	_73
+	SYMB	LINE, 110
+	MOV.B	_ByteCnt,#00H
+	SYMB	LINE, 112
+	ADDS.B	_State,#01H
+	SYMB	LINE, 114
+	BR	_73
+	SYMB	LINE, 116
+_14:
+	MOV.B	_RecByte,R1L
+	SYMB	LINE, 117
+	CMP.B	_RecByte,#00H
+	BEQ	_15
+	CMP.B	_RecByte,#01H
+	BEQ	_18
+	CMP.B	_RecByte,#02H
+	BEQ	_20
+	CMP.B	_RecByte,#04H
+	BEQ	_22
+	CMP.B	_RecByte,#05H
+	BEQ	_24
+	BR	_26
+	SYMB	LINE, 118
+_15:
+	SYMB	LINE, 119
+	AND.W	_LoadAddress,#00H
+	AND.W	_LoadAddress+2,#0FH
+	SYMB	LINE, 120
+	MOV.W	R0,_RecWord
+	MOVS.W	R1,#00H
+	ADD.W	_LoadAddress,R0
+	ADDC.W	_LoadAddress+2,R1
+	SYMB	LINE, 124
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	AND.W	R0,#01H
+	AND.W	R1,#00H
+	OR.W	R1,R0
+	BEQ	_16
+	SYMB	LINE, 125
+	SUB.W	_LoadAddress,#01H
+	SUBB.W	_LoadAddress+2,#00H
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	MOV.W	_LoadAddress+2,R1
+	MOV.W	_LoadAddress,R0
+	CALL	_flash_read_word
+	AND.W	R0,#0FFH
+	MOV.W	_RecWord,R0
+	SYMB	LINE, 127
+	MOV.B	_ByteCnt,#01H
+	SYMB	LINE, 128
+	BR	_17
+_16:
+	SYMB	LINE, 130
+	MOV.B	_ByteCnt,#00H
+	MOV.W	_RecWord,#00H
+_17:
+	SYMB	LINE, 132
+	MOV.B	_State,#04H
+	SYMB	LINE, 133
+	BR	_73
+	SYMB	LINE, 135
+_18:
+	SYMB	LINE, 136
+	MOV.B	R0L,_RecLength
+	BNE	_19
+	SYMB	LINE, 137
+	MOV.B	_State,#08H
+	BR	_73
+_19:
+	SYMB	LINE, 139
+	MOV.B	R5L,#02H
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 140
+	BR	_73
+	SYMB	LINE, 142
+_20:
+	SYMB	LINE, 143
+	CMP.B	_RecLength,#02H
+	BNE	_21
+	SYMB	LINE, 144
+	MOV.B	_State,#05H
+	SYMB	LINE, 146
+	MOV.B	_ByteCnt,#00H
+	MOV.W	_RecWord,#00H
+	SYMB	LINE, 147
+	BR	_73
+_21:
+	SYMB	LINE, 149
+	MOV.B	R5L,#02H
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 150
+	BR	_73
+	SYMB	LINE, 152
+_22:
+	SYMB	LINE, 153
+	CMP.B	_RecLength,#02H
+	BNE	_23
+	SYMB	LINE, 154
+	MOV.B	_State,#06H
+	SYMB	LINE, 156
+	MOV.B	_ByteCnt,#00H
+	MOV.W	_RecWord,#00H
+	SYMB	LINE, 157
+	BR	_73
+_23:
+	SYMB	LINE, 159
+	MOV.B	R5L,#02H
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 160
+	BR	_73
+	SYMB	LINE, 162
+_24:
+	SYMB	LINE, 163
+	CMP.B	_RecLength,#02H
+	BNE	_25
+	SYMB	LINE, 164
+	MOV.B	_State,_Checksum
+	SYMB	LINE, 166
+	MOV.B	_ByteCnt,#00H
+	MOV.W	_RecWord,#00H
+	SYMB	LINE, 167
+	BR	_73
+_25:
+	SYMB	LINE, 169
+	MOV.B	R5L,#02H
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 170
+	BR	_73
+	SYMB	LINE, 172
+_26:
+	SYMB	LINE, 173
+	MOV.B	R5L,#03H
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 176
+	BR	_73
+	SYMB	LINE, 178
+_27:
+	SYMB	LINE, 179
+	MOV.B	R0L,_ByteCnt
+	ADDS.B	R0L,#01H
+	MOV.B	_ByteCnt,R0L
+	CMP.B	_ByteCnt,#02H
+	BNE	_28
+	SYMB	LINE, 180
+	MOV.B	R0L,_RecByte
+	MOVS.B	R0H,#00H
+	ASL.W	R0,#08H
+	ADD.W	_RecWord,R0
+	BR	_29
+_28:
+	SYMB	LINE, 182
+	MOV.B	R0L,_RecByte
+	MOVS.B	R0H,#00H
+	MOV.W	_RecWord,R0
+_29:
+	SYMB	LINE, 184
+	ADDS.B	_RecLength,#0FH
+	MOV.B	R0L,_RecLength
+	BEQ	_35
+	SYMB	LINE, 185
+	CMP.B	_ByteCnt,#02H
+	BNE	_73
+	SYMB	LINE, 187
+	MOV.B	R4L,#02H
+	SYMB	LTIM, "retry", 16, 0, 205
+	SYMB	LINE, 189
+_30:
+	SYMB	LINE, 191
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	MOV.W	R2,_RecWord
+	CALL	_flash_write_word
+	SYMB	LTIM, "tmp", 0, 0, 205
+	SYMB	LINE, 193
+	MOV.B	R4H,R0L
+	SYMB	LTIM, "tmp", 0, 0, 77
+	SYMB	LTIM, "tmp", 17, 0, 205
+	BNE	_31
+	MOV.W	R6,_RecWord
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	CALL	_flash_read_word
+	CMP.W	R6,R0
+	BEQ	_34
+_31:
+	SYMB	LINE, 195
+	OR.B	R4H,R4H
+	BEQ	_32
+	SYMB	LINE, 196
+	MOV.B	R0L,R4H
+	MOVS.B	R0H,#00H
+	ASL.W	R0,#02H
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( __FL_STATUS )
+	MOV.W	R1,[R0+SOF( __FL_STATUS+2 )]
+	MOV.W	R0,[R0+SOF( __FL_STATUS )]
+	CALL	_Udr_CPutNChar
+	BR	_34
+_32:
+	SYMB	LINE, 198
+	MOV.W	R1,#SEG( __FL_WRITEERRORTxt )
+	MOV.W	R0,#SOF( __FL_WRITEERRORTxt )
+	CALL	_Udr_CPutNChar
+	SYMB	LINE, 199
+_34:
+	SYMB	LINE, 200
+	MOV.B	R0L,R4L
+	SYMB	LTIM, "retry", 16, 0, 77
+	SYMB	LTIM, "retry", 0, 0, 205
+	ADDS.B	R4L,#0FH
+	SYMB	LTIM, "retry", 0, 0, 77
+	SYMB	LTIM, "retry", 16, 0, 205
+	OR.B	R0L,R0L
+	BNE	_30
+	SYMB	LINE, 202
+	ADD.W	_LoadAddress,#02H
+	ADDC.W	_LoadAddress+2,#00H
+	SYMB	LINE, 204
+	MOV.B	_ByteCnt,#00H
+	MOV.W	_RecWord,#00H
+	SYMB	LINE, 206
+	MOV.B	R0L,_RecLength
+	BNE	_73
+	SYMB	LINE, 207
+	MOV.B	_State,#08H
+	SYMB	LINE, 209
+	BR	_73
+_35:
+	SYMB	LINE, 211
+	CMP.B	_ByteCnt,#01H
+	BNE	_36
+	SYMB	LINE, 212
+	MOV.W	R4,_RecWord
+	SYMB	LTIM, "retry", 16, 0, 77
+	SYMB	LTIM, "tmp", 17, 0, 77
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	CALL	_flash_read_word
+	AND.W	R0,#0FF00H
+	ADD.W	R4,R0
+	MOV.W	_RecWord,R4
+_36:
+	SYMB	LINE, 214
+	MOV.B	R4L,#02H
+	SYMB	LTIM, "retry", 16, 0, 205
+	SYMB	LINE, 216
+_37:
+	SYMB	LINE, 218
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	MOV.W	R2,_RecWord
+	CALL	_flash_write_word
+	SYMB	LTIM, "tmp", 0, 0, 205
+	SYMB	LINE, 220
+	MOV.B	R4H,R0L
+	SYMB	LTIM, "tmp", 0, 0, 77
+	SYMB	LTIM, "tmp", 17, 0, 205
+	BNE	_38
+	MOV.W	R6,_RecWord
+	MOV.W	R1,_LoadAddress+2
+	MOV.W	R0,_LoadAddress
+	CALL	_flash_read_word
+	CMP.W	R6,R0
+	BEQ	_41
+_38:
+	SYMB	LINE, 222
+	OR.B	R4H,R4H
+	BEQ	_39
+	SYMB	LINE, 223
+	MOV.B	R0L,R4H
+	MOVS.B	R0H,#00H
+	ASL.W	R0,#02H
+	MOVS.W	R1,#00H
+	MOV.B	ES,#SEG( __FL_STATUS )
+	MOV.W	R1,[R0+SOF( __FL_STATUS+2 )]
+	MOV.W	R0,[R0+SOF( __FL_STATUS )]
+	CALL	_Udr_CPutNChar
+	BR	_41
+_39:
+	SYMB	LINE, 225
+	MOV.W	R1,#SEG( __FL_WRITEERRORTxt )
+	MOV.W	R0,#SOF( __FL_WRITEERRORTxt )
+	CALL	_Udr_CPutNChar
+	SYMB	LINE, 226
+_41:
+	SYMB	LINE, 227
+	MOV.B	R0L,R4L
+	SYMB	LTIM, "retry", 16, 0, 77
+	SYMB	LTIM, "retry", 0, 0, 205
+	ADDS.B	R4L,#0FH
+	SYMB	LTIM, "retry", 0, 0, 77
+	SYMB	LTIM, "retry", 16, 0, 205
+	OR.B	R0L,R0L
+	BNE	_37
+	SYMB	LINE, 229
+	MOV.B	_State,#08H
+	SYMB	LINE, 231
+	BR	_73
+	SYMB	LINE, 233
+_42:
+	SYMB	LINE, 234
+	MOV.W	R0,_RecWord
+	ASL.W	R0,#08H
+	MOV.W	_RecWord,R0
+	SYMB	LINE, 235
+	MOV.B	R0L,_RecByte
+	MOVS.B	R0H,#00H
+	ADD.W	_RecWord,R0
+	SYMB	LINE, 237
+	ADDS.B	_ByteCnt,#01H
+	CMP.B	_ByteCnt,#02H
+	BNE	_73
+	SYMB	LINE, 238
+	MOV.B	_ByteCnt,#00H
+	SYMB	LINE, 240
+	MOV.B	_State,#08H
+	SYMB	LINE, 242
+	BR	_73
+	SYMB	LINE, 244
+_43:
+	SYMB	LINE, 245
+	MOV.W	R0,_RecWord
+	ASL.W	R0,#08H
+	MOV.W	_RecWord,R0
+	SYMB	LINE, 246
+	MOV.B	R0L,_RecByte
+	MOVS.B	R0H,#00H
+	ADD.W	_RecWord,R0
+	SYMB	LINE, 248
+	ADDS.B	_ByteCnt,#01H
+	CMP.B	_ByteCnt,#02H
+	BNE	_73
+	SYMB	LINE, 249
+	AND.W	_LoadAddress+2,#00H
+	SYMB	LINE, 250
+	MOV.W	R0,_RecWord
+	MOVS.W	R1,#00H
+	ASL.D	R0,#04H
+	AND.W	R0,#00H
+	AND.W	R1,#0FH
+	ADD.W	_LoadAddress,R0
+	ADDC.W	_LoadAddress+2,R1
+	SYMB	LINE, 252
+	MOV.B	_ByteCnt,#00H
+	SYMB	LINE, 254
+	MOV.B	_State,#08H
+	SYMB	LINE, 256
+	BR	_73
+	SYMB	LINE, 258
+_44:
+	SYMB	LINE, 259
+	MOV.W	R0,_RecWord
+	ASL.W	R0,#08H
+	MOV.W	_RecWord,R0
+	SYMB	LINE, 260
+	MOV.B	R0L,_RecByte
+	MOVS.B	R0H,#00H
+	ADD.W	_RecWord,R0
+	SYMB	LINE, 262
+	ADDS.B	_ByteCnt,#01H
+	CMP.B	_ByteCnt,#02H
+	BNE	_73
+	SYMB	LINE, 263
+	AND.W	_LoadAddress+2,#00H
+	SYMB	LINE, 264
+	MOV.W	R0,_RecWord
+	MOVS.W	R1,#00H
+	ASL.D	R0,#010H
+	AND.W	R0,#00H
+	AND.W	R1,#0FH
+	ADD.W	_LoadAddress,R0
+	ADDC.W	_LoadAddress+2,R1
+	SYMB	LINE, 266
+	MOV.B	_ByteCnt,#00H
+	SYMB	LINE, 268
+	MOV.B	_State,#08H
+	SYMB	LINE, 270
+	BR	_73
+	SYMB	LINE, 272
+_45:
+	SYMB	LINE, 273
+	MOV.B	_State,#00H
+	SYMB	LINE, 275
+	MOV.B	R0L,_Checksum
+	BEQ	_73
+	SYMB	LINE, 276
+	MOV.B	R5L,#04H
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 20, 0, 205
+	SYMB	LINE, 280
+_73:
+	SYMB	LINE, 282
+	MOV.B	R0L,R5L
+	OR.B	R5L,R5L
+	SYMB	LTIM, "error", 20, 0, 77
+	SYMB	LTIM, "error", 0, 0, 205
+	BEQ	_74
+	SYMB	LINE, 283
+	MOV.B	_State,#00H
+_74:
+	SYMB	LINE, 286
+_75:
+	POP.W	R4, R5, R6
+	SYMB	SOFF, 0
+	RET
+	SYMB	LTIM, "error", 0, 0, 77
+	SYMB	LTIM, "retry", 16, 0, 77
+	SYMB	LTIM, "tmp", 17, 0, 77
+	SYMB	EFUN
+	SYMB	ENDF
+
+	SYMB	IDEN, "RecLength", _RecLength, #257, 130, 4
+LOADER_CLR_NE@DS	SEGMENT	DATA JOIN CLEAR
+	RSEG	LOADER_CLR_NE@DS
+_RecLength:	DS	1
+	SYMB	IDEN, "ByteCnt", _ByteCnt, #257, 130, 4
+_ByteCnt:	DS	1
+	SYMB	TYPE, 263, 'Z', #2, 19
+	SYMB	IDEN, "strout", _strout, #263, 130, 0
+	SYMB	ALAB, _strout, #263
+LOADER_CLR_FA	SEGMENT	HDATA INSEGMENT CLEAR
+	RSEG	LOADER_CLR_FA
+	PUBLIC	_strout
+_strout:	DS	20
+	SYMB	IDEN, "Checksum", _Checksum, #257, 130, 4
+	RSEG	LOADER_CLR_NE@DS
+_Checksum:	DS	1
+	SYMB	TYPE, 266, 'n', #2, 129
+	SYMB	TYPE, 267, 'P', #266
+	SYMB	TYPE, 265, 'X', 12, #1, 30, 1, #267
+	SYMB	ALAB, _Udr_CPutNChar, #265
+	EXTRN	HCODE(_Udr_CPutNChar)
+	SYMB	ALAB, __FL_WRITEERRORTxt, #260
+	EXTRN	HCODE(__FL_WRITEERRORTxt)
+	SYMB	TYPE, 268, 'X', 12, #258, 30, 1, #259
+	SYMB	ALAB, _flash_read_word, #268
+	EXTRN	HCODE(_flash_read_word)
+	SYMB	TYPE, 269, 'Z', #267, -1
+	SYMB	ALAB, __FL_STATUS, #269
+	EXTRN	HDATA(__FL_STATUS)
+	SYMB	IDEN, "CharCnt", _CharCnt, #257, 130, 4
+_CharCnt:	DS	1
+	SYMB	IDEN, "LoadAddress", _LoadAddress, #259, 130, 4
+	ALIGN	1
+_LoadAddress:	DS	4
+	SYMB	IDEN, "RecByte", _RecByte, #257, 130, 4
+_RecByte:	DS	1
+	SYMB	TYPE, 271, 'X', 12, #257, 30, 2, #259, #258
+	SYMB	ALAB, _flash_write_word, #271
+	EXTRN	HCODE(_flash_write_word)
+	SYMB	IDEN, "RecWord", _RecWord, #258, 130, 4
+	ALIGN	1
+_RecWord:	DS	2
+	SYMB	IDEN, "State", _State, #257, 130, 4
+_State:	DS	1
+	EXTRN	DATA(__lc_ub_xvwbuffer)
+	EXTRN	DATA(__lc_ue_xvwbuffer)
+	CALLS	'IntelLoader', 'flash_read_word'
+	CALLS	'IntelLoader', 'flash_write_word'
+	CALLS	'IntelLoader', 'flash_read_word'
+	CALLS	'IntelLoader', 'Udr_CPutNChar'
+	CALLS	'IntelLoader', 'flash_read_word'
+	CALLS	'IntelLoader', 'flash_write_word'
+	CALLS	'IntelLoader', 'flash_read_word'
+	CALLS	'IntelLoader', 'Udr_CPutNChar'
+	END
