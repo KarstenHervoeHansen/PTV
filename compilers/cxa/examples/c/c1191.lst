@@ -1,0 +1,789 @@
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   1
+C:\cxa\examples\c\c1191.src
+ADDR   CODE            LINE SOURCELINE
+                          2 ; options: -IC:\cxa\include -Ml -Cxag3 -So -A1 -u -O1 -g
+                          4 $NOZPAGE
+                          5         NAME    C1191
+000000                   25 C1191_RO        SEGMENT HCODE ROMDATA
+000000                   26         RSEG    C1191_RO
+                         30         PUBLIC  _BlockOffset
+                         31         ALIGN   1
+000000                   32 _BlockOffset:
+000000 00000000000001    33         DD      000000000H,000010000H,000020000H,000030000H,000040000H
+       00000002000000       
+       030000000400         
+000014 00000500000006    34         DD      000050000H,000060000H,000070000H
+       0000000700           
+000000                   35 C1191_PR        SEGMENT HCODE
+000000                   36         RSEG    C1191_PR
+                         37         ALIGN   1
+000000                   39 _FlashWrite:
+000000 862C42            47         MOV.B   ES,R1L
+000003 8248              48         MOV.B   [R0],R2L
+000005 8104              49         MOV.B   R0L,R2L
+000007 D680              54         RET
+000009 00                57         ALIGN   1
+                         59         PUBLIC  _FlashRead
+00000A                   60 _FlashRead:
+00000A 862C42            67         MOV.B   ES,R1L
+00000D 8200              68         MOV.B   R0L,[R0]
+00000F D680              71         RET
+000011 00                73         ALIGN   1
+000012                   75 _FlashPause:
+000012 A97C              78         ADDS.W  R7,#0CH
+000014 E90000C8          84         MULU.W  R0,#0C8H
+000018 8C1F02            86         MOV.W   [R7+2],R1
+00001B 8A0F              87         MOV.W   [R7],R0
+00001D FE06              89         BR      _4
+00001D FE0600            89         BR      _4
+000020                   90 _3:
+000020 9A720001          92         SUB.W   [R7],#01H
+000024 9C73020000        93         SUBB.W  [R7+2],#00H
+00002A                   95 _4:
+00002A 9C74020000        96         CMP.W   [R7+2],#00H
+00002F F203              97         BNE     _5
+000031 9A740000          98         CMP.W   [R7],#00H
+000031 9A74000000        98         CMP.W   [R7],#00H
+000036                   99 _5:
+000036 F8F4             100         BG      _3
+000038 A974             102         ADDS.W  R7,#04H
+00003A D680             104         RET
+                        106         ALIGN   1
+                        108         PUBLIC  _FlashReadReset
+00003C                  109 _FlashReadReset:
+00003C B910             114         MOV.W   R1,#00H
+00003E 99085555         115         MOV.W   R0,#05555H
+000042 9148AA           116         MOV.B   R2L,#0AAH
+000045 C5FFDC           117         CALL    _FlashWrite
+000048 B910             119         MOV.W   R1,#00H
+00004A 99082AAA         120         MOV.W   R0,#02AAAH
+00004E 914855           121         MOV.B   R2L,#055H
+000051 C5FFD6           122         CALL    _FlashWrite
+000054 B910             124         MOV.W   R1,#00H
+000056 B900             125         MOV.W   R0,#00H
+000058 9148F0           126         MOV.B   R2L,#0F0H
+00005B C5FFD1           127         CALL    _FlashWrite
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   2
+
+ADDR   CODE            LINE SOURCELINE
+00005E 9908000A         129         MOV.W   R0,#0AH
+000062 C5FFD7           130         CALL    _FlashPause
+000065 D680             132         RET
+000067 00               134         ALIGN   1
+                        136         PUBLIC  _FlashAutoSelect
+000068                  137 _FlashAutoSelect:
+000068 0F10             141         PUSH.W  R4
+00006A 8940             144         MOV.W   R4,R0
+00006C 9148AA           151         MOV.B   R2L,#0AAH
+00006F B910             152         MOV.W   R1,#00H
+000071 99085555         153         MOV.W   R0,#05555H
+000075 C5FFC4           154         CALL    _FlashWrite
+000078 B910             156         MOV.W   R1,#00H
+00007A 99082AAA         157         MOV.W   R0,#02AAAH
+00007E 914855           158         MOV.B   R2L,#055H
+000081 C5FFBE           159         CALL    _FlashWrite
+000084 914890           161         MOV.B   R2L,#090H
+000087 B910             162         MOV.W   R1,#00H
+000089 99085555         163         MOV.W   R0,#05555H
+00008D C5FFB8           164         CALL    _FlashWrite
+000090 9944FFFE         166         CMP.W   R4,#0FFFEH
+000094 F207             167         BNE     _6
+000096 B910             169         MOV.W   R1,#00H
+000098 B900             170         MOV.W   R0,#00H
+00009A C5FFB7           171         CALL    _FlashRead
+00009D B110             172         MOVS.B  R0H,#00H
+00009F 8940             173         MOV.W   R4,R0
+0000A1 FE2F             176         BR      _12
+0000A1 FE2F00           176         BR      _12
+0000A4                  177 _6:
+0000A4 9944FFFF         181         CMP.W   R4,#0FFFFH
+0000A8 F207             182         BNE     _7
+0000AA B910             184         MOV.W   R1,#00H
+0000AC B901             185         MOV.W   R0,#01H
+0000AE C5FFAD           186         CALL    _FlashRead
+0000B1 B110             187         MOVS.B  R0H,#00H
+0000B3 8940             188         MOV.W   R4,R0
+0000B5 FE25             191         BR      _12
+0000B5 FE2500           191         BR      _12
+0000B8                  192 _7:
+0000B8 99440000         196         CMP.W   R4,#00H
+0000BC FB1F             197         BLT     _9
+0000BE 99440008         198         CMP.W   R4,#08H
+0000C2 FA1C             199         BGE     _9
+0000C4 D942             201         ASL.W   R4,#02H
+0000C6 8924             203         MOV.W   R2,R4
+0000C8 B930             204         MOVS.W  R3,#00H
+0000CA 9918rrrr         205         MOV.W   R1,#SEG( _BlockOffset )
+0000CE 9908rrrr         206         MOV.W   R0,#SOF( _BlockOffset )
+0000D2 0902             207         ADD.W   R0,R2
+0000D4 1913             208         ADDC.W  R1,R3
+0000D6 862C43           209         MOV.B   CS,R1L
+0000D9 8820             210         MOVC.W  R2,[R0+]
+0000DB 99040000         211         CMP.W   R0,#00H
+0000DF F202             212         BNE     _17
+0000E1 A64143           213         ADDS.B  CS,#01H
+0000E1 A64143           213         ADDS.B  CS,#01H
+0000E4                  214 _17:
+0000E4 8830             215         MOVC.W  R3,[R0+]
+0000E6 8913             216         MOV.W   R1,R3
+0000E8 8902             217         MOV.W   R0,R2
+0000EA 99000002         218         ADD.W   R0,#02H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   3
+
+ADDR   CODE            LINE SOURCELINE
+0000EE 99110000         219         ADDC.W  R1,#00H
+0000F2 C5FF8B           220         CALL    _FlashRead
+0000F5 B110             221         MOVS.B  R0H,#00H
+0000F7 8940             222         MOV.W   R4,R0
+0000F9 FE03             224         BR      _12
+0000F9 FE0300           224         BR      _12
+0000FC                  225 _9:
+0000FC 9948FFFB         227         MOV.W   R4,#0FFFBH
+000100                  230 _12:
+000100 B910             232         MOV.W   R1,#00H
+000102 B900             233         MOV.W   R0,#00H
+000104 9148F0           234         MOV.B   R2L,#0F0H
+000107 C5FF7B           235         CALL    _FlashWrite
+00010A 8904             237         MOV.W   R0,R4
+00010C 2F10             241         POP.W   R4
+00010E D680             243         RET
+                        246         ALIGN   1
+                        248         PUBLIC  _FlashBlockErase
+000110                  249 _FlashBlockErase:
+000110 0F70             255         PUSH.W  R4, R5, R6
+000112 9972000A         257         SUB.W   R7,#0AH
+000116 8953             261         MOV.W   R5,R3
+000118 8942             262         MOV.W   R4,R2
+00011A 81D0             265         MOV.B   R6H,R0L
+00011C 9C7804FFFF       279         MOV.W   [R7+4],#0FFFFH
+000121 9908FFFE         282         MOV.W   R0,#0FFFEH
+000125 C5FFA0           283         CALL    _FlashAutoSelect
+000128 99040020         284         CMP.W   R0,#020H
+00012C F207             285         BNE     _18
+00012E 9908FFFF         286         MOV.W   R0,#0FFFFH
+000132 C5FF9A           287         CALL    _FlashAutoSelect
+000135 990400E2         288         CMP.W   R0,#0E2H
+000139 F305             289         BEQ     _19
+000139 F30500           289         BEQ     _19
+00013C                  290 _18:
+00013C 9908FFF8         292         MOV.W   R0,#0FFF8H
+                        293         BR      _34
+000140 D500B8          +293         JMP.L   _34
+000140 D500B800        +293         JMP.L   _34
+000144                  294 _19:
+000144 91D408           302         CMP.B   R6H,#08H
+000147 F904             303         BL      _20
+000149 9908FFFD         305         MOV.W   R0,#0FFFDH
+                        306         BR      _34
+00014D D500B1          +306         JMP.L   _34
+00014D D500B1          +306         JMP.L   _34
+000150                  307 _20:
+000150 91C800           315         MOV.B   R6L,#00H
+000153 8C5F08           317         MOV.W   [R7+8],R5
+000156 8C4F06           318         MOV.W   [R7+6],R4
+000159 FE10             322         BR      _23
+000159 FE1000           322         BR      _23
+00015C                  323 _21:
+00015C 86AC42           325         MOV.B   ES,R5L
+00015F 8204             326         MOV.B   R0L,[R4]
+000161 B110             327         MOVS.B  R0H,#00H
+000163 C5FF81           328         CALL    _FlashAutoSelect
+000166 6900             329         OR.W    R0,R0
+000168 F305             330         BEQ     _22
+00016A 86AC42           332         MOV.B   ES,R5L
+00016D 8204             333         MOV.B   R0L,[R4]
+00016F B110             334         MOVS.B  R0H,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   4
+
+ADDR   CODE            LINE SOURCELINE
+                        335         BR      _34
+000171 D5009F          +335         JMP.L   _34
+000171 D5009F          +335         JMP.L   _34
+000174                  336 _22:
+000174 99400001         348         ADD.W   R4,#01H
+000178 A1C1             351         ADDS.B  R6L,#01H
+00017A                  354 _23:
+00017A 41CD             355         CMP.B   R6L,R6H
+00017C F1EF             356         BCS     _21
+00017E 9148AA           358         MOV.B   R2L,#0AAH
+000181 B910             359         MOV.W   R1,#00H
+000183 99085555         360         MOV.W   R0,#05555H
+000187 C5FF3B           361         CALL    _FlashWrite
+00018A 914855           363         MOV.B   R2L,#055H
+00018D B910             364         MOV.W   R1,#00H
+00018F 99082AAA         365         MOV.W   R0,#02AAAH
+000193 C5FF35           366         CALL    _FlashWrite
+000196 914880           368         MOV.B   R2L,#080H
+000199 B910             369         MOV.W   R1,#00H
+00019B 99085555         370         MOV.W   R0,#05555H
+00019F C5FF2F           371         CALL    _FlashWrite
+0001A2 B910             373         MOV.W   R1,#00H
+0001A4 99085555         374         MOV.W   R0,#05555H
+0001A8 9148AA           375         MOV.B   R2L,#0AAH
+0001AB C5FF29           376         CALL    _FlashWrite
+0001AE B910             378         MOV.W   R1,#00H
+0001B0 99082AAA         379         MOV.W   R0,#02AAAH
+0001B4 914855           380         MOV.B   R2L,#055H
+0001B7 C5FF23           381         CALL    _FlashWrite
+0001BA 918800           383         MOV.B   R4L,#00H
+0001BD 8C1708           387         MOV.W   R1,[R7+8]
+0001C0 8C0706           388         MOV.W   R0,[R7+6]
+0001C3 FE3B             390         BR      _25
+0001C3 FE3B00           390         BR      _25
+0001C6                  391 _24:
+0001C6 8C1F02           393         MOV.W   [R7+2],R1
+0001C9 8A0F             394         MOV.W   [R7],R0
+0001CB 862C42           395         MOV.B   ES,R1L
+0001CE 8200             396         MOV.B   R0L,[R0]
+0001D0 B110             399         MOVS.B  R0H,#00H
+0001D2 D902             400         ASL.W   R0,#02H
+0001D4 8920             401         MOV.W   R2,R0
+0001D6 B930             402         MOVS.W  R3,#00H
+0001D8 9920rrrr         403         ADD.W   R2,#SOF( _BlockOffset )
+0001DC 9931rrrr         404         ADDC.W  R3,#SEG( _BlockOffset )
+0001E0 866C43           405         MOV.B   CS,R3L
+0001E3 8802             406         MOVC.W  R0,[R2+]
+0001E5 99240000         407         CMP.W   R2,#00H
+0001E9 F202             408         BNE     _39
+0001EB A64143           409         ADDS.B  CS,#01H
+0001EB A64143           409         ADDS.B  CS,#01H
+0001EE                  410 _39:
+0001EE 8812             411         MOVC.W  R1,[R2+]
+0001F0 914830           412         MOV.B   R2L,#030H
+0001F3 C5FF05           413         CALL    _FlashWrite
+0001F6 8C1708           415         MOV.W   R1,[R7+8]
+0001F9 8C0706           416         MOV.W   R0,[R7+6]
+0001FC 862C42           417         MOV.B   ES,R1L
+0001FF 8200             418         MOV.B   R0L,[R0]
+000201 B110             419         MOVS.B  R0H,#00H
+000203 D902             420         ASL.W   R0,#02H
+000205 B910             421         MOVS.W  R1,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   5
+
+ADDR   CODE            LINE SOURCELINE
+000207 9938rrrr         422         MOV.W   R3,#SEG( _BlockOffset )
+00020B 9928rrrr         423         MOV.W   R2,#SOF( _BlockOffset )
+00020F 0920             424         ADD.W   R2,R0
+000211 1931             425         ADDC.W  R3,R1
+000213 866C43           426         MOV.B   CS,R3L
+000216 8802             427         MOVC.W  R0,[R2+]
+000218 99240000         428         CMP.W   R2,#00H
+00021C F202             429         BNE     _40
+00021E A64143           430         ADDS.B  CS,#01H
+00021E A6414300         430         ADDS.B  CS,#01H
+000222                  431 _40:
+000222 8812             432         MOVC.W  R1,[R2+]
+000224 C5FEF2           433         CALL    _FlashRead
+000227 910508           434         AND.B   R0L,#08H
+00022A 910408           435         CMP.B   R0L,#08H
+00022D F308             436         BEQ     _26
+00022F 8C1702           438         MOV.W   R1,[R7+2]
+000232 8A07             439         MOV.W   R0,[R7]
+000234 99000001         440         ADD.W   R0,#01H
+000238 A181             445         ADDS.B  R4L,#01H
+00023A                  448 _25:
+00023A 418D             449         CMP.B   R4L,R6H
+00023C F1C4             450         BCS     _24
+00023E                  452 _26:
+00023E 418D             454         CMP.B   R4L,R6H
+000240 F011             455         BCC     _29
+000242 9C7804FFFC       457         MOV.W   [R7+4],#0FFFCH
+000247 FE0C             461         BR      _28
+000247 FE0C00           461         BR      _28
+00024A                  462 _27:
+00024A 8108             464         MOV.B   R0L,R4L
+00024C B110             465         MOVS.B  R0H,#00H
+00024E B910             467         MOVS.W  R1,#00H
+000250 8C3708           468         MOV.W   R3,[R7+8]
+000253 8C2706           469         MOV.W   R2,[R7+6]
+000256 0920             470         ADD.W   R2,R0
+000258 866C42           471         MOV.B   ES,R3L
+00025B 9228FF           472         MOV.B   [R2],#0FFH
+00025E A181             473         ADDS.B  R4L,#01H
+000260                  477 _28:
+000260 418D             478         CMP.B   R4L,R6H
+000262 F1F3             479         BCS     _27
+000264                  481 _29:
+000264                  481 _29:
+000264                  482 _30:
+000264 8C1708           484         MOV.W   R1,[R7+8]
+000267 8C0706           485         MOV.W   R0,[R7+6]
+00026A 862C42           486         MOV.B   ES,R1L
+00026D 8200             487         MOV.B   R0L,[R0]
+00026F B110             488         MOVS.B  R0H,#00H
+000271 D902             489         ASL.W   R0,#02H
+000273 B910             490         MOVS.W  R1,#00H
+000275 9938rrrr         491         MOV.W   R3,#SEG( _BlockOffset )
+000279 9928rrrr         492         MOV.W   R2,#SOF( _BlockOffset )
+00027D 0920             493         ADD.W   R2,R0
+00027F 1931             494         ADDC.W  R3,R1
+000281 866C43           495         MOV.B   CS,R3L
+000284 8802             496         MOVC.W  R0,[R2+]
+000286 99240000         497         CMP.W   R2,#00H
+00028A F202             498         BNE     _45
+00028C A64143           499         ADDS.B  CS,#01H
+00028C A6414300         499         ADDS.B  CS,#01H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   6
+
+ADDR   CODE            LINE SOURCELINE
+000290                  500 _45:
+000290 8812             501         MOVC.W  R1,[R2+]
+000292 C5FEBB           502         CALL    _FlashRead
+000295 910508           503         AND.B   R0L,#08H
+000298 910408           504         CMP.B   R0L,#08H
+00029B F2E4             505         BNE     _30
+00029D C50122           507         CALL    _FlashDataToggle
+0002A0 9904FFFF         508         CMP.W   R0,#0FFFFH
+0002A4 F304             509         BEQ     _31
+0002A6 9C7804FFF2       511         MOV.W   [R7+4],#0FFF2H
+0002AB C5FEC7           515         CALL    _FlashReadReset
+0002AE                  517 _31:
+0002AE 8C0704           519         MOV.W   R0,[R7+4]
+0002B2                  523 _34:
+0002B2 9970000A         524         ADD.W   R7,#0AH
+0002B6 2F70             526         POP.W   R4, R5, R6
+0002B8 D680             528         RET
+                        534         ALIGN   1
+                        536         PUBLIC  _FlashChipErase
+0002BA                  537 _FlashChipErase:
+0002BA 0F10             541         PUSH.W  R4
+0002BC 9908FFFE         546         MOV.W   R0,#0FFFEH
+0002C0 C5FED3           547         CALL    _FlashAutoSelect
+0002C3 99040020         548         CMP.W   R0,#020H
+0002C7 F207             549         BNE     _48
+0002C9 9908FFFF         550         MOV.W   R0,#0FFFFH
+0002CD C5FECC           551         CALL    _FlashAutoSelect
+0002D0 990400E2         552         CMP.W   R0,#0E2H
+0002D4 F303             553         BEQ     _49
+0002D4 F303             553         BEQ     _49
+0002D6                  554 _48:
+0002D6 9908FFF8         556         MOV.W   R0,#0FFF8H
+0002DA FE3E             557         BR      _55
+0002DA FE3E             557         BR      _55
+0002DC                  558 _49:
+0002DC 918800           560         MOV.B   R4L,#00H
+0002E0                  562 _50:
+0002E0 8108             564         MOV.B   R0L,R4L
+0002E2 B110             565         MOVS.B  R0H,#00H
+0002E4 C5FEC1           566         CALL    _FlashAutoSelect
+0002E7 6900             567         OR.W    R0,R0
+0002E9 F304             568         BEQ     _51
+0002EB 8108             570         MOV.B   R0L,R4L
+0002ED B110             571         MOVS.B  R0H,#00H
+0002EF FE34             572         BR      _55
+0002EF FE3400           572         BR      _55
+0002F2                  573 _51:
+0002F2 A181             577         ADDS.B  R4L,#01H
+0002F4 918408           580         CMP.B   R4L,#08H
+0002F7 F1F4             581         BCS     _50
+0002F9 9148AA           583         MOV.B   R2L,#0AAH
+0002FC B910             584         MOV.W   R1,#00H
+0002FE 99085555         585         MOV.W   R0,#05555H
+000302 C5FE7E           586         CALL    _FlashWrite
+000305 914855           588         MOV.B   R2L,#055H
+000308 B910             589         MOV.W   R1,#00H
+00030A 99082AAA         590         MOV.W   R0,#02AAAH
+00030E C5FE78           591         CALL    _FlashWrite
+000311 914880           593         MOV.B   R2L,#080H
+000314 B910             594         MOV.W   R1,#00H
+000316 99085555         595         MOV.W   R0,#05555H
+00031A C5FE72           596         CALL    _FlashWrite
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   7
+
+ADDR   CODE            LINE SOURCELINE
+00031D B910             597         MOV.W   R1,#00H
+00031F 99085555         598         MOV.W   R0,#05555H
+000323 9148AA           600         MOV.B   R2L,#0AAH
+000326 C5FE6C           601         CALL    _FlashWrite
+000329 B910             603         MOV.W   R1,#00H
+00032B 99082AAA         604         MOV.W   R0,#02AAAH
+00032F 914855           605         MOV.B   R2L,#055H
+000332 C5FE66           606         CALL    _FlashWrite
+000335 914810           608         MOV.B   R2L,#010H
+000338 B910             609         MOV.W   R1,#00H
+00033A 99085555         610         MOV.W   R0,#05555H
+00033E C5FE60           611         CALL    _FlashWrite
+000341 C500D0           613         CALL    _FlashDataToggle
+000344 9904FFFF         614         CMP.W   R0,#0FFFFH
+000348 F305             615         BEQ     _52
+00034A C5FE78           617         CALL    _FlashReadReset
+00034D 9908FFF2         619         MOV.W   R0,#0FFF2H
+000351 FE03             620         BR      _55
+000354                  622 _52:
+000354 9908FFFF         624         MOV.W   R0,#0FFFFH
+000358                  626 _55:
+000358 2F10             627         POP.W   R4
+00035A D680             629         RET
+                        632         ALIGN   1
+                        634         PUBLIC  _FlashProgram
+00035C                  635 _FlashProgram:
+00035C 0F70             641         PUSH.W  R4, R5, R6
+00035E 9972000C         643         SUB.W   R7,#0CH
+000362 8962             646         MOV.W   R6,R2
+000364 8951             649         MOV.W   R5,R1
+000366 8940             650         MOV.W   R4,R0
+000368 9908FFFE         668         MOV.W   R0,#0FFFEH
+00036C C5FE7D           669         CALL    _FlashAutoSelect
+00036F 99040020         670         CMP.W   R0,#020H
+000373 F207             671         BNE     _60
+000375 9908FFFF         672         MOV.W   R0,#0FFFFH
+000379 C5FE76           673         CALL    _FlashAutoSelect
+00037C 990400E2         674         CMP.W   R0,#0E2H
+000380 F304             675         BEQ     _61
+000380 F304             675         BEQ     _61
+000382                  676 _60:
+000382 9908FFF8         678         MOV.W   R0,#0FFF8H
+                        679         BR      _76
+000386 D500AA          +679         JMP.L   _76
+000386 D500AA00        +679         JMP.L   _76
+00038A                  680 _61:
+00038A 8906             684         MOV.W   R0,R6
+00038C B910             685         MOVS.W  R1,#00H
+00038E 8C5F0A           686         MOV.W   [R7+10],R5
+000391 8C4F08           687         MOV.W   [R7+8],R4
+000394 0904             688         ADD.W   R0,R4
+000396 1915             689         ADDC.W  R1,R5
+000398 99020001         690         SUB.W   R0,#01H
+00039C 99130000         691         SUBB.W  R1,#00H
+0003A0 8C1F06           694         MOV.W   [R7+6],R1
+0003A3 8C0F04           695         MOV.W   [R7+4],R0
+0003A6 99140008         696         CMP.W   R1,#08H
+0003AA F202             697         BNE     _80
+0003AC 99040000         698         CMP.W   R0,#00H
+0003AC 99040000         698         CMP.W   R0,#00H
+0003B0                  699 _80:
+0003B0 F104             702         BCS     _62
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   8
+
+ADDR   CODE            LINE SOURCELINE
+0003B2 9908FFF9         704         MOV.W   R0,#0FFF9H
+                        705         BR      _76
+0003B6 D50092          +705         JMP.L   _76
+0003B6 D5009200        +705         JMP.L   _76
+0003BA                  706 _62:
+0003BA 918800           709         MOV.B   R4L,#00H
+0003BD 9918rrrr         710         MOV.W   R1,#SEG( _BlockOffset )
+0003C1 9908rrrr         711         MOV.W   R0,#SOF( _BlockOffset )
+0003C6                  713 _63:
+0003C6 8C1F02           715         MOV.W   [R7+2],R1
+0003C9 8A0F             716         MOV.W   [R7],R0
+0003CB 862C43           717         MOV.B   CS,R1L
+0003CE 8820             718         MOVC.W  R2,[R0+]
+0003D0 99040000         719         CMP.W   R0,#00H
+0003D4 F202             720         BNE     _81
+0003D6 A64143           721         ADDS.B  CS,#01H
+0003D6 A6414300         721         ADDS.B  CS,#01H
+0003DA                  722 _81:
+0003DA 8830             723         MOVC.W  R3,[R0+]
+0003DC 4C3706           726         CMP.W   R3,[R7+6]
+0003DF F202             727         BNE     _82
+0003E1 4C2704           728         CMP.W   R2,[R7+4]
+0003E1 4C2704           728         CMP.W   R2,[R7+4]
+0003E4                  729 _82:
+0003E4 F830             730         BG      _67
+0003E6 918407           732         CMP.B   R4L,#07H
+0003E9 F017             733         BCC     _64
+0003EB 8108             734         MOV.B   R0L,R4L
+0003ED B110             735         MOVS.B  R0H,#00H
+0003EF D902             736         ASL.W   R0,#02H
+0003F1 A904             737         ADDS.W  R0,#04H
+0003F3 B910             738         MOVS.W  R1,#00H
+0003F5 9900rrrr         739         ADD.W   R0,#SOF( _BlockOffset )
+0003F9 9911rrrr         740         ADDC.W  R1,#SEG( _BlockOffset )
+0003FD 862C43           741         MOV.B   CS,R1L
+000400 8820             742         MOVC.W  R2,[R0+]
+000402 99040000         743         CMP.W   R0,#00H
+000406 F202             744         BNE     _84
+000408 A64143           745         ADDS.B  CS,#01H
+000408 A6414300         745         ADDS.B  CS,#01H
+00040C                  746 _84:
+00040C 8830             747         MOVC.W  R3,[R0+]
+00040E 4C3F0A           748         CMP.W   [R7+10],R3
+000411 F202             749         BNE     _85
+000413 4C2F08           750         CMP.W   [R7+8],R2
+000413 4C2F08           750         CMP.W   [R7+8],R2
+000416                  751 _85:
+000416 F009             752         BCC     _66
+000418                  754 _64:
+000418 8108             756         MOV.B   R0L,R4L
+00041A B110             757         MOVS.B  R0H,#00H
+00041C C5FE25           758         CALL    _FlashAutoSelect
+00041F 6900             759         OR.W    R0,R0
+000421 F304             760         BEQ     _66
+000423 8108             762         MOV.B   R0L,R4L
+000425 B110             763         MOVS.B  R0H,#00H
+000427 FE5A             764         BR      _76
+00042A                  766 _66:
+00042A 8C1702           769         MOV.W   R1,[R7+2]
+00042D 8A07             770         MOV.W   R0,[R7]
+00042F 99000004         771         ADD.W   R0,#04H
+000433 99110000         772         ADDC.W  R1,#00H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page   9
+
+ADDR   CODE            LINE SOURCELINE
+000437 A181             777         ADDS.B  R4L,#01H
+000439 9914rrrr         778         CMP.W   R1,#SEG( _BlockOffset+32 )
+00043D F203             779         BNE     _86
+00043F 9904rrrr         780         CMP.W   R0,#SOF( _BlockOffset+32 )
+00043F 9904rrrr00       780         CMP.W   R0,#SOF( _BlockOffset+32 )
+000444                  781 _86:
+000444 F1C0             782         BCS     _63
+000446                  784 _67:
+000446 8C5718           786         MOV.W   R5,[R7+24]
+000449 8C4716           787         MOV.W   R4,[R7+22]
+00044C FE3D             790         BR      _71
+00044C FE3D             790         BR      _71
+00044E                  791 _68:
+00044E 8C170A           793         MOV.W   R1,[R7+10]
+000451 8C0708           794         MOV.W   R0,[R7+8]
+000454 C5FDDA           796         CALL    _FlashRead
+000457 B110             797         MOVS.B  R0H,#00H
+000459 980A             798         CPL.W   R0
+00045B 86AC42           799         MOV.B   ES,R5L
+00045E 8224             800         MOV.B   R1L,[R4]
+000460 B130             801         MOVS.B  R1H,#00H
+000462 5901             802         AND.W   R0,R1
+000464 F303             803         BEQ     _69
+000466 9908FFFA         805         MOV.W   R0,#0FFFAH
+00046A FE38             806         BR      _76
+00046A FE38             806         BR      _76
+00046C                  807 _69:
+00046C 9148AA           811         MOV.B   R2L,#0AAH
+00046F B910             812         MOV.W   R1,#00H
+000471 99085555         813         MOV.W   R0,#05555H
+000475 C5FDC4           814         CALL    _FlashWrite
+000478 B910             816         MOV.W   R1,#00H
+00047A 99082AAA         817         MOV.W   R0,#02AAAH
+00047E 914855           818         MOV.B   R2L,#055H
+000481 C5FDBE           819         CALL    _FlashWrite
+000484 9148A0           821         MOV.B   R2L,#0A0H
+000487 B910             822         MOV.W   R1,#00H
+000489 99085555         823         MOV.W   R0,#05555H
+00048D C5FDB8           824         CALL    _FlashWrite
+000490 86AC42           826         MOV.B   ES,R5L
+000493 8244             827         MOV.B   R2L,[R4]
+000495 8C170A           828         MOV.W   R1,[R7+10]
+000498 8C0708           829         MOV.W   R0,[R7+8]
+00049B C5FDB1           830         CALL    _FlashWrite
+00049E C50022           832         CALL    _FlashDataToggle
+0004A1 9904FFF1         833         CMP.W   R0,#0FFF1H
+0004A5 F205             834         BNE     _70
+0004A7 C5FDC9           836         CALL    _FlashReadReset
+0004AA 9908FFFA         838         MOV.W   R0,#0FFFAH
+0004AE FE16             839         BR      _76
+0004B0                  841 _70:
+0004B0 8C170A           845         MOV.W   R1,[R7+10]
+0004B3 8C0708           846         MOV.W   R0,[R7+8]
+0004B6 99000001         847         ADD.W   R0,#01H
+0004BA 99110000         848         ADDC.W  R1,#00H
+0004BE 8C1F0A           849         MOV.W   [R7+10],R1
+0004C1 8C0F08           850         MOV.W   [R7+8],R0
+0004C4 99400001         852         ADD.W   R4,#01H
+0004C8                  856 _71:
+0004C8 8C1706           857         MOV.W   R1,[R7+6]
+0004CB 8C0704           858         MOV.W   R0,[R7+4]
+0004CE 4C1F0A           859         CMP.W   [R7+10],R1
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  10
+
+ADDR   CODE            LINE SOURCELINE
+0004D1 F202             860         BNE     _88
+0004D3 4C0F08           861         CMP.W   [R7+8],R0
+0004D3 4C0F08           861         CMP.W   [R7+8],R0
+0004D6                  862 _88:
+0004D6 F9BB             863         BL      _68
+0004D8 9908FFFF         865         MOV.W   R0,#0FFFFH
+0004DC                  867 _76:
+0004DC 9970000C         868         ADD.W   R7,#0CH
+0004E0 2F70             870         POP.W   R4, R5, R6
+0004E2 D680             872         RET
+                        876         ALIGN   1
+0004E4                  878 _FlashDataToggle:
+0004E4 0F10             881         PUSH.W  R4
+0004E6                  888 _89:
+0004E6 B910             890         MOV.W   R1,#00H
+0004E8 B900             891         MOV.W   R0,#00H
+0004EA C5FD8F           892         CALL    _FlashRead
+0004ED 8190             893         MOV.B   R4H,R0L
+0004EF B910             895         MOV.W   R1,#00H
+0004F1 B900             896         MOV.W   R0,#00H
+0004F3 C5FD8A           898         CALL    _FlashRead
+0004F6 919540           901         AND.B   R4H,#040H
+0004F9 8180             903         MOV.B   R4L,R0L
+0004FB 918540           904         AND.B   R4L,#040H
+0004FE 4198             905         CMP.B   R4H,R4L
+000500 F310             906         BEQ     _91
+000502 910520           908         AND.B   R0L,#020H
+000505 F3F0             910         BEQ     _89
+000507 B910             912         MOV.W   R1,#00H
+000509 B900             913         MOV.W   R0,#00H
+00050B C5FD7E           914         CALL    _FlashRead
+00050E 910540           917         AND.B   R0L,#040H
+000511 4180             919         CMP.B   R4L,R0L
+000513 F204             920         BNE     _90
+000515 9908FFFF         922         MOV.W   R0,#0FFFFH
+000519 FE06             923         BR      _93
+000519 FE0600           923         BR      _93
+00051C                  924 _90:
+00051C 9908FFF1         926         MOV.W   R0,#0FFF1H
+000520 FE02             927         BR      _93
+000522                  929 _91:
+000522 9908FFFF         930         MOV.W   R0,#0FFFFH
+000526                  932 _93:
+000526 2F10             933         POP.W   R4
+000528 D680             935         RET
+                        937         ALIGN   1
+000000                  939 C1191_INI_FA    SEGMENT HDATA INSEGMENT INIT
+000000                  940         RSEG    C1191_INI_FA
+                        941         ALIGN   1
+000000 rrrrrrrrrrrrrr   942 _97:    DD      _96,_98,_99,_100,_101,_102,_103,_104,_105,_106,_107,_108
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrr           
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  11
+
+ADDR   CODE            LINE SOURCELINE
+                        943         PUBLIC  _FlashErrorStr
+000030 rrrrrrrrrrrrrr   944         DD      _109,_110,_111
+       rrrrrrrrrrrrrr       
+       rrrrrrrrrrrrrr       
+       rrrrrr               
+00052A                  945         RSEG    C1191_PR
+00052A                  945         RSEG    C1191_PR
+00052A                  946 _FlashErrorStr:
+00052A 980B             955         NEG.W   R0
+00052C A90F             957         ADDS.W  R0,#0FH
+00052E 99040000         960         CMP.W   R0,#00H
+000532 FB03             961         BLT     _113
+000534 9904000F         962         CMP.W   R0,#0FH
+000538 FB05             963         BLT     _114
+000538 FB05             963         BLT     _114
+00053A                  964 _113:
+00053A 9918rrrr         966         MOV.W   R1,#SEG( _112 )
+00053E 9908rrrr         967         MOV.W   R0,#SOF( _112 )
+000542 D680             969         RET
+000542 D680             969         RET
+000544                  970 _114:
+000544 D902             972         ASL.W   R0,#02H
+000546 B910             973         MOVS.W  R1,#00H
+000548 964842rr         974         MOV.B   ES,#SEG( _97 )
+00054C 8D10rrrr         975         MOV.W   R1,[R0+SOF( _97+2 )]
+000550 8D00rrrr         976         MOV.W   R0,[R0+SOF( _97 )]
+000554                  978 _115:
+000554 D680             979         RET
+00003C                  983         RSEG    C1191_INI_FA
+00003C 466C6173682069   984 _106:   DB      046H,06CH,061H,073H,068H,020H,069H,073H,020H,055H,06EH,070H
+       7320556E70           
+000048 726F7465637465   985         DB      072H,06FH,074H,065H,063H,074H,065H,064H,000H
+       6400                 
+000051 466C6173682054   986 _99:    DB      046H,06CH,061H,073H,068H,020H,054H,06FH,06FH,020H,04DH,061H
+       6F6F204D61           
+00005D 6E7920426C6F63   987         DB      06EH,079H,020H,042H,06CH,06FH,063H,06BH,073H,000H
+       6B7300               
+000067 466C6173682042   988 _101:   DB      046H,06CH,061H,073H,068H,020H,042H,06CH,06FH,063H,06BH,020H
+       6C6F636B20           
+000073 73656C65637465   989         DB      073H,065H,06CH,065H,063H,074H,065H,064H,020H,069H,073H,020H
+       6420697320           
+00007F 696E76616C6964   990         DB      069H,06EH,076H,061H,06CH,069H,064H,000H
+       00                   
+000087 466C6173682050   991 _98:    DB      046H,06CH,061H,073H,068H,020H,050H,06FH,06CH,06CH,020H,046H
+       6F6C6C2046           
+000093 61696C75726500   992         DB      061H,069H,06CH,075H,072H,065H,000H
+00009A 466C6173682069   993 _104:   DB      046H,06CH,061H,073H,068H,020H,069H,073H,020H,06FH,066H,020H
+       73206F6620           
+0000A6 57726F6E672054   994         DB      057H,072H,06FH,06EH,067H,020H,054H,079H,070H,065H,000H
+       79706500             
+0000B1 466C6173682054   995 _111:   DB      046H,06CH,061H,073H,068H,020H,054H,06FH,067H,067H,06CH,065H
+       6F67676C65           
+0000BD 20466C6F772043   996         DB      020H,046H,06CH,06FH,077H,020H,043H,068H,061H,072H,074H,020H
+       6861727420           
+0000C9 4661696C757265   997         DB      046H,061H,069H,06CH,075H,072H,065H,000H
+       00                   
+0000D1 466C6173682042   998 _105:   DB      046H,06CH,061H,073H,068H,020H,042H,06CH,06FH,063H,06BH,020H
+       6C6F636B20           
+0000DD 4661696C656420   999         DB      046H,061H,069H,06CH,065H,064H,020H,045H,072H,061H,073H,065H
+       4572617365           
+0000E9 00              1000         DB      000H
+XA assembler v2.0 r2                    SN00085795-037 (c) 1998 TASKING, Inc.
+                                                                                                                            Page  12
+
+ADDR   CODE            LINE SOURCELINE
+0000EA 466C6173682066  1001 _108:   DB      046H,06CH,061H,073H,068H,020H,066H,075H,06EH,063H,074H,069H
+       756E637469           
+0000F6 6F6E206E6F7420  1002         DB      06FH,06EH,020H,06EH,06FH,074H,020H,073H,075H,070H,070H,06FH
+       737570706F           
+000102 7274656400      1003         DB      072H,074H,065H,064H,000H
+000107 466C6173682056  1004 _109:   DB      046H,06CH,061H,073H,068H,020H,056H,070H,070H,020H,049H,06EH
+       707020496E           
+000113 76616C696400    1005         DB      076H,061H,06CH,069H,064H,000H
+000119 556E6B6E6F776E  1006 _112:   DB      055H,06EH,06BH,06EH,06FH,077H,06EH,020H,045H,072H,072H,06FH
+       204572726F           
+000125 720A00          1007         DB      072H,00AH,000H
+000128 4D505520697320  1008 _100:   DB      04DH,050H,055H,020H,069H,073H,020H,074H,06FH,06FH,020H,073H
+       746F6F2073           
+000134 6C6F7720746F20  1009         DB      06CH,06FH,077H,020H,074H,06FH,020H,065H,072H,061H,073H,065H
+       6572617365           
+000140 20616C6C207468  1010         DB      020H,061H,06CH,06CH,020H,074H,068H,065H,020H,062H,06CH,06FH
+       6520626C6F           
+00014C 636B7300        1011         DB      063H,06BH,073H,000H
+000150 466C6173682050  1012 _102:   DB      046H,06CH,061H,073H,068H,020H,050H,072H,06FH,067H,072H,061H
+       726F677261           
+00015C 6D204661696C75  1013         DB      06DH,020H,046H,061H,069H,06CH,075H,072H,065H,000H
+       726500               
+000166 466C6173682069  1014 _107:   DB      046H,06CH,061H,073H,068H,020H,069H,073H,020H,050H,072H,06FH
+       732050726F           
+000172 74656374656400  1015         DB      074H,065H,063H,074H,065H,064H,000H
+000179 466C6173682045  1016 _110:   DB      046H,06CH,061H,073H,068H,020H,045H,072H,061H,073H,065H,020H
+       7261736520           
+000185 4661696C00      1017         DB      046H,061H,069H,06CH,000H
+00018A 466C6173682053  1018 _96:    DB      046H,06CH,061H,073H,068H,020H,053H,075H,063H,063H,065H,073H
+       7563636573           
+000196 7300            1019         DB      073H,000H
+000198 466C6173682041  1020 _103:   DB      046H,06CH,061H,073H,068H,020H,041H,064H,064H,072H,065H,073H
+       6464726573           
+0001A4 73204F66667365  1021         DB      073H,020H,04FH,066H,066H,073H,065H,074H,020H,04FH,075H,074H
+       74204F7574           
+0001B0 204F662052616E  1022         DB      020H,04FH,066H,020H,052H,061H,06EH,067H,065H,000H
+       676500               
+                       1023         EXTRN   DATA(__lc_ub_xvwbuffer)
+                       1024         EXTRN   DATA(__lc_ue_xvwbuffer)
+                       1025         CALLS   'FlashReadReset', 'C1191?FlashWrite'
+                       1026         CALLS   'FlashReadReset', 'C1191?FlashPause'
+                       1027         CALLS   'FlashAutoSelect', 'C1191?FlashWrite'
+                       1028         CALLS   'FlashAutoSelect', 'FlashRead'
+                       1029         CALLS   'FlashAutoSelect', 'C1191?FlashWrite'
+                       1030         CALLS   'FlashBlockErase', 'FlashAutoSelect'
+                       1031         CALLS   'FlashBlockErase', 'C1191?FlashWrite'
+                       1032         CALLS   'FlashBlockErase', 'FlashRead'
+                       1033         CALLS   'FlashBlockErase', 'C1191?FlashDataToggle'
+                       1034         CALLS   'FlashBlockErase', 'FlashReadReset'
+                       1035         CALLS   'FlashChipErase', 'FlashAutoSelect'
+                       1036         CALLS   'FlashChipErase', 'C1191?FlashWrite'
+                       1037         CALLS   'FlashChipErase', 'C1191?FlashDataToggle'
+                       1038         CALLS   'FlashChipErase', 'FlashReadReset'
+                       1039         CALLS   'FlashProgram', 'FlashAutoSelect'
+                       1040         CALLS   'FlashProgram', 'FlashRead'
+                       1041         CALLS   'FlashProgram', 'C1191?FlashWrite'
+                       1042         CALLS   'FlashProgram', 'C1191?FlashDataToggle'
+                       1043         CALLS   'FlashProgram', 'FlashReadReset'
+                       1044         CALLS   'C1191?FlashDataToggle', 'FlashRead'

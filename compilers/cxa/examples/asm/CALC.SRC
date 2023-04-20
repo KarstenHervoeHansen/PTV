@@ -1,0 +1,79 @@
+;*****************************************************************************
+;*
+;*  %'@(#)calc.asm	1.1 11/15/96'
+;*
+;* Illustrative example of XA assembly language programming.
+;*
+;* The algorithm used (described in 'C' notation):
+;*
+;*	 unsigned int factorial( unsigned char num )
+;*	 {
+;*	 	if (num < 2) 
+;*			return 1;
+;*		else
+;*			return num * factorial(num - 1);
+;*	 }
+;*
+;* Assembly implementation:
+;*	 recursive:	yes	(locals must be preserved on stack)
+;*	 arguments:	R0L	(num)
+;*	 local:		R0,R1L,R2
+;*	 result:	R0
+;*
+;*****************************************************************************
+$CASE
+$ZPAGE
+	
+		NAME	calc
+
+CALC_PR		SEGMENT	CODE
+		RSEG	CALC_PR
+
+		PUBLIC	entry
+
+entry:
+		MOV.B	R0L,num
+		CALL	factorial
+		MOV.W	result,R0
+		RET
+
+factorial:
+		SUB.W	R7,#04H
+		MOV.B	[R7+2],R0L
+		CMP.B	[R7+2],#02H
+		BCC	compute
+		MOV.W	R0,#01H
+		BR	endfunc
+compute:
+		MOV.B	R0L,[R7+2]
+		MOV.B	R1L,R0L
+		MOVS.B	R1H,#00H
+		MOV.B	R0L,[R7+2]
+		SUB.B	R0L,#01H
+		MOV.W	[R7],R1
+		CALL	factorial
+		MOV.W	R2,[R7]
+		MULU.W	R2,R0
+		MOV.W	R0,R2
+endfunc:
+		ADD.W	R7,#04H
+		RET
+
+CALC_INI_NE	SEGMENT	DATA INIT
+		RSEG	CALC_INI_NE
+		PUBLIC	num
+		PUBLIC	entry
+num:		DB	007H
+	
+
+CALC_CLR_NE	SEGMENT	DATA CLEAR
+		RSEG	CALC_CLR_NE
+		PUBLIC	result
+		ALIGN	1
+result:		DS	2
+	
+		RSEG	CALC_INI_NE
+		CALLS	'entry', 'factorial'
+		CALLS	'factorial', 'factorial'
+
+		END

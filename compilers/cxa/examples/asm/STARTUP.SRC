@@ -1,0 +1,104 @@
+;*****************************************************************************
+;*
+;*  %'@(#)startup.asm	1.2 12/6/96'
+;*
+;*  XA assembler startup code
+;*
+;*****************************************************************************
+$CASE
+$ZPAGE
+
+		NAME	start
+
+START_PR	SEGMENT CODE
+		RSEG	START_PR
+
+		PUBLIC	__START			; start label
+
+;	------------------- SYSTEM STARTUP CODE ----------------------------
+
+__START:
+		MOV.B	SCR,#B_SCR		; set System Configuration Register
+
+						; disable watchdog timer
+		MOV.B	WDCON,#00H		; set WD control register to clear WDRUN
+		MOV.B	WFEED1,#0A5H		; do watchdog feed part 1
+		MOV.B	WFEED2,#05AH		; do watchdog feed part 2
+
+		MOV.W	R7,#SOF(__lc_es)	; initialize stack pointer
+
+		MOV.W	R0,#020H		; start address bit space
+		MOV.W	R1,#010H		; number of bit words
+_clrb:		MOV.W	[R0+],#00H		; clear bit word
+		DJNZ.W	R1,_clrb		; loop until end of bit segment
+
+		CALL	initseg			; initialized data segments
+		CALL	entry			; execute user program
+		SETB	PD			; Power down
+
+;	------------- CONFIGURATION BITS ---- SCR ------------------------------
+
+_PT1		EQU	0			; Peripheral Clock
+_PT0		EQU	0			; 0 0	oscillator/4
+						; 0 1	oscillator/16
+						; 1 0	oscillator/64
+						; 1 1	reserved
+	
+_CM		EQU	0			; Only "native" mode XA is supported
+_PZ		EQU	1			; Page zero mode
+
+B_SCR		EQU	( 0    SHL 7 ) OR \
+			( 0    SHL 6 ) OR \
+			( 0    SHL 5 ) OR \
+			( 0    SHL 4 ) OR \
+			( _PT1 SHL 3 ) OR \
+			( _PT0 SHL 2 ) OR \
+			( _CM  SHL 1 ) OR \
+			( _PZ  SHL 0 )
+
+;	------------- CONFIGURATION BITS ---- RESET PSW --------------------------
+
+_SM		EQU	1			; 1 = System mode
+						; 0 = User mode
+
+_TM		EQU	0			; 1 = Trace Mode
+						; 0 = XA debugging feature are disabled
+
+_RS		EQU	0			; Register bank number [0..3]
+
+_IM		EQU	15			; Interrupt priority (0-15) 15 indicates highest priority
+
+_C		EQU	0			; Carry flag 
+_AC		EQU	0			; Auxilary carry
+_V		EQU	0			; Overflow flag
+_N		EQU	0			; Negative flag
+_Z		EQU	0			; Zero flag
+
+B_PSWH		EQU	( _SM  SHL 7 ) OR \
+			( _TM  SHL 6 ) OR \
+			( _RS  SHL 4 ) OR \
+			( _IM  SHL 0 )
+
+B_PSWL		EQU	( _C   SHL 7 ) OR \
+			( _AC  SHL 6 ) OR \
+			( 0    SHL 5 ) OR \
+			( 0    SHL 4 ) OR \
+			( 0    SHL 3 ) OR \
+			( _V   SHL 2 ) OR \
+			( _N   SHL 1 ) OR \
+			( _Z   SHL 0 )
+
+B_PSW		EQU	( B_PSWH SHL 8 ) OR ( B_PSWL )
+
+;	----------------------- RESET VECTOR -------------------------------
+
+RESET_VECTOR	SEGMENT	CODE			; Reset vector of the application: locator
+		RSEG	RESET_VECTOR		; description file contains absolute address
+		DW      B_PSW			; set initail PSW
+		DW      __START			; Vector to the startup code 
+
+		EXTRN	CODE( initseg )		; label copy-table init function
+		EXTRN	CODE( entry )		; user program
+		EXTRN	IDATA(__lc_es)		; end of stack label
+
+		END

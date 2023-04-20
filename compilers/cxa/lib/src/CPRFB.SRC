@@ -1,0 +1,53 @@
+; @(#)cprfb.src	1.1 11/4/97
+;*****************************************************************************
+;*
+;* MODULE	: cprfb.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: Copy data block from rom data to far data. The source and
+;*		  destination address pointers and the number of bytes to
+;*		  copy are passed to this copy routine via registers. The
+;*		  registers used are :
+;*
+;*		  R3:R2 = address source
+;*		  R5:R4 = address destination
+;*		  R6    = number of bytes to copy
+;*
+;* INPUT	: R2-R6
+;*
+;* OUTPUT	: none
+;*
+;* USES		: R1,R2-R6
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+		NAME _CPRFB
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+
+		PUBLIC	__CPRFB
+__CPRFB:
+IF	MODEL_MEDIUM
+	SETB	SSEL.2		; source addressed via CS
+	SETB	SSEL.4		; destination addressed via ES
+ENDIF
+	MOV.B	ES,R5L		; destination addressed via ES
+loop:	MOV.B	CS,R3L		; source addressed via CS
+	MOVC.B	R1L,[R2+]	; copy source to destination
+	MOV.B	[R4+],R1L	; 
+	SUB.W	R2,#01H		;
+	ADD.W	R2,#01H		; increment source pointer
+	ADDC.W	R3,#00H		;
+	DJNZ.W	R6,loop		; loop if count not zero
+IF	MODEL_MEDIUM
+	CLR	SSEL.2		; restore source pointer
+	CLR	SSEL.4		; restore destination pointer
+ENDIF
+	RET			; and return
+
+	END
