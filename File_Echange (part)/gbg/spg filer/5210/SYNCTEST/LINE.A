@@ -1,0 +1,876 @@
+$include	(equ.a)
+;	'I N T E R R U P T    R O U T I N E S'
+;********************************************************
+; filename	: line.s				*
+; version	: 					*
+; author	: p.christiansen			*
+; optimized for	: speed					*
+; specialities	:					*
+;********************************************************
+	line segment code
+	rseg line
+
+; 950922 RAM-table abandoned for direct ROM-table (#tablestart).
+; 950714 Job distribution now through table. Kommun outside H-intr.
+; 950710 H-counter (Timer0) replaced by count in HTELHI, HTELLO
+; 950628 ACCU now pushed instead of saved.
+; 941129 M-changes added to lineint and line7
+;  Ver.1.0
+; 940519 port 3.1 now freed for use with source code option
+; 931214 New tables  with bankswitch (in hfasef)
+; 931208 New filter for good/bad fields (in lineint)
+; 931122 HERR and BUERR is changed to (inverted) SYNCAV and BUAV
+; 931118 SPHGOD and PHGOD now loaded from variable ERRPRE (speed/noise)
+; 931115 After HPOS-read, bit 15 is masked out
+; 931105 Burstfase moved to file: lock.a
+; 931026 ADDL,SUPR,SAMP changed into a byte LINADD
+; 931025 New lines for B (task-distribution) 
+; 931021 Timing for 3 lines
+; 930914 B also checked for 52,51,18,17 --!REMOVED 931011
+; 930729 EPH-preparation moved to BUTSTFASE from BURSTLOCK
+;	 SECAM-detection added to BURSTFASE
+; 930723 pal-n detection added to BURSTFASE
+; 930602 Addition in line7 (sphgod)
+
+	public 	hfasef,lineint,line7,mode,sch
+	extrn   data(start1,start2,start3,start4)
+	extrn	code(kommun,tablestart)
+;****************
+; entry		: lineint (routine 1)
+; purpose	: line interrupt routine. (timer 0 addr B)
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: use only: A,dptr
+; execute time	:
+;****************
+lineint:
+;*** TEST ***
+
+	push	psw		;save status
+	push	0		;	
+	push	dph		;<950922a2
+	push	dpl
+	push	acc		;<950628c
+
+
+	jnb	cntenab,ejnul	;count only H-lines if enabled
+	inc	htello
+	mov	a,#0
+	add	a,htello
+	jnz	ejnul
+	inc	htelhi		;count carry
+	add	a,htelhi
+	jnz	ejnul
+	setb	TF0		;counter was zero, set vtimer-interrupt
+ejnul:
+	jnb	ns,adown	;if no sync
+;	setb	nsf		;	
+	mov	verr,#verrpre	;				<930602a
+
+
+adown:
+	djnz	atel,tsacalb	;count lines (a= a-1)
+
+;* 3 lines has gone now **
+	djnz	btel,setamaxb	;count 3 lines (b= b-1)
+
+;* one full frame has gone now **
+	mov	a,levelcnt	;good/bad field-filter
+	jnb	syncav,nosnc
+	jz	cklock
+	dec	levelcnt
+	sjmp	cklock
+nosnc:
+	jnb	acc.7,inc20
+	cpl	level
+	mov	levelcnt,#0
+	sjmp	cklock
+tsacalb:
+	ljmp	tsacal
+setamaxb:
+	sjmp	setamax
+inc20:
+	add	a,#20
+	mov	levelcnt,a
+cklock:
+	jnb	lockbit,seta
+	mov	a,#level2
+	clr	c
+	subb	a,blackav
+	jnc	cklev1
+	setb	level
+	sjmp	seta
+cklev1:
+	mov	a,#level1
+	clr	c
+	subb	a,blackav
+	jc	seta
+	clr	level
+seta:
+	mov	atel,#afield	;re-load 9-line counter
+	mov	btel,#bmax	;re-load 70*9 counter
+
+	djnz	ftel,getdur
+
+;* 8 fields has gone now **
+	mov	ftel,#fmax	;re-load frame counter
+
+getdur:
+;* set subcref (correct later for frame no.) *
+	mov	subcref,subcpot	;set new reference
+	mov	subcref+1,subcpot+1
+	mov	a,ftel
+	jnb	acc.0 ,ts2_4
+	cjne	a,#3,setf1
+;* f=3, correct subcref *
+	mov	a,subcref+1
+	add	a,#040h		;(40)	<931021
+	mov	subcref+1,a
+	mov	r0,#start3
+	sjmp	dpok
+setf1:
+;* f=1, correct subcref *
+	mov	a,subcref+1
+$if (gvers=1)
+	add	a,#0c0h		;G-version
+$else
+	add	a,#080h		;M-version
+$endif
+	mov	subcref+1,a
+	mov	r0,#start1
+	sjmp	dpok
+ts2_4:	cjne	a,#4,setf2
+;* f=4, no correction of subcref *
+	mov	r0,#start4
+	sjmp	dpok
+setf2:
+;* f=2, correct subcref *
+	mov	a,subcref+1
+$if (gvers=1)
+	add	a,#080h
+$endif
+	mov	subcref+1,a
+	mov	r0,#start2
+dpok:
+;* get new duration and line type from table **
+	mov	dptr,#tablestart	;use ROM instead of RAM <950922
+	mov	a,r0
+	movc	a,@a+dptr
+
+;	mov	p2,#ramtable
+;	movx	a,@r0		;get line type
+
+	mov	lintyp,a	;save
+	inc	r0		;point to duration
+
+;	movx	a,@r0		;get duration
+
+	mov	a,r0
+	movc	a,@a+dptr
+
+	mov	cvartel,a	;save
+	mov	dpoint,r0	;save pointer
+
+	mov	p2,#typeport	;send line type
+	mov	a,lintyp
+	movx	@r0,a		;the value of r0 is irrelevant here
+	ljmp	outlin
+
+setamax:
+	mov	atel,#amax	;re-load 9-line counter
+
+	djnz	cvartel,notframe	;count duration (c= c-1)
+;* Get new type and duration *
+	mov	r0,dpoint
+	inc	r0
+	mov	dptr,#tablestart	;use ROM instead of RAM <950922
+	mov	a,r0
+	movc	a,@a+dptr
+
+;	mov	p2,#ramtable
+;	movx	a,@r0		;get line type
+
+	mov	lintyp,a	;save
+	inc	r0		;point to duration
+;	movx	a,@r0
+	mov	a,r0
+	movc	a,@a+dptr
+	mov	cvartel,a	
+	mov	dpoint,r0
+notframe:
+;* write line type **
+	mov	a,lintyp
+	mov	p2,#typeport	;send line type
+	movx	@r0,a
+	ljmp	outlin
+
+tsacal:
+
+	djnz	cvartel,tsacal2	;count duration (c= c-1)
+;* Get new type and duration *
+	mov	r0,dpoint
+	inc	r0
+	mov	dptr,#tablestart	;use ROM instead of RAM <950922
+	mov	a,r0
+	movc	a,@a+dptr
+
+;	mov	p2,#ramtable
+;	movx	a,@r0		;get line type
+	mov	lintyp,a	;save
+	inc	r0		;point to duration
+;	movx	a,@r0
+
+	mov	a,r0
+	movc	a,@a+dptr
+	mov	cvartel,a	
+	mov	dpoint,r0
+
+tsacal2:
+	mov	a,atel
+	cjne	a,#acal,tssamp
+
+;* line 6 of 9 is found *
+	mov	p2,#typeport	;send line type
+	mov	a,lintyp	;write lintyp to port
+
+	orl	a,linadd	;correction while locking	<931026a2
+	mov	linadd,#0	;reset correction value
+	movx	@r0,a		;write to typeport (r0 irrelevant)
+
+;* now add 25Hz offset to subc **
+	mov	a,subcref
+	add	a,#low(subcinc)
+	mov	subcref,a
+	mov	a,subcref+1
+	addc	a,#high(subcinc)
+	mov	subcref+1,a
+;* get ext. hpos **
+	mov	p2,#ehportl
+	movx	a,@r0
+	mov	hpos,a
+	mov	p2,#ehporth
+	movx	a,@r0
+
+	mov	c,acc.7		;mask bit 15	<931115a3
+	mov	lockdet,c
+	anl	a,#07h
+
+	mov	hpos+1,a
+
+;* find special lines **
+	mov	a,btel
+
+	mov	dptr,#btable
+	movc	a,@a+dptr
+	orl	doflags,a
+outlin:
+	pop	acc		;<950628c	
+	pop	dpl		;<950922a2
+	pop	dph
+	pop	0
+	pop	psw
+	reti
+;** END of 1: lineint *****
+
+
+; GAMMELT:
+	cjne	a,#bl1,tsbl2
+	setb	doline7		;call line7 routine
+	setb	doknap		;read buttons
+	setb	butena		; enable buttons
+	setb	domode		;call mode routine
+	sjmp	outlin
+tsbl2:
+	cjne	a,#bl2,tsbl3
+	setb	dosch		;call	sch routine
+	sjmp	outlin
+tsbl3:
+	cjne	a,#bl3,tsbl4
+	sjmp	talk
+tsbl4:
+	cjne	a,#bl4,tsbl5
+talk:
+	lcall	kommun		;uses R0, ACC     <TEST!!!
+	sjmp	outlin
+tsbl5:
+	cjne	a,#bl5,tsbl6
+	setb	dosch		;call	sch routine
+	sjmp	outlin
+tsbl6:
+	cjne	a,#bl6,tsbl7
+	setb	dosch		;call	sch routine
+	sjmp	outlin
+tsbl7:
+	cjne	a,#bl7,setlock
+	setb	dosch		;call	sch routine
+	sjmp	outlin
+
+setlock:
+	setb	dolock		;call lock routine
+	sjmp	outlin
+; GAMMELT SLUT
+
+
+
+tssamp:
+	cjne	a,#asamp,newtab	;test if a = asamp
+
+;* atel = 8 found *
+	mov	p2,#typeport	;send line type
+	mov	a,lintyp	;write lintyp to port
+	orl	a,#samp		;			<931026a
+	movx	@r0,a	
+
+	pop	acc		;<950628c
+	pop	dpl		;<950922a2
+	pop	dph
+	pop	0		;				<1/10a
+	pop	psw
+	reti
+;** END of 1: lineint *****
+
+newtab:
+	mov	p2,#typeport	;send line type
+	mov	a,lintyp	;write lintyp to port
+	movx	@r0,a	
+	sjmp	outlin
+;****************
+; entry		: line7	(routine 1.2)
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: palpuls,burstfase
+; execute time	: (57+48+144=249)187us
+;****************
+		linie7 segment code
+	rseg linie7
+line7:
+	jb	genlocken,hop1
+	ljmp	outlin7
+hop1:
+	jb	syncav,hop2
+	ljmp	outlin7
+hop2:	mov	a,verr
+	jz	hop3
+
+	ljmp	outlin7
+hop3:
+	jb	buav,hop4
+	ljmp	outlin7
+hop4:
+$if (gvers=1)
+	sjmp	getbufa
+$endif
+	mov	a,ftel
+	cjne	a,#1,outlin7
+	sjmp	tsg1
+
+; det neste udgaar evt. !!!!!!
+;	jnb	pplocken,getbufa
+;	lcall	palpuls		;subr.1.2.1 time(47)35
+;	mov	a,papulock
+;	jnz	tspapu
+;	jnb	epapu,getbufa
+;	mov	ftel,#4
+;	mov	papulock,#3
+;	sjmp	outlin7
+;tspapu:
+;	jnb	epapu,decpapu
+;	mov	papulock,#3
+;	sjmp	getbufa
+;decpapu:
+;	dec	papulock
+;	sjmp	outlin7
+
+
+getbufa:
+	mov	a,ftel
+	cjne	a,#4,outlin7
+;* make I = (oldph/1024) * 4
+	mov	a,oldph+1
+	anl	a,#0fch
+	cjne	a,#pha40,ts45	;test I = #Pha40
+tsg1:
+	mov	phgod,errpre	;			<930601a
+	mov	a,schph		;test if schph < sch61
+	clr	c
+	subb	a,#sch61
+	jnc	tsg2
+
+	mov	sphgod,errpre	;			<930601a
+
+	sjmp	outlin7
+tsg2:
+	mov	a,#sch62	;test if schph > sch62
+	clr	c
+	subb	a,schph
+	jnc	testgod
+	mov	sphgod,errpre
+	sjmp	outlin7
+testgod:
+	mov	a,sphgod
+	jz	setftel2
+	dec	sphgod
+	sjmp	outlin7
+
+setftel2:
+	mov	sphgod,errpre
+	mov	ftel,#2
+	mov	linadd,#add2	;(5)			<931026a
+	sjmp	outlin7
+ts45:
+	cjne	a,#pha45,tsm40	;test I = #Pha45
+	sjmp	tsg1
+tsm40:
+	mov	sphgod,errpre	;			<930601a
+	cjne	a,#pham40,tsm45	;test I = #Pham40
+	sjmp	tstphgod
+setf3:
+	mov	phgod,errpre	;			<930601a
+	mov	ftel,#3
+	mov	linadd,#add1	;(7)			<931026a
+	sjmp	outlin7
+tsm45:
+	cjne	a,#pham45,setbad ;test I = #Pham45
+tstphgod:
+	mov	a,phgod
+	jz	setf3
+	dec	phgod
+	sjmp	outlin7
+setbad:	mov	phgod,errpre
+outlin7:
+	clr	doline7
+	ret
+
+;** END of 1.2: line7 *****
+;****************
+; entry		: palpuls -1.2.1
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	: 0
+; uses/calls	: none
+; execute time	: (48)36us
+;****************
+		palpul segment code
+	rseg palpul
+palpuls:
+	mov	a,hpos		;make I = hpos + #papupos
+	add	a,#low(papupos)
+	mov	i,a
+	mov	a,hpos+1
+	addc	a,#high(papupos)
+	mov	i+1,a
+;* test if i >= #hlen *
+	mov	a,i		
+	clr	c
+	subb	a,#low(hlen)
+	mov	a,i+1
+	subb	a,#high(hlen)
+	jnc	toobig
+	mov	dph,i+1		;save I in datapointer
+	mov	dpl,i
+	sjmp	getpap
+toobig:
+;* I to big, subtract #hlen *
+	mov	a,i
+	clr	c
+	subb	a,#low(hlen)
+	mov	dpl,a		;save in datapointer
+	mov	a,i+1
+	subb	a,#high(hlen)
+	mov	dph,a
+getpap:
+	orl	dph,#dualport	;set prefix for address
+	movx	a,@dptr		;get byte in dual port ram
+	clr	c
+	subb	a,black		;subtract black value		<1/10c3
+	jnc	subdon		; if negative, set to zero
+	clr	a
+subdon:
+	mov	papua,a		;compare to #papug
+	mov	a,#papug
+	clr	c
+	subb	a,papua
+	jnc	clrpapu
+	setb	epapu
+	sjmp	outpapu
+clrpapu:
+	clr	epapu
+outpapu:
+	ret
+;** END of 1.2.1: palpuls *****
+;****************
+; entry		: mode  (routine 1.4)
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: 
+; execute time	: (51)38us
+;****************
+		moderut segment code
+	rseg moderut
+mode:
+;* subcpot = (genphase modulus 1024)*64 
+	mov	a,genphase+1
+	anl	a,#3
+	swap	a		;first 1 nipple left (mult by 16)
+	mov	r7,a		;save med. result
+	mov	a,genphase
+	swap	a
+	anl	a,#00fh
+	orl	a,r7
+	mov	r7,a		;now r7 holds high byte
+	mov	a,genphase
+	swap	a
+	anl	a,#0f0h		; and acc. holds low byte
+	clr	c		;* multiply by 4
+	rlc	a		; rotate 1. time
+	xch	a,r7		; now high in acc
+	rlc	a
+	xch	a,r7		; now low in acc
+	rlc	a		; rotate 2. time
+	mov	subcpot,a	; save low
+	xch	a,r7		; now high in acc
+	rlc	a
+	mov	subcpot+1,a	; save high
+;* href = hphzero + genphase *
+	mov	a,hphzero
+	add	a,genphase
+	mov	href,a
+	mov	a,hphzero+1
+	addc	a,genphase+1
+	mov	href+1,a
+	mov	a,hphzero+2
+	addc	a,#0
+	mov	href+2,a
+;* test if href >= #hlen*256 *
+	mov	a,href+1
+	clr	c
+	subb	a,#low(hlen)
+	mov	a,href+2
+	subb	a,#high(hlen)
+	jc	outmode
+;* href = href - 256*#hlen *
+	mov	a,href+1	;			<1/10cx
+	clr	c
+	subb	a,#low(hlen)
+	mov	href+1,a
+	mov	a,href+2
+	subb	a,#high(hlen)
+	mov	href+2,a
+outmode:
+	clr	domode
+	ret
+;** END of 1.4: mode *****
+;****************
+; entry		: sch	(routine 1.5)
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+; execute time	: (50+79+n*29+18+9= 156+n*29)117+n*22us
+;****************
+		schfase segment code
+	rseg schfase
+sch:
+	jnb	genlocken,outsch
+	jnb	syncav,outsch
+	mov	a,verr
+	jnz	outsch
+	jnb	buav,outsch
+
+	lcall	hfasef		; 1.5.1 (79+n*25)
+;* phdiff = href - hinput *
+	mov	a,href
+	clr	c
+	subb	a,hinput
+	mov	phdiff,a
+	mov	a,href+1
+	subb	a,hinput+1
+	mov	phdiff+1,a
+	mov	a,href+2
+	subb	a,hinput+2
+	mov	phdiff+2,a
+
+; schph=(phdiff mod 1024)/4
+	mov	r6,phdiff
+	mov	a,phdiff+1
+	rrc	a		;divide by 2
+	xch	a,r6		;now high in r6
+	rrc	a		;rotate into low
+	xch	a,r6		;now low in r6
+	rrc	a		;divede by 2 more
+	mov	a,r6		;rotate into low
+	rrc	a
+	mov	schph,a		;save low (schph is only 1 byte)
+;* test phdiff bit23 *
+	mov	a,phdiff+2
+	jnb	acc.7 ,posit
+;* phdiff = hinput - href *
+	mov	a,hinput
+	clr	c
+	subb	a,href
+	mov	phdiff,a
+	mov	a,hinput+1
+	subb	a,href+1
+	mov	phdiff+1,a
+	mov	a,hinput+2
+	subb	a,href+2
+	mov	phdiff+2,a
+;* test phdiff bit 18,17 *
+	anl	a,#6
+	jnz	newphd
+	lcall	tsphdif		; 1.5.3		(29)
+	jnc	outschx
+
+	mov	a,#1		;			<930603a4
+	cjne	a,godgren,setgren
+	mov	a,schgod
+	jnz	decgod
+	mov	linadd,#add4	;(1)
+
+	sjmp	outschx
+
+setgren:			;				<930603a6
+	mov	godgren,a
+	sjmp	outschx
+decgod:
+	dec	schgod
+	sjmp	outsch
+
+outschx:			;			<930603a3
+	mov	schgod,errpre
+outsch:
+	clr	dosch		;			<1/10m2
+	ret
+
+newphd:
+;* phdiff= #hlen*256-phdiff *
+	clr	a
+	clr	c
+	subb	a,phdiff
+	mov	phdiff,a
+	mov	a,#low(hlen)
+	subb	a,phdiff+1
+	mov	phdiff+1,a
+	mov	a,#high(hlen)
+	subb	a,phdiff+2
+	mov	phdiff+2,a
+	lcall	tsphdif		; 1.5.3
+	jnc	outschx
+
+	mov	a,#2		;			<930603a4
+	cjne	a,godgren,setgren
+	mov	a,schgod
+	jnz	decgod
+	mov	linadd,#supr4	;(2)
+	sjmp	outschx
+
+posit:
+;* test phdiff bit 18,17 (phdiff in acc) *
+	anl	a,#6
+	jnz	tsphad
+	lcall	tsphdif		; 1.5.3
+	jnc	outschx
+
+	mov	a,#3		;			<930603a4
+	cjne	a,godgren,setgren
+	mov	a,schgod
+	jnz	decgod
+	mov	linadd,#supr4	;(2)
+	sjmp	outschx
+tsphad:
+;* phdiff= #hlen*256-phdiff *				<1/10ax
+	clr	a
+	clr	c
+	subb	a,phdiff
+	mov	phdiff,a
+	mov	a,#low(hlen)
+	subb	a,phdiff+1
+	mov	phdiff+1,a
+	mov	a,#high(hlen)
+	subb	a,phdiff+2
+	mov	phdiff+2,a
+	lcall	tsphdif		; 1.5.3
+	jnc	outschx
+
+	mov	a,#4		;			<930603a4
+	cjne	a,godgren,setgren
+	mov	a,schgod
+	jnz	decgod
+	mov	linadd,#add4	;(1)
+	
+	sjmp	outschx
+;** END of 1.5: sch *****
+
+;****************
+; entry		: hfasef	(routine 1.5.1 , 1.6.3.1)
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: none
+; execute time	: (79+n*25)59+n*19us
+;****************
+		hfasefine segment code
+	rseg hfasefine
+hfasef:
+	mov	a,hpos		; I = hpos - #hstart
+	clr	c
+	subb	a,#hstart
+	mov	i,a
+	mov	a,hpos+1
+	subb	a,#0
+	mov	i+1,a
+	jnb	acc.7 ,settrig
+	mov	a,i		; I = I + #hlen
+	add	a,#low(hlen)
+	mov	i,a
+	mov	a,i+1
+	addc	a,#high(hlen)
+	mov	i+1,a
+settrig:
+	mov	a,black		; trig = black/2
+	clr	c
+	rrc	a
+	mov	trig,a
+gets1:				; s1 = dual.port.ram(I)
+	mov	dph,i+1
+	mov	dpl,i
+	orl	dph,#dualport	;add prefix for dual port ram
+	movx	a,@dptr
+	mov	r5,a		;save s1 in r5
+	mov	a,trig
+	clr	c
+	subb	a,r5
+	jc	s1big
+	dec	i		; I = I - 1
+	mov	a,i
+	cjne	a,#255,tsi15
+	dec	i+1
+tsi15:
+	mov	a,i+1
+	jnb	acc.7 ,gets1	;if positive then get next
+	mov	a,i		; I = I + #hlen
+	add	a,#low(hlen)
+	mov	i,a
+	mov	a,i+1
+	addc	a,#high(hlen)
+	mov	i+1,a
+	sjmp	gets1
+s1big:
+	mov	a,i		; J = I + 1
+	add	a,#1
+	mov	j,a
+	mov	a,i+1
+	addc	a,#0
+	mov	j+1,a
+	cjne	a,#high(hlen),gets2	;test if J = #hlen
+	mov	a,j
+	cjne	a,#low(hlen),gets2
+	clr	a		; yes, set J = 0
+	mov	j,a
+	mov	j+1,a
+gets2:
+	mov	dpl,j		;get s2 = dual.port.ram(J)
+	mov	dph,j+1
+	orl	dph,#dualport	;add prefix for dual port ram
+	movx	a,@dptr
+	mov	r6,a		;save s2 in r6
+	mov	a,r5		; x = s1 - s2
+	clr	c
+	subb	a,r6
+	xch	a,r5		;put x in r5, get s1 to acc
+	clr	c		; y = s1 - trig
+	subb	a,trig
+	mov	r6,a		;save y in r6
+;* get s3 = tabela(y,x) - special address *
+	mov	dph,#tableam	;set port prefix for tableam	<931214cx
+	clr	ea		;disable intrpt
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r6		;get table value
+	mov	dpl,r5
+	movx	a,@dptr
+	mov	dph,#3		;set port prefix to normal bank
+	movx	@dptr,a		;do dummy write to change bank
+	setb	ea		;enable intrpt
+	mov	hinput,a	; hinput = I*256 + s3
+	mov	hinput+1,i
+	mov	hinput+2,i+1
+	ret
+;** END of 1.5.1: hfasef *****
+
+;* subroutine: tsphdif 1.5.3  (9) *
+;* test if phdiff> #phmar *
+tsphdif:
+	mov	a,#low(phmar)
+	clr	c
+	subb	a,phdiff
+	mov	a,#high(phmar)
+	subb	a,phdiff+1
+	clr	a
+	subb	a,phdiff+2
+	ret			;return cy if phdiff > #phmar
+;** END of 1.5.2: tsphdif *****
+
+
+;** LINE JOBS DISTRIBUTION TABLE
+$if (gvers=1)
+btable:
+	db	1,20,1,1,1,1,1,1,1,1	;0-9
+	db	1,1,1,1,1,1,1,1,1,1	;10-19
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1	;50-59
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,8,2,2,2,1,1,1,1	;100-109
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1	;150-159
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,8,2,1	;200-209
+$else
+btable:
+	db	1,20,1,1,1,1,1,1,1,1	;0-9
+	db	1,1,1,1,1,1,1,1,1,1	;10-19
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1	;50-59
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,8,2,2,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1	;100-109
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1	;150-159
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,8,2,2,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1
+	db	1,1,1,1,1,1,1,1,1,1	;200-209
+$endif	
+	end

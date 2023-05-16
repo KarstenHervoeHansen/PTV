@@ -1,0 +1,121 @@
+
+;********************************************************************
+;* Project	: PT5210  Time Code Converter
+;* Filename	: HINT.A
+;* Version	: 1.1
+;* Purpose	: H-Interrupt handling
+;* Org.date	: 960903
+;* Author	: PRC
+;********************************************************************
+;HISTORY:
+;970xxx RELEASED 1.1
+;970127 Added table for M-system.
+
+HCOUNT	SEGMENT CODE
+;	PT5210 Timecode Unit
+; File:		wint.c		word-interrupt
+; Version:	0.0
+; Author:	PRC
+; HISTORY:
+
+; 961211 KILL inverted
+; 960717 translated from PM5655, hint.a
+
+EXTRN DATA	(slice, wordno, readbuf)
+EXTRN CODE	(linecountg, linecountm)
+;EXTRN XDATA	(port1tab, port2tab)
+extrn bit	(load1, load2, found, done)
+
+locked	equ	P1.3
+enable	equ	P1.4
+kill	equ	P1.5
+clear	equ	P1.7
+crc	equ	P3.0
+window	equ	P3.1
+tenbit	equ	P3.2
+gsys	equ	P3.5
+readport equ	P1
+
+
+CSEG AT 000BH
+ljmp	hint
+
+
+RSEG	HCOUNT
+
+hint:
+	clr	window		;reset counters
+;	nop			;delay untill after burst
+;	nop
+;	nop
+	setb	window		;start search
+
+	jb	crc,badcrc	;test CRC
+	clr	window		;CRC was good, stop counters
+	setb	found		;good CRC
+	clr	done		;set flag for new data
+	sjmp	nxtlin
+badcrc:
+;	clr	window		;reset counters
+;	setb	window		;start search
+	jnb	found,clrreg
+	clr	window		;was already found, stop counters
+	sjmp	nxtlin
+clrreg:
+	setb	clear		;reset FIFO-reg.
+	clr	clear
+
+nxtlin:
+	PUSH    ACC
+	PUSH    PSW
+        PUSH    DPH
+        PUSH    DPL
+
+	MOV     PSW,#08H
+
+	inc	slice
+
+	; TL0= linecount[slice<<1];
+	mov	a,slice
+	rl	a
+	mov	r0,a
+	jnb	gsys, msys
+	mov	dptr,#linecountg
+	sjmp	setit
+msys:
+	mov	dptr,#linecountm
+setit:
+	movc	a,@a+dptr
+	mov	TL0,a
+   	; TH0= linecount[(slice<<1) + 1];
+	inc	r0
+	mov	a,r0
+	movc	a,@a+dptr
+	mov	TH0,a
+tstslice:
+	; if (slice==18)  window= 0;
+	mov	a,slice
+	cjne	a,#18,tst36
+	clr	window
+	setb	load2
+	sjmp	outtim0
+tst36:
+	; if (slice>35) { window= 0; TR0= 0;}
+	cjne	a,#35,outtim0
+	clr	window
+	setb	load1
+	mov	c,found		;cut off if bad input
+	anl	c,locked	; or if not in lock
+	anl	c,enable	; or if not enabled
+;	cpl	c
+	mov	kill,c
+stop:
+	clr	TR0
+outtim0:
+        POP     DPL
+        POP     DPH
+	POP     PSW
+	POP     ACC
+	RETI    
+
+end

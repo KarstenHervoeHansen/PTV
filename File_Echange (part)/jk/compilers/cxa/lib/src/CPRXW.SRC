@@ -1,0 +1,52 @@
+; @(#)cprxw.src	1.3 7/22/97
+;*****************************************************************************
+;*
+;* MODULE	: cprxw.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: Copy data block from rom data to xdat data. The source and
+;*		  destination address pointers and the number of words to
+;*		  copy are passed to this copy routine via registers. The
+;*		  registers used are :
+;*
+;*		  R3:R2 = address source
+;*		  R4    = address destination
+;*		  R6    = number of words to copy
+;*
+;* INPUT	: R2-R3,R4-R6
+;*
+;* OUTPUT	: none
+;*
+;* USES		: R1-R3,R4-R6
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+		NAME _CPRXW
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+
+		PUBLIC	__CPRXW
+
+__CPRXW:
+IF	MODEL_MEDIUM
+	SETB	SSEL.2		; source addressed via CS
+ENDIF
+loop:	MOV.B	CS,R3L		; source addressed via CS
+	MOVC.W	R1,[R2+]	; copy source to destination
+	MOVX.W	[R4],R1		; 
+	ADDS.W	R4,#02H		; increment destination pointer
+	SUB.W	R2,#02H		;
+	ADD.W	R2,#02H		; increment source pointer
+	ADDC.W	R3,#00H		;
+	DJNZ.W	R6,loop		; loop if count not zero
+IF	MODEL_MEDIUM
+	CLR	SSEL.2		; restore source pointer
+ENDIF
+	RET			; and return
+
+	END

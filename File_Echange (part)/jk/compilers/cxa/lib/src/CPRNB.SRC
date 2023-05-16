@@ -1,0 +1,55 @@
+; @(#)cprnb.src	1.1.1.1 6/11/98
+;*****************************************************************************
+;*
+;* MODULE	: cprnb.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: Copy data block from rom data to near data. The source and
+;*		  destination address pointers and the number of bytes to
+;*		  copy are passed to this copy routine via registers. The
+;*		  registers used are :
+;*
+;*		  R3:R2 = address source
+;*		  R4    = address destination
+;*		  R6    = number of bytes to copy
+;*
+;* INPUT	: R2-R3,R4-R6
+;*
+;* OUTPUT	: none
+;*
+;* USES		: R1-R3,R4-R6
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+		NAME _CPRNB
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+
+		PUBLIC	__CPRNB
+
+__CPRNB:
+IF	MODEL_LARGE
+	CLR	SSEL.4		; source addressed via DS
+ELSE
+	SETB	SSEL.2		; source addressed via CS
+ENDIF
+loop:	MOV.B	CS,R3L		; source addressed via CS
+	MOVC.B	R1L,[R2+]	; copy source to destination
+	MOV.B	[R4+],R1L	; 
+	SUB.W	R2,#01H		;
+	ADD.W	R2,#01H		; increment source pointer
+	ADDC.W	R3,#00H		;
+	DJNZ.W	R6,loop		; loop if count not zero
+IF	MODEL_LARGE
+	SETB	SSEL.4		; restore source pointer
+ELSE
+	CLR	SSEL.2		; restore source pointer
+ENDIF
+	RET			; and return
+
+	END

@@ -1,0 +1,56 @@
+	Multiprocessor konfiguration i PT5210.	rev.03	961014 prc
+
+Master Processoren benytter en V24-bus til at korrespondere med
+3-5 andre (slave-)processorer. Processorerne er alle af XA- og
+80C31-typen. V24 s‘ttes op i hver processor i registeret: SCON.
+
+Der konfigureres til 9 bit.
+Hastighedsmuligheder med XTAL p† XA= 29.4912M og 80C31= 14.7456M:
+1. XA mode 3, timer= -1; 80C31 mode 2:			460,8 KBAUD
+2. XA mode 3, timer= -6; 80C31 mode 3, timer 1= -1:	 76,8 KBAUD
+
+Disse er de to h›jest opn†elige hastigheder. 76,8 KBAUD v‘lges for
+at have tid nok til at hver byte kan aktivere et interrupt med en
+modtagerutine som kan n† at gemme hver modtagne byte.
+
+Virkem†den er som f›lger:
+Alle slaver initierer deres 9' bit (SM2) til h›j, hvorefter slaven
+kun vil blive interruptet hvis den modtagne 9' bit er h›j (adresse-
+mode).
+
+Master sender f›rst en adresse med bit 9 sat h›j. Alle slaver mod-
+tager adressen og den slave som matcher adressen s‘tter sin bit 9
+lav. Herefter vil kun denne blive interruptet af de efterf›lgende
+data fra Master.
+
+Master sender et antal data-bytes med 9' bit lav og afslutter med en
+slut-kode (f.eks.'0A'). Kun den adresserede slave modtager data og
+n†r den m›der '0A' s‘tter den sin bit 9 h›j og er klar til en ny
+adressering.
+
+
+SIKRING AF KOMMUNIKATION:
+Hvis sendingen af en eller anden grund kikser er det n›dvendigt at
+gensende fra Master. Derfor sender Master til slut en checksum af de
+sendte bytes (incl. adresse og separator) med bit 7 sat til 0.
+Modtageren kontrollerer checksummen og sender en kvittering tilbage
+til Master.
+(Dette princip blev indf›rt i PM5689 og er nedf‘ldet i PTV's "norm":
+ "RS232 Serial Communication protocol).
+
+I PT5210 m† visse units kun forstyrres i meget korte tidsrum. (f.eks.
+Sync Genlock og Black Burst).
+
+Virkem†den i PT5210 er f›lgende:
+Hver byte som slaven modtager udl›ser en receive-interrupt rutine
+hvor 1) byten adderes til de foreg†ende (checksum), og 2) byten
+gemmes i en 'string' som til slut udg›r hele sendingen (kommandoen).
+N†r slut-koden modtages, sender slaven sin kvitterings-kode (OK
+eller checksum-fejl) til Master  og initierer en SW-interrupt af
+lavere prioritet.
+N†r denne interrupt f†r lov, flytter slaven den modtagne
+kommando til en cyklisk buffer (som er brugt i PM5685 og i PM5655).
+Slavens baggrundsprogram vil efterh†nden afl‘se og udf›re kommandoen.
+Hvis checksummen ikke stemmer g†r slavens modtagerdel til initial-
+tilstand. Hvis Master enten modtager ckecksum-fejl eller ingenting
+(time-out) vil den gensende kommandoen op til X gange.

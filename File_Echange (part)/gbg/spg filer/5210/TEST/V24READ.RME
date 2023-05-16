@@ -1,0 +1,31 @@
+961101 er indf›rt ny kommando: SndRequest() til at hente v‘rdier
+til Master.
+Slaven skal vente ca. 1 ms efter at den har sendt 0x80
+(for checksum OK) f›r den sender v‘rdien. Den afslutter med en
+checksum.
+Svaret hentes med  (bit) AnswerCheck(void).
+og ligger s† i  UC AnswerBuf[] som indeholder alle data incl. cksum.
+
+eksempel:
+
+MASTER:
+
+void get_syncstat(void)		// receive sync status
+{ 
+   if (SndRequest(sync_addr,'G','S')==0)	// send ordre
+      if (AnswerCheck()==0)			// modtag data
+         syncstatus= AnswerBuf[0];		// brug data
+}
+
+
+SLAVE:
+
+void systatus(void)		// send status til Master
+{  int i;
+   for (i=0;i<500;i++) ;	// appr. 800 us
+   put_char1(outs);		// status
+   for (i=0;i<100;i++) ;	// n›dvendigt delay kendes ikke!
+   put_char1(0x0a);		// separator
+   for (i=0;i<100;i++) ;	// n›dvendigt delay kendes ikke!
+   put_char1((outs+0x0a)&0x7f);	// checksum
+}

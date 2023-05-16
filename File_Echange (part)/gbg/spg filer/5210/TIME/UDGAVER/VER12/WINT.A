@@ -1,0 +1,54 @@
+;********************************************************************
+;* Project	: PT5210  Time Code Converter
+;* Filename	: WINT.C
+;* Version	: 1.1
+;* Purpose	: CRC-check interrupt
+;* Org.date	: 960903
+;* Author	: PRC
+;********************************************************************
+;HISTORY:
+;970xxx RELEASED 1.1
+;960717 translated from PM5655, hint.a
+
+WORDINT	SEGMENT CODE
+
+
+EXTRN DATA	(slice, wordno, readbuf)
+;EXTRN XDATA	(port1tab, port2tab)
+extrn bit	(found)
+
+clear	equ	P1.7
+crc	equ	P3.0
+window	equ	P3.1
+tenbit	equ	P3.2
+gsys	equ	P3.5
+readport equ	P1
+
+CSEG AT 0003H
+ljmp	int90
+
+
+RSEG	WORDINT
+
+int90:
+	reti
+	clr	window		;stop detecting
+	jnb	crc,goodcrc	;check CRC
+
+;	PUSH    ACC
+;	PUSH	0
+;	PUSH    PSW
+	
+	clr	found		;bad CRC
+	setb	clear		;reset FIFO-reg.
+	clr	clear
+	sjmp	out10
+goodcrc:
+	setb	found		;good CRC
+out10:
+
+;	POP     PSW
+;	POP	0
+;	POP     ACC
+	RETI    
+end

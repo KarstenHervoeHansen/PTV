@@ -1,0 +1,1 @@
+c:\c51\c51 %1.c debug small code oe

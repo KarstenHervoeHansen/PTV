@@ -1,0 +1,57 @@
+ÚÄÄÄÄÄÂÄÄÄÄÄÂÄÄÄÄÄÂÄÄÄÄÄÂÄÄÂÄÄÄÄÄ¿
+³ ÚÄ¿ ÃÄ¿ ÚÄ´  ÄÄÄÅÄÄÄ¿ Ã¿ ³ ÚÄ¿ ³
+³ ÀÄÙ ³ ³ ³ ÀÄÄÄ¿ ÃÄÄÄÙ ³³ ³ ³ ³ ³
+³ ÚÄÄÄÙ ³ ³ ÚÄÄÄÙ ³  ÄÄÄ´³ ³ ÀÄÙ ³
+ÀÄÙ     ÀÄÙ ÀÄÄÄÄÄÁÄÄÄÄÄÙÀÄÁÄÄÄÄÄÙ
+MASTER S/W					Rev.03 970203 PRC
+Konvertering af Bin‘rt delay-tal til Field, Line, Tid.
+
+Der betragtes G-version.
+Delay udtrykkes ved Ts som er 0 ved ingen delay. Enheden for Ts er
+step a ca. 0,14 ns. Af Ts udregnes T = Ts x 0,14.. x 10 [nstenth].
+(hvor nstenth er 1/10 ns).
+
+       delay <= 4 fields        delay > 4 fields
+                                (angives negativt)
+
+       0 < T <= Tmax/2          Tmax/2 < T <= Tmax
+
+Field, Line, ns udregnes ved heltalsdivision. Field vil herved
+aldrig blive st›rre end 312, men da der ›nskes skiftevis 313 og
+312 linier i visningen udregnes i stedet Frame, Line, ns.
+Herved vil Line ligge fra 0 til 624 og dette kan bruges til at
+korrigere efter udregningen:
+
+if (T >= 2 * 400000000 * 640000)
+{  T -= 1;			// Negativt delay fundet; korriger
+   // (denne korrektion g›r konverteringen simplere)
+
+   Frame = T / 400000000;		// find frames (0-3)
+   Line = (T % 400000000) / 640000;	// find lines (0-624)
+   Tid = T % (400000000 * 640000);	// resten er 1/10 ns
+   Field = 2 x Frame;
+
+   if (Line > 312) {
+      Field += 1;
+      Line = 624 - Line;
+   }
+   else  Line = 312 - Line;
+
+   Tid = 639999 - Tid;
+   Field = 7 - Field;
+   If (Field != 4)  Minus = 1;
+}
+
+else  {			// Positivt delay fundet
+   Frame = T / 400000000;		// find frames (0-3)
+   Line = (T % 400000000) / 640000;	// find lines (0-624)
+   Tid = T % (400000000 * 640000);	// resten er 1/10 ns
+   Field = 2 x Frame;
+
+   if (Line > 312) {
+      Field += 1;
+      Line -= 313;
+   }
+}
+
+

@@ -1,0 +1,51 @@
+PT5210  Black Burst. Beregning af faseforskydning.  960715 PRC
+
+
+Tidsforskydningen t‘nkes regnet positiv fra 0 op til en 31 bit
+st›rrelse.
+
+Hvis 	lin  er antal linier i tidsforskydningen
+	hc   er antal grove trin af ca.37ns (1/27MHz)
+	hf   er antal fine trin a ca. 0.14ns (1/27MHz/256)
+
+er samlet tid:
+	T = (lin * 1728 +hc)* 256 + hf [trin a 0.14ns]  (G-system)
+	T = (lin * 1716 +hc)* 256 + hf [trin a 0.14ns]  (M-system)
+
+Subcarrier:
+	1 svingning af Fsubc deles i 2048 trin.
+
+	1 H-trin p† 0.14ns svarer da til 
+
+		4.43361875 * 2048     2^31 
+                -----------------  *  ----  [subc-trin]
+		     27 * 256         2^31 
+
+( de 2^31 er en beregningsteknisk normering s† tallet kan udregnes
+i en 32 bit variabel med stor n›jagtighed).
+
+
+Hele forskydningen  T  svarer da til:
+
+	2.821.073.708,76776 * T / 2^16 / 2^15 [subc-trin]  i G-system
+og	2.277.633.882,89783 * T / 2^16 / 2^15 [subc-trin]  i M-system
+
+T foreligger i 32 bit og opdeles s†dan:
+
+			   T =   A * 2^16   +   B
+
+Faktoren opdeles s†dan:       fak1 * 2^16   +   fak2
+
+Produktet udregnes som:	(A*fak2 + B*fak1) * 2^16 + B*fak2.
+
+Termen  A * 2^16 * fak1 * 2^16 flyder ovenud af det 32 bit lange
+register og bruges derfor ikke.
+
+Der reduceres med 2^15:  subc= (A*fak2 + B*fak1) * 2 + (B*fak2) / 2^15
+
+Der mangler nu at reduceres med 2^16. Dette sker ved at benytte
+de ›verste 16 bit som udtryk for antal subc-trin.
+
+Afrundingsfejlen (via fak2) er max. 0,24 * A * 2 / 2^16 [subc-trin].
+
+A  er max 15 bit, s† fejlen er h›jst  0,24  [subc-trin].

@@ -1,0 +1,119 @@
+$include	(equ.a)
+;********************************************************
+; filename	: fiel.s				*
+; author	: p.christiansen	90-07-05	*
+; version	: 0.1	PM5655		95-07-10	*
+; status	: preliminary				*
+; optimized for	: speed					*
+;********************************************************
+;HISTORY:
+
+; 950710 H-counter (Timer0) replaced by count in HTELHI, HTELLO
+; 941129 M-values included.
+;  ver.1.0
+; 931122 HERR is changed to (inverted) SYNCAV
+; 931004 Detect of slow lock 623,624,626,627 lines
+
+	fiel segment code
+	rseg fiel
+	public 	vint,vtimerint
+;****************
+; entry		: vint  (addr 03)
+; purpose	: field interrupt routine (routine no. 2)
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+;****************
+vint:
+	push	acc
+	push	psw
+;* check if vint is in acceptance window *
+	jnb	window,outside
+;* v-intr. is in window *
+	mov	a,verr		;test error level
+	jnz	erdecr
+	jnb	syncav,timmax	;		<931122a
+	jnb	genlocken,timmax
+
+; check if slow-lock (623,624,626,627 lines)
+	mov	a ,htello
+	cjne	a,#-vdetect,slowlo	;(3) test if 625 lines
+;625 lines found
+	clr	slowlock
+	sjmp	pset
+slowlo:
+;slow lock found
+	setb	slowlock
+        sjmp	timmax			;<940121 SNJ
+pset:
+	mov	atel,#apreset
+	mov	btel,#bpreset
+timmax:
+	mov	tl0,#low(-vlenmin)	;(-623/523) and load v-timer
+	mov	th0,#high(-vlenmin)
+
+	mov	htello,#low(-vlenmin)	;(-623/523) and load TEST-TIMER
+	mov	htelhi,#high(-vlenmin)
+	setb	cntenab			;start timer
+	clr	window
+	sjmp	outvin
+erdecr:
+	dec	verr			;count good field
+
+;	mov	a,verr		; TEST 9506
+;	anl	a,#0
+;	jnz	asd
+;	clr	p3.1
+;	setb	sw5		;start test
+	
+asd:
+;	mov	tl0,#low(-vlenmin)	; and load v-timer
+;	mov	th0,#high(-vlenmin)
+	mov	htello,#low(-vlenmin)	;(-623/523) and load TEST-TIMER
+	mov	htelhi,#high(-vlenmin)
+	setb	cntenab			;start timer
+	clr	window
+	sjmp	outvin
+outside:
+;* v-intr. not in window *
+	mov	verr,#verrpre		;(4) initiate error
+;	mov	tl0,#low(-vlenmin)	; and load v-timer
+;	mov	th0,#high(-vlenmin)
+	mov	htello,#low(-vlenmin)	;(-623/523) and load TEST-TIMER
+	mov	htelhi,#high(-vlenmin)
+	setb	cntenab			;start timer
+	sjmp	outvin
+outvin:
+	pop	psw
+	pop	acc
+	reti
+;** END of 2: fiel **
+;****************
+; entry		: vtimerint (intr.addr.: 00b)h
+; purpose	: field time-out routine (routine no. 3)
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+;****************
+vtimerint:  ;no flags changed
+	jnb	window,notin
+	clr	window
+	mov	verr,#verrpre		;set field error
+	clr	cntenab			;start timer
+	sjmp	outint
+notin:
+	setb	window
+	mov	tl0,#low(-windlen)	;(5) and load v-timer
+
+	mov	htello,#low(-windlen)	;(5) and load TEST-TIMER
+	mov	th0,#high(-windlen)
+	mov	htelhi,#high(-windlen)
+outint:
+	reti
+;* END of 3: vtimerint **
+
+	end

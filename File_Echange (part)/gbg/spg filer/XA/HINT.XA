@@ -1,0 +1,226 @@
+$pagewidth 132t
+; HCOUNT	SEGMENT CODE
+; HISTORY:
+; 960129 Fieldjobs() moved to fieldint.
+; 940610 stop line no. modified
+; 940608 datawin target now 11 us to 19 us from sync
+; 940524 trmask and trampli added.
+;
+
+; extrn code	(fieldjobs)
+;
+
+;EXTRN 	lineno, fieldno, detmask, v24on, trmask, trampli
+;****************Lookup failed ***********
+;**** Keeping the original line unchanged as follows *****
+EXTRN 	lineno, fieldno, detmask, v24on, trmask, trampli
+;EXTRN 	port1tab, port2tab
+;****************Lookup failed ***********
+;**** Keeping the original line unchanged as follows *****
+EXTRN 	port1tab, port2tab
+;EXTRN	testmode
+;****************Lookup failed ***********
+;**** Keeping the original line unchanged as follows *****
+EXTRN	testmode
+;
+
+;PSECT HSTART
+;****************Lookup failed ***********
+;**** Keeping the original line unchanged as follows *****
+PSECT HSTART
+;
+
+;ORG 000Bh
+;****************Lookup failed ***********
+;**** Keeping the original line unchanged as follows *****
+ORG 000Bh
+;	ljmp	hint
+;
+
+;
+
+; RSEG	HDATA
+; index:	DS	1
+;
+
+;PSECT	HCOUNT
+;****************Lookup failed ***********
+;**** Keeping the original line unchanged as follows *****
+PSECT	HCOUNT
+;
+
+;hint:
+hint:
+;	PUSH    ACC
+           PUSH.B  ACC              
+;	PUSH	B
+           PUSH.B  R4H              
+;        PUSH    DPH
+           PUSH.B  DPH              
+;        PUSH    DPL
+           PUSH.B  DPL              
+;	PUSH    PSW
+           PUSH.B  PSW              
+;	MOV     PSW,#08H
+           MOV.B   PSW,#08H         
+;
+
+;	mov	a,r5		;get presaved port2 value
+           MOV.B   R4L,R2H          ;get presaved port2 value
+;	MOV     DPTR,#08000H
+           MOV.W   R6,#08000H       
+;	MOVX    @DPTR,A		;write port2 value (with START OF DATAWIN)
+           MOVX.B  [R6],R4L         ;write port2 value (with START OF DATAWIN)
+;	mov	r6,a		;save value
+           MOV.B   R3L,R4L          ;save value
+;
+
+;	MOV     A,lineno	;get line no. to get port1 value
+           MOV.B   R4L,lineno       ;get line no. to get port1 value
+;	ADD     A,#LOW port1tab	;offset by table start
+           ADD.B   R4L,#LOW port1tab ;offset by table start
+;
+
+;NOW MAKE A BREAK TO STOP DATAWIN ON PORT2
+;	xch	a,r6		;save acc and get port2 value
+           XCH.B   R4L,R3L          ;save acc and get port2 value
+;	anl	a,#0fbh		;value for stopping datawin
+           AND.B   R4L,#0fbh        ;value for stopping datawin
+;	MOV     DPTR,#08000H
+;	mov	r5,a		;delay
+           MOV.B   R2H,R4L          ;delay
+;	mov	r5,a		;delay
+           MOV.B   R2H,R4L          ;delay
+;	mov	r5,a		;delay
+           MOV.B   R2H,R4L          ;delay
+;	mov	r5,a		;delay
+           MOV.B   R2H,R4L          ;delay
+;	mov	r5,a		;delay
+           MOV.B   R2H,R4L          ;delay
+;
+
+;	MOVX    @DPTR,A		;STOP DATAWIN
+           MOVX.B  [R6],R4L         ;STOP DATAWIN
+;	
+	
+;	mov	a,r6		;get port2 value back
+           MOV.B   R4L,R3L          ;get port2 value back
+;	MOV     DPL,A
+           MOV.B   DPL,R4L          
+;	CLR     A
+           MOVS    R4L,#0           
+;	ADDC    A,#HIGH port1tab
+           ADDC.B  R4L,#HIGH port1tab 
+;	MOV     DPH,A
+           MOV.B   DPH,R4L          
+;	MOVX    A,@DPTR		;get port1 value
+           MOVX.B  R4L,[R6]         ;get port1 value
+;	orl	a,detmask	;insert det. positions
+           OR.B    R4L,detmask      ;insert det. positions
+;	mov	dptr,#0c000h	;write to port
+           MOV.W   R6,#0c000h       ;write to port
+;	movx	@dptr,a
+           MOVX.B  [R6],R4L         
+;
+
+;
+
+; PREPARE NEXT LINE
+;	MOV     A,lineno		;get line no.
+           MOV.B   R4L,lineno       ;get line no.
+;	inc	a
+           ADDS.B  R4L,#1           
+;	ADD     A,#LOW port2tab	;offset by table start
+           ADD.B   R4L,#LOW port2tab ;offset by table start
+;	MOV     DPL,A
+           MOV.B   DPL,R4L          
+;	CLR     A
+           MOVS    R4L,#0           
+;	ADDC    A,#HIGH port2tab
+           ADDC.B  R4L,#HIGH port2tab 
+;	MOV     DPH,A
+           MOV.B   DPH,R4L          
+;	MOVX    A,@DPTR		;get port2 value
+           MOVX.B  R4L,[R6]         ;get port2 value
+;	orl	a,v24on		;add bit for V24-out control
+           OR.B    R4L,v24on        ;add bit for V24-out control
+;	orl	a,trmask	;set mode (play-address)
+           OR.B    R4L,trmask       ;set mode (play-address)
+;	orl	a,trampli	;set amplitude
+           OR.B    R4L,trampli      ;set amplitude
+;	jnb	testmode,notst	;set testmode
+           JNB     testmode,notst   ;set testmode
+;	setb	acc.0
+           SETB    R4L.0            
+;********* WARNING : Please double check the bit maps above
+;notst:
+notst:
+;	MOV     R5,a		;save it until next line
+           MOV.B   R2H,R4L          ;save it until next line
+;	MOV     A,lineno	;stop if line 23 (line=17)
+           MOV.B   R4L,lineno       ;stop if line 23 (line=17)
+;	CJNE    A,#17,ck36
+           CJNE.B  R4L,#17,ck36     
+;	CLR     TR0
+           CLR     TR0              
+;********* WARNING : Please double check the bit maps above
+;	setb	fieldjob
+;	sjmp	finish
+           BR      finish           
+;ck36:
+ck36:
+;	CJNE    A,#35,morelin		;F2: stop if line 313+23 (line=35)
+           CJNE.B  R4L,#35,morelin  ;F2: stop if line 313+23 (line=35)
+;	CLR     TR0
+           CLR     TR0              
+;********* WARNING : Please double check the bit maps above
+;	setb	fieldjob
+;finish:				;stop transmit from line 23 (336)
+finish:				;stop transmit from line 23 (336)
+;	mov	r1,#20		;wait 1/2 line
+           MOV.B   R0H,#20          ;wait 1/2 line
+;	djnz	r1,$
+XA_ADJUST_0000: DJNZ.B  R0H,$       
+;	mov	a,r5
+           MOV.B   R4L,R2H          
+;	MOV     DPTR,#08000H
+           MOV.W   R6,#08000H       
+;	MOVX    @DPTR,A		;write port2 value (with start of datawin)
+           MOVX.B  [R6],R4L         ;write port2 value (with start of datawin)
+;	MOV     lineno,#0	;reset line no. <960129a
+           MOV.B   lineno,#0        ;reset line no. <960129a
+;
+
+;	POP     PSW
+           POP.B   PSW              
+;        POP     DPL
+           POP.B   DPL              
+;        POP     DPH
+           POP.B   DPH              
+;	POP	B
+           POP.B   R4H              
+;	POP     ACC
+           POP.B   ACC              
+;	lcall	fieldjobs
+;	RETI    
+           RETI                     
+;	
+	
+;morelin:
+morelin:
+;	INC     lineno		;next line
+           ADDS.B  lineno,#1        ;next line
+;	POP     PSW
+           POP.B   PSW              
+;        POP     DPL
+           POP.B   DPL              
+;        POP     DPH
+           POP.B   DPH              
+;	POP	B
+           POP.B   R4H              
+;	POP     ACC
+           POP.B   ACC              
+;	RETI    
+           RETI                     
+;end
+end

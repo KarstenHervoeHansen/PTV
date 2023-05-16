@@ -1,0 +1,145 @@
+EKSEMPEL P KOMMANDO TIL UNIT
+/***************************************************************************/
+*** MENU.C ***
+void BBSystemSelect(){
+   if ( FuncSave || FuncEscape) {
+      if ( FuncSave) {             // If system has changed..
+         ActivePresetNo = 0;       // Clear possible preset
+                                   // Save new BB system
+         AnlBlkConfig[AnlBlkNdx].System = UcharVal;
+
+   -->    if ( ErrorCode = TrxAnlBlkSystem( AnlBlkNdx, UcharVal)) {
+            GotoErrorStatus( 256*AnlBlkNdx + ErrorCode);
+            return;
+         }
+      }
+      SelectModeOn = FALSE;     // Clear select-mode
+      Ptr = PrevPtr;            // Set pointer to previous menu
+      Ptr->DispFunct();         // Display previous menu
+      return;
+   }
+
+/***************************************************************************/
+*  TrxAnlBlkSystem                                            UNIT_DRV.C51
+*  Function:   Transmit TV system to a black burst unit                 
+*  Remarks:      Resets delay if it is illegal in selected system       
+*  Returns:      V24 error code    
+/***************************************************************************/
+UC TrxAnlBlkSystem( UC index, UC system) {
+   if ( system > PAL_PALID) {                     // If system is NTSC..
+                                                //  test if delay is valid
+      if ( AnlBlkConfig[index].Delay >= (UL) 4*525*1716*256)
+         AnlBlkConfig[index].Delay = 0;
+   }
+-->  error = TrxAnlBlkDelay( index, AnlBlkConfig[index].Delay);
+     if ( error == 0)                                    // Transmit ScH-Phase
+-->     error = TrxAnlBlkScHPhase( index, AnlBlkConfig[index].ScHPhase);
+     return( error);
+}
+/***************************************************************************/
+*  TrxAnlBlkDelay                                               UNIT_DRV.C51 
+*  Function:   Transmit a delay, (ie. phase), to a black burst unit  
+*  Returns:      V24 error code   
+/***************************************************************************/
+UC TrxAnlBlkDelay( UC index, UL delay) {
+   ( index % 2) ? ( V24Cmd[0] = 'J') : ( V24Cmd[0] = 'H');
+   switch ( AnlBlkConfig[index].System) {
+      case PAL:
+         V24Cmd[1] = 'G';
+         break;
+      case PAL_PALID:
+         V24Cmd[1] = 'K';
+         break;
+	osv...
+   }
+--> if ( error = SndLong( AnlBlkUnit[index].Address, V24Cmd, delay))
+      error += AnlBlkErrorType;
+   return( error);
+}
+/***************************************************************************/
+*  TrxAnlBlkScHPhase                                            UNIT_DRV.C51
+*  Function:   Convert and transmit a ScH-Phase to a black burst unit
+*  Returns:      V24 error code
+/***************************************************************************/
+UC TrxAnlBlkScHPhase( UC index, int ScHPhase) {
+   long tmp = ScHPhase;
+   ( index % 2) ? ( V24Cmd[0] = 'J') : ( V24Cmd[0] = 'H');
+   V24Cmd[1] = 'H';
+   if ( ScHPhase < 0)            // -1 deg equ. 359 deg a.s.f.
+      tmp += 360;
+   tmp *= 2048;
+   tmp /= 360;                     // tmp = ( ScHPhase*2048)/360;
+--> if ( error = SndInt( AnlBlkUnit[index].Address, V24Cmd, (UI) tmp))
+      error += AnlBlkErrorType;
+   return( error);
+}
+********************************************************************
+* Filename	: SERIAL1.C
+* Purpose	: RS232 drivers for RX1/TX1 (port P1.4/P1.5)
+********************************************************************
+UC SndInt(UC adr, char *A, UI x)
+{  CmdIndex= 0;
+   cksum= 0;
+   TB8_1= 1;		// set bit for address transmit
+   put_char1(adr);	// send address
+   TB8_1= 0;		// clear bit for data transmit
+   cksum= 0;
+   put_char1 (*A++);
+   put_char1 (*A);
+   put_char1 (x/10000 + '0');
+   put_char1 ((x/1000)%10 + '0');
+   put_char1 ((x/100)%10 + '0');
+   put_char1 ((x/10)%10 + '0');
+   put_char1 (x%10 + '0');
+   put_char1 (';');
+   put_char1 (cksum & 0x7f);
+   rstate= 1;			// state for 'wait for answer'
+   request= 0;			// request flag off
+   CmdToSend[CmdIndex]= 0;	// end the command string
+--> waitanswer();		// wait for answer (with re-send)
+   return(v24stat);   
+}
+// *****************************************************************
+void waitanswer(void)
+// (former Low priority (SW)interrupt,) called from Serial1_int.
+// Purpose is to wait for command-confirm code from units and re-send
+// command in case of checksum error or time-out.
+{  UI tel;
+   while (rstate>0 && rstate<3)
+   {  if (rstate==1)
+      {  tel= TIME_OUT;	// wait up to appr. 2 ms
+         while (rstate==1 && --tel>0) ; // wait until answer or timeout
+         if (tel==0)
+         {  rstate= 2;
+	    v24stat= 2;	// time-out
+         }
+      }
+      if (rstate==2)
+      {  CmdIndex= 0;	// resend command
+         rep_no += 1;	// count re-sends
+         if (rep_no>=MaxTransmit)// stop after 2 times resend
+         {  rstate= 0;	// Sorry! receiver would not respond
+	    rep_no= 0;	// this is a communication error!
+         }
+         else // if (CmdToSend[0]!=0)
+         {  TB8_1= 1;	// set bit for address transmit
+   	    S1BUF= CmdToSend[CmdIndex++];	// send address
+   	    ERI1= 0;       // Disable serial interrupt
+    	    while (!TI1);  // while waiting for transmitter ready
+   	    TI1= 0;
+   	    ERI1= 1;
+            TB8_1= 0;	// clear bit for data transmit
+            pause1(100);	// wait for slaves to evaluate address
+     	    while (CmdToSend[CmdIndex]!=0)
+	    {  S1BUF= CmdToSend[CmdIndex++];	// send next byte
+   	       ERI1 = 0;   // Disable serial interrupt 
+   	       while (!TI1);	// while waiting for transmitter ready
+   	       TI1 = 0;
+   	       ERI1 = 1;
+               pause1(100);	// wait for slaves to evaluate data
+            }
+	    rstate= 1;	// wait for status answer
+         }
+      }
+   }
+}

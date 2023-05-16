@@ -1,0 +1,59 @@
+; @(#)mull.src	1.3 7/22/97
+INCLUDE	'HEAD'
+
+		NAME _MULL
+
+DEFINE	MLR	"R4"	; Multiply low register
+DEFINE	MHR	"R5"	; Multiply high register
+DEFINE	_a	"R1"	; operand 1 high word
+DEFINE	_b	"R0"	; operand 1 low  word
+DEFINE	_x	"R3"	; operand 2 high word
+DEFINE	_y	"R2"	; operand 2 low  word
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+;
+		PUBLIC	__MULL
+;************************************************************************
+;*									*
+;*		MULL							*
+;*									*
+;*	this routine provides an 32 bit multiplication (a*b)		*
+;*	at entry:	R0D		one operand (a|b)		*
+;*			R2D		the other operand (x|y)		*
+;*									*
+;*	at exit:	R0D		the 32 bit result (a|b)*(x|y)	*
+;*									*
+;*	destroys:	R0D,R2D						*
+;*									*
+;************************************************************************
+;*									*
+;*		     Multiplication algoritm				*
+;*			a * x = w.w		UNNECESSARY !!		*
+;*			a * y =   w.w					*
+;*			b * x =   w.w					*
+;*			b * y =     w.w  				*
+;*			        -----.--+				*
+;*		result:	a|b         r.r					*
+;*									*
+;************************************************************************
+
+__MULL:	OR.W	_a,_a		; if( a == 0 )
+	BEQ	OP1H0		; then a * y = 0
+	MOV.W	MLR,_a		; else load multiply low register with a
+	MULU.W	MLR,_y		; and a * y
+	MOV.W	_a,MLR		; a now result high word; MHR result 
+				; is 0 else overflow.
+OP1H0:	OR.W	_x,_x		; if( x == 0 )
+	BEQ	OP2H0		; then x * b = 0
+	MOV.W	MLR,_x		; else load multiply low register with x
+	MULU.W	MLR,_b		; and x * b
+	ADD.W	_a,MLR		; a = a + MLR; MHR result is 0 else overflow.
+OP2H0:	MOV.W	MLR,_y		; load multiply low register with y
+	MULU.W	MLR,_b		; b * y
+	ADD.W	_a,MHR		; a = a + MHR; a is high word result
+	MOV.W	_b,MLR		; b is low word result
+
+	RET			; and return
+
+	END

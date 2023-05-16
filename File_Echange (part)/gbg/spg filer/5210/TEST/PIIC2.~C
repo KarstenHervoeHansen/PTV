@@ -1,0 +1,236 @@
+/*
+********************************************************************
+* Project	: PT5210  MASTER
+* Filename	: PIIC2.C
+* Version	: 0.0	961219
+* Purpose	: IIC driver for IIC2 on ext. port
+* Org.date	: 960215
+* Author	: PRC
+********************************************************************
+HISTORY:
+961220 Fixed error in SDA definition.
+961219 Added routines for read and write EEPROM
+960710 Commands changed to IIC1_... (IIC2_...)
+960215 Adapted to XA processor, related to UIIC.C
+*/
+
+#include <stdio.h>
+#include <xa.h>                      /* define 8051 registers */
+
+/*
+FILE: PIIC2.C	(IIC via EXT. PORT)
+HISTORY:
+960710 Commands changed to IIC1_... (IIC2_...)
+960215 Adapted to XA processor, related to UIIC.C
+*/
+
+#define UC 	unsigned char
+#define UI 	unsigned int
+#define UL	unsigned long
+#define sbit 	static bit
+
+extern UC ud1buf;
+extern UC ind1;		// definition of IIC-ports
+extern UC ud1;
+
+#define SDA	((ind1 & 8)>>3)
+#define SCL	(ind1 & 4)
+#define SDA_0	{ ud1buf &= ~8; ud1= ud1buf;}
+#define SCL_0	{ ud1buf &= ~4; ud1= ud1buf;}
+#define SDA_1	{ ud1buf |= 8; ud1= ud1buf;}
+#define SCL_1	{ ud1buf |= 4; ud1= ud1buf;}
+// Each "pau=0" delays xx us. (0.15?)
+#define PAUS0	pau=0;
+#define PAUS	PAUS0;PAUS0
+#define PAUS1	PAUS0;PAUS0;PAUS0
+#define SCL_3L  SCL_0;PAUS1;PAUS;PAUS
+#define SCL_3H  SCL_1;PAUS1;PAUS1
+#define STARTCond  SDA_0;PAUS1;PAUS1;PAUS;SCL_0
+#define STOPCond   SDA_0;SCL_3L;SCL_1;while((SCL)==0); SCL_3H;SDA_1;PAUS1;PAUS
+
+static near UC pau;
+
+static near UC  B	@ 9;
+sbit    B_7  @ 0x4f;	// R4H^7
+sbit  Acknowledge;
+static near UC X;
+// *****************************************************************
+
+bit ByteTxb(UC XX) {
+sbit Ack;
+
+   X = XX;
+   asm("MOV R4H, _X");
+   XX = 8;		//Use X as loop - counter
+
+   do			// Coded to fastest execute time
+   {	// SCL_0;
+	if (B_7) SDA_1 else SDA_0	// SDA = B_7;
+	// pau=0;
+        asm("ADD R4H, R4H");
+	SCL_1; PAUS1; PAUS1;
+	while((SCL)==0) ; // ****** GENINDS’TTES!
+	SCL_0; // PAUS; PAUS;
+   }
+   while (--XX != 0);
+
+   SDA_1; PAUS; PAUS0;	// Ready for reading Acknowledge bit
+   SCL_1; PAUS; // PAUS;
+   while((SCL)==0) ; // ****** GENINDS’TTES!
+   Ack = !(SDA);	//Ack = !SDA	// Read here ack-bit
+   SCL_0;
+   return(Ack);
+}
+// *****************************************************************
+
+UC IIC2_Read(UC Address)
+{  register UC B;
+   STARTCond;
+   Acknowledge = ByteTxb(Address+1);
+   PAUS1; PAUS;
+
+   /* Read byte into B  */
+   B = 0;
+   Address = 8;                /* Use Address as loop - counter */
+   do
+   {  PAUS0;
+      SCL_1; PAUS1;
+      while((SCL)==0); // ******* GENINDS’TTES!
+      B += B + SDA;	// B += B + (char)SDA;
+      SCL_0; PAUS1; PAUS; PAUS;
+   }
+   while (--Address != 0);
+
+   // Write Acknowledge bit  (`1` for last byte to read )
+
+   SDA_1;
+   SCL_1; PAUS1; PAUS;pau=0;
+   while((SCL)==0) ;	// ***** GENINDS’TTES!
+   SCL_0;
+
+   STOPCond;
+   return (B);
+}
+// *****************************************************************
+
+bit IIC2_Write(UC Address,UC Data)
+{
+   STARTCond;
+   Acknowledge = ByteTxb(Address);
+   Acknowledge = ByteTxb(Data);
+   STOPCond;
+   return(Acknowledge);
+}
+// *****************************************************************
+
+bit IIC2_Write2(UC Address,UC Data,UC Data2)
+{
+   STARTCond;
+   Acknowledge = ByteTxb(Address);
+   ByteTxb(Data);
+   ByteTxb(Data2);
+   STOPCond;
+   return(Acknowledge);
+}
+// *****************************************************************
+extern void waitms(UI delay);
+
+bit IIC2_WrStr(UC Address, UC subadr, char *s)
+{  UC i;			// EEPROM string write routine
+   STARTCond;
+   Acknowledge = ByteTxb(Address);
+   ByteTxb(subadr);
+
+   for (i=0;i<10;i++)
+   {  ByteTxb(s[i]);
+      if (s[i] == '\0') break;
+      if (((i+1)&3)==0)
+      {  STOPCond;	// packet write, enables use of alternative EEPROM
+         waitms(20);			// wait while NVRAM store bytes
+         STARTCond;			// store next (1-4) bytes
+         Acknowledge = ByteTxb(Address);
+         ByteTxb(subadr+i+1);
+      }
+   }
+   STOPCond;
+//   waitms(20);		// wait while NVRAM store bytes
+   return(Acknowledge);		// NB! allow 20ms before next write
+}
+// *****************************************************************
+
+bit IIC2_RdStr(UC Address, UC subadr, char *s)
+{  UC i;			// EEPROM string read routine
+   STARTCond;
+   Acknowledge = ByteTxb(Address);
+   ByteTxb(subadr);
+   STOPCond;
+
+   for (i=0;i<10;i++)
+   {  s[i]= IIC2_Read(Address);	// read char
+      if (s[i]=='\0')  break;
+   }
+   s[++i]= '\0';
+   return(Acknowledge);
+}
+// *****************************************************************
+
+bit IIC2_WrLongInt(UC Address, UC subadr, UL a, UI b)
+{  STARTCond;
+   Acknowledge = ByteTxb(Address);
+   ByteTxb(subadr);
+   ByteTxb((UC)((a & 0xff000000)>>24));
+   ByteTxb((UC)((a & 0x00ff0000)>>16));
+   ByteTxb((UC)((a & 0x0000ff00)>>8));
+   ByteTxb((UC)(a & 0x000000ff));
+   STOPCond;
+   waitms(20);			// wait while NVRAM store bytes
+   STARTCond;			// store next (1-4) bytes
+   Acknowledge = ByteTxb(Address);
+   ByteTxb(subadr+4);
+   ByteTxb((UC)((b & 0xff00)>>8));
+   ByteTxb((UC)(b & 0x00ff));
+   STOPCond;
+//   waitms(20);			// wait while NVRAM store bytes
+   return(Acknowledge);
+}
+// *****************************************************************
+near UL tmp;
+
+UL IIC2_RdLong(UC ram_addr, UC subadr)
+{  UL x, y;
+   UC i;
+   IIC2_Write(ram_addr, subadr);		// set RAM address
+   x= 0; tmp= 0;			// read H-phase
+   for (i=0;i<4;i++)
+   {  y= (UL)IIC2_Read(ram_addr);
+      x= tmp<<8;
+      tmp= x + y;
+   }
+   return(tmp);
+}
+// *****************************************************************
+
+UI IIC2_RdInt(UC ram_addr, UC subadr)
+{  UI y;
+   IIC2_Write(ram_addr, subadr);		// set RAM address
+   y= IIC2_Read(ram_addr);		// read SCH-phase
+   y= 256 * y + IIC2_Read(ram_addr);
+   return(y);
+}
+// *****************************************************************
+/*
+bit IIC2_Cmd(UC Address,char Aa,char Bb,UC Nn)
+{  STARTCond;
+   Acknowledge = ByteTxb(Address);
+   ByteTxb(Aa);
+   ByteTxb(Bb);
+   ByteTxb(  Nn/100      + '0');
+   ByteTxb(( Nn/10) % 10 + '0');
+   ByteTxb(  Nn%10       + '0');
+   ByteTxb( '\n');
+   STOPCond;
+   return(Acknowledge);
+}
+// *****************************************************************
+*/
+

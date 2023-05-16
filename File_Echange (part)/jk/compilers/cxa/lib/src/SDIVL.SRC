@@ -1,0 +1,76 @@
+; @(#)sdivl.src	1.3 7/22/97
+INCLUDE	'HEAD'
+
+		NAME _SDIVL
+
+DEFINE	_sp	"R7"	; stack pointer
+DEFINE	_a	"R1"	; operand 1 high word
+DEFINE	_b	"R0"	; operand 1 low  word
+DEFINE	_x	"R3"	; operand 2 high word
+DEFINE	_y	"R2"	; operand 2 low  word
+
+IF	MODEL_LARGE || MODEL_MEDIUM
+	EXTRN	HCODE(__UDIVL)
+ELSE
+	EXTRN	CODE(__UDIVL)
+ENDIF
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+;
+		PUBLIC	__SDIVL
+;************************************************************************
+;*									*
+;*		SDIVL							*
+;*									*
+;*	this routine provides an 32 bit by 32 bit signed divide		*
+;*	at entry:	R0D		the dividend (a:b)		*
+;*			R2D		the divisor (x:y)		*
+;*									*
+;*	at exit:	R0D		the 32 bit quotient (aa:bb)	*
+;*									*
+;*	destroys:	R0D,R2D						*
+;*									*
+;************************************************************************
+__SDIVL:				; signed long division
+	SUB.W	_sp,#02H		; increment user stack pointer
+	MOV.W	[_sp],#00H		; set result sign on user stack to zero
+	OR.W	_a,_a			; if( most significant bit dividend NOT set )
+	BPL	OP1P			; then dividend is positive
+					; else negate dividend
+	CPL.W	_b			; neg b
+	CPL.W	_a			; neg a
+	ADD.W	_b,#01H			;
+	ADDC.W	_a,#00H			;
+	PUSH.W	_a			; push a on user stack
+	MOV.W	_a,[_sp+02H]		; get result sign from user stack to a
+	CPL.W	_a			; invert result sign
+	MOV.W	[_sp+02H],_a		; move result sign back to user stack
+	POP.W	_a			; pop a from user stack
+OP1P:	OR.W	_x,_x			; if( most significant bit divisor NOT set )
+	BPL	OP2P			; then divisor is positive
+					; else negate divisor
+	CPL.W	_y			; neg y
+	CPL.W	_x			; neg x
+	ADD.W	_y,#01H			;
+	ADDC.W	_x,#00H			;
+	PUSH.W	_x			; push x on user stack
+	MOV.W	_x,[_sp+02H]		; get result sign from user stack to x
+	CPL.W	_x			; invert result sign
+	MOV.W	[_sp+02H],_x		; push result sign back to user stack
+	POP.W	_x			; pop a from user stack
+OP2P:	GCALL	__UDIVL			; call common usigned divide long 
+					; a is result high word
+					; b is result low word
+					; y and x are free now
+	POP.W	_x			; pop result sign from user stack
+	OR.W	_x,_x			; if( result sign bit not set  )
+	BEQ	POS			; then result is positive
+					; else negate result
+	CPL.W	_b			; neg b
+	CPL.W	_a			; neg a
+	ADD.W	_b,#01H			;
+	ADDC.W	_a,#00H			;
+POS:	RET				; and return
+
+	END

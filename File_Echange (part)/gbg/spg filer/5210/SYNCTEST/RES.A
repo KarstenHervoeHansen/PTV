@@ -1,0 +1,406 @@
+;name res
+$include	(equ.a)
+;********************************************************
+; filename	: res.s					*
+; author	: p.christiansen	931118		*
+; version	: 			950922		*
+; status	: preliminary				*
+; tested by	:					*
+; optimized for	: speed					*
+; specialities	:					*
+;********************************************************
+; HISTORY
+; 950922 RAM-table abandoned for direct ROM-table (#tablestart).
+; 950714 Kommun routine now outside H-interrupt routine.
+; 950710 H-counter (Timer0) replaced by count in HTELHI, HTELLO
+; 931118 VERR (and others) now loaded from variable ERRPRE (speed/noise)
+; 931116	Dummy write to address 03XX
+
+	res segment code
+	rseg res
+	public 	start,wait
+	extrn code(knap,line7,lock,mode,sch,vint)
+	extrn code(lineint,vtimerint,tablestart,startf4,kommun)
+;****************
+; entry		: start
+; purpose	: start-up routines (initializing)
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+;****************
+	org	0
+start:	ljmp	begin		;jump over interrupt addresses
+	ljmp	vint		;interrupt from intr0 (each frame) - addr 3
+	org $+ 	5
+	ljmp	vtimerint	;interrupt from timer 0 (line counter) - addr B
+	org $+ 	5
+	ljmp	lineint		;intrpt from intr1 (each line) - addr 013h
+	org $+ 	21
+begin:
+	mov     r1,#0
+ldr0:	mov	r0,#0		;delay start-up
+	djnz	r0,$
+	djnz	r1,ldr0
+
+	mov	sp,#7		;stack starts from addr 8
+
+	mov	dptr,#0300h	;preset bank switching		<931115
+	clr	a
+	movx	@dptr,a
+
+;	lcall	promck          ;check prom
+;	lcall	ramchk          ;check ram
+
+	lcall	ramini		;erase int. ram
+
+;	mov	dptr,#tablestart ;move type/duration table to ram <950922d11
+;	mov	p2,#ramtable	;point to ram section
+;	clr	a
+;	mov	r0,a
+;nxtdat:
+;	movc	a,@a+dptr
+;	movx	@r0,a
+;	mov	a,r0
+;	inc	a
+;	mov	r0,a
+;	cjne	a,#typesize,nxtdat
+ramend:
+
+;* set-up counters and interrupts *
+setup:	mov	tmod,#065h	;t1 =8 bit reload; t0 =16 bit count
+	setb	it0		;intr0 edge trig
+	setb	it1		;intr1 edge trig
+
+;	mov	tl1,#255	;set t1 to intr. after 1 count
+;	mov	tl1,#255	;set reload value
+
+;	setb	px0		;high prior. for ext0 (field)
+	setb	et0		;enable intr from timer0
+	setb	ex0		;	-	- intr0
+	setb	ex1		;	-	- intr1
+
+;* preset some internals *
+	mov	errpre,#3	;
+	setb	alian
+
+	setb	bulocken
+	mov	atel,#amax
+	mov	btel,#bmax
+	mov	ftel,#fmax
+	mov	dptr,#startf4	;set default datapointer
+	mov	dpoint,dpl
+	mov	dpoint+1,dph
+	mov	phgod,errpre
+	mov	sphgod,errpre
+
+;* recall some internals *
+	mov	r0,#saves
+	mov	dptr,#xsaves
+	movx	a,@dptr
+	mov	@r0,a
+	inc	r0
+	inc	dptr
+	movx	a,@dptr
+	mov	@r0,a
+	mov	r0,#genphase
+	mov	dptr,#xgenphase
+	movx	a,@dptr
+	mov	@r0,a
+	inc	r0
+	inc	dptr
+	movx	a,@dptr
+	mov	@r0,a
+	mov	r0,#hphzero
+	mov	dptr,#xhphzero
+	movx	a,@dptr
+	mov	@r0,a
+	inc	r0
+	inc	dptr
+	movx	a,@dptr
+	mov	@r0,a
+	inc	r0
+	inc	dptr
+	movx	a,@dptr
+	mov	@r0,a
+
+; TEST-START-UP!!!
+	mov	saves,#1
+	mov	saves+1,#0
+$if (gvers=1)
+	mov	genphase,#06fh
+	mov	genphase+1,#064h
+	mov	hphzero,#0f4h
+	mov	hphzero+1,#022h
+	mov	hphzero+2,#04h
+$else
+	mov	genphase,#06fh
+	mov	genphase+1,#064h
+	mov	hphzero,#00h
+	mov	hphzero+1,#03ah
+	mov	hphzero+2,#03h
+$endif
+
+;* preset some externals *
+
+;* start timers and enable interrupts *
+sttim:	setb	ea		;enable all interrupts
+;	setb	tr0		;start counter 0 (line intr)	<950710d
+	setb	cntenab		;replaces TR0 for line count enable
+	
+;* interrupt waiting loop *
+wait:	
+	jnb	dolock,kommundo
+	lcall	lock
+kommundo:
+	jnb	doknap,schdo
+	clr	doknap
+	lcall	kommun
+schdo:
+	jnb	dosch,line7do
+	lcall	sch
+line7do:
+	jnb	doline7,wait
+	lcall	line7
+	lcall	mode
+	sjmp	wait
+
+;** subroutine: check ram and load data from ext to int ram **
+;loadat:	mov	p2,#6		;ext. ram pointer, high byte
+;	mov	r0,#extck	;check-figures rel. pos
+;	movx	a,@r0		;get
+;	mov	r1,a		;save
+;	inc	r0		;get next
+;	movx	a,@r0
+;	mov	p2,#0
+;	xrl	a,r1
+;	inc	a
+;	jz	loadby
+;* check figure wrong - data not valid *
+;	lcall	setdef		;set defaults
+;* valid data - load int. ram *
+;loadby:
+;	mov	r0,#wrkdat	;move data from addr. wrkdat
+;	mov	p2,#0		; (inclusive menuon, used later)
+;	mov	a,#128		; (calcul. how many bytes)
+;	clr	c
+;	subb	a,#wrkdat
+;	mov	r2,a
+;nxtda1:	movx	a,@r0
+;	mov	@r0,a		; into int. ram
+;	inc	r0
+;	djnz	r2,nxtda1
+	ret
+
+;ldram:	;* load ram from ext. ram *
+;	ret
+
+;** subroutine: set default data in ext. ram **
+
+;* set some default data in ext. ram *
+
+;** subroutines **
+;** ramini - fill ram with zeroes **
+ramini:	mov	r0,#32	  ;ram start
+;	mov	p2,#0
+	clr	a
+ra1:	mov	@r0,a	  ;fill with zero
+;	movx	@r0,a
+	inc	r0	      ;next addr
+	cjne	r0,#128,ra1     ;loop
+	ret
+
+;** savvip: save important data in ext. ram **
+;	ret
+
+;* non-destruktive ramcheck **				<25/1ax
+; first the data lines are checked for shorts/disconnections by exercicing    *
+; one memory cell. next the address lines are checked by writing at specified *
+; adresses and reading back at certain addr. which would overlay the writing  *
+; address in case of shorts or disconn. if a match is found, the check is     *
+; repeated with the inverted word in case the match should be a valid data.   *
+ramchk:	mov	p2,#0           ;point to addr.
+	mov	r0,#10
+	mov	dptr,#ramta1    ;point to table
+	mov	r2,#6           ;six check figures
+nextf1:	clr	a
+	movc	a,@a+dptr       ;get figure
+	mov	scratc,a        ;save
+	movx	@r0,a           ;put
+	inc	dptr
+	movx	a,@r0           ;get
+	cjne	a,scratc,erram  ;check
+	djnz	r2,nextf1
+; address line check *
+adrchk:	mov	dptr,#ramta2    ;point to new table
+nxtwrt:	clr	a
+	movc	a,@a+dptr       ;get hi. addr.
+	mov	p2,a            ;set
+	mov	r7,a            ;and save
+	inc	dptr
+	clr	a
+	movc	a,@a+dptr       ;get lo. addr.
+	mov	r0,a            ;set
+	mov	r6,a            ;and save        write addr. now in r7,r6
+	mov	a,#055h        ;check figure
+	mov	scratc,a        ;save            check figure in 'scratc'
+	movx	@r0,a           ;put check figure
+; check next addr. *
+adrck1:	inc	dptr
+	clr	a
+	movc	a,@a+dptr       ;get hi. addr
+	cjne	a,#8,chkzer      ;if flag=8
+	inc	dptr
+	sjmp	nxtwrt           ;then next write address
+chkzer:	cjne	a,#9,cont1       ;if flag=9 then finished
+	mov	p2,#0
+	ret
+cont1:	mov	p2,a            ;set
+	mov	r5,a            ;and save
+	inc	dptr
+	clr	a
+	movc	a,@a+dptr       ;get lo. addr.
+	mov	r0,a            ;set
+	mov	r4,a            ;and save        read addr. now in r5,r4
+	movx	a,@r0           ;read
+	cjne	a,scratc,adrck1 ;if equal then check inverted figure
+	sjmp	chkinv
+; read = write, check inverted *
+chkinv:	mov	p2,r7           ;set hi. write addr.
+	mov	a,r6
+	mov	r0,a            ;set lo.
+	mov	a,scratc        ;invert check figure
+	cpl	a
+	mov	scratc,a        ;save
+	movx	@r0,a           ;write figure
+	mov	p2,r5           ;get read addr.hi.
+	mov	a,r4
+	mov	r0,a            ;get lo.
+	movx	a,@r0           ;get figure
+	cjne	a,scratc,adrck1 ;if not equal then next
+; error: display error and halt *
+erram:
+;	mov	ledsto,#0ffh	;turn on all leds except horiz. uncal led
+;	mov	ledsto+1,#0dfh
+;agaerr:	sjmp	wrtled		;write to leds store
+;	sjmp	agaerr          ;repeat displaying error
+
+; tables *
+ramta1:	db	055h
+	db	0aah
+	db	033h
+	db	0cch
+	db	00fh
+	db	0f0h
+ramta2:	db	5
+	db	015h                                 ;1'st write addr.
+	db	5
+	db	017h
+	db	5
+	db	01dh
+	db	5
+	db	035h
+	db	5
+	db	095h
+	db	7
+	db	015h
+	db	5
+	db	011h
+	db	5
+	db	5
+	db	4
+	db	015h
+	db	1
+	db	015h
+	db	5
+	db	055h
+	db	5
+	db	014h
+	db	8                                       ;flag for next
+	db	1
+	db	099h                                 ;2'nd write addr.
+	db	1
+	db	09dh
+	db	5
+	db	09dh
+	db	1
+	db	091h
+	db	1
+	db	019h
+	db	1
+	db	089h
+	db	0
+	db	099h
+	db	1
+	db	0b9h
+	db	1
+	db	0d9h
+	db	3
+	db	099h
+	db	8                                       ;flag for next
+	db	6
+	db	00bh                                 ;3'rd write addr.
+	db	6
+	db	01bh
+	db	7
+	db	01bh
+	db	6
+	db	02bh
+	db	6
+	db	04bh
+	db	2
+	db	00bh
+	db	6
+	db	08bh
+	db	4
+	db	00bh
+	db	6
+	db	9
+	db	8                                       ;flag for next
+	db	2
+	db	010h                                 ;4'th write addr.
+	db	0
+	db	010h
+	db	3
+	db	010h
+	db	2
+	db	011h
+	db	9                                       ;stop flag
+
+; prom check *
+promck:	mov	dptr,#0
+	mov	r2,#128
+	clr	a
+	mov	r1,a            ;counts 256
+	mov	r3,a
+	mov	r4,a            ;r4,r3 collects the checksum
+tsrom1:	clr	a
+	movc	a,@a+dptr
+	add	a,r3            ;add byte
+	mov	r3,a
+	jnc	nxtup
+	inc	r4
+nxtup:	inc	dptr
+	djnz	r1,tsrom1       ;check 256 bytes
+	djnz	r2,tsrom1               ;times 128 = 32 kby.
+;
+	mov	dptr,#07fffh   ;read last byte in rom
+	clr	a
+	movc	a,@a+dptr
+	cjne	a,4,romerr
+	mov	a,r3
+	jnz	romerr          ;if high order byte of checksum is equal to
+	ret                     ;last byte in rom and if lo-byte is zero then
+;                               rom ok.
+romerr:
+;	display ROM-error
+
+;	sjmp	agerr           ;repeat displaying error
+
+; Interrupt from IIC port
+;**********************************************************
+;iicint:
+;	mov	iicdat,p1		;read port
+
+	end

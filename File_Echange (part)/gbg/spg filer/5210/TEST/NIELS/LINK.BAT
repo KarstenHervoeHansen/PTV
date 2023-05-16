@@ -1,0 +1,3 @@
+rem LINKNING AF PROGRAMDELE TIL P40
+l51 @linklist
+

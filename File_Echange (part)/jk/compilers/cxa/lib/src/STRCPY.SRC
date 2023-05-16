@@ -1,0 +1,67 @@
+; @(#)strcpy.src	1.3.1.1 4/1/98
+;*****************************************************************************
+;*
+;* MODULE	: strcpy.src
+;*
+;* APPLICATION	: C library
+;*
+;* DESCRIPTION	: Source file for strcpy() routine
+;*		  Copies one string to another.
+;*
+;* INPUT	: s1 = R0	(tiny/small/medium)
+;*		  s1 = R1:R0	(large)
+;*		  s2 = R1	(tiny/small/medium)
+;*		  s2 = R3:R2	(large)
+;*
+;* OUTPUT	: s1 = R0	(tiny/small/medium)
+;*		  s1 = R1:R0	(large)
+;*
+;* USES		: R0-R3
+;*
+;* COPYRIGHT	: 1997 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+
+INCLUDE 'HEAD'
+
+	NAME	STRCPY
+
+DEFINE S1	"R0"
+IF    MODEL_LARGE
+DEFINE S2	"R2"
+ELSE
+DEFINE S2	"R1"
+ENDIF
+
+IF    MODEL_MEDIUM || MODEL_LARGE
+LIBC_PR	SEGMENT	HCODE
+ELSE
+LIBC_PR	SEGMENT	CODE
+ENDIF
+
+	RSEG	LIBC_PR
+
+	PUBLIC	_strcpy
+
+;*****************************************************************************
+;* strcpy
+;*****************************************************************************
+_strcpy:
+IF    MODEL_LARGE
+	PUSH.B	DS		; save default segment
+	MOV.B	ES,R3L		; s2 addressed via ES
+	CLR	SSEL.0		; s1 addressed via DS
+	MOV.B	DS,R1L		;
+ENDIF
+	MOV.W	R3,S1		; os1 = s1
+loop:
+	MOV.B	[S1+],[S2+]	; 
+	BNE	loop		; while (*s1++ = *s2++)
+	MOV.W	S1,R3		; return os1;
+IF    MODEL_LARGE
+	SETB	SSEL.0		; set back for default addressing
+	POP.B	DS		; restore default segment
+ENDIF
+	RET
+
+	END

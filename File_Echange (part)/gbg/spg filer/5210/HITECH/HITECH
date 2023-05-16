@@ -1,0 +1,101 @@
+From:	Preben Christiansen
+	Philips TV Test Equipment A/S
+	Kornmarksvej 21
+	DK 2605 Broendby.
+
+To: HI-TECH compiler support.
+
+We have great troubles with the HI-TECH XA compiler HPDXA
+purchased from NOHAU, Denmark. We seem to be the first firm in
+Denmark to use this compiler.
+
+Our numbers are: S/N: CXA-05557  Key: 3E1D-267B-B64F-786C-D7
+
+
+We use the Large model and have 'text' from addr.0, some
+'code' from addr.3000H and 3 large code tables in a psect
+from addr. 10000H-3FFFFH.
+
+
+OUTPUT FILE ERROR:
+In version 7.55 in all HEX output formats an address space is
+missing, approx. 35532H-37FFFH  The uppermost table is thus missing
+some values. In the UBROF format the table is truncated at about
+address 34000H. The only format that is OK is Binary, but our
+emulator (Nohau) can not read this format.
+
+In version 7.60 the output format control is not functioning at all!
+and it only writes out in Signetics format (with the same failures).
+
+
+COMPILER ERROR:
+The statement:    result= x * 256 + c;
+(x is long and c is char) is compiled wrong. If x is greater than
+256 then the high word of 'result' becomes twice the true value.
+Here is a cut from the resulting .as file:
+
+;LINE.C: 317: hinput= (long)i * 256 + s3;
+	line	317
+	mov.w	r0,r4
+	movs.w	r1,#00h
+	asl.d	r0,#08h		here r0 can rotate bits into r1 !
+	mov.b	r2l,[r7]
+	mov.b	r2h,r1l		here r1l is assumed = 0 !
+	mov.w	r3,r1
+	add.w	r2,r0
+	addc.w	r3,r1
+	mov.w	r1,#_hinput
+	mov.w	[r1],r2
+	mov.w	[r1+02h],r3
+
+
+INTERRUPT VECTORING:
+We are using the ROM_VECTOR statement to set the interrupt vectors.
+This produces apparently illegal codes:
+code at address 80h= 00 8F 68 01
+code at address 88h= 00 8F 6C 01
+The addresses 0168h and 016Ch are correctly pointing to the FJMP
+table, but '8F' is illegal code?. Sometimes the '8F' is observed
+being '98' which is also illegal?. Despite of this, the interrupts
+seem to work.
+By assembling to .as we observe the correct: ORG 80h;  FJMP xxxx;
+
+
+MORE INTERRUPT VECTORS:
+The declarations:
+ROM_VECTOR(IV_T0, Timer_int, IV_SYSTEM+IV_PRI08+IV_BANK1)
+ROM_VECTOR(IV_RI0, Serial0_int, IV_SYSTEM+IV_PRI08+IV_BANK1)
+ROM_VECTOR(IV_TI0, Tmit0_int, IV_SYSTEM+IV_PRI08+IV_BANK1)
+ROM_VECTOR(IV_RI1, Serial1_int, IV_SYSTEM+IV_PRI08+IV_BANK1)
+ROM_VECTOR(IV_TI1, Tmit1_int, IV_SYSTEM+IV_PRI08+IV_BANK1)
+
+do not work. When I receive an interrupt on RI0 the interrupt
+routine calls itself indefinitely. If I reduce this to: 
+
+ROM_VECTOR(IV_T0, Timer_int, IV_SYSTEM+IV_PRI08+IV_BANK1)
+ROM_VECTOR(IV_RI0, Serial0_int, IV_PSW)
+ROM_VECTOR(IV_RI1, Serial1_int, IV_PSW)
+
+then it works. I cannot figure out what is wrong.
+
+
+My collegue has problems with pointer type conflicts as he is using
+pointers to textstrings, some declared code and some as programmable
+strings. As he is on vacation now I miss some details and hope to
+get back to the subject later.
+
+
+EMULATOR PROBLEMS:
+Our emulator is from NOHAU. The emulator can not load binary code
+which is the only correct output format from the HITECH compiler.
+Furthermore the emulator will only load symbols in combination
+with INTEL HEX codes, not SIGNETICS, and then only if the code is
+smaller than 64K (reading the INTEL CODE wraps all segments into
+segment 0-64K). I think this is NOHAU's problem.
+
+Looking forward to hearing from you.
+
+	Regards
+
+	Preben Christiansen.
+	pchr@dk-online.dk

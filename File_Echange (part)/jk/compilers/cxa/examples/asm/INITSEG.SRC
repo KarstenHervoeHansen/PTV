@@ -1,0 +1,216 @@
+;**************************************************************************************
+;*
+;*  %'@(#)initseg.asm	1.1 11/15/96'
+;*
+;*	Start Initialisation
+;*
+;*	Initialize or clear data segements as specified by the copy-table
+;*
+;*	copy-table entry:
+;*
+;*		+10 length
+;*		 +9 length
+;*		 +8 length
+;*		 +7 source-address
+;*		 +6 source-address
+;*		 +5 source-address
+;*		 +4 destination-address
+;*		 +3 destination-address
+;*		 +2 destination-address
+;*		 +1 action (0 if last entry)
+;*  cpt_entry -> +0 amode  (0 if last entry)
+;*
+;**************************************************************************************
+$CASE
+$ZPAGE
+
+		NAME initseg
+
+INIT_PR		SEGMENT CODE
+		RSEG	INIT_PR
+
+		PUBLIC	initseg
+	
+initseg:
+		MOV.W	R6,#__lc_cp		; now R6 points to first entry in the copytable
+
+_cpt_next_entry:
+		MOVC.B	R1H,[R6+]		; +00 amode  (0 if last entry)
+		BEQ	_cpt_ready		; Ready
+		MOVC.B	R3H,[R6+]		; +01 action (0 if last entry)
+		MOVC.B	R0L,[R6+]		; +02 destination-address
+		MOVC.B	R0H,[R6+]		; +03 destination-address
+		MOVC.B	R1L,[R6+]		; +04 destination-address
+		MOVC.B	R2L,[R6+]		; +05 source-address
+		MOVC.B	R2H,[R6+]		; +06 source-address
+		MOVC.B	R3L,[R6+]		; +07 source-address
+		MOVC.B	R4L,[R6+]		; +08 length
+		MOVC.B	R4H,[R6+]		; +09 length
+		MOVC.B	R5L,[R6+]		; +10 length
+		MOV.B	R5H,#00H		; clear high byte of MSW-length
+		CJNE.B	R3H,#CP_COPY,_cpt_clear	; test if area must be initialised or cleared
+
+_cpt_init:					; Initialise data segment
+		MOV.B	R3H,#00H		; clear high byte of MSW-source-address
+		CMP.B	R1H,#CP_DATA		;
+		BEQ	_cpt_initdata		; Initialise segment DATA
+		CMP.B	R1H,#CP_IDATA		;
+		BEQ	_cpt_initidata		; Initialise segment IDATA
+		CMP.B	R1H,#CP_XDATA		;
+		BEQ	_cpt_initidata		; Initialise segment XDATA
+		CMP.B	R1H,#CP_XSHORT		;
+		BEQ	_cpt_initxshort		; Initialise segment XDATA SHORT
+		CMP.B	R1H,#CP_BIT		;
+		BEQ	_cpt_initbit		; Initialise segment BIT
+		JMP	_cpt_ready		; Ready
+
+_cpt_clear:					; Clear data segment
+		MOV.B	R3H,#00H		; clear high byte of MSW-source-address
+		CMP.B	R1H,#CP_DATA		;
+		BEQ	_cpt_bssdata		; Clear segment DATA
+		CMP.B	R1H,#CP_IDATA		;
+		BEQ	_cpt_bssidata		; Clear segment IDATA
+		CMP.B	R1H,#CP_XDATA		;
+		BEQ	_cpt_bssidata		; Clear segment XDATA
+		CMP.B	R1H,#CP_XSHORT		;
+		BEQ	_cpt_bssxshort		; Clear segment IDATA SHORT
+		JMP	_cpt_ready		; Ready
+
+;**************************************************************************************
+;*
+;*	Initialisation completed
+;*
+;**************************************************************************************
+_cpt_ready:
+		RET
+
+;**************************************************************************************
+;*
+;*	Clear segment DATA
+;*
+;**************************************************************************************
+_cpt_bssdata:
+
+_cpt_bssdata_next:
+		MOV.B	[R0+],#00H
+		DJNZ.W	R4,_cpt_bssdata_next
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Clear segment IDATA
+;*
+;**************************************************************************************
+_cpt_bssidata:
+
+_cpt_bssidata_next:
+		MOV.B	[R0+],#00H
+		DJNZ.W	R4,_cpt_bssidata_next
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Clear segment XSHORT
+;*
+;**************************************************************************************
+_cpt_bssxshort:
+
+_cpt_bssxshort_next:
+		MOVX.B	[R0],R5H
+		ADD.W	R0,#01H
+		DJNZ.W	R4,_cpt_bssxshort_next
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise segment DATA
+;*
+;**************************************************************************************
+_cpt_initdata:
+		PUSH.B	R6L
+
+_cpt_initdata_next:
+		MOVC.B	R6L,[R2+]
+		MOV.B	[R0+],R6L
+		DJNZ.W	R4,_cpt_initdata_next
+		POP.B	R6L
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise segment IDATA
+;*
+;**************************************************************************************
+_cpt_initidata:
+		PUSH.B	R6L
+
+_cpt_initidata_next:
+		MOVC.B	R6L,[R2+]
+		MOV.B	[R0+],R6L
+		DJNZ.W	R4,_cpt_initidata_next
+		POP.B	R6L
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise segment XSHORT
+;*
+;**************************************************************************************
+_cpt_initxshort:
+		PUSH.B	R6L
+
+_cpt_initxshort_next:
+		MOVC.B	R6L,[R2+]
+		MOVX.B	[R0],R6L
+		ADD.W	R0,#01H
+		DJNZ.W	R4,_cpt_initxshort_next
+		POP.B	R6L
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	Initialise BIT segment
+;*
+;**************************************************************************************
+_cpt_initbit:
+		PUSH.W	R6
+
+_cpt_initbit_next:
+		MOVC.B	R6L,[R2+]
+		MOV.W	R1,R0
+		MOV.B	R6H,R1L
+		LSR.W	R1,#3
+		AND.B	R6H,#07h
+		ASL.B	R6L,R6H
+		OR.B	[R1],R6L
+		ADD.W	R0,#01H
+		DJNZ.W	R4,_cpt_initbit_next
+		POP.W	R6
+		JMP	_cpt_next_entry
+
+;**************************************************************************************
+;*
+;*	End Initialisation
+;*
+;**************************************************************************************
+
+; copy table addressing modes, these numbers are defined in the
+; xa.cpu description file. <number> equals Y<number> amode definitions
+CP_LAST		EQU	 0			; not used for initialization
+CP_HCODE	EQU	 1			; not used for initialization
+CP_HDATA	EQU	 2			; not used for this initialization
+CP_XSHORT	EQU	 3
+CP_BIT		EQU	 4
+CP_SFR		EQU	 5			; not used for initialization
+CP_SFRBIT	EQU	 6			; not used for initialization
+CP_IDATA	EQU	 7
+CP_DATA		EQU	 8
+CP_XDATA	EQU	 9 
+CP_CODE		EQU	10			; not used for initialization
+
+; copy table action 
+CP_COPY		EQU	1
+
+	EXTRN	CODE(__lc_cp)
+
+	END

@@ -1,0 +1,31 @@
+	Multiprocessor konfiguration i PT5210.		960628 prc
+
+Master Processoren (MP) benytter en V24-bus til at korrespondere
+med 3-5 andre (slave-)processorer. Processorerne er alle af XA-
+og 80C31-typen.
+V24 s‘ttes op i hver processor i registeret: SCON.
+
+Der konfigureres til 9 bit (mode 2 ell. 3).
+Hastighedsmuligheder med XTAL p† XA= 29.4912M og 80C31= 14.7456M:
+1. XA mode 3, timer= -1; 80C31 mode 2:			460,8 KBAUD
+2. XA mode 3, timer= -6; 80C31 mode 3, timer 1= -1:	 76,8 KBAUD
+  (disse er de to h›jest opn†elige hastigheder. Det endelige valg
+   af hastighed skal tillade at interrupt kan aktiveres og at en
+   modtagerutine kan n† at gemme hver modtagne byte).
+
+Virkem†den er som f›lger:
+Alle slaver initierer deres 9' bit (SM2) til h›j, hvorved slaven kun
+vil blive interruptet hvis den modtagne 9' bit er h›j (adressemode).
+
+Master sender f›rst en adresse med bit 9 sat h›j. Alle slaver mod-
+tager adressen og den slave som matcher adressen s‘tter sin bit 9
+lav. Herved vil den blive interruptet af de efterf›lgende data fra
+Master.
+
+Master sender et antal data-bytes med 9' bit lav og afslutter med en
+fast kode ('0A'). Kun den adresserede slave modtager data og n†r
+den m›der '0A' s‘tter den sin bit 9 h›j og er klar til en ny adres-
+sering.
+
+En form for kvittering, f.eks. ved at tilbagesende en checksum, skal
+indf›res.

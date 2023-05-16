@@ -1,0 +1,53 @@
+; @(#)cphnb.src	1.1 11/4/97
+;*****************************************************************************
+;*
+;* MODULE	: cphnb.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: Copy data block from huge data to near data. The source and
+;*		  destination address pointers and the number of bytes to
+;*		  copy are passed to this copy routine via registers. The
+;*		  registers used are:
+;*
+;*		  R3:R2 = address source
+;*		  DS:R4 = address destination
+;*		  R6    = number of bytes to copy
+;*
+;* INPUT	: R2-R4,R6
+;*
+;* OUTPUT	: none
+;*
+;* USES		: R2-R4,R6
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+		NAME _CPHNB
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+
+		PUBLIC	__CPHNB
+__CPHNB:
+IF	MODEL_LARGE
+	CLR	SSEL.4		; source addressed via DS
+ELSE
+	SETB	SSEL.2		; destination addressed via ES
+ENDIF
+loop:	MOV.B	ES,R3L		; source addressed via ES
+	MOV.B	[R4+],[R2+]	; copy source to destination
+	SUB.W	R2,#01H		;
+	ADD.W	R2,#01H		; increment source pointer
+	ADDC.W	R3,#00H		;
+	DJNZ.W	R6,loop		; loop if count not zero
+IF	MODEL_LARGE
+	SETB	SSEL.4		; restore source pointer
+ELSE
+	CLR	SSEL.2		; restore source pointer
+ENDIF
+	RET			; and return
+
+	END

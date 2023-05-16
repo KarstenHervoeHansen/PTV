@@ -1,0 +1,257 @@
+<html>
+<head>
+<title>HI-TECH C XA Compiler -- Release Notes</title>
+</head>
+<body background="../gfx/paper1.jpg">
+<center>
+<h1>HI-TECH C XA Compiler</h1>
+<h2>Release Notes for V7.54</h2>
+</center>
+<hr>
+<img src="../gfx/white_dot.gif">The  <a href="../xatech.html">XA Compiler</a> (version 7.54) can be downloaded from
+<a href="ftp://ftp.hitech.com.au/hitech/updates/xa754.exe">our FTP server</a> or <a href="../files/updates/xa754.exe">web server</a>. <em>This version will only work for 
+registered users.</em> For a free, working demo of our XA (and other) compilers, see the
+<a href="http://www.hitech.com.au/downloads.html#demo">FTP Index</a>.
+<hr>
+
+<h3>1.1 Overview</h3>
+
+
+<p>This release of the XA compiler includes a number of new features
+and numerous bug fixes and improvements relative to V7.53.
+</p>
+
+<h3>1.2 New Features</h3>
+
+The new features included in this release are:<ul>
+<li>       Non-volatile RAM support in far memory
+
+<li>       Interrupts can use alternate register banks
+
+<li>       Predefined constants are provided in <intrpt.h>  to  initialise
+		 PSW contents for interrupt vectors.
+
+<li>       Large model code can be renamed and  relocated  with  the
+	#pragma psect directive.
+
+<li>       Initialization of auto aggregates is now implemented
+
+<li>       A new pragma is provided to control switch statement code
+	generation.
+
+<li>       CPP is now provided in a 32 bit version as well
+</ul>
+
+<p>
+These features are discussed in more detail below.
+</p>
+
+<h3>1.3 Bugs Fixed</h3></h3>
+<p>
+The major bugs fixed in this release are listed  below.  All  reported 
+bugs have been fixed at the time of this release.</p>
+<ul>
+<li>       Assembler crashed with use of equated bit addresses
+
+<li>       Optimizer was converting fcall/ret into  jmp  instead  of
+	fjmp
+
+<li>       Various "can't generate code" errors were fixed.
+
+<li>       Interrrupt functions werenot correctly saving and restoring
+		 the SSEL, CS and ES registers
+
+<li>       The help file for XAC has been renamed correctly
+
+<li>       Some hard-coded list size limits have been  removed  from
+	HPDXA  and  XAC. In particular, there is now no specific limit on
+	the number of object files that can be passed on the linker  command 
+	line. Previously it was 127. or fewer.
+
+</ul>
+
+<h3>1.4 Non-Volatile Far Memory</h3>
+
+<p>
+Variables declared persistent are placed into a special psect  to
+allow  them  to be preserved across resets. Previously this psect
+could only be located in the first 64K of memory. Now you can declare  
+a  variable  to be far persistent and it will be placed in
+another psect (farnvram) which can be located anywhere in the address  
+space. There is an additional value accepted by the -A option 
+to XAC, and an extra field in the ROM and RAM addresses dialog  
+box in HPDXA to specify a value for this address. An address
+of zero will result in the far persistent data being placed along
+with  other  data  in  RAM.  Use  this if all your RAM is battery
+backed.
+</p>
+
+<h3>1.5 Register Banks with Interrupts</h3>
+
+<p>The XA has four banks of registers that may be selected into  the
+lower processor registers (R0-R3). These may be used in interrupt
+functions to minimize saving of registers on the  stack.  If  the
+keyword  banked  is  added  to an interrupt function declaration,
+then the compiler will not generate code to save  R0-R3  even  if
+they  are used. The actual bank switching is performed by loading
+the new PSW from the interrupt vector as  described  below.  Note
+that  it  is entirely up to the programmer to ensure that the interrupt 
+vector is correctly initialized to select the correct register bank, and 
+to ensure that the interrupt function is not interrupted by another 
+function using the same register bank.
+</p>
+
+<h3>1.6 Predefined Values for Interrupt Vector PSW</h3>
+
+<p>The third argument to ROM_VECTOR and RAM_VECTOR is the new PSW to
+be loaded when the interrupt is servciced. See the XA user manual
+for a full description of the PSW, but the important parts of the
+PSW  for  interrupt vectors are the system mode bit (bit 15), the
+execution priority (bits 8-11) and the register bank select (bits
+12-13).  For  most  applications you can use the predefined  constant
+(from < xa.h >) IV_PSW which will set system  mode,  register
+bank  0,  and an execution priority of 15, thus making the interrupt
+function non-interruptable. For other requirements, you  can
+use  a  combination  of other values, as listed in Table 3 - 1 on
+page 2. For example to execute the interrupt at priority  8,  and
+using register bank 1, you could use IV_SYSTEM+IV_PRIO08+IV_BANK1
+as the third argument to ROM_VECTOR. In this case  the  interrupt
+function  could be declared banked which would prevent the saving
+of register R0-R3 on the stack. NOTE! If you use the banked  keyword 
+it is entirely up to you to ensure that the interrupt vector
+PSW setting specifies a register bank other than zero, and to ensure
+  that only one interrupt function executes at any time using
+a given bank.
+</p>
+
+<table border=1 cellpadding=5>
+<caption><h4>Table 3 - 1  Interrupt PSW Values</h4></caption>
+<th align=left>IV_PSW      <td>Standard PSW setting - System mode, priority 15, bank 0
+<tr>
+<th align=left>IV_SYSTEM   <td>Set system mode
+<tr>
+<th align=left>IV_PRI00    <td>Execution priority 0 (lowest)
+<tr>
+<th align=left>IV_PRI01    <td>Execution priority 1
+<tr>
+<th align=left>IV_PRI02    <td>Execution priority 2
+<tr>
+<th align=left>IV_PRI03    <td>Execution priority 3
+<tr>
+<th align=left>IV_PRI04    <td>Execution priority 4
+<tr>
+<th align=left>IV_PRI05    <td>Execution priority 5
+<tr>
+<th align=left>IV_PRI06    <td>Execution priority 6
+<tr>
+<th align=left>IV_PRI07    <td>Execution priority 7
+<tr>
+<th align=left>IV_PRI08    <td>Execution priority 8
+<tr>
+<th align=left>IV_PRI09    <td>Execution priority 9
+<tr>
+<th align=left>IV_PRI10    <td>Execution priority 10
+<tr>
+<th align=left>IV_PRI11    <td>Execution priority 11
+<tr>
+<th align=left>IV_PRI12    <td>Execution priority 12
+<tr>
+<th align=left>IV_PRI13    <td>Execution priority 13
+<tr>
+<th align=left>IV_PRI14    <td>Execution priority 14
+<tr>
+<th align=left>IV_PRI15    <td>Execution priority 15 (highest)
+<tr>
+<th align=left>IV_BANK0    <td>Select register bank 0
+<tr>
+<th align=left>IV_BANK1    <td>Select register bank 1
+<tr>
+<th align=left>IV_BANK2    <td>Select register bank 2
+<tr>
+<th align=left>IV_BANK3    <td>Select register bank 3
+</table>
+
+<h3>1.7 Loading Code in Large Model at Specific Addresses</h3>
+
+<p>When using large model, it is possible to change the name of  the
+psect  used for code (ltext) to another name, then specify a particular
+ address to load that code in physical memory. The #pragma
+psect directive will allow you to rename the ltext psect, and you
+can then assign it an address at link time. For example, use</p>
+<p>
+<tt>#pragma psect ltext=dummy</tt>
+</p>
+
+<p>
+and all code in this module will appear in the psect  dummy.  You
+can  assign an address to this psect at link time with the linker
+option (added into the Linker Options list in HPDXA, or  supplied
+to XAC with the -l option) as follows:
+</p>
+
+<p>
+<tt>-pdummy=0/40000h</tt>
+</p>
+
+<p>
+This will start the psect at physical address 40000 (i.e. segment
+number 4). The link address of zero sets the lower 16 bits of the
+PC. If you wanted to start this part way through a  segment,  add
+the same offse to both the link and load addresses, e.g.
+</p>
+
+<p>
+<tt>-pdummy=4000h/44000h</tt>
+</p>
+
+<h3>1.8 Auto Aggregate Initialization</h3>
+
+<p>
+This version of the compiler implements auto aggregrate initialization, 
+i.e.  you  can  include an initialization of an array or
+structure in a declaration local to a function
+</p>
+
+<h3>1.9 The #pragma switch Directive</h3>
+
+<p>
+The compiler generates several different kinds of code for switch
+statements.  Usually  the  compiler will choose the smallest code
+for a given switch. The major methods are a direct switch,  where
+a  jump  table  is  indexed by the value being switched on, and a
+simple switch, where a sequence of comparisons are done. A direct
+switch  operates  in  constant time and will usually be faster on
+average than a simple switch, but can be quite large for a sparse
+set  of  case  labels. If you have a particular need for a determinstic time switch, you can select a  direct  switch  with  this
+directive.  A  #pragma switch directive will have effect only for
+the immediate next switch statement, and only if this appears  in
+the  same  function. The possible arguments to this directive are
+auto, which restores behaviour  to  the  default,  direct,  which
+selects a direct switch, and simple which selects a simple switch
+For example:
+</p>
+<p>
+<tt>#pragma switch direct</tt>
+</p>
+
+<h3>1.10 CPP Now 32 bit</h3>
+
+<p>Some users have experienced running out of memory in  CPP.  There
+is  now  a  32 bit version of CPP supplied which should eliminate
+this problem.
+</p>
+
+<h3>1.11 Installing the Upgrade</h3>
+
+<p>
+If you already had an earlier version, you will need  to  install
+the upgrade disks using the serial number and activation key ori-
+ginally supplied. Simply install over your previous version.
+</p>
+<hr>
+<h4>Copyright &copy 1996 HI-TECH Software
+<br>
+This page last updated February 12th, 1996</h4>
+<br>
+</body>
+</html>

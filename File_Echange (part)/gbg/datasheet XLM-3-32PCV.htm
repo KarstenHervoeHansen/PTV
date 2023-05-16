@@ -1,0 +1,748 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<!-- saved from url=(0085)http://www.ittcannon.com/products/datasheet.asp?PN=XLM%2D3%2D32%2DPCV&FamilyID=110398 -->
+<HTML><HEAD>
+<META http-equiv=Content-Type content="text/html; charset=windows-1252">
+<SCRIPT>
+
+function openWindow( link ) {
+	return window.open(link, '', 'statusbar=no,scrollbars=no,resizable=yes,addressbar=no,width=380,height=300');
+}
+
+function openWindowSize( link, width, height ) {
+	return window.open(link, '', 'statusbar=no,scrollbars=yes,resizable=yes,addressbar=no,width=' + width + ',height=' + height);
+}
+
+
+function hasValue(obj, obj_type) {
+    if (obj_type == "TEXT" || obj_type == "PASSWORD") {
+    	if (obj.value.length == 0) 
+      		return false;
+    	else 
+      		return true;
+   	} else if (obj_type == "SELECT") {
+        for (i=0; i < obj.length; i++)
+			if (obj.options[i].selected)
+				return true;
+       	return false;	
+		
+	} else if (obj_type == "SINGLE_VALUE_RADIO" || obj_type == "SINGLE_VALUE_CHECKBOX") {
+		if (obj.checked)
+			return true;
+		else
+       		return false;	
+			
+	} else if (obj_type == "RADIO" || obj_type == "CHECKBOX") {
+        for (i=0; i < obj.length; i++)
+			if (obj[i].checked)
+				return true;
+       	return false;	
+	}
+}
+
+
+function checkinteger(object_value) {
+    //Returns true if value is a number
+    //otherwise returns false	
+
+    if (object_value.length == 0)
+        return false;
+    //Returns true if value is an integer defined as
+    //   having an optional leading + or -.
+    //   otherwise containing only the characters 0-9.
+	var decimal_format = ".";
+	var check_char;
+    //The first character can be + -  blank or a digit.
+	check_char = object_value.indexOf(decimal_format)
+    //Was it a decimal?
+    if (check_char < 1)
+		return checknumber(object_value);
+    else
+		return false;
+}
+
+function checknumber(object_value) {
+    //Returns true if value is a number
+    //otherwise returns false	
+	if (object_value.length == 0)
+        return false;
+    //Returns true if value is a number defined as
+    //   having an optional leading + or -.
+    //   having at most 1 decimal point.
+    //   otherwise containing only the characters 0-9.
+	var start_format = " .+-0123456789";
+	var number_format = " .0123456789";
+	var check_char;
+	var decimal = false;
+	var trailing_blank = false;
+	var digits = false;
+
+	while (object_value.indexOf(",") > 0) { 
+		object_value = object_value.replace(",", ""); 
+	}	
+    //The first character can be + - .  blank or a digit.
+	check_char = start_format.indexOf(object_value.charAt(0))
+    //Was it a decimal?
+	if (check_char == 1)
+	    decimal = true;
+	else if (check_char < 1)
+		return false;
+	//Remaining characters can be only . or a digit, but only one decimal.
+	for (var i = 1; i < object_value.length; i++) {
+		check_char = number_format.indexOf(object_value.charAt(i))
+		if (check_char < 0)
+			return false;
+		else if (check_char == 1) {
+			if (decimal)		// Second decimal.
+				return false;
+			else
+				decimal = true;
+		}
+		else if (check_char == 0) {
+			if (decimal || digits)	
+				trailing_blank = true;
+        // ignore leading blanks
+		}
+	        else if (trailing_blank)
+			return false;
+		else
+			digits = true;
+	}	
+    //All tests passed, so...
+    return true
+}
+
+
+function checkrange(object_value, min_value, max_value) {
+    //if value is in range then return true else return false
+    if (object_value.length == 0)
+        return false;
+
+    if (!checknumber(object_value))
+		return false;
+	else 
+		return (numberrange((eval(object_value)), min_value, max_value));
+    //All tests passed, so...
+    return true;
+}
+
+
+function numberrange(object_value, min_value, max_value) {
+    // check minimum
+    if (min_value != null) {
+        if (object_value < min_value)
+			return false;
+	}
+    // check maximum
+    if (max_value != null) {
+		if (object_value > max_value)
+			return false;
+	}
+    return true;
+}
+
+
+function checkdate(object_value) {
+  if (object_value.length == 0)
+    return false;
+
+	isplit = object_value.indexOf('/');
+
+	if (isplit == -1) 
+		isplit = object_value.indexOf('.');
+
+	if (isplit == -1 || isplit == object_value.length)
+		return false;
+
+  sMonth = object_value.substring(0, isplit);
+	daySplit = isplit + 1;
+
+	isplit = object_value.indexOf('/', daySplit);
+
+	if (isplit == -1)
+		isplit = object_value.indexOf('.', daySplit);
+
+	if (isplit == -1 ||  (isplit + 1 )  == object_value.length)
+		return false;
+
+  sDay = object_value.substring((sMonth.length + 1), isplit);
+
+	sYear = object_value.substring(isplit + 1);
+
+	if (!checkinteger(sMonth)) 					// check month
+		return false;
+	else if (!checkrange(sMonth, 1, 12)) 		// check month
+		return false;
+	else if (!checkinteger(sYear)) 				// check year
+		return false;
+	else if (!checkrange(sYear, 1900, null)) 		// check year
+		return false;
+	else if (!checkinteger(sDay)) 				// check day
+		return false;
+	else if (!checkday(sYear, sMonth, sDay))	// check day
+		return false;
+
+	return true;
+}
+
+function checkday(checkYear, checkMonth, checkDay) {
+	maxDay = 31;
+	if (checkMonth == 4 || checkMonth == 6 || checkMonth == 9 || checkMonth == 11)
+		maxDay = 30;
+	else
+		if (checkMonth == 2) {
+			if (checkYear % 4 > 0)
+				maxDay = 28;
+			else
+				if (checkYear % 100 == 0 && checkYear % 400 > 0)
+					maxDay = 28;
+				else
+					maxDay = 29;
+		}
+
+	return checkrange(checkDay, 1, maxDay); 
+}
+
+
+function trim(str) {
+	var i, strWork;
+	strWork=str;
+	if (str.length) {
+		while (strWork.length && strWork.charAt(0) == ' ')
+			strWork=strWork.substring(1,strWork.length)
+		while (strWork.length && strWork.charAt(strWork.length-1) == ' ')
+			strWork=strWork.substring(0,strWork.length-1)
+	}
+	return strWork;
+}
+
+</SCRIPT>
+<LINK href="datasheet XLM-3-32PCV_files/cc.css" type=text/css 
+rel=stylesheet><LINK href="datasheet XLM-3-32PCV_files/style.css" type=text/css 
+rel=stylesheet>
+<SCRIPT language=JavaScript type=text/javascript>
+<!--
+
+if(window.event + "" == "undefined") event = null;
+function HM_f_PopUp(){return false};
+function HM_f_PopDown(){return false};
+popUp = HM_f_PopUp;
+popDown = HM_f_PopDown;
+
+//-->
+
+</SCRIPT>
+
+<SCRIPT language=JavaScript type=text/javascript>
+<!--
+     NS4 = (document.layers);
+     IE4 = (document.all);
+    ver4 = (NS4 || IE4);
+	 IE5 = (IE4 && navigator.appVersion.indexOf("5.")!=-1);
+   isMac = (navigator.appVersion.indexOf("Mac") != -1);
+  isMenu = (NS4 || (IE4 && !isMac) || (IE5 && isMac));
+function popUp(){return};
+function popDown(){return};
+if (!ver4) event=null;
+//-->
+</SCRIPT>
+
+<SCRIPT language=JavaScript1.2 type=text/javascript>
+<!--
+
+HM_PG_MenuWidth = 150;
+HM_PG_FontFamily = "Verdana";
+HM_PG_FontSize = 8;
+HM_PG_FontBold = 0;
+HM_PG_FontItalic = 0;
+HM_PG_FontColor = "blue";
+HM_PG_FontColorOver = "white";
+HM_PG_BGColor = "#DDDDDD";
+HM_PG_BGColorOver = "#FFCCCC";
+HM_PG_ItemPadding = 3;
+
+HM_PG_BorderWidth = 1;
+HM_PG_BorderColor = "black";
+HM_PG_BorderStyle = "solid";
+HM_PG_SeparatorSize = 1;
+HM_PG_SeparatorColor = "#d0ff00";
+HM_PG_ImageSrc = "/media/images/tri.gif";
+HM_PG_ImageSrcLeft = "/media/images/triL.gif";
+
+HM_PG_ImageSize = 5;
+HM_PG_ImageHorizSpace = 0;
+HM_PG_ImageVertSpace = 2;
+
+HM_PG_KeepHilite = true; 
+HM_PG_ClickStart = 0;
+HM_PG_ClickKill = false;
+HM_PG_ChildOverlap = 20;
+HM_PG_ChildOffset = 10;
+HM_PG_ChildPerCentOver = null;
+HM_PG_TopSecondsVisible = 1;
+HM_PG_StatusDisplayBuild =0;
+HM_PG_StatusDisplayLink = 0;
+HM_PG_UponDisplay = null;
+HM_PG_UponHide = null;
+HM_PG_RightToLeft = false;
+
+HM_PG_CreateTopOnly = 1;
+HM_PG_ShowLinkCursor = 1;
+HM_PG_NSFontOver = true;
+
+//-->
+</SCRIPT>
+
+<SCRIPT language=JavaScript>
+<!--
+function MM_swapImgRestore() { //v3.0
+  var i,x,a=document.MM_sr; for(i=0;a&&i<a.length&&(x=a[i])&&x.oSrc;i++) x.src=x.oSrc;
+}
+
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+}
+
+function MM_findObj(n, d) { //v3.0
+  var p,i,x;  if(!d) d=document; if((p=n.indexOf("?"))>0&&parent.frames.length) {
+    d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}
+  if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i<d.forms.length;i++) x=d.forms[i][n];
+  for(i=0;!x&&d.layers&&i<d.layers.length;i++) x=MM_findObj(n,d.layers[i].document); return x;
+}
+
+function MM_swapImage() { //v3.0
+  var i,j=0,x,a=MM_swapImage.arguments; document.MM_sr=new Array; for(i=0;i<(a.length-2);i+=3)
+   if ((x=MM_findObj(a[i]))!=null){document.MM_sr[j++]=x; if(!x.oSrc) x.oSrc=x.src; x.src=a[i+2];}
+}
+
+function LaunchWindow(url, attibutes)
+{
+	window.open(url, "popup", attributes);
+}
+//-->
+</SCRIPT>
+
+<META content="MSHTML 6.00.3790.2795" name=GENERATOR></HEAD>
+<BODY text=#666666 vLink=#666666 aLink=#666666 link=#666666 bgColor=#ffffff 
+leftMargin=0 background="datasheet XLM-3-32PCV_files/sp_background_sub.gif" 
+topMargin=0 marginheight="0" marginwidth="0">
+<TABLE height="100%" cellSpacing=0 cellPadding=0 width=770 border=0>
+  <TBODY>
+  <TR vAlign=top align=left>
+    <TD width=770 height=72>
+      <SCRIPT language=JavaScript>
+	function submitsearch() {
+		if (document.forms["frmSearch"].SRCH.value == '') { 
+			alert("Please enter a part number or keyword before submitting.") 
+		}else{ 	
+			document.forms["frmSearch"].submit();
+		}		
+	}
+
+
+</SCRIPT>
+
+      <TABLE height=72 cellSpacing=0 cellPadding=0 width=770 border=0>
+        <TBODY>
+        <TR vAlign=top align=left>
+          <TD width=187 height=72 rowSpan=3><A 
+            href="http://www.ittcannon.com/"><IMG height=72 
+            src="datasheet XLM-3-32PCV_files/logo_ittcannon.gif" width=187 
+            border=0></A></TD>
+          <TD align=left width=63 height=35><IMG height=35 
+            src="datasheet XLM-3-32PCV_files/sp_angle.gif" width=63></TD>
+          <TD align=right width=523 bgColor=#f5f5f5 height=35>
+            <TABLE height=35 cellSpacing=0 cellPadding=0 width=200 border=0>
+              <TBODY>
+              <TR>
+                <FORM id=frmSearch name=frmSearch 
+                action=/products/partsearch.asp?cf=nb method=post>
+                <TD width=45><IMG height=35 
+                  src="datasheet XLM-3-32PCV_files/hdr_search.gif" width=36></TD>
+                <TD vAlign=center align=middle width=120><INPUT size=13 
+                  name=SRCH> </TD><!--<td width="33" height="35"><input type="image" src="/media/images/btn_go.gif" width="23" height="35"></td> -->
+                <TD width=33 height=35><A 
+                  href="javascript:submitsearch();"><IMG height=35 
+                  src="datasheet XLM-3-32PCV_files/btn_go.gif" width=23 
+                  border=0></A></TD></TR></FORM></TBODY></TABLE></TD></TR>
+        <TR>
+          <TD vAlign=top align=left colSpan=2 height=21><A 
+            onmouseover="MM_swapImage('product','','/media/images/nav_products_1_hover.gif',1); HM_f_PopUp('HM_Menu1',event);" 
+            onmouseout="MM_swapImgRestore(); HM_f_PopDown('HM_Menu1');" 
+            href="http://www.ittcannon.com/products/?cf=nb"><IMG height=21 
+            src="datasheet XLM-3-32PCV_files/nav_products_1.gif" width=97 
+            border=0 name=product></A><A 
+            onmouseover="MM_swapImage('catalogs','','/media/images/nav_catalogs_4_hover.gif',1); HM_f_PopUp('HM_Menu5',event);" 
+            onmouseout="MM_swapImgRestore(); HM_f_PopDown('HM_Menu1');" 
+            href="http://www.ittcannon.com/support/switch_connector_literature.asp?cf=nb"><IMG 
+            height=21 src="datasheet XLM-3-32PCV_files/nav_catalogs_4.gif" 
+            width=82 border=0 name=catalogs></A><A 
+            onmouseover="MM_swapImage('search','','/media/images/nav_search_2_hover.gif',1); HM_f_PopUp('HM_Menu2',event);" 
+            onmouseout="MM_swapImgRestore(); HM_f_PopDown('HM_Menu2');" 
+            href="http://www.ittcannon.com/search"><IMG height=21 
+            src="datasheet XLM-3-32PCV_files/nav_search_2.gif" width=72 border=0 
+            name=search></A><A 
+            onmouseover="MM_swapImage('support','','/media/images/nav_support_2_hover.gif',1); HM_f_PopUp('HM_Menu3',event);" 
+            onmouseout="MM_swapImgRestore(); HM_f_PopDown('HM_Menu3');" 
+            href="http://www.ittcannon.com/support"><IMG height=21 
+            src="datasheet XLM-3-32PCV_files/nav_support_2.gif" width=122 
+            border=0 name=support></A><A 
+            onmouseover="MM_swapImage('about','','/media/images/nav_about_3_hover.gif',1); HM_f_PopUp('HM_Menu4',event);" 
+            onmouseout="MM_swapImgRestore(); HM_f_PopDown('HM_Menu4');" 
+            href="http://www.ittcannon.com/company"><IMG height=21 
+            src="datasheet XLM-3-32PCV_files/nav_about_3.gif" width=111 border=0 
+            name=about></A><A 
+            onmouseover="MM_swapImage('home','','/media/images/nav_home_5_hover.gif',1)" 
+            onmouseout=MM_swapImgRestore() href="http://www.ittcannon.com/"><IMG 
+            height=21 src="datasheet XLM-3-32PCV_files/nav_home_5.gif" width=40 
+            border=0 name=home></A><IMG height=21 
+            src="datasheet XLM-3-32PCV_files/nav_space_4.gif" width=59 
+          border=0></TD></TR>
+        <TR>
+          <TD vAlign=top align=right colSpan=2><IMG height=16 
+            src="datasheet XLM-3-32PCV_files/sp_arrow.gif" width=23></TD>
+          <TD><A href="http://www.ittcannon.com/crawlpage.htm"><IMG height=1 
+            src="datasheet XLM-3-32PCV_files/spacer.gif" width=1 
+        border=0></A></TD></TR></TBODY></TABLE>
+      <SCRIPT language=JavaScript1.2 
+      src="datasheet XLM-3-32PCV_files/HM_Loader.js" 
+      type=text/javascript></SCRIPT>
+    </TD></TR>
+  <TR vAlign=top align=left>
+    <TD><!-- Start: Inserted by ConfigurationWizard.jsp --><!-- |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | --><!-- |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | --><!-- V  V  V  V  V  V  V  V  V  V  V  V  V  V  V  V  V  V -->
+      <FORM id=frmdatasheet name=frmdatasheet action=datasheet_prt.asp 
+      method=post>
+      <TABLE cellSpacing=0 cellPadding=0 border=0>
+        <TBODY>
+        <TR>
+          <TD>
+            <TABLE class=ConfigurationWizard_PF-PN-SR-SD height=300 
+            cellSpacing=1 cellPadding=0 border=0>
+              <TBODY>
+              <TR class=HEADING vAlign=top>
+                <TD vAlign=top align=left colSpan=3>
+                  <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0>
+                    <TBODY>
+                    <TR class=Product>
+                      <TD class=Product align=left width=622 
+                      background="datasheet XLM-3-32PCV_files/title_bar.gif" 
+                      height=30>XLM-PC</TD>
+                      <TD class=product 
+                      onmouseover="javascript: document.images.LOGO.src = '/media/cc/images/logo_clickit_hover.gif'" 
+                      onmouseout="javascript: document.images.LOGO.src = '/media/cc/images/logo_clickit.gif'" 
+                      align=left><IMG 
+                        src="datasheet XLM-3-32PCV_files/logo_clickit.gif" 
+                        width=124 border=0 name=LOGO></TD></TR></TBODY></TABLE></TD></TR>
+              <TR vAlign=top>
+                <TD vAlign=top colSpan=3>
+                  <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0>
+                    <TBODY>
+                    <TR class=Action_Buttons vAlign=center height=22 
+                    WIDTH="100%"><INPUT type=hidden value=XLM-3-32-PCV 
+                      name=partnumber> 
+                      <TD align=middle width=622 bgColor=#ffcc00>
+                        <P class=midheader>PART NUMBER: XLM-3-32-PCV</P></TD><!-- Displays the vertical spacer line -->
+                      <TD width=1 bgColor=#cccccc></TD><!-- Displays the "Restart" Button  -->
+                      <TD align=middle bgColor=#ffffff>&nbsp; 
+                  </TD></TR></TBODY></TABLE></TD></TR>
+              <TR vAlign=top>
+                <TD vAlign=top align=left width=622 height="100%">
+                  <TABLE class=Selector_Background height="100%" cellSpacing=2 
+                  cellPadding=0 width=622 border=0>
+                    <TBODY>
+                    <TR vAlign=top>
+                      <TD align=middle><!-- ########################################################################## --><!-- ########################################################################## --><!-- ########################################################################## -->
+                        <TABLE cellPadding=2 width="100%">
+                          <TBODY>
+                          <TR>
+                            <TD>
+                              <TABLE width="100%" border=0>
+                                <TBODY>
+                                <TR>
+                                <TD align=left bgColor=#ffffff colSpan=2><INPUT 
+                                type=hidden value=audio/AU76-2.jpg 
+                                name=thumbnail> 
+                                <P class=midheader><IMG 
+                                src="datasheet XLM-3-32PCV_files/AU76-2.jpg" 
+                                align=right><BR></P>
+                                <P class=smallnormal>Image Disclaimer:<BR>Please 
+                                use Customer Drawing for design activity: line 
+                                art and other pictures are general 
+                                representations of product dimensions.</P><A 
+                                href="http://www.ittcannon.com/products/datasheet.asp?PN=XLM%2D3%2D32%2DPCV&amp;FamilyID=110398#prodimages"><IMG 
+                                src="datasheet XLM-3-32PCV_files/btn_data_vlinedrawings.gif" 
+                                border=0></A> </TD></TR><INPUT type=hidden 
+                                value=Audio name="Product Family"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Product Family</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>Audio</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Audio+XLM%2DPC 
+                                name="Product Group"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Product Group</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>Audio 
+                                XLM-PC</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden 
+                                value=PCB+mount+type+with+metal+shell%2E+Improved+EMI+shielding%2E+Intermaeable+with+XLR+and+XLB2%2E 
+                                name="Product Description"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Product Description</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>PCB mount type with metal shell. 
+                                Improved EMI shielding. Intermaeable with XLR 
+                                and XLB2.</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Receptacle 
+                                name="Product Series"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Product Series</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>Receptacle</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=3 name="Contact Arrangement"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Contact Arrangement</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>3</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Male name=Gender> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P 
+                                class=normalbold>Gender</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>Male</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Flange name="Shell  Style"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Shell Style</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>Flange</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Vertical+90 name=Termination> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Termination</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>Vertical 
+                                90</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Silver name="Shell Color"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Shell Color</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>Silver</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=3+A name="Current Rating"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Current Rating</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>3 
+                                A</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=133+V 
+                                name="Service Voltage (AC)"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Service Voltage (AC)</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>133 
+                                V</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=1400+V 
+                                name="Dielectric Withstanding Voltage (AC)"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Dielectric Withstanding 
+                                Voltage (AC)</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>1400 
+                                V</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=30+milliohms+max%2E 
+                                name="Contact Resistance"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Contact Resistance</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>30 milliohms max.</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden 
+                                value=5%2C000+megaohms+min%2E+at+500+V+DC 
+                                name="Insulation Resistance"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Insulation Resistance</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>5,000 megaohms min. at 500 V 
+                                DC</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden 
+                                value=%2D35%B0C+to+%2B+85%B0C+%28%2D31%B0F+to+185%B0F%29 
+                                name="Temperature Rating"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Temperature Rating</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>-35°C to + 85°C (-31°F to 
+                                185°F)</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=%2314 
+                                name="Wire Accommodation Reference AWG"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Wire Accommodation Reference 
+                                AWG</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>#14</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=2%2E0+mm%3Csup%3E2%3C%2Fsup%3E 
+                                name="Wire Cross Section (max.)"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Wire Cross Section 
+(max.)</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>2.0 mm<SUP>2</SUP></P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=2%2E1+mm 
+                                name="Stranded Wire O.D. (max.)"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Stranded Wire O.D. 
+(max.)</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>2.1 
+                                mm</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden 
+                                value=Copper+Alloy+%28Finish%3A+Silver%29 
+                                name="Contact Material"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Contact Material</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>Copper Alloy (Finish: 
+Silver)</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=PBT+Glass%2Dfilled 
+                                name="Socket Insulator Material"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Socket Insulator 
+Material</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>PBT Glass-filled</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Nylon 
+                                name="Pin Insulator Material"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Pin Insulator Material</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P 
+                                class=normal>Nylon</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Zinc+Alloy+%28Nickel%29 
+                                name="Shell Material"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Shell Material</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>Zinc Alloy (Nickel)</P><!-- saqprod	--></TD></TR><INPUT 
+                                type=hidden value=Zinc+Alloy+%28Nickel%29 
+                                name="Barrel Material"> 
+                                <TR>
+                                <TD width="50%" bgColor=#cccccc>
+                                <P class=normalbold>Barrel Material</P><!-- saqprod	--></TD>
+                                <TD width="50%" bgColor=#ebebeb>
+                                <P class=normal>Zinc Alloy (Nickel)</P><!-- saqprod	--></TD></TR></TBODY></TABLE><A 
+                              name=prodimages>
+                              <TABLE border=0><!--	<img src="/media/datasheet/Contact Arrangement Configuration"><br> -->
+                                <TBODY>
+                                <TR>
+                                <TD><INPUT type=hidden 
+                                value=/media/datasheet/audio/AU77-1.gif 
+                                name=prtimage0> <IMG 
+                                src="datasheet XLM-3-32PCV_files/AU77-1.gif"><BR></TD></TR><!--	<img src="/media/datasheet/Contact Arrangement Configuration"><br> -->
+                                <TR bgColor=#ebebeb height=15>
+                                <TD></TD></TR>
+                                <TR>
+                                <TD><INPUT type=hidden 
+                                value=/media/datasheet/audio/AU63-1.gif 
+                                name=prtimage1> <IMG 
+                                src="datasheet XLM-3-32PCV_files/AU63-1.gif"><BR></TD></TR><!--	<img src="/media/datasheet/Contact Arrangement Configuration"><br> -->
+                                <TR bgColor=#ebebeb height=15>
+                                <TD></TD></TR>
+                                <TR>
+                                <TD><INPUT type=hidden 
+                                value=/media/datasheet/audio/AU91-1.gif 
+                                name=prtimage2> <IMG 
+                                src="datasheet XLM-3-32PCV_files/AU91-1.gif"><BR></TD></TR><!--	<img src="/media/datasheet/Contact Arrangement Configuration"><br> -->
+                                <TR bgColor=#ebebeb height=15>
+                                <TD></TD></TR>
+                                <TR>
+                                <TD><INPUT type=hidden 
+                                value=/media/datasheet/audio/AU93-1.gif 
+                                name=prtimage3> <IMG 
+                                src="datasheet XLM-3-32PCV_files/AU93-1.gif"><BR></TD></TR></TBODY></TABLE></A></TD></TR></TBODY></TABLE><!-- ########################################################################## --><!-- ########################################################################## --><!-- ########################################################################## --></TD></TR></TBODY></TABLE></TD>
+                <TD vAlign=top align=left width=123 height="100%"><!-- Start Background Table (this table generates the grey background) -->
+                  <TABLE height="100%" cellSpacing=0 cellPadding=0 width=123 
+                  bgColor=#ebebeb border=0>
+                    <TBODY>
+                    <TR vAlign=top>
+                      <TD align=middle height=2><IMG height=2 
+                        src="datasheet XLM-3-32PCV_files/spacer.gif" width=102 
+                        border=0> </TD></TR>
+                    <TR vAlign=top>
+                      <TD align=middle height=20><A 
+                        href="http://www.ittcannon.com/support/dealers.asp"><IMG 
+                        height=17 
+                        src="datasheet XLM-3-32PCV_files/btn_data_nav_salessupport.gif" 
+                        width=102 border=0></A> </TD></TR>
+                    <TR vAlign=top>
+                      <TD align=middle height=20><A 
+                        href="http://www.ittcannon.com/support/askspecialist.asp?prodid=10003"><IMG 
+                        height=17 
+                        src="datasheet XLM-3-32PCV_files/btn_data_nav_askasp.gif" 
+                        width=102 border=0></A> </TD></TR>
+                    <TR vAlign=top>
+                      <TD align=middle height=20><A 
+                        href="http://www.ittcannon.com/products/products.asp?prodids=10003"><IMG 
+                        height=17 
+                        src="datasheet XLM-3-32PCV_files/btn_data_nav_getlit.gif" 
+                        width=102 border=0></A> </TD></TR>
+                    <TR vAlign=top>
+                      <TD align=middle height=20><A 
+                        href="http://www.ittcannon.com/support/stockcheck_result.asp?strPart=XLM-3-32-PCV"><IMG 
+                        height=17 
+                        src="datasheet XLM-3-32PCV_files/btn_data_nav_stock.gif" 
+                        width=102 border=0></A> </TD></TR>
+                    <TR vAlign=top>
+                      <TD align=middle height=45><INPUT id=image1 type=image 
+                        height=45 width=119 
+                        src="datasheet XLM-3-32PCV_files/btn_data_nav_btm.gif" 
+                        border=0> </TD></TR>
+                    <TR vAlign=top>
+                      <TD align=middle></TR></TBODY></TABLE><!-- End Background Table (this table generates the grey background) --></TD></TR></TBODY></TABLE></TD></TR></TBODY></TABLE></TD></TR>
+  <TR vAlign=bottom align=left>
+    <TD vAlign=bottom width=770 height=40><BR>
+      <TABLE height=32 cellSpacing=0 cellPadding=0 width=770 bgColor=#666666 
+      border=0>
+        <TBODY>
+        <TR vAlign=top align=left>
+          <TD width=10 height=32>&nbsp;</TD>
+          <TD vAlign=center align=left width=652 height=32>
+            <P align=center><FONT face="Verdana, Arial, Helvetica, sans-serif" 
+            color=#cccccc size=1><A style="COLOR: #cccccc" 
+            href="http://www.ittcannon.com/company/extranet.asp">Sign In</A> | 
+            <A style="COLOR: #cccccc" 
+            href="http://www.ittcannon.com/support/contactus.asp">Contact Us</A> 
+            | <A style="COLOR: #cccccc" 
+            href="http://www.ittcannon.com/company/disclaimer.asp">Legal 
+            Disclaimer</A> | <A style="COLOR: #cccccc" 
+            href="http://www.ittcannon.com/company/privacy_policy.asp">Privacy 
+            Policy</A> | <A style="COLOR: #cccccc" 
+            href="http://www.ittcannon.com/default.asp">Home</A><BR>© 2006 ITT 
+            Industries </FONT></P></TD>
+          <TD align=middle width=108 
+  height=32></TD></TR></TBODY></TABLE></TD></TR></TBODY></TABLE></FORM></BODY></HTML>

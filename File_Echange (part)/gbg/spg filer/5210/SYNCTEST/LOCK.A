@@ -1,0 +1,1165 @@
+$include	(equ.a)
+;********************************************************
+; filename	: lock.a	ver.	950508		*
+; author	: p.christiansen	931026		*
+; status	: preliminary				*
+; tested by	:					*
+; optimized for	: speed					*
+; specialities	:					*
+;********************************************************
+; HISTORY:
+; 950713 BUAM not used
+; 950508 PALM filter added.
+; 940519 port 3.1 now freed for use with source code option
+; 931214 New tables with bank shift
+; 931208 Bit level is inserted in port output
+; 931122 New lock routine
+; 931118 Filter on BLACK
+; 931105 Burstfase moved to here from file: line.a
+; 931026 ADDL and SUPR changed into a byte LINADD
+; 930604 HFASEC is now called from HLOCK
+		locking segment code
+	rseg locking
+	public 	lock
+	extrn code(hfasef)
+
+;****************
+; entry		: lock
+; purpose	: subroutine 1.6
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: burstfase(144),burstlock(179),hlock(174+n*29),intern(12)
+; execute time	: (24+174+n*29)=149+n*22us
+;****************
+lock:
+	jnb	genlocken,setintb
+	mov	a,verr
+	jnz	setintb
+;* vertical lock OK *
+	lcall	burstfase
+;* check if blackav > syg1 *
+	mov	a,#syg1
+	clr	c
+	subb	a,blackav
+	jnc	setintb
+;* check if blackav > syg2 *
+	mov	a,#syg2
+	clr	c
+	subb	a,blackav
+	jc	ckslow
+	jnb	syncav,setintb
+ckslow:
+	jnb	slowlock,her1
+	ljmp	setslow
+her1:
+	jb	bulocken,her2
+	ljmp	nobu
+;* check if buamav > #buamg1 *
+her2:
+	mov	a,#buamg1
+	clr	c
+	subb	a,buamav
+	jnc	nobu
+;* check if buamav > #buamg2 *
+	mov	a,#buamg2
+	clr	c
+	subb	a,buamav
+	jc	ckali
+	jnb	buav,nobu
+ckali:
+;$if (gvers=0)
+;	clr	alian
+;$endif
+
+	jnb	alian,palg
+
+
+$if (gvers=1)
+;* check if secamav < #secag2 *
+	mov	a,secamav
+	clr	c
+	subb	a,#secag2
+	jnc	seca
+;* check if secamav < #secag1 *
+	mov	a,secamav
+	clr	c
+	subb	a,#secag1
+	jc	cdif
+	jb	secam,seca
+;* check if buamav-secamav > #secag3 *
+cdif:
+	mov	a,buamav
+	clr	c
+	subb	a,secamav
+	jc	seca
+	subb	a,#secag3
+	jc	seca
+	jz	seca
+;* check if palav > #palg2 *
+	mov	a,#palg2
+	clr	c
+	subb	a,palav
+	jnc	chkg1
+	sjmp	palg
+setintb:
+	sjmp	setint
+chkg1:
+	mov	a,#palg1
+	clr	c
+	subb	a,palav
+	jnc	pallo
+	jb	pal,pallo
+palg:
+	jnb	lockdet,palgun
+	mov	outs,#palglock
+	mov	errpre,#3
+	sjmp	bulo
+palgun:
+	mov	outs,#palgunl
+	mov	errpre,#1
+bulo:
+	lcall	burstlock
+	sjmp	outlock
+
+$else
+
+;* check if palav > #palg2 *
+	mov	a,#palg2
+	clr	c
+	subb	a,palav
+	jnc	chkg1
+	sjmp	palg
+setintb:
+	sjmp	setint
+chkg1:
+	mov	a,#palg1
+	clr	c
+	subb	a,palav
+	jnc	pallo
+	jb	pal,pallo
+palg:
+	jnb	lockdet,palgun
+	mov	outs,#palglock
+	mov	errpre,#3
+	sjmp	bulo
+palgun:
+	mov	outs,#palgunl
+	mov	errpre,#1
+bulo:
+	lcall	burstlock
+	sjmp	outlock
+
+$endif
+
+pallo:
+	jnb	lockdet,pnunl
+	mov	outs,#pallock
+	mov	errpre,#3
+	sjmp	hloc
+pnunl:
+	mov	outs,#palunl
+	mov	errpre,#1
+	sjmp	hloc
+seca:
+	jnb	lockdet,seunl
+	mov	outs,#secamlock
+	mov	errpre,#3
+	sjmp	hloc
+seunl:
+	mov	outs,#secamunl
+	mov	errpre,#1
+	sjmp	hloc
+nobu:
+	jnb	lockdet,nohl
+	mov	outs,#hlocked
+	mov	errpre,#3
+	sjmp	hloc
+nohl:
+	mov	outs,#hunl
+	mov	errpre,#1
+hloc:
+	lcall	hlock
+	sjmp	outlock
+setslow:
+	mov	outs,#slowerr
+	sjmp	inte
+setint:
+	mov	outs,#internl
+inte:
+	lcall	intern
+outlock:
+	mov	dptr,#outport
+	mov	a,outs
+
+	jnb	level,portout	;insert bit: level	<931208a3
+	orl	a,#20h
+portout:
+	movx	@dptr,a
+	clr	dolock
+
+;	jnb	iicdiff,noiread	;skip if port is not read 	<940223a13
+;	jb	cachefull,noiread ;or cache full
+;	mov	p1,#0ffh	;else clear port
+;	mov	a,p1		; and read message
+;	cjne	a,#0ffh,check	;if port is empty (FF)
+;	sjmp	noiread
+;check:
+;	cjne	a,oldread,putca	;skip if same byte as last
+;	sjmp	noiread
+;putca:
+;	mov	cache,a		;else put in cache
+;	setb	cachefull	;and set flag for full cache
+;noiread:
+
+;	setb	p3.1		;TIL TEST
+	ret
+
+;** END of 1.6: lock *****
+;****************
+; entry		: burstfase -1.6.1
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+; execute time	: (144)108us
+;****************
+		bufase segment code
+	rseg bufase
+burstfase:
+	mov	a,hpos		; make I = hpos + #bupos
+	add	a,#low(bupos)
+	mov	i,a
+	mov	a,hpos+1
+	addc	a,#high(bupos)
+	mov	i+1,a
+;* test if i >= #hlen *
+	mov	a,i		
+	clr	c
+	subb	a,#low(hlen)
+	mov	a,i+1
+	subb	a,#high(hlen)
+	jnc	toobig2
+	mov	dph,i+1		;save in datapointer
+	mov	dpl,i
+	sjmp	icalc
+toobig2:
+;* I to big, subtract #hlen *
+	mov	a,i
+	clr	c
+	subb	a,#low(hlen)
+	mov	dpl,a		;save in datapointer
+	mov	a,i+1
+	subb	a,#high(hlen)
+	mov	dph,a
+icalc:
+	anl	dpl,#0fch	;clear 2 lsb bit
+	mov	a,dph
+	jz	getdual
+	mov	a,dpl		;subtract 4
+	clr	c
+	subb	a,#4
+	mov	dpl,a		;put in pointer
+	mov	a,dph
+	subb	a,#0
+	mov	dph,a
+getdual:
+	orl	dph,#dualport	;set prefix for address
+	movx	a,@dptr		;get and save 4 values
+	mov	r1,a
+	inc	dptr
+	movx	a,@dptr
+	mov	r2,a
+	inc	dptr
+	movx	a,@dptr
+	mov	r3,a
+	inc	dptr
+	movx	a,@dptr
+	mov	r4,a
+
+	add	a,r3		;make black = (s1+s2+3+s4)/4
+	mov	r5,#0		;use r5 to collect overflows
+	jnc	addr2
+	inc	r5
+addr2:
+	add	a,r2
+	jnc	addr1
+	inc	r5
+addr1:
+	add	a,r1
+	jnc	outadd
+	inc	r5
+outadd:
+				;* div r5,a by 4 *	
+	xch	a,r5		;rotate r5
+	clr	c
+	rrc	a
+	xch	a,r5
+	rrc	a		;rotate into a
+	xch	a,r5
+	clr	c
+	rrc	a		;rotate r5
+	xch	a,r5
+	rrc	a		;rotate into a
+	mov	black,a		;this is new black value
+
+; MAKE AVERAGE OF BLACK *********		<931118a14
+	mov	a,blackav
+	clr	c
+	subb	a,black
+	mov	a,blackav
+	jnc	testb0
+	add	a,#1
+	jz	maken
+	inc	blackav
+	sjmp	maken
+testb0:
+	jz	maken
+	dec	blackav
+maken:
+; **************************************************
+; find x=s3-s2 and y=s4-s1 for LATER PAL-N detection		<930723ax
+; **************************************************
+	clr	xnneg
+	clr	ynneg
+	mov	a,r3		;calc x = |s3 - s2|
+	clr	c
+	subb	a,r2
+	jnc	savxn
+	cpl	a
+	inc	a
+	setb	xnneg		;flag for negative
+savxn:
+	mov	x,a		;save
+	mov	a,r4		;calc y = |s4 - s1|
+	clr	c
+	subb	a,r1
+	jnc	savyn
+	cpl	a
+	inc	a
+	setb	ynneg		;flag for negative
+savyn:
+	mov	y,a		;save
+
+; CALCULATE X AND Y FOR BURST CALCULATION
+	clr	yneg
+	mov	a,r2		;calc y = s2 - s4
+	clr	c
+	subb	a,r4
+	jnc	savy
+	cpl	a
+	inc	a
+	setb	yneg		;flag for negative
+savy:
+	mov	r6,a		;save
+	mov	a,r1		;calc x = s1 - s3
+	clr	c
+	subb	a,r3
+	jc	notpos
+	mov	r5,a		;save
+	jz	xzero
+	mov	a,r6		;get y
+	jb	yneg ,negay1
+	lcall	makeyx		;get phase to buph and ampl. to acc -(27)20us
+	mov	r0,#0	; (1.2.2.2)
+;*time 127(95us)
+	sjmp	rotbuph
+negay1:
+	lcall	makexy		;get phase to buph and amplitude to acc
+	mov	r0,#0c0h	; (1.2.2.3)
+	sjmp	rotbuph
+xzero:
+	mov	a,r6
+	jb	yneg ,negay2
+	mov	buph,#0		;phase = 0100 shifted 6bits left
+	mov	buph+1,#040h
+	lcall	makexyam	;get amplitude to acc	1.2.2.4
+	sjmp	outbufa
+negay2:
+	mov	buph,#0		;phase = FF00 shifted 6bits left
+	mov	buph+1,#0c0h
+	lcall	makexyam	;get amplitude to acc	1.2.2.4
+	sjmp	outbufa
+notpos:
+	cpl	a		;make x = -x
+	inc	a
+	mov	r5,a		;save x
+	mov	a,r6		;get y
+	jb	yneg ,negay3
+	lcall	makexy		;get phase to buph and amplitude to acc
+	mov	r0,#040h	; (1.2.2.2)
+	sjmp	rotbuph
+negay3:
+	lcall	makeyx		;get ampl. to (z) and phase to acc(1.2.2.2
+	mov	r0,#080h
+rotbuph: ;rotate buph (16bit) 6 times left by using acc as high byte
+	 ; and rotate it 2 times right. Finally add prefix (in r0)
+	clr	c		;buph is in acc
+	rrc	a		;1. rotate
+	mov	buph+1,a
+	clr	a
+	rrc	a		; into low byte
+	mov	buph,a
+	mov	a,buph+1	;2. rotate
+	clr	c
+	rrc	a
+	orl	a,r0		;add prefix to high byte
+	mov	buph+1,a
+	mov	a,buph		; rotate into low byte
+	rrc	a
+	mov	buph,a
+outbufa:
+	mov	a,buamav
+	clr	c
+	subb	a,z
+	mov	a,buamav
+	jnc	test0
+	add	a,#1
+	jz	paldet
+	inc	buamav
+	sjmp	paldet
+test0:
+	jz	paldet
+	dec	buamav
+paldet:
+
+
+$if (gvers=1)
+; ************* DETECT PAL-N *************************
+	mov	a,x		;get x and y
+	mov	r5,a		;and save in registers
+	mov	a,y
+	mov	r6,a
+	jnb	xnneg,testy
+	jnb	ynneg,outpaln
+	sjmp	looktbl
+testy:
+	jb	ynneg,outpaln
+looktbl:
+	mov	dph,#tableam	;set port prefix for tableam	<931214cx
+	clr	ea		;disable intrpt
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r5		;get table value		<940307c2
+	mov	dpl,r6
+	movx	a,@dptr
+	mov	dph,#3		;set port prefix to normal bank
+	movx	@dptr,a		;do dummy write to change bank
+	setb	ea		;enable intrpt
+;PAL-N filter
+	clr	c
+	subb	a,palav
+	mov	a,palav
+	jc	tst0
+	add	a,#1
+	jz	outpaln
+	inc	palav
+	sjmp	outpaln
+tst0:
+	jz	outpaln
+	dec	palav
+outpaln:
+
+; ************* DETECT SECAM *************************
+secamdet:
+	mov	a,hpos		; make I = hpos + #sepos
+	add	a,#low(sepos)
+	mov	i,a
+	mov	a,hpos+1
+	addc	a,#high(sepos)
+	mov	i+1,a
+;* test if i >= #hlen *
+	mov	a,i		
+	clr	c
+	subb	a,#low(hlen)
+	mov	a,i+1
+	subb	a,#high(hlen)
+	jnc	toobig22
+	mov	dph,i+1		;save in datapointer
+	mov	dpl,i
+	sjmp	icalc2
+toobig22:
+;* I to big, subtract #hlen *
+	mov	a,i
+	clr	c
+	subb	a,#low(hlen)
+	mov	dpl,a		;save in datapointer
+	mov	a,i+1
+	subb	a,#high(hlen)
+	mov	dph,a
+icalc2:
+	anl	dpl,#0fch	;clear 2 lsb bit
+	mov	a,dph
+	jz	getdual2
+	mov	a,dpl		;subtract 4
+	clr	c
+	subb	a,#4
+	mov	dpl,a		;put in pointer
+	mov	a,dph
+	subb	a,#0
+	mov	dph,a
+getdual2:
+	orl	dph,#dualport	;set prefix for address
+	movx	a,@dptr		;get and save 4 values
+	mov	r1,a
+	inc	dptr
+	movx	a,@dptr
+	mov	r2,a
+	inc	dptr
+	movx	a,@dptr
+	mov	r3,a
+	inc	dptr
+	movx	a,@dptr
+	mov	r4,a
+
+; CALCULATE X AND Y FOR BURST CALCULATION
+	mov	a,r2		;calc y = s2 - s4 --> R6
+	clr	c
+	subb	a,r4
+	mov	r6,a		;save
+	mov	a,r1		;calc x = s1 - s3 --> R5
+	clr	c
+	subb	a,r3
+	mov	r5,a
+
+	jnb	acc.7,poly
+	cpl	a
+	inc	a
+	mov	r5,a
+poly:
+	mov	a,r6
+	jnb	acc.7,tblops
+	cpl	a
+	inc	a
+	mov	r6,a		;save y
+tblops:
+	mov	dph,#tablepyt
+	clr	ea		;disable intrpt
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r5		;get table value
+	mov	dpl,r6
+	movx	a,@dptr
+	mov	dph,#3		;set port prefix to normal bank
+	movx	@dptr,a		;do dummy write to change bank
+	setb	ea		;enable intrpt
+
+	clr	c
+	subb	a,secamav
+	mov	a,secamav
+	jc	tck0
+	add	a,#1
+	jz	outsecam
+	inc	secamav
+	sjmp	outsecam
+tck0:
+	jz	outsecam
+	dec	secamav
+outsecam:
+
+$else
+; M-VERSION:
+; ************* DETECT PALM *************************
+	mov	a,buph+1
+	clr	c
+	subb	a,subcref+1
+	mov	palm,a
+	mov	a,oldpalm
+	clr	c
+	subb	a,palm
+	mov	diff,a
+	mov	oldpalm,palm
+; now check for PALM
+	mov	a,diff
+	anl	a,#0c0h
+	jz	tstfe
+	mov	a,diff
+	anl	a,#0c0h
+	cjne	a,#0c0h,tstzer
+tstfe:
+	mov	a,palav
+	anl	a,#0feh
+	cjne	a,#0feh,uppalm
+	sjmp	outpalm
+tstzer:
+	mov	a,palav
+	clr	c
+	subb	a,#3
+	jc	setzer
+	dec	palav
+	dec	palav
+	sjmp	outpalm
+setzer:
+	mov	palav,#0
+	sjmp	outpalm
+uppalm:
+	inc	palav
+	mov	a,palav
+	cjne	a,#0,outpalm
+	dec	palav
+outpalm:
+
+$endif
+
+	ret			;time(144)108us + (paln) + (eph) + (secam)
+;** END of 1.6.1: burstfase *****
+
+
+; ***************************************************
+;* subroutine: makexy - get phase and amplitude from x,y *
+;* states	: (27)
+makexy:
+	mov	dph,#tableph	;prefix for table	<931214cx
+	clr	ea		;disable intrpt
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r5		;get table value(x,y)
+	mov	dpl,r6
+	movx	a,@dptr
+	mov	r0,a		;save buph
+
+;	mov	dph,#tableam	;prefix for table	<950713d
+;	movx	@dptr,a		;do dummy write to change bank
+;	mov	dph,r5		;point to new table
+;	mov	dpl,r6		;get offset
+;	movx	a,@dptr		;get value from prom
+;	mov	buam,a		;save amplitude
+
+	mov	dph,#tablepyt	;point to new table
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r5		;point to new table
+	mov	dpl,r6		;get offset
+	movx	a,@dptr		;get value from prom
+	mov	z,a		; save in z
+
+	mov	dph,#3		;set port prefix to normal bank
+	movx	@dptr,a		;do dummy write to change bank
+	setb	ea		;enable intrpt
+	mov	a,r0		;process buph
+	ret
+
+;* subroutine: makeyx - get phase and amplitude from y,x
+;* states	: (27)
+makeyx:
+	mov	dph,#tableph	;prefix for table	<931214cx
+	clr	ea		;disable intrpt
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r6		;get table value(y,x)
+	mov	dpl,r5
+	movx	a,@dptr
+	mov	r0,a		;save buph
+
+;	mov	dph,#tableam	;prefix for table	<950713d
+;	movx	@dptr,a		;do dummy write to change bank
+;	mov	dph,r5		;point to new table
+;	mov	dpl,r6		;get offset
+;	movx	a,@dptr		;get value from prom
+;	mov	buam,a		;save amplitude
+
+	mov	dph,#tablepyt	;point to new table
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r5		;point to new table
+	mov	dpl,r6		;get offset
+	movx	a,@dptr		;get value from prom
+	mov	z,a		; save in z
+
+	mov	dph,#3		;set port prefix to normal bank
+	movx	@dptr,a		;do dummy write to change bank
+	setb	ea		;enable intrpt
+	mov	a,r0		;process buph
+	ret
+
+;* subroutine: makexyam - get amplitude from x,y
+;* states	: (16)
+makexyam:
+	clr	ea		;disable intrpt
+;	mov	dph,#tableam	;prefix for table	<950713d
+;	movx	@dptr,a		;do dummy write to change bank
+;	mov	dph,r5		;point to new table
+;	mov	dpl,r6		;get offset
+;	movx	a,@dptr		;get value from prom
+;	mov	buam,a		;save amplitude
+
+	mov	dph,#tablepyt	;point to new table
+	movx	@dptr,a		;do dummy write to change bank
+	mov	dph,r5		;point to new table
+	mov	dpl,r6		;get offset
+	movx	a,@dptr		;get value from prom
+	mov	z,a		; save in z
+
+	mov	dph,#3		;set port prefix to normal bank
+	movx	@dptr,a		;do dummy write to change bank
+	setb	ea		;enable intrpt
+	mov	a,r0		;process buph
+	ret
+;****************
+; entry		: burstlock
+; purpose	: subroutine 1.6.2
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: hfasec (73)
+; states	: 106+73=179
+;****************
+		bulock segment code
+	rseg bulock
+burstlock:
+	mov	a,subcref	;* eph = subcref - buph
+	clr	c
+	subb	a,buph
+	mov	eph,a
+	mov	a,subcref+1
+	subb	a,buph+1
+	mov	eph+1,a
+
+	mov	i,oldph		;* I = oldph
+	mov	i+1,oldph+1
+	mov	oldph,eph	;* oldph = eph
+	mov	oldph+1,eph+1
+
+;* make eph = (eph+i)/2  - (circular mean value) *
+	clr	minus		;prepare sign flag
+	mov	a,i+1		;test if eph.high > i.high
+	clr	c
+	subb	a,eph+1
+	jnc	tsbma
+;* eph is biggest *
+	mov	a,eph+1		;test if eph.high - i.high >= 080h
+	clr	c
+	subb	a,i+1
+	jnb	acc.7 ,calc
+	setb	minus		; then set sign flag
+	sjmp	calc
+tsbma:
+;* eph is smallest *
+	jnb	acc.7 ,calc
+	setb	minus
+	sjmp	calc
+calc:	
+	mov	a,eph		;add eph and i
+	add	a,i
+	mov	eph,a
+	mov	a,eph+1
+	addc	a,i+1
+	rrc	a		;divide by 2
+	jnb	minus,okhigh
+	cpl	acc.7 
+okhigh:
+	mov	eph+1,a
+	mov	a,eph
+	rrc	a
+	mov	eph,a
+
+
+	mov	a,phdet+1	;* test phdet bit(15,14,13) = 000
+	anl	a,#0e0h
+	jz	tseph1
+	cjne	a,#0e0h,tsph15	;* test phdet bit(15,14,13) = 111
+tseph1:
+	mov	a,eph+1		;* phdet = eph/2
+	mov	c,acc.7 	;put sign
+	rrc	a
+	mov	phdet+1,a
+	mov	a,eph
+	rrc	a
+	mov	phdet,a
+	sjmp	outdac
+tsph15:
+	jb	acc.7 ,tseph2
+;* phdet positive *
+	mov	a,eph+1
+	jb	acc.7 ,addeph
+;* eph positive *
+	mov	a,eph+1		;* phdet = eph/2
+	clr	c
+	rrc	a
+	mov	phdet+1,a
+	mov	a,eph
+	rrc	a
+	mov	phdet,a
+	sjmp	outdac
+addeph:
+;* eph negative *
+	mov	a,eph+1		;* phdet = eph/2 and complement bit 15
+	clr	c		;new bit 15
+	rrc	a
+	mov	phdet+1,a
+	mov	a,eph
+	rrc	a
+	mov	phdet,a
+	sjmp	outdac
+tseph2:
+;* phdet negative *
+	mov	a,eph+1
+	jb	acc.7 ,addeph2
+;* eph positive *
+	mov	a,eph+1		;* phdet = eph/2 and complement bit 15
+	setb	c		;new bit 15
+	rrc	a
+	mov	phdet+1,a
+	mov	a,eph
+	rrc	a
+	mov	phdet,a
+	sjmp	outdac
+addeph2:
+;* eph negative *
+	mov	a,eph+1		;* phdet = eph/2
+	setb	c		;set sign
+	rrc	a
+	mov	phdet+1,a
+	mov	a,eph
+	rrc	a
+	mov	phdet,a
+outdac:
+
+;* skriv til DAC
+	mov	a,phdet+1		;shift high byte 1 nipple right
+	swap	a
+	mov	r0,a		;save nipple 2,3
+	mov	dptr,#freqh	;read out high (only low nipple used)
+	cpl	acc.3 
+	movx	@dptr,a
+	mov	a,r0		;get nipple 2,3
+	anl	a,#0f0h		;clear nipple 3
+	mov	r0,a		;save 2,-
+	mov	a,phdet		;get nipple 1,0
+	swap	a		;make 0,1
+	anl	a,#00fh		;make -,1
+	orl	a,r0		;make 2,1
+	mov	dptr,#freql	;read out low nipples
+	movx	@dptr,a
+	mov	dptr,#freqload	;update DAC
+	movx	@dptr,a
+
+test12:				;<<<<<<<<<<<<<test1
+	lcall	hfasec
+	ret
+;** END of 1.6.2 **
+;****************
+; entry		: hlock
+; purpose	: subroutine 1.6.3
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: hfasef(79+n*25),
+; states	: 95+79+n*29 = 174+n*29
+;****************
+		hlocking segment code
+	rseg hlocking
+hlock:
+;	mov	dptr,#0e002h	;test<<<<<<<<<<<<<2lin	930602d2
+;	movx	@dptr,a
+	lcall	hfasef
+	clr	c		;phdiff = href - hinput
+	mov	a,href
+	subb	a,hinput
+	mov	phdiff,a
+	mov	a,href+1
+	subb	a,hinput+1
+	mov	phdiff+1,a
+	mov	a,href+2
+	subb	a,hinput+2
+	mov	phdiff+2,a
+
+	jb	acc.7 ,phneg
+	ljmp	tsb1817
+phneg:
+	clr	c		;phdiff = hinput - href		<12/10cx
+	mov	a,hinput
+	subb	a,href
+	mov	phdiff,a
+	mov	a,hinput+1
+	subb	a,href+1
+	mov	phdiff+1,a
+	mov	a,hinput+2
+	subb	a,href+2
+	mov	phdiff+2,a
+
+	anl	a,#6		;test phdiff bit 18,17
+	jnz	setphd
+ts400:
+	mov	a,phdiff+2	;test if phdiff >= 000400
+	jnz	setx401
+	mov	a,#3
+	clr	c
+	subb	a,phdiff+1
+	jnc	invphd
+setx401:
+	mov	outf+1,#4
+	mov	outf,#1
+	sjmp	sndoutf
+invphd:
+	mov	a,phdiff	;make outf  equ  - phdiff (phdiff 2 byte ;)
+	cpl	a
+	add	a,#1
+	mov	outf,a
+	mov	a,phdiff+1
+	cpl	a
+	addc	a,#0
+	mov	outf+1,a
+	sjmp	sndoutf
+setphd:
+	clr	a		;phdiff = #hlen * 256 - phdiff
+	clr	c
+	subb	a,phdiff
+	mov	phdiff,a
+	mov	a,#low(hlen)
+	subb	a,phdiff+1
+	mov	phdiff+1,a
+	mov	a,#high(hlen)
+	subb	a,phdiff+2
+	mov	phdiff+2,a
+ts4002:
+	mov	a,phdiff+2	;test if phdiff >= 000400
+	jnz	setx000
+	mov	a,#3
+	clr	c
+	subb	a,phdiff+1
+	jnc	eqphd
+setx000:
+	mov	outf+1,#3
+	mov	outf,#0ffh
+	sjmp	sndoutf
+eqphd:
+	mov	outf,phdiff
+	mov	outf+1,phdiff+1
+	sjmp	sndoutf
+tsb1817:
+	mov	a,phdiff+2
+	anl	a,#6		;test phdiff bit 18,17
+	jz	ts4002
+
+	clr	a		;phdiff = #hlen * 256 - phdiff
+	clr	c
+	subb	a,phdiff
+	mov	phdiff,a
+	mov	a,#low(hlen)
+	subb	a,phdiff+1
+	mov	phdiff+1,a
+	mov	a,#high(hlen)
+	subb	a,phdiff+2
+	mov	phdiff+2,a
+	sjmp	ts400
+
+sndoutf:
+;* output:  2 * outf to DAC (bit 11 inverted) *
+	mov	a,outf	 	;first multiply by 2
+	clr	c
+	rlc	a
+	mov	outf,a
+	mov	a,outf+1
+	rlc	a
+
+	cpl	acc.3 		;invert bit11
+	mov	dptr,#freqh	;read out high (only low nipple used)
+	movx	@dptr,a
+	mov	a,outf		;get nipple 1,0
+	mov	dptr,#freql	;read out low nipples
+	movx	@dptr,a
+	mov	dptr,#freqload	;update DAC
+	movx	@dptr,a
+
+	lcall	hfasec		;		<930604a
+	ret
+;** END of 1.6.3 **
+;****************
+; entry		: intern
+; purpose	: subroutine 1.6.4
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: none
+; states	: 12
+;****************
+		internt segment code
+	rseg internt
+intern:
+	mov	dptr,#freqh	;send freq. ref. to port
+	mov	a,#high(freqref)
+	movx	@dptr,a
+	mov	dptr,#freql
+	mov	a,#low(freqref)
+	movx	@dptr,a
+	mov	dptr,#freqload	;update DAC (pseudo write)
+	movx	@dptr,a
+	ret
+;** END of 1.6.4 **
+;****************
+; entry		: hfasec
+; purpose	: subroutine 1.6.2.1
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	: none
+; states	: 73
+;****************
+		hfasecor segment code
+	rseg hfasecor
+hfasec:
+	mov	a,href+2	;* s1 = href/256/8
+	clr	c		;divide by 2
+	rrc	a
+	mov	r7,a
+	mov	a,href+1
+	rrc	a
+	xch	a,r7		;now low in r7
+	clr	c		;divide by 2 again
+	rrc	a
+	xch	a,r7		;now high in r7
+	rrc	a
+	xch	a,r7		;now low in r7
+	clr	c		;divide by 2 again
+	rrc	a
+	xch	a,r7		;now high in r7
+	rrc	a
+	mov	r6,a		; now s1 in r7,r6
+
+	mov	a,hpos+1	;* s2 = hpos/8
+	clr	c		;divide by 2
+	rrc	a
+	mov	r5,a
+	mov	a,hpos
+	rrc	a
+	xch	a,r5		;now low in r5
+	clr	c		;divide by 2 again
+	rrc	a
+	xch	a,r5		;now high in r5
+	rrc	a
+	xch	a,r5		;now low in r5
+	clr	c		;divide by 2 again
+	rrc	a
+	xch	a,r5		;now high in r5
+	rrc	a
+	mov	r4,a		; now s2 in r5,r4
+
+	mov	a,r4
+	clr	c		;* test s1 > s2
+	subb	a,r6
+	jnc	s2big
+
+	mov	a,r6		;* make s1 = s1 - s2
+	clr	c
+	subb	a,r4
+	mov	r6,a
+				;* test if s1 > #hcen (1 byte)
+	mov	a,#hcen		;s1.high is zero
+	clr	c
+	subb	a,r6
+
+; this could be written shorter:
+;	add	a,#-hcen-1
+
+	jnc	s1small
+s1big:
+	mov	a,#low(hcyk)	;* make s1 = #hcyk - s1
+	clr	c
+	subb	a,r6
+	mov	r6,a
+				;* test if s1 > 4	<1/10d
+	mov	a,#4
+	clr	c
+	subb	a,r6
+; this could be written shorter:
+;	mov	a,#low(hcyk)	;* make s1 = #hcyk - s1
+;	clr	c
+;	subb	a,r6
+;	add	a,#-5
+
+	jnc	outhfac
+
+	mov	linadd,#add4	;(1)
+	sjmp	outhfac
+s1small:			;* test if s1 > 4
+	mov	a,#4		;s1.high is zero
+	clr	c
+	subb	a,r6
+
+; this could be written shorter:
+;	mov	a,r6
+;	add	a,#-5
+
+	jnc	outhfac
+	mov	linadd,#supr4	;(2)
+
+	sjmp	outhfac
+s2big:
+	mov	a,r4		;* make s2 = s2 - s1
+	clr	c		;s2 in r5,r4
+	subb	a,r6
+	mov	r4,a
+				;* test if s2 > #hcen (1 byte)
+	mov	a,#hcen		;s2.high is zero
+	clr	c
+	subb	a,r4
+
+; this could be written shorter:
+;	add	a,#-hcen-1
+
+	jnc	s2small
+s2big2:
+	mov	a,#low(hcyk)	;* make s2 = #hcyk - s2
+	clr	c
+	subb	a,r4
+	mov	r4,a
+	mov	a,#4		;* test if s2 > 4	<1/10d
+	clr	c
+	subb	a,r4
+
+; this could be written shorter:
+;	mov	a,#low(hcyk)	;* make s2 = #hcyk - s2
+;	clr	c
+;	subb	a,r4
+;	add	a,#-5
+
+	jnc	outhfac
+suprup:
+	mov	linadd,#supr4	;(2)
+	sjmp	outhfac
+s2small:			;* test if s2 > 4
+	mov	a,#4		;s2.high is zero
+	clr	c
+	subb	a,r4
+
+; this could be written shorter:
+;	mov	a,r4
+;	add	a,#-5
+
+	jnc	outhfac
+	mov	linadd,#add4	;(1)
+outhfac:
+	ret
+;** END of 1.6.2.1 **
+
+
+testskriv:
+;* skriv til DAC
+	mov	a,eph+1		;shift high byte 1 nipple right
+	swap	a
+	mov	r0,a		;save nipple 2,3
+	mov	dptr,#freqh	;read out high (only low nipple used)
+	cpl	acc.3 
+;test!!!
+;	cpl	a
+
+	movx	@dptr,a
+	mov	a,r0		;get nipple 2,3
+	anl	a,#0f0h		;clear nipple 3
+	mov	r0,a		;save 2,-
+	mov	a,eph		;get nipple 1,0
+	swap	a		;make 0,1
+	anl	a,#00fh		;make -,1
+	orl	a,r0		;make 2,1
+	mov	dptr,#freql	;read out low nipples
+;test!!!
+;	cpl	a
+
+	movx	@dptr,a
+	mov	dptr,#freqload	;update DAC
+	movx	@dptr,a
+	ret
+
+	end

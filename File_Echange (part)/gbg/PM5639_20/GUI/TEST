@@ -1,0 +1,166 @@
+int int_scale = 8192;
+
+const int EBUphosphor[] = {
+	int_scale,	-3761,		-1300,
+	-4231, 		int_scale,	212,
+	575,			-1709,		int_scale
+};
+
+const int SMPTECphosphor[] = {
+	int_scale,	-4017,		-1282,
+	-4433,		int_scale,	174,
+	611,			-1702,		int_scale
+};
+
+
+Xm = m†lte X;
+Ym = m†lte Y;
+Zm = m†lte Z;
+
+R = Xm*8192  + Ym*-3761 + Zm*-1300
+G = Xm*-4231 + Ym*8192  + Zm*212
+B = Xm*575   + Ym*-1709 + Zm*8192
+
+
+
+int LearnRedPhosphor( WININFO* wptr, FILENODE* F) {
+
+	MEASINFO* meas = &wptr->meas;
+
+	if ( !COMopened[wptr->sensor])
+		openCOMPort( wptr->sensor, wptr);
+
+	if ( COMopened[wptr->sensor]) {
+		Get_Measurement( wptr->sensor, meas);
+
+		if ( meas->X > 0.01) {
+
+			F->val[1] = meas->Y / meas->X;
+			F->val[2] = meas->Z / meas->X;
+
+			if ( wptr->running == INACTIVE)
+					shutdownCOMPorts();
+
+			return( 0xFF);
+		}
+		if ( wptr->running == INACTIVE);
+			shutdownCOMPorts();
+
+		displayError( 23);
+	}
+	return( 0);
+}
+
+
+int LearnGreenPhosphor( WININFO* wptr, FILENODE* F) {
+
+	MEASINFO* meas = &wptr->meas;
+
+	if ( !COMopened[wptr->sensor])
+		openCOMPort( wptr->sensor, wptr);
+
+	if ( COMopened[wptr->sensor]) {
+		Get_Measurement( wptr->sensor, meas);
+
+		if ( meas->Y > 0.01) {
+
+			F->val[3] = meas->X / meas->Y;
+			F->val[5] = meas->Z / meas->Y;
+
+			if ( wptr->running == INACTIVE)
+					shutdownCOMPorts();
+
+			return( 0xFF);
+		}
+		if ( wptr->running == INACTIVE);
+			shutdownCOMPorts();
+
+		displayError( 23);
+	}
+	return( 0);
+}
+
+
+int LearnBluePhosphor( WININFO* wptr, FILENODE* F) {
+
+	MEASINFO* meas = &wptr->meas;
+
+	if ( !COMopened[wptr->sensor])
+		openCOMPort( wptr->sensor, wptr);
+
+	if ( COMopened[wptr->sensor]) {
+		Get_Measurement( wptr->sensor, meas);
+
+		if ( meas->Z > 0.01) {
+
+			F->val[6] = meas->X / meas->Z;
+			F->val[7] = meas->Y / meas->Z;
+
+			if ( wptr->running == INACTIVE)
+					shutdownCOMPorts();
+
+			return( 0xFF);
+		}
+		if ( wptr->running == INACTIVE);
+			shutdownCOMPorts();
+
+		displayError( 23);
+	}
+	return( 0);
+}
+
+
+void calculatePhosphor( PHOSINFO* new, FILENODE* tmp) {
+
+	int i;
+	float aa, rr1;
+
+	/* Calculate for RED phosphor */
+
+	aa = tmp->val[6];
+
+	for ( i=0; i<10; i++) {
+		rr1 = tmp->val[3] - aa * tmp->val[5];
+		aa = tmp->val[6] - rr1 * tmp->val[7];
+	}
+	new->pho[2] = - ( int)( aa  * int_scale);
+	new->pho[1] = - ( int)( rr1 * int_scale);
+
+	/* Calculate for GREEN phosphor */
+
+	aa = tmp->val[7];
+
+	for ( i=0; i<10; i++) {
+		rr1 = tmp->val[1] - aa * tmp->val[2];
+		aa = tmp->val[7] - rr1 * tmp->val[6];
+	}
+	new->pho[5] = - ( int)( aa  * int_scale);
+	new->pho[3] = - ( int)( rr1 * int_scale);
+
+	/* Calculate for BLUE phosphor */
+
+	aa = tmp->val[5];
+
+	for ( i=0; i<10; i++) {
+		rr1 = tmp->val[2] - aa * tmp->val[1];
+		aa = tmp->val[5] - rr1 * tmp->val[3];
+	}
+	new->pho[7] = - ( int)( aa  * int_scale);
+	new->pho[6] = - ( int)( rr1 * int_scale);
+
+	new->pho[0] = new->pho[4] = new->pho[8] = int_scale;
+}
+
+
+
+LearnRedPhosphor( newP, &pho);
+LearnBluePhosphor( newP, &pho);
+LearnGreenPhosphor( newP, &pho);
+
+calculatePhosphor( &newP->P, &pho);
+
+for ( i = 0; i < 9; i++)
+	oldP->P.pho[i] = newP->P.pho[i];
+
+strcpy( oldP->P.KuNo, newP->sensorid.KuNo);
+strcpy( oldP->P.phoName, pho.name);

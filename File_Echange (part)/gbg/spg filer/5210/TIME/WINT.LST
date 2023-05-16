@@ -1,0 +1,93 @@
+A51 MACRO ASSEMBLER      WINT                                                                DATE  24/01/97   PAGE     1
+
+
+MS-DOS MACRO ASSEMBLER A51 V4.4 
+OBJECT MODULE PLACED IN WINT.OBJ
+ASSEMBLER INVOKED BY:  A51 WINT.A DEBUG
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ;********************************************************************
+                       2     ;* Project      : PT5210  Time Code Converter
+                       3     ;* Filename     : WINT.C
+                       4     ;* Version      : 1.1
+                       5     ;* Purpose      : CRC-check interrupt
+                       6     ;* Org.date     : 960903
+                       7     ;* Author       : PRC
+                       8     ;********************************************************************
+                       9     ;HISTORY:
+                      10     ;970xxx RELEASED 1.1
+                      11     ;960717 translated from PM5655, hint.a
+                      12     
+                      13     WORDINT SEGMENT CODE
+                      14     
+                      15     
+                      16     EXTRN DATA      (slice, wordno, readbuf)
+                      17     ;EXTRN XDATA    (port1tab, port2tab)
+                      18     extrn bit       (found)
+                      19     
+  0097                20     clear   equ     P1.7
+  00B0                21     crc     equ     P3.0
+  00B1                22     window  equ     P3.1
+  00B2                23     tenbit  equ     P3.2
+  00B5                24     gsys    equ     P3.5
+  0090                25     readport equ    P1
+                      26     
+                      27     CSEG AT 0003H
+0003 020000   F       28     ljmp    int90
+                      29     
+                      30     
+----                  31     RSEG    WORDINT
+                      32     
+0000                  33     int90:
+0000 32               34             reti
+0001 C2B1             35             clr     window          ;stop detecting
+0003 30B008           36             jnb     crc,goodcrc     ;check CRC
+                      37     
+                      38     ;       PUSH    ACC
+                      39     ;       PUSH    0
+                      40     ;       PUSH    PSW
+                      41             
+0006 C200     F       42             clr     found           ;bad CRC
+0008 D297             43             setb    clear           ;reset FIFO-reg.
+000A C297             44             clr     clear
+000C 8002             45             sjmp    out10
+000E                  46     goodcrc:
+000E D200     F       47             setb    found           ;good CRC
+0010                  48     out10:
+                      49     
+                      50     ;       POP     PSW
+                      51     ;       POP     0
+                      52     ;       POP     ACC
+0010 32               53             RETI    
+                      54     end
+A51 MACRO ASSEMBLER      WINT                                                                DATE  24/01/97   PAGE     2
+
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E     T Y P E  V A L U E   ATTRIBUTES
+
+CLEAR. . .  B ADDR   0090H.7 A
+CRC. . . .  B ADDR   00B0H.0 A
+FOUND. . .  B ADDR   ----        EXT
+GOODCRC. .  C ADDR   000EH   R        SEG=WORDINT
+GSYS . . .  B ADDR   00B0H.5 A
+INT90. . .  C ADDR   0000H   R        SEG=WORDINT
+OUT10. . .  C ADDR   0010H   R        SEG=WORDINT
+P1 . . . .  D ADDR   0090H   A
+P3 . . . .  D ADDR   00B0H   A
+READBUF. .  D ADDR   ----        EXT
+READPORT .  D ADDR   0090H   A
+SLICE. . .  D ADDR   ----        EXT
+TENBIT . .  B ADDR   00B0H.2 A
+WINDOW . .  B ADDR   00B0H.1 A
+WORDINT. .  C SEG    0000H            REL=UNIT
+WORDNO . .  D ADDR   ----        EXT
+
+
+REGISTER BANK(S) USED: 0
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

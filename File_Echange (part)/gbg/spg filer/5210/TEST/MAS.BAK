@@ -1,0 +1,1048 @@
+
+/*
+********************************************************************
+* Project	: PT5210  MASTER
+* Filename	: MAS.C
+* Version	: 0.0	961030
+* Purpose	: Main and start-up module
+* Org.date	: 960828
+* Author	: PRC
+********************************************************************
+HISTORY:
+961002 Recognition of options.
+	(Anal.Test + SDI Test + Multi-BB are still missing)
+960710 V24 addresses now sent to units
+960214 Created from mas.c in PM5655 to be used in PT5210
+*/
+
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <xa.h>
+#include <intrpt.h>
+#include "vars.h"
+#include "piic.h"
+#include "iniic.h"
+#include "serial1.h"
+#include "mas.h"
+
+extern void syssetup();
+
+near UC syncstatus;
+
+// HARDWARE DEFINES
+sbit P3_4 @ 0x39c;
+
+
+// PORT CONTROL:
+// RAM has address-space 0-0x1fff
+volatile UC  ind1 @ 0x2001;	// input port 1
+volatile UC  ind2 @ 0x4001;	// input port 2
+volatile UC  ud1 @ 0x2001;	// output port 1
+volatile UC  ud2 @ 0x4001;	// output port 2
+volatile UC  ud3 @ 0x6001;	// output port 3
+volatile UC  ud4 @ 0x8001;	// output port 4
+volatile UC  ud5 @ 0xa001;	// output port 5
+code far UC  pgadata @ 0x20000;	// PGA-PROM
+near UC ud1buf;			// buffer for output port 1
+near UC ud4buf;			// buffer for output port 4
+near UC ud5buf;			// buffer for output port 5
+// CONTROL OF OPTIONAL UNITS:
+// Resets:
+#define    MRES1_on	{ ud4buf &= ~0x20; ud4= ud4buf;}
+#define    MRES1_off	{ ud4buf |= 0x20; ud4= ud4buf;}
+#define    MRES2_on	{ ud4buf &= ~0x40; ud4= ud4buf;}
+#define    MRES2_off	{ ud4buf |= 0x40; ud4= ud4buf;}
+#define    MRES3_on	{ ud4buf &= ~0x80; ud4= ud4buf;}
+#define    MRES3_off	{ ud4buf |= 0x80; ud4= ud4buf;}
+
+
+near UC myaddress;	// V24 address for master
+near UL Number, Number1;	// V24 number transfer data
+near char header1;	// store for 1'st letter in V24 cmd.
+
+#define v24ok 0
+
+// CONTROL OF FAN (BLOWER)
+#define fan_on		{ ud1buf |= 16; ud1= ud1buf;}
+#define fan_off		{ ud1buf &= ~16; ud1= ud1buf;}
+near int temp;		// temperature
+near UI oldtemp, grense; // temperature stores
+near UC tempcnt;	// counter for speed change filter
+bit shotdown;		// flag for very hot apparatus
+near UC tempwarn;	// flag for hot apparatus
+
+// WATCHDOG
+#define feed_dog	{ ud4buf ^= 16; ud4= ud4buf;}
+
+// LEVEL DETECTOR
+near lev1det;
+near lev2det;
+
+// FOR TEST
+near long testbbu= 0;
+near UC speed;
+
+
+// SYSTEM VARIABLES (some are old from PM5655)
+near UI teller;		// time-out counter
+near UC c;		// common globals
+near UC slicer;	// time window counter
+near UI options;	//
+near UC reread;	// counter for re-read of sync gen. (time-out)
+near UI fejl;
+bit Timer_flag;		// control bit for 21 ms timing
+bit genbusy, bufbusy;	// generator not ready to receive, bus busy
+bit req_ready;		// ready to answer requests
+bit Acknowledge;	// Acknowledge after IIC communication
+near char cc;
+bit req,quit,save;	// flags for requests from frontplate
+
+// ******************************************************************
+
+void waitms(UI time)	// longer wait routine
+{  UI n;
+   while (time-- > 0) 	// wait 1 ms x time
+   { n= 750;
+     while (n>0)  n--;
+   }
+}
+// ******************************************************************
+
+void waitus(UI time)	// short wait routine
+{
+   while (time-- > 0) ;	// wait 1.1 us x time
+}
+// ******************************************************************
+extern void put_char0(char n);
+
+void backchar(UC n)
+{  UC i;
+   put_char0 (' ');
+   for (i=0;i<n;i++)  put_char0(AnswerBuf[i]);
+   put_char0 (13);
+}
+// ******************************************************************
+
+void get_syncstat(void)	// receive sync status
+{ 
+   if (SndRequest(sync_addr,"GS")==0)
+      if (AnswerCheck()==0)
+      {  syncstatus= AnswerBuf[2] & 1;
+	 backchar(3);
+      }
+}
+// ******************************************************************
+
+void gfase1(void)	// old eksample-routine
+{  SndLong(bbu0_addr,"HG",Number);
+}
+// ******************************************************************
+
+void gfase2(void)	// old eksample-routine
+{  SndLong(bbu0_addr,"JG",Number);
+}
+// ******************************************************************
+
+void load1g7(void)	// HK  new phase
+{  SndLong(bbu0_addr,"HK",Number);
+}
+// *****************************************************************
+
+void load2g7(void)	// JK  new phase
+{  SndLong(bbu0_addr,"JK",Number);
+}
+// *****************************************************************
+
+void mfase1(void)	// old eksample-routine
+{  SndLong(bbu0_addr,"HM",Number);
+}
+// ******************************************************************
+
+void mfase2(void)	// old eksample-routine
+{  SndLong(bbu0_addr,"JM",Number);
+}
+// ******************************************************************
+
+void load1ms(void)	// HL  new phase
+{  SndLong(bbu0_addr,"HL",Number);
+}
+// *****************************************************************
+
+void load2ms(void)	// JL  new phase
+{  SndLong(bbu0_addr,"JL",Number);
+}
+// *****************************************************************
+
+void global1(void)		// HO  -set global offset phase
+{  SndLong(bbu0_addr,"HO",Number);
+}
+// *****************************************************************
+
+void global2(void)		// JO  -set global offset phase
+{  SndLong(bbu0_addr,"JO",Number);
+}
+// *****************************************************************
+
+void scload1(void)	// HH  -set sch-phase, channel 1
+{  SndInt(bbu0_addr,"HH",Number);
+}
+// *****************************************************************
+
+void scload2(void)	// JH  -set sch-phase, channel 2
+{  SndInt(bbu0_addr,"JH",Number);
+}
+// *****************************************************************
+void sch1(void)		// old eksample-routine
+{  SndLong(bbu0_addr,"HS",(UI)Number);
+}
+// ******************************************************************
+
+void sch2(void)		// old eksample-routine
+{  SndLong(bbu0_addr,"JS",(UI)Number);
+}
+// ******************************************************************
+
+void phases1(void)
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"HX")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(100);
+      	    backchar(16);
+         }
+   }
+   else  SndSpecial(bbu0_addr, "HX",'$');
+}
+// ******************************************************************
+
+void phases2(void)
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"JX")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(100);
+      	    backchar(16);
+         }
+   }
+   else  SndSpecial(bbu0_addr,"JX",'$');
+}
+// ******************************************************************
+
+void phases1m(void)
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"HY")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(100);
+      	    backchar(16);
+         }
+   }
+   else  SndSpecial(bbu0_addr,"HY",'$');
+}
+// ******************************************************************
+
+void phases2m(void)
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"JY")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(100);
+      	    backchar(16);
+         }
+   }
+   else  SndSpecial(bbu0_addr,"JY",'$');
+}
+// ******************************************************************
+
+void daclev1(void)		// HD  -set/store/read DAC level
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"HD")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(20);
+      	    backchar(3);
+         }
+   }
+   else if (save)
+   {  save= 0;
+      SndSpecial(bbu0_addr, "HD",'$');
+   }
+   else SndChar(bbu0_addr,"HD",(UC)Number);
+}
+// *****************************************************************
+
+void dacoffset1(void)		// HC  -set/store/read DAC offset
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"HC")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(20);
+      	    backchar(3);
+         }
+   }
+   else if (save)
+   {  save= 0;
+      SndSpecial(bbu0_addr,"HC",'$');
+   }
+   else SndChar(bbu0_addr,"HC",(UC)Number);
+}
+// *****************************************************************
+
+void daclev2(void)		// JD  -set/store/read DAC level
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"JD")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(20);
+      	    backchar(3);
+         }
+   }
+   else if (save)
+   {  save= 0;
+      SndSpecial(bbu0_addr,"JD",'$');
+   }
+   else SndChar(bbu0_addr,"JD",(UC)Number);
+}
+// *****************************************************************
+
+void dacoffset2(void)		// JC  -set/store/read DAC offset
+{  if (req)
+   {  req= 0;
+      if (SndRequest(bbu0_addr,"JC")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(20);
+      	    backchar(3);
+         }
+   }
+   else if (save)
+   {  save= 0;
+      SndSpecial(bbu0_addr,"JC",'$');
+   }
+   else SndChar(bbu0_addr,"JC",(UC)Number);
+}
+// *****************************************************************
+
+void reset1(void)
+{  SndVoid(bbu0_addr,"HZ");
+}
+// ******************************************************************
+
+void reset2(void)
+{  SndVoid(bbu0_addr,"JZ");
+}
+// ******************************************************************
+
+void hphsetg(void)
+{  SndLong(sync_addr,"GZ",Number);
+}
+// ******************************************************************
+
+void hphsetm(void)
+{  SndLong(sync_addr,"GY",Number);
+}
+// ******************************************************************
+
+void gensetg(void)
+{
+   if (req) {
+      if (SndRequest(sync_addr,"GF")==0)
+      req=0; 
+      if (AnswerCheck()==0)
+      {  waitms(20);
+         backchar(5);
+      }
+   }
+   else
+   SndLong(sync_addr,"GF",Number);
+}
+// ******************************************************************
+
+void gensetm(void)
+{
+   if (req) {
+      if (SndRequest(sync_addr,"GG")==0)
+      req=0; 
+      if (AnswerCheck()==0)
+      {  waitms(20);
+         backchar(5);
+      }
+   }
+   else
+   SndLong(sync_addr,"GG",Number);
+}
+// ******************************************************************
+
+void gensetd6(void)
+{  SndLong(sync_addr,"GD",Number);
+}
+// ******************************************************************
+
+void gensetd5(void)
+{  SndLong(sync_addr,"GE",Number);
+}
+// ******************************************************************
+
+void hphcalcg(void)
+{
+   if (req) {
+      if (SndRequest(sync_addr,"GA")==0)
+      req=0; 
+      if (AnswerCheck()==0)
+      {  waitms(20);
+         backchar(10);
+      }
+   }
+   else
+   SndVoid(sync_addr,"GA");
+}
+// ******************************************************************
+
+void hphcalcm(void)
+{
+   if (req) {
+      if (SndRequest(sync_addr,"GU")==0)
+      req=0; 
+      if (AnswerCheck()==0)
+      {  waitms(20);
+         backchar(10);
+      }
+   }
+   else
+   SndVoid(sync_addr,"GU");
+}
+// ******************************************************************
+
+void hphupg(void)
+{  SndInt(sync_addr,"GI",100);
+}
+// ******************************************************************
+
+void hphupm(void)
+{  SndInt(sync_addr,"GJ",100);
+}
+// ******************************************************************
+code UC modetab[]=
+{ 0xa1,0xaf,0xad,0xa5,0xa5,0xa4,0xb1,0xa1,0xa1,0xb0,0xa0,0xa0
+};
+
+void genmode(void)
+{  SndChar(sync_addr,"GM",(UC)Number);
+   ud5buf= modetab[(UC)Number];	// default sync config
+   ud5= ud5buf;
+}
+// ******************************************************************
+
+char instring[11];	// receive string
+char *instrptr;
+UC instr_index;		// index into receive string (instring)
+// *****************************************************************
+
+void wrtext1(void)
+{  instrptr= instring;
+	  SndAsc_n(bbu0_addr, "HW",(UC)Number,instrptr);
+}
+// ******************************************************************
+
+void rdtext1(void)
+{
+      if (SndRequest_n(bbu0_addr,"HR",(UC)Number)==0)
+         if (AnswerCheck()==0)
+	 {  waitms(100);
+      	    backchar(12);
+         }
+}
+// ******************************************************************
+
+void wrtext2(void)
+{  instrptr= instring;
+	  SndAsc_n(bbu0_addr,"JW",(UC)Number,instrptr);
+}
+// ******************************************************************
+
+void rdtext2(void)
+{
+      if (SndRequest_n(bbu0_addr,"JR",(UC)Number)==0)
+         if (AnswerCheck()==0)
+	 {  waitms(100);
+      	    backchar(12);
+         }
+}
+// ******************************************************************
+
+void genwrtxt(void)	// GW
+{  instrptr= instring;
+   IIC2_WrStr(0xa8, 12, instrptr);
+}
+// ******************************************************************
+
+void genrdtxt(void)	// GR
+{  IIC2_RdStr(0xa8, 12, AnswerBuf+1);
+   AnswerBuf[0]= '"';
+   AnswerBuf[9]= '"';
+   backchar(12);
+}
+// ******************************************************************
+void genstoreg(void)	// GV
+{  IIC2_WrLongInt(0xa8, 0, Number, 12345);
+}
+// ******************************************************************
+void genstorem(void)	// GX
+{  IIC2_WrLongInt(0xa8, 6, Number, 23456);
+}
+// ******************************************************************
+void genrdg(void)		// GK
+{  UL a;
+   UI b;
+//   UC i;
+   a= IIC2_RdLong(0xa8, 0);
+   b= IIC2_RdInt(0xa8, 4);
+}
+// ******************************************************************
+void genrdm(void)		// GL
+{  UL a;
+   UI b;
+//   UC i;
+   a= IIC2_RdLong(0xa8, 6);
+   b= IIC2_RdInt(0xa8, 10);
+}
+// ******************************************************************
+
+void status1(void)
+{
+      if (SndRequest(bbu0_addr,"HS")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(20);
+      	    backchar(3);
+         }
+}
+// ******************************************************************
+
+void status2(void)
+{
+      if (SndRequest(bbu0_addr,"JS")==0)
+         if (AnswerCheck()==0)
+	 {  waitms(20);
+      	    backchar(3);
+         }
+}
+// ******************************************************************
+
+void optstat(void)	// OS
+{  UC i;
+   UI n;
+   if (req)
+   {  req= 0;
+      n= 1;
+      for (i=0;i<15;i++)
+      {  if (options & n )  AnswerBuf[i]= '1'; else AnswerBuf[i]= '0';
+	 n <<= 1;
+      }
+      backchar(15);
+   }
+}
+// ******************************************************************
+
+void dummy(void)
+{  SndVoid(sync_addr,"DU");
+}
+// ******************************************************************
+void NotFound(void)		// old eksample-routine
+{ ;
+}
+// ******************************************************************
+
+struct kommando {
+	 char Aa;
+	 char Bb;
+	 void (*funktion)(void);
+};
+
+void warntemp(void) {
+};
+// ******************************************************************
+// TABLE FOR ARRIVING COMMANDOS	FROM RS232 (FOR TEST)
+// ******************************************************************
+
+code const struct kommando kommandotabel[] = {
+
+'G','M',genmode,
+'G','S',get_syncstat,
+'G','Z',hphsetg,
+'G','Y',hphsetm,
+'G','A',hphcalcg,
+'G','I',hphupg,
+'G','J',hphupm,
+'G','F',gensetg,
+'G','G',gensetm,
+'G','D',gensetd6,
+'G','E',gensetd5,
+'G','W',genwrtxt,
+'G','R',genrdtxt,
+'G','V',genstoreg,
+'G','X',genstorem,
+'G','U',hphcalcm,
+'G','K',genrdg,
+'G','L',genrdm,
+
+'H','G',gfase1,
+'H','K',load1g7,
+'H','M',mfase1,
+'H','L',load1ms,
+'H','O',global1,
+'H','H',scload1,
+'H','X',phases1,
+'H','Y',phases1m,
+'H','D',daclev1,
+'H','C',dacoffset1,
+'H','Z',reset1,
+'H','W',wrtext1,
+'H','R',rdtext1,
+'H','S',status1,
+
+'J','G',gfase2,
+'J','K',load2g7,
+'J','M',mfase2,
+'J','L',load2ms,
+'J','O',global2,
+'J','H',scload2,
+'J','X',phases2,
+'J','Y',phases2m,
+'J','D',daclev2,
+'J','C',dacoffset2,
+'J','Z',reset2,
+'J','W',wrtext2,
+'J','R',rdtext2,
+'J','S',status2,
+'O','S',optstat,
+
+
+'S','C',sch1,
+'S','D',sch2,
+'D','U',dummy,
+'x','x',NotFound
+};
+// ******************************************************************
+// Command Machine
+// ******************************************************************
+
+CommandExecute(char A,char B) {
+UC x;
+for (x = 0; x < (sizeof(kommandotabel)/sizeof(struct kommando)); x++)
+   if (A==kommandotabel[x].Aa)
+      if (B==kommandotabel[x].Bb)
+      {
+         header1 = A;
+         kommandotabel[x].funktion();
+         break;
+      }
+}
+// ******************************************************************
+// NB! '$' ER ERSTATTET AF '%' I DENNE TEST-VERSION!!!!!
+
+
+void CharHandler(char c)
+{  static UC MesState;
+   static char First,Second;
+   switch ( MesState)
+   {  case 0: if(isalpha(c) || (c=='?'))
+  	      {  First = toupper(c); MesState = 1;} break;
+      case 1: if(isalpha(c) || (c=='?'))
+    	      {  Second =toupper(c); MesState = 2; Number = 0;} break;
+      case 2: if(isdigit(c))  Number = 10 * Number + (c-'0');
+	      if (c==',')  MesState= 3;
+	      else if (c==34)
+	      {  MesState= 4;	// quote
+		 instr_index= 0;
+	      }
+	      else if (c==10 || c==';' || c==13 || c== '?' || c== '!' || c== '%')
+	      {  MesState = 0;
+	         if (c == '?') req = 1; else req = 0;
+	         if (c == '!') quit = 1; else quit = 0;
+	         if (c == '%') save = 1; else save = 0;
+	         CommandExecute(First,Second);
+	      }  break;
+      case 3: if(isdigit(c))  Number1 = 10 * Number1 + (c-'0');
+	      else if (c==34)
+	      {  MesState= 4;	// quote
+		 instr_index= 0;
+	      }
+	      else if (c==10 || c==';' || c==13 || c== '?' || c== '!' || c== '%')
+	      {  MesState = 0;
+	         if (c == '?') req = 1; else req = 0;
+	         if (c == '!') quit = 1; else quit = 0;
+	         if (c == '%') save = 1; else save = 0;
+	         CommandExecute(First,Second);
+	      }  break;
+      case 4: if (c==34)  instring[instr_index]= 0;  // end the string
+	      else if (c==10 || c==';' || c==13 || c== '?' || c== '!' || c== '%')
+	      {  MesState = 0;
+	         if (c == '?') req = 1; else req = 0;
+	         if (c == '!') quit = 1; else quit = 0;
+	         if (c == '%') save = 1; else save = 0;
+	         CommandExecute(First,Second);
+	      }
+	      else  instring[instr_index++]= c; 
+	      break;
+      default: MesState = 0; break;
+   }
+}
+
+/*
+CharHandler(char c)
+{  static UC MesState;
+   static char First,Second;
+   switch ( MesState)
+   {  case 0: if(isalpha(c) || (c=='?'))
+  	    { First = toupper(c); MesState = 1;} break;
+      case 1: if(isalpha(c) || (c=='?'))
+    	    { Second =toupper(c); MesState = 2; Number = 0;} break;
+      case 2: if(isdigit(c))  Number = 10 * Number + (c-'0');
+	    if (c==10 || c==13 || c=='?' || c=='!' || c=='$')
+	    { MesState = 0;
+	      if (c == '?') req = 1; else req = 0;
+	      if (c == '!') quit = 1; else quit = 0;
+	      if (c == '$') save = 1; else save = 0;
+	      CommandExecute(First,Second);
+	    } break;
+      default: MesState = 0; break;
+   }
+}
+*/
+// ******************************************************************
+
+/* Interrupts:	T0 prior:     9  bank 1
+		Ser0_rec     15   -   0
+		Ser1_rec  -  15   -   0
+		Ser0_trm  -   ?   -   0
+		Ser1_trm  -   ?   -   0
+*/
+ROM_VECTOR(IV_T0, Timer_int, IV_SYSTEM+IV_PRI09+IV_BANK1)
+ROM_VECTOR(IV_RI0, Serial0_int, IV_PSW)
+ROM_VECTOR(IV_RI1, Serial1_int, IV_PSW)
+
+
+#define xtal 29491200
+// ******************************************************************
+
+interrupt void Timer_int(void)
+{  static near UC ticker;
+   TH0 = -xtal/256/4/3/50;  // Load timer to 50 Hz (20ms)
+   if (++ticker>2)
+   {  ticker= 0;
+      Timer_flag= 1;
+   }
+}
+// ******************************************************************
+
+void checkopt(void)	// Find options
+{
+
+}
+// ******************************************************************
+
+void opstart(void)	// Initialize units
+{
+
+}
+// ******************************************************************
+// ******************************************************************
+// ******************************************************************
+
+void main(void)
+{ UC i;
+  UC testtel;
+   // TEST
+
+
+// System set-up
+   BCR= 0x02;	// set 20 bit BUS, 8 bit DATA
+   syssetup();
+
+// Serial set-up
+   S0CON= 0x50;	// (D2) Transmit mode 1(3), 8(9) bit UART, Receive enable
+   S1CON= 0xF2;	// Transmit mode 3,  9 bit UART,  Address mode, Rec.enable
+   // PCON= 0;	// => SMOD = 0, not double Baud Rate
+   //  TI0= 1;	// set transmitter ready
+   S1ADDR= master_addr;	// receive address
+   S1ADEN= 0xCC;	// mask for receive address
+   // receive address = 00010000 AND 11001100 = 00XX00XX (00 to 33)
+
+// Timer set-up
+   TMOD= 0x21;	// timer 1: 8 bit autoload; timer 0: 16 bit count
+   RTL1= -48;	// reload value for Timer 1, sets Baud rate to 9600
+   TH0= -255;	// start value
+   T2MOD= 0x31;	// use T2 for V24_1, count up
+   T2CAPH= -1;	// set reload values
+   T2CAPL= -6;
+//  T2CON= 0x30;	// use T2 for V24_0
+   TH2= -1;	// set for max. Baud
+   TL2= -6;
+   TR2= 1;	// start V24-timer
+
+// Interrupt setting
+   IT0 = 1;	// edge trig on ext0
+   IT1 = 1;	// edge trig on ext1
+   EX0= 0;	// disable ext0
+   ET0= 1;	// enable timer0 intrpt
+   ET1= 0;	// disable timer1 intrpt
+
+// NB! IPAx PRIORITETS-SETTING SKAL MATCHE SETTING I ROM_VECTOR() !!!
+// (Brug kun 9-F, 0 ell. 8 er intrpt off!)
+   IPA0= 0x90;	// 0x76 prior. for Timer0/EX0 
+   IPA4= 0xff;	// 0xbb serial 0 intrpt.
+   IPA5= 0xff;	// 0xaa serial 1 intrpt.
+
+   Serial0_init();
+   Serial1_init();
+
+   ud1buf |= 15;	// Init IIC (via port)
+   ud1= ud1buf;
+   
+   ERI0 =1;
+//   ETI0= 1;
+   
+   TR0 = 1;	// start loop timer
+   TR1= 1;	// start V24-timer
+
+   EA = 1 ;	// enable all
+
+
+   fan_off;			// turn blower off
+//  Wr_iic2(0x90,0x40,0);	// turn blower off (PM5655)
+
+   oldtemp = 255;		// initiate temper. control
+   tempwarn = 0;
+   slicer=0;
+   Number=0;
+   teller=0;
+   options=0;
+   reread=0;
+
+// ******************************************************************
+/* Reset all units. There are 3 resets to options, MRES1 to MRES3.
+   In order to identify the position of the options, one reset is
+   released at a time and an option address is send to this option.
+   If the option then answeres back its address, the Master then
+   knows the presens of this option.
+   to allow all units to do their own initialisation. */
+// ******************************************************************
+
+   feed_dog;	// watch-dog feed
+
+   MRES1_on;	// reset all options
+   MRES2_on;
+   MRES3_on;
+   waitms(100);	// reset for at least 100 ms
+   
+   MRES1_off;	// release reset 1
+   waitms(100);	// Wait for unit to init its interface
+//   SndChar(default_addr,"SW",bbu1_addr); // DUMMY CMD to wake unit
+   SndChar(default_addr,"HA",bbu1_addr); // change V24 address on unit
+   waitms(10);				// wait for answer from unit
+   i= S1BUF;
+   if (i==bbu1_addr)  options |= 0x0100;
+   else if (i==bbu1_addr+64)  options |= 0x0800;
+
+   MRES2_off;	// release reset 2
+   waitms(100); // Wait for unit to init its interface
+   SndChar(default_addr,"SW",bbu2_addr); // DUMMY CMD to wake unit
+   SndChar(default_addr,"HA",bbu2_addr); // change V24 address on unit
+   waitms(10);				// wait for answer from unit
+   i= S1BUF;
+   if (i==bbu2_addr)  options |= 0x0200;
+   else if (i==bbu2_addr+64)  options |= 0x1000;
+
+   MRES3_off;	// release reset 3
+   waitms(100); // Wait for unit to init its interface
+   SndChar(default_addr,"SW",bbu3_addr); // DUMMY CMD to wake unit
+   SndChar(default_addr,"HA",bbu3_addr); // change V24 address on unit
+   waitms(10);				// wait for answer from unit
+   i= S1BUF;
+   if (i==bbu3_addr)  options |= 0x0400;
+   else if (i==bbu3_addr+64)  options |= 0x2000;
+
+   if (IIC1_Write(d1lock_addr,0xff))  options |= 32;	// D1 genlock
+   if (IIC1_Write(time_addr,0xff))  options |= 64;	// Time gen.
+   if (IIC2_Write(sound1_addr,0xff))  options |= 16;	// Sound gen.
+   if (SndChar(AnlSig_addr,"AD",0)==v24ok) // option checks the check-sum
+   { 
+      options |= 1;	// PT8601
+   }
+
+   if (SndChar(SDISig_addr,"SD",0)==v24ok) // option checks the check-sum
+   {
+      options |= 2;	// PT8602 or PT8603
+   }
+
+   if (IIC2_Write(multibb_addr,0xff))
+   { 
+      options |= 8;	// PT8604
+   }
+
+   if (IIC2_Write(sound1_addr,0xff))
+   {
+      options |= 16;	// PT8605
+   }
+
+   if (IIC1_Write(d1lock_addr,0xff))
+   {
+      options |= 32;	// PT8606
+   }
+
+   if (IIC1_Write(time_addr,0xff))
+   { 
+      options |= 64;	// PT8607
+   }
+
+   if (SndRequest(sync_addr,"GS")==0)
+      if (AnswerCheck()==0)
+      {  if ((AnswerBuf[0]*100 + AnswerBuf[1]*10 + AnswerBuf[2]) & 64)
+	   options |= 0x0x4000;  	// Oven unit
+      }
+// ******************************************************************
+ // RECALL OLD SETTINGS
+   grense = templimit-2;	// limit for blower (high temp.)
+   feed_dog;
+   fejl = 0;
+   // ramcheck();
+
+   if (fejl & ramerr)
+   { // load_ram();
+     // defphases();
+   }
+
+   checkopt();			// find options
+   opstart();
+
+   // TEST: SET DEFAULT VALUES
+   ud5buf= 0xa1;	// default sync config
+   ud5= ud5buf;
+
+// ******************************************************************
+// ENDLESS LOOP
+// ******************************************************************
+   while(1)
+   {  while(Timer_flag == 0)	// while waiting for timer flag
+      {	// if (req_ready)		// moved to here 931220
+	// if (!bufbusy)  // read new orders only when GEN. buffer is empty
+         while ((cc=get_char0()) != 0)	// handle characters from buffer
+		  CharHandler(cc);
+
+//    	 if (IIC1_Write(0x40,0x55)==0) ;	// TEST 1/11-96
+
+
+      }
+// 20 ms TIMER EXPIRED
+// ******************************************************************
+
+      Timer_flag = 0;
+
+      slicer++; if (slicer > 10) slicer = 1;	// divide in 21 windows
+
+      if (slicer&1)
+      { ;		// do job every 40ms
+      }
+
+      if (slicer == 1)		// window 1
+// ******************************************************************
+      {  temp = Rd_iic(temperat_addr); // set blower speed from NTC resistor temp
+	  if (temp==0) temp= 255;
+	  if (temp==oldtemp) tempcnt=25;
+	  else if (--tempcnt==0 || oldtemp>temp+1)
+	  {   tempcnt = 25;
+	      oldtemp = temp;
+    // MANAGE TEMPERATURE WARNINGS
+	      if (temp> hottemp+2)		// test if colder than HOT
+	      { if (tempwarn!=0)
+	        { tempwarn=0; warntemp(); } // warning off
+	      }
+	      else if (temp< panictemp)		// test if warmer than TOOHOT
+	      { shotdown= 1;			// then shot down
+	        if (tempwarn!=2)
+	        { tempwarn=2; warntemp(); } // WARNING to frontplate4e
+	      }
+	      else if (temp< hottemp)		// test if warmer than HOT
+	      { if (tempwarn!=1)
+	        { tempwarn=1; warntemp(); } // WARNING to frontplate
+	      }
+ 	      if (temp> panictemp+10)
+	      if (shotdown)
+	      { shotdown=0; // NOT TOOHOT, CANCEL SHOTDOWN
+	        // klardat= 0;	// normal start without data reset
+	        // restart();
+	      }
+    // SET BLOWER SPEED
+	      if (temp>grense)
+	      {	temp=0;			// cold, blower off
+		  if (ud1buf & 16)  fan_off;
+		  grense = templimit-2;
+	      }
+	      else
+	      {	grense = templimit;
+		  if (!(ud1buf & 16))  fan_on;	// blower on
+	      }
+	  }
+      }
+
+      if (slicer == 2) 		// window 2
+// ******************************************************************
+      {
+         lev1det= Rd_iic(lev1det_addr);
+         lev2det= Rd_iic(lev2det_addr);
+      }
+
+    if (slicer == 3) 		// window 3
+// ******************************************************************
+      { feed_dog;
+      }
+
+      if (slicer == 4)		// window 4
+// ******************************************************************
+      {
+      }
+
+      if (slicer == 5)		// window 5
+// ******************************************************************
+      {
+      }
+
+      if (slicer == 6)		// window 6
+// *****************************************************************
+      {
+      }
+
+      if (slicer == 7)		// window 7
+// ******************************************************************
+      {
+      }
+
+      if (slicer == 8) 		// window 8
+// ******************************************************************
+       { 
+//	   get_syncstat();
+       }
+
+      if (slicer == 9) 		// window 9
+// ******************************************************************
+      { 
+	   testtel++;
+
+         if ((testtel++ & 15)== 15) ;
+//	IIC2_Write(0xa8,0x49);
+//	IIC2_Read(0xa8);
+
+/*         	SndSpecial(bbu0_addr,"HX",'$');	// save phases
+		wrtext1();
+         else if ((testtel & 1)== 0)
+         	SndRequest(bbu0_addr,"HX");	// request phases
+		rdtext1();
+         SndRequest_n(bbu0_addr,"HR",1);	// request string
+*/
+      }
+// ******************************************************************
+   }
+}
+

@@ -1,0 +1,61 @@
+	PROJEKT PT2510				PRC
+				rev.02 960808, rev.03 970604
+					
+	VITC code reader.
+
+VITC kode sendes i en eller to linier i omr†det lin.6-22.
+Amplituden er 550 mV+-50 mV. Der sendes 90 bit fordelt som 9
+gange (2 bit ('1-0') + 8 bit (data)).  Start min. 11.2 us efter
+TH. Slut min. 1.9 us f›r TH.  Bit-rate 1812.5+-0.2 kb/s.
+Varighed nominelt 49.655 us, og min. 49.65 us.  Ubestemthed er
+da 64-11.2-1.9-49.65= 1.25 us.
+NTSC: Start min. 10.0 us efter TH. Slut min. 2.1 us f›r TH.
+Bit-rate 1789.77+-0.2 kb/s. Varighed nominelt 50.286 us, og min.
+50.280 us.  Ubestemthed er da 63.556-10.0-2.1-50.28= 1.176 us.
+
+
+se diagram VITC code reader.
+U-Controlleren starter s›gning efter tidskode ved at s‘tte signalet
+WINDOW h›jt i de linier som ›nskes unders›gt.
+Data kommer fra en niveau-slicer samtidig til skifteregisteret
+(1), til CRC-registeret (2) og til startdetektoren (5). Hvis der
+i vinduet 11.1-12.5 us efter FH kommer en positiv flanke, vil
+(5) starte t‘lleren (6) som under stop er loaded med tallet '4'.
+T‘lleren t‘ller nu p† cp som har en frekvens p† 8x bitrate.
+Da t‘lleren starter p† '4', vil data blive klokket ind i
+skifteregisteret (1) og CRC-registeret (2) midt i bit- perioden.
+Efter hver 10 clock-pulser vil de 2 f›rste bit (sync-bit) blive
+sammenlignet med '10'. Hvis dette fejler, vil CRC-latchen blive
+l†st s† den ikke kan godkende data for denne linie. De sidste 8
+bit bliver latchet ind i FIFO registeret. Efter 90 clock-pulser
+trigges CRC-latchen (4). Resultatet unders›ges af U-Controlleren
+i n‘ste linie.
+Hvis CRC er i orden ligger (4) p† 0 og U-Controlleren vil ikke s›ge
+mere i denne frame. I field 2 l‘ses de modtagne data fra FIFO-
+registeret og koderne behandles og konverteres til biphase LTC-kode
+som gemmes i DUAL-PORT RAM (8) p† en s†dan m†de, at der ikke sker
+adressesammenfald p† indgang og udgang.
+
+
+LTC-CODE data.
+Biphasekode med T= 500 +- 2.5 us. Tr= 50 +15 -10 us. 0.5 - 4.5
+Vpp med impedans < 30 OHM.
+NTSC: T= 416.7 +- 4.2us. Tr= 25 +- 5us. Se ANSI/SMPTE 12M si.2.
+
+se diagram TIME-CODE OUT.
+
+PLL-oscillatoren (9) er l†st til Frame og leverer 4 kHz til t‘lleren
+(10) og til udl‘seregisteret (11). T‘lleren (10) deler de 4KHz med
+160 og leverer samtidig adresser til RAM (8) og load-pulser til
+udl‘seregisteret (11).
+
+
+
+
+Bem‘rkninger:
+- en integreret VITC READER bruges i et kommercielt apparat
+  (IHP8603). Typenummer MB654220 (Fujitsu?), det unders›ges.
+- S/W: husk at inds‘tte bit 59 (Phase-correction bit). Se
+  EBU3097E si.10. (NTSC bit 27).
+- Der er skrappe data for udgangsforst‘rkeren!
+  Se EBU3097E si.35 = APPENDIX 5.

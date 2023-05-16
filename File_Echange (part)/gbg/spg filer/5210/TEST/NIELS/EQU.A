@@ -1,0 +1,350 @@
+; EQU.A
+; date:		950710
+; version:	1.x
+; author:	P.Chr.
+
+
+; 950710 H-counter (Timer0) replaced by count in HTELHI, HTELLO
+; 950629 HERR and BUERR deleted
+; 950508 PALM detection added
+; 950131 M-version added
+; 941129 Version control added to this file.
+;  Ver.1.0
+; 940303 SEPOS changed.
+; 931210 Oldread added
+; 931208 Levelcnt,#leve1,#level2 and bit:level added
+; 931203 New Type table (Typesize changed)
+; 931122 New: ALIAN,BULOCKEN,SECAM
+; 931118 New variables: ERRPRE(for optimizing) and BLACKAV
+; 931115 New bits: TAU and LOCKBIT
+; 931026 ADD,SUPR,SAMP changed into a byte LINADD
+; 931021 New values for 3-line
+; 931004 vlenmin and windlen changed to detect slow lock
+; 930806 added burst, secam and paln-detection
+; 930805 added BUAMAV, SEAMAV, PALNAV
+; 930729 added FASECHK
+; 930723 x and y for pal-n detector in BURSTFASE
+; 930601 sphgod and phgod is new
+
+;* VERSION CONTROL **
+$set (gvers=0)		; 1= G-version. 0= M-version.
+
+;* CONSTANTS **
+acal	 equ  2		;(6) a-value for datatreatment
+add1	 equ  7		;V-lock correction value for LINADD (use in LINE7)
+add2	 equ  5		;V-lock correction value for LINADD (use in LINE7)
+add4	 equ  1		;V-lock correction value for LINADD
+amax	 equ  3		;(9)limit for a-couter (lines)
+apreset	 equ  2		;(2)a vaerdi til brug ved field1 interrupt
+asamp	 equ  1		;(8)value for a for which to sample in next line
+bl1	 equ  1	;values for line sorting in "lineint" <931021a7
+buerrpre equ  30	;limit for acceptance of burst		<9/10a
+freq1	 equ  0		;limit for output freq
+freq2	 equ  00fffh 	; do., upper
+freqref	 equ  0800h	;reference frequence for intern use
+herrpre  equ  30	;limit for acceptance of h		<2/10c
+id61	 equ  015h
+id62	 equ  02ah
+level1	 equ  51	;for check of blacklevel
+level2	 equ  65	;for check of blacklevel
+papug	 equ  36	;limit for accept of pal-pulse
+papupos  equ  372	;relativ palpuls position i forhold til sync
+pham40	 equ  01ch	;check figure for burst phase   snj 931112
+pham45	 equ  020h	; -	-	-	-       snj 931112
+pha40	 equ  0e0h	; -	-	-	-       snj 931112
+pha45	 equ  0dch	; -	-	-	-       snj 931112
+phmar	 equ  0280h	;graense for at godkende h fase
+;bitaddl	 equ  0		;pos. of bit 'addl' in type byte
+;bitsamp	 equ  2		;pos. of bit 'samp' in type byte
+;bitsupr	 equ  1		;pos. of bit 'supr' in type byte
+samp	 equ  4		;value for setting sampling (use in LINEINT)
+sch61	 equ  050h	;(040h sv. til 0 degr. hysterese - 048h til 11 degr.)		<16/10c2
+sch62	 equ  0b0h	;(2's kompl. af sch61)          snj 931112
+secag1   equ  90	;secam detection
+secag2   equ  115	;secam detection
+secag3   equ  20	;secam detection
+sepos	 equ  154	;(164)
+supr4	 equ  2		;V-lock suppress flag value for LINADD
+syg1	 equ  24	;snj 931126 graense for sync amplitude lower
+;vlenmax  equ  0fd8ah 	;no. of lines to frame time-out (-630)
+verrpre  equ  3	;graense for godkendelse af field (antal gode frames)
+windlen	 equ  5	;(foer 10) field pulse acceptance window length (lines)
+vdetect	 equ  3	;v-teller vaerdi inden for window for 625 linier
+
+$if (gvers=1)
+;	** G-VERSION **
+afield	 equ  1		;(4)
+bl2	 equ  105
+bl3	 equ  207
+bl4	 equ  102
+bl5	 equ  208
+bl6	 equ  104
+bl7	 equ  103
+bmax	 equ  209	;(70)limit for b counter (5-line groups)
+bpreset	 equ  208	;(70)b vaerdi til brug ved field1 interrupt
+buamg1   equ  100	;burst detection
+buamg2   equ  140	;burst detection
+bupos	 equ  120	;relativ burst position i forhold til sync
+fmax	 equ  4		;limit for f counter (frames)
+hcal1	 equ  0420h 	;low limit for hphzero calibrating (the 2 highest bytes)
+hcal2	 equ  0424h 	;high	-	-	-	-	-	-
+hcen	 equ  71	;for line pull - NB; kun 1 byte stor (se rutine 'hfacec')
+hcyk	 equ  142	;for line pull
+hlen	 equ  1135	;line length in clockpulses
+hstart	 equ  5		;(3)offset from HPOS to seek for LINE
+palg1    equ  185	;pal-n detection
+palg2    equ  205	;pal-n detection
+refmult	 equ  04000h	;subc.ref frame offset
+subcinc  equ  0bec5h    ;Ver.G.(3c50);fasetilvaekst paa subc. paa 9 (5) lin.
+syg2	 equ  36	;graense for sync amplitude upper
+typesize equ  112	;size of tabel for types
+vlenmin	 equ  623	; no. of lines to frame check window
+
+$else
+;	** M-VERSION **
+afield	 equ  3		;(4)
+bl2	 equ  175
+bl3	 equ  173
+bl4	 equ  86
+bl5	 equ  174
+bl6	 equ  88
+bl7	 equ  87
+bmax	 equ  175	;(70)limit for b counter (5-line groups)
+bpreset	 equ  175	;(70)b vaerdi til brug ved field1 interrupt
+buamg1   equ  95	;burst detection	<950327
+buamg2   equ  133	;burst detection	<950327
+bupos	 equ  96	;relativ burst position i forhold til sync
+fmax	 equ  2		;limit for f counter (frames)
+hcal1	 equ  0340h 	;low limit for hphzero calibrating (the 2 highest bytes)<950327
+hcal2	 equ  0344h 	;high	-	-	-	-	-	-	<950327
+hcen	 equ  57	;for line pull - NB; kun 1 byte stor (se rutine 'hfacec')
+hcyk	 equ  114	;for line pull
+hlen	 equ  910	;line length in clockpulses
+hstart	 equ  4		;(3)offset from HPOS to seek for LINE
+palg1    equ  64	;pal-m detection
+palg2    equ  192	;pal-m detection
+refmult	 equ  08000h	;subc.ref frame offset
+subcinc  equ  08000h 	;Ver.M.(bec5);fasetilvaekst paa subc. paa 9 (5) lin.
+syg2	 equ  34	;graense for sync amplitude upper <950227
+typesize equ  104	;size of tabel for types
+vlenmin	 equ  523	; no. of lines to frame check window
+$endif
+
+
+; CONSTANTS FOR STATUS OUTPUT
+;			tau,secam,slowlock,paln
+;			ÚÙ  ÚÄÄÄ-buav,spgint,lockbit,syncav
+palglock	equ	10001111b
+palgunl		equ	00001101b
+pallock		equ	10010111b
+palunl		equ	00010101b
+secamlock	equ	11000111b
+secamunl	equ	01000101b
+hlocked		equ	10000111b
+hunl		equ	00000101b
+slowerr		equ	10100001b  ;940121 snj
+internl		equ	00000000b
+
+;* BYTE VARIABLES IN BIT AREA *
+saves	 equ  02bh
+outs	 equ  02ch	;output status
+;buts	 equ  02dh	;buttons read-store
+doflags  equ  02eh	;colection of flags for waiting routines
+buam	 equ  02fh	;burst.amplitude
+
+;* BYTE Variables in Byte area *
+atel	 equ  030h	;taeller rundt til 5 paa line  		| disse 3 signaler
+black	 equ  031h	;gennemsnits sort vaerdi
+btel	 equ  032h	;taeller rundt til 125 paa carry fra a	| udgoer tilsammen en
+cvartel	 equ  033h	;taeller varighed til outdata loades fra tabel
+;tid1	 equ  034h	;maalt tidsforsk. course input/output sync enhed clockpulser
+;tid2	 equ  035h	;maalt tidsforsk. fine input/output sync enhed clockpulser/256 
+
+phgod	 equ  034h	;filter counter for line7
+sphgod	 equ  035h	;filter counter for line7
+ftel	 equ  036h	;taeller rundt til 4 paa carry fra b	| 8 field linie taeller
+;hamp	 equ  037h	;sync amplityde
+htello	 equ  037h	;H-counter (lo)
+htelhi	 equ  038h	;H-counter (lo)
+;herr	 equ  038h	;taeller der taeller ned ved gode lines
+schph	 equ  039h	;sch fase paa input signal
+papua	 equ  03ah	;pal pulse ampl.
+papulock equ  03bh	;taeller til at finde ud af om der er 8 fields puls
+sync	 equ  03ch	;gennemsnits sync vaerdi
+trig	 equ  03dh	;trigger niavue for 50 % sync		
+verr	 equ  03eh	;taeller der taeller ned paa gode fields
+speeddel equ  03fh	;counter for button speeder delay
+speedval equ  040h	;button speeder rate
+lintyp	 equ  041h	;last read line type
+dpoint	 equ  042h	;data pointer in table
+savacc	 equ  043h	;store for accu
+;buerr	 equ  044h	;counter for errors in burst
+linadd	 equ  045h	;correction value for LINTYP output
+errpre	 equ  046h	;error preset variable
+blackav	 equ  047h	;black value average
+
+;* VARIABLES 16BIT **
+buph	 equ  048h	;burst phase
+eph	 equ  04ah	;external burst phase
+genphase equ  04ch	;wanted genlock fase, updated from frontplate
+hpos	 equ  04eh	;position of extern line
+i	 equ  050h	;local variable
+j	 equ  052h	;local variable
+oldph	 equ  054h	;old ext. burst phase
+outf	 equ  056h	;output freq.
+phdet	 equ  058h	;phasedet. var. for use in freq.lock
+; OBS: 'combuf' occupies from 5ah - 5fh
+x	equ	060h	;immediate result from burstfase
+y	equ	061h	;immediate result from burstfase
+z	equ	062h	;immediate result from burstfase
+
+subcpot  equ  064h	;wanted subc genlock phase, derived from genphase
+subcref	 equ  066h	;subc phase in aktual line
+
+; MORE 1-BYTE VARIABLES
+levelcnt equ	068h	;counter for good/bad fields
+godgren	equ	069h	;indicates which branch in SCH was last used
+schgod	equ	06ah	;filter counter for SCH routine
+
+;* VARIABLES 24BIT **
+scratc	 equ  06bh	;scratch pad, 3 bytes
+hinput	 equ  06eh	;maalt horisontal fase af input signal
+			; maalt som ram position
+			; bestaar af 3 byte 
+			; 2 der giver ram position i clockpulser
+			; 1 der giver underindelingen
+href	 equ  071h	;oensket horisontal fase af input signal
+			; maalt som ram position
+			; bestaar af 3 byte 
+			; 2 der giver ram position i clockpulser
+			; 1 der giver underindelingen
+hphzero	 equ  074h	;calibrerings data til indstilling af genlock fase
+			; maalt som ram position
+			; bestaar af 3 byte 
+			; 2 der giver ram position i clockpulser
+			; 1 der giver underindelingen
+phdiff	 equ  077h	;fase difference mellem input og oensket fase
+			; maalt som ram position
+			; bestaar af 3 byte 
+			; 2 der giver ram position i clockpulser
+			; 1 der giver underindelingen
+
+
+; MORE 1-BYTE VARIABLES
+oldread	 equ  07ch	;last legal kommun. port read value
+palav	 equ  07dh	;
+buamav	 equ  07fh	;
+
+$if (gvers=1)
+secamav	 equ  07eh	;for secam filter
+
+$else
+oldpalm	 equ  07eh	;
+diff	 equ  07bh	;for PALM filter
+palm	 equ  07ah	; Do.
+
+$endif
+
+
+
+
+;* BUFFER **
+combuf	equ	05ah	;buffer for commands from master uP
+
+;* BITS AND FLAGS **
+comerr	equ	048h	;flag for communication error
+cmdin	equ	049h	;flag for command received
+level   equ	04ah	;level shift bit
+xnneg	equ	04bh	;flag for xn negative (in Burstfase)
+ynneg	equ	04ch	;flag for yn negative (in Burstfase)
+yneg	equ	04dh	;flag for y negative (in Burstfase)
+
+; cachefull equ	04eh	;flag for byte in cache for use
+cntenab	equ	04fh	;line counter enable
+
+;* other bits **
+minus	 equ  050h	;flag for negative medium result
+butena	 equ  051h	;enables button read. Is set every frame
+window	 equ  052h	;flag for field pulse in window
+lockdet	 equ  053h	;
+bulocken equ  054h	;
+alian	 equ  055h	;
+epapu	 equ  056h	;white bar is on active linie
+;buok	 equ  057h	;burst amplitude is ok		<12/10d
+;* bits in byte: saves **
+genlocken equ  058h 	;genlock allowed
+pplocken  equ  059h	;lock to 8 fields pulse allowed
+
+;* bits in byte: outs **
+syncav	 equ  060h	;indicates sync available
+lockbit	 equ  061h	;indicates spg genlocked
+spgint	 equ  062h	;indicates (0 = oven reference)
+buav	 equ  063h	;indicates burst available
+pal	 equ  064h	;indicates paln
+slowlock equ  065h	;indicates 623,624,626,627 lines found
+secam	 equ  066h	;indicates secam
+tau	 equ  067h	;indicates slow phase lock time constant
+
+
+;* bits in byte: buts **
+sw1	 equ  06bh	;int/ext switch button
+sw2	 equ  06ch	;
+sw3	 equ  06dh	;button for genlock phase down
+sw4	 equ  06eh	;	-	-	  up
+sw5	 equ  06fh	;pplock button
+
+;* bits in byte: doflags **
+doline7	 equ  074h	;flag for waiting routine
+doknap	 equ  073h	; -	-	-
+domode	 equ  072h	; -	-	-
+dosch	 equ  071h	; -	-	-
+dolock	 equ  070h	; -	-	-
+nsf	 equ  075h	;flag for error in sync
+
+
+
+;* bits in byte: buam **
+;		 equ  078h 	;
+;		 equ  079h	;
+
+;* PORT BITS **
+ns	 equ  p3.0	;flag, incomming sync is bad
+iicdiff	equ	p3.5	;flag, master has read the port
+
+;* tables **
+tablepyt equ  2		;prefix for pointer
+tableam  equ  1		;prefix for pointer
+tableph	 equ  0		;prefix for pointer
+;tabelt	 equ 		;line type and duration table (is put in ram)
+
+;pref1	 equ 		;entry in tabelt for field 1 at field1 interrupt
+;pref2	 equ 		;	--	-	2	-	-
+;pref3	 equ 		;	--	-	3	-	-
+;pref4	 equ 		;	--	-	4	-	-
+;startf1 equ 		;start point in tabelt for field 1
+;startf2 equ 		;	-	-	-	2
+;startf3 equ 		;	-	-	-	3
+;startf4 equ 		;	-	-	-	4
+
+;tabelf	 equ 		;from sinus/cosinus to burst phase
+;tabela	 equ 		;from sinus/cosinus to burst amplitude
+
+;* PORT ADDRESSES **
+;ramadr  equ  0f0h	;startadr. for RAM, high byte
+ramtable equ  0feh	;startadr. for type and durations table in ram
+freql	 equ 0f700h	;port for output frequency, low byte 	(sel 3)
+freqh	 equ 0f780h	;	-	-	-  high byte 	(sel 4)
+outport  equ 0f400h	;output port
+freqload equ  0f600h	;pseudo-port for update of DAC
+dualport equ  0f8h	;dual port ram
+typeport equ 0f5h	;port for output of linietype 		(sel 5)
+outsport equ 0f4h	;port for output			(sel 6)
+
+ehportl	 equ 0f6h	;port for read-in of exstern h position, low byte  (sel 7)
+ehporth	 equ 0f5h	;	-	-	-	-    	 high byte (sel 8)
+butport equ 0f400h	;	-	- of buttons		(sel 9)
+
+;* EXTERN RAM ADDRESSES (in dual-port RAM) **
+xsaves	  equ	0ffe0h	;flags
+xgenphase equ	0ffe2h	;wanted genlock fase, updated from frontplate
+xhphzero  equ	0ffe4h	;calibrerings data til indstilling af genlock fase

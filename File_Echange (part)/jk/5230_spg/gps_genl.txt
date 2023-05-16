@@ -1,0 +1,36 @@
+
+
+
+SDI Genlock vs. GPS Genlock.
+
+
+The SDI Genlock module generates F_D1 signal, which signals beginning of each 
+SDI frame.  This signal, when in SDI Genlock mode, generates  External 
+Interrupt 0 (Vertical (Frame) Interrupt), which is serviced by 
+    v_int().
+This function (Frame Interrupt), initalizes or updates a line counter.
+It has nothing to do with Frame Counter.
+
+There is also a line interrupt, on External Interrupt 1, triggered by SPGINT
+signal.  How this signal is generated is unknown, so we must assume that
+it is active on the beginning of each line (line interrupt).
+
+In the line  interrupt routine there is frame counter (ftel) which counts:
+4, 3, 2, 1, 4, 3, 2, 1, 4 ..... in G mode and
+2, 1, 2, 1, 2, 1, 2.............in M mode.
+
+This frame counter is used to generate two signals, used to synchronize all
+Black Burst generators and all analog pattern generators, namely:
+
+F8_G (true when ScH phase is 0: every 4th frame), and 
+F4_M (true when ScH phase is 0: every 2nd frame).
+
+Because these signals are generated from the F_D1 SDI frame signal, there will
+be arbitary relationship between ScH phase of analog generators and these
+signals.  With 2 sync generators genlocked to the same SDI signal, there may
+be ScH phase difference on analog generators.
+
+When using the GPS Genlock board, this problem is remedied as follows (G mode only):
+
+The GPS board produces the F_D1 signal which comes each 4 frames.
+The Frame Interrupt routine is modified by setting Frame Counter (ftel) equal 1.

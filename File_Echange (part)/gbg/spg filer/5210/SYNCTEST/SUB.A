@@ -1,0 +1,227 @@
+$include	(equ.a)
+;********************************************************
+; filename	: sub.s					*
+; author	: p.christiansen	930726		*
+; version	: 0.1			931119		*
+; status	: preliminary				*
+; tested by	:					*
+; optimized for	: speed					*
+; specialities	:					*
+;********************************************************
+;HISTORY:
+;931119 BL/WH genlock and Genlock optimize selections
+; 930804 command 'S' changed to 5Xh (X for sub-commands)
+	sub segment code
+	rseg sub
+	public 	kommun,add24,compar,sub24
+	extrn code(autohph)
+;****************
+; entry		: 
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+;****************
+kommun:
+	jnb	iicdiff,outkomb	;skip if port is not read	<<30/4a6
+
+;	jnb	cachefull,normread	;if cache full, use it <940223a4
+;	mov	a,cache	
+;	sjmp	bytein
+;normread:
+
+	mov	p1,#0ffh	;else clear port
+	mov	a,p1		; and read message
+bytein:
+	cjne	a,#0ffh,decode	;if port is empty (FF)
+	sjmp	fffound
+decode:
+;	jb	acc.7,errset
+
+	cjne	a,oldread,newb	;skip if same byte as last	<931210a4
+	ljmp	outkom
+newb:
+	mov	oldread,a	;save new read
+
+	jb	cmdin,datread
+	mov	combuf,a	;save command
+	setb	cmdin
+	ljmp	outkom
+datread:
+	mov	r0,a		;save data
+	swap	a		;calculate address in buffer
+	anl	a,#7
+	add	a,#combuf
+	xch	a,r0		;find if hi or lo byte
+	jnb	acc.7,savlo
+	anl	a,#15
+	swap	a
+	mov	@r0,a		;save hi byte
+savlo:
+	anl	a,#15
+	orl	a,@r0		;add to hi byte
+	mov	@r0,a		;save lo byte
+	ljmp	outkom
+fffound:
+	mov	oldread,#0	;clear old reading	<931210a
+
+	jbc	comerr,outkomb
+	jnb	cmdin,outkomb
+	mov	a,combuf
+
+;*** HERE IS THE COMMAND PARSER ***
+	mov	r0,a		;save command
+;	anl	a,#0f0h
+	cjne	a,#50h,ts51
+	mov	a,r0		;restore command
+	mov	p1,outs		; do the command
+	ljmp	notcmd
+
+; her inds‘ttes ordrer fra low nipple
+ts51:	mov	a,r0		;restore command
+	cjne	a,#51h,ts52
+; BL/WH genlock only
+	clr	bulocken
+	ljmp	notcmd
+ts52:	cjne	a,#52h,ts53
+	setb	bulocken
+	ljmp	notcmd
+ts53:	cjne	a,#53h,ts54
+	mov	errpre,#1
+	sjmp	notcmd
+outkomb:
+	sjmp	outkom
+
+ts54:	cjne	a,#54h,tsh
+	mov	errpre,#3
+	sjmp	notcmd
+tsh:	cjne	a,#'H',tsg		;<930528ax
+	mov	hphzero+2,combuf+1
+	mov	hphzero+1,combuf+2
+	mov	hphzero,combuf+3
+	sjmp	notcmd
+tsg:	cjne	a,#'G',ts7b
+	mov	genphase+1,combuf+1
+	mov	genphase,combuf+2
+	sjmp	notcmd
+ts7b:	cjne	a,#07bh,ts77
+	mov	a,#1
+	add	a,genphase
+	mov	genphase,a
+	clr	a
+	addc	a,genphase+1
+	mov	genphase+1,a
+	sjmp	notcmd
+ts77:	cjne	a,#077h,ts3f
+	mov	a,genphase
+	clr	c
+	subb	a,#1
+	mov	genphase,a
+	mov	a,genphase+1
+	subb	a,#0
+	mov	genphase+1,a
+	sjmp	notcmd
+ts3f:	cjne	a,#03fh,tsa
+	mov	p1,outs		; give an answer to master, not ffh
+	lcall	autohph
+	sjmp	notcmd
+tsa:	cjne	a,#'A',tsb
+	mov	p1,hphzero+2
+	sjmp	notcmd
+tsb:	cjne	a,#'B',tsc
+	mov	p1,hphzero+1
+	sjmp	notcmd
+tsc:	cjne	a,#'C',notcmd
+	mov	p1,hphzero
+
+notcmd:
+	clr	cmdin
+	sjmp	outkom
+errset:
+	setb	comerr
+	mov	combuf,#0	;clear command
+	clr	cmdin
+outkom:
+;	jnb	cachefull,goout	;if cache was used	<940223a4
+;	clr	cachefull	; then also make
+;	ljmp	normread	;  a normal read
+;goout:
+	ret
+;****************
+; entry		: 
+; purpose	: 
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+;****************
+
+
+;* subroutine: sub24 (11) **
+;* Subtracts r4,r3,r2 from r7,r6,r5 *
+sub24:	clr	c
+	mov	a,r5
+	subb	a,r2
+	mov	r5,a
+	mov	a,r6
+	subb	a,r3
+	mov	r6,a
+	mov	a,r7
+	subb	a,r4
+	mov	r7,a
+	ret
+;* END of sub24 **
+
+;* subroutine: add24 - add r4,r3,r2 to r7,r6,r5 **
+add24:
+	mov	a,r5
+	add	a,r2
+	mov	r5,a
+	mov	a,r6
+	addc	a,r3
+	mov	r6,a
+	mov	a,r7
+	addc	a,r4
+	mov	r7,a
+	ret
+;* END of add24 **
+
+;*****************
+;entry		: compar
+;purpose	: compare two 2-byte values r7,r6 - r5,r4. if > then a=1
+;output		: 	if equal then a=0, if < then a=255 and cy=1.
+;		:	if positive, the result is in r7,r6.
+;input		: r7,r6 and r5,r4 holds the two figures
+;destroys	: a
+;execute time	: (19)14us
+;*****************
+compar:	mov	a,r7
+	clr	c
+	subb	a,r5
+	jc	lower
+	jnz	higher
+	mov	r7,#0		;r7 is zero
+	mov	a,r6
+	subb	a,r4
+	jc	lower
+	mov	r6,a		;restore r6
+	jz	outcmp		;if not zero,
+	mov	a,#1		; then set flag for positive
+outcmp:	ret
+lower:	mov	a,#255		;set flag for negative
+	ret
+higher:	mov	r7,a		;result to r7
+	mov	a,r6
+	subb	a,r4
+	jnc	outhi
+	dec	r7
+	clr	c
+outhi:	mov	r6,a		;result to r6
+	mov	a,#1		;set flag for positive
+	ret
+;* END of compar **
+
+	end

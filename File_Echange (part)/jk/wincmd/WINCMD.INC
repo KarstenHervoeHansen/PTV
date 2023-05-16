@@ -1,0 +1,160 @@
+cm_SrcShort=301;Source: only file names
+cm_SrcLong=302;Source: all file details
+cm_SrcTree=303;Source: directory tree
+cm_SrcQuickview=304;Source: quick view panel
+cm_SrcExecs=311;Source: only programs
+cm_SrcAllFiles=312;Source: all files
+cm_SrcUserSpec=313;Source: last selected
+cm_SrcUserDef=314;Source: select user type
+cm_SrcByName=321;Source: sort by name
+cm_SrcByExt=322;Source: by extension
+cm_SrcBySize=323;Source: by size
+cm_SrcByDateTime=324;Source: by date
+cm_SrcUnsorted=325;Source: unsorted
+cm_SrcNegOrder=330;Source: reversed order
+
+cm_LeftShort=101;Left: only file names
+cm_LeftLong=102;Left: all file details
+cm_LeftTree=103;Left: directory tree
+cm_LeftQuickview=104;Left: quick view panel
+cm_LeftExecs=111;Left: only programs
+cm_LeftAllFiles=112;Left: all files
+cm_LeftUserSpec=113;Left: last selected
+cm_LeftUserDef=114;Left: select user type
+cm_LeftByName=121;Left: sort by name
+cm_LeftByExt=122;Left: by extension
+cm_LeftBySize=123;Left: by size
+cm_LeftByDateTime=124;Left: by date
+cm_LeftUnsorted=125;Left: unsorted
+cm_LeftNegOrder=130;Left: reversed order
+
+cm_RightShort=201;Right: only file names
+cm_RightLong=202;Right: all file details
+cm_RightTree=203;Right: directory tree
+cm_RightQuickview=204;Right: quick view panel
+cm_RightExecs=211;Right: only programs
+cm_RightAllFiles=212;Right: all files
+cm_RightUserSpec=213;Right: last selected
+cm_RightUserDef=214;Right: select user type
+cm_RightByName=221;Right: sort by name
+cm_RightByExt=222;Right: by extension
+cm_RightBySize=223;Right: by size
+cm_RightByDateTime=224;Right: by date
+cm_RightUnsorted=225;Right: unsorted
+cm_RightNegOrder=230;Right: reversed order
+
+cm_Config=490;Conf: general settings
+cm_Config2=516;Conf: extended settings
+cm_PackerConfig=491;Conf: packer
+cm_FontConfig=492;Conf: font
+cm_ConfigSavePos=493;Conf: save position
+cm_ColorConfig=494;Conf: colors
+cm_Confirmation=495;Conf: confirmation
+cm_EditConfig=496;Conf: viewer/editor
+cm_ConfTabChange=497;Conf: tabstops
+cm_ButtonConfig=498;Conf: button bar
+cm_LanguageConfig=499;Conf: language
+
+cm_CDtree=500;popup directory tree
+cm_SearchFor=501;search for
+cm_SetAttrib=502;change attributes
+cm_GetFileSpace=503;calculate space
+cm_PrintFile=504;print file
+cm_VolumeId=505;volume label
+cm_SysInfo=506;system information
+cm_Associate=507;associate
+cm_PackFiles=508;pack files
+cm_UnpackFiles=509;unpack all
+cm_TestArchive=518;test selected archives
+cm_VersionInfo=510;version information
+cm_ExecuteDOS=511;start DOS
+cm_NetConnect=512;network connections
+cm_NetDisconnect=513;disconnect network drives
+cm_NetShareDir=514;share directory
+cm_NetUnshareDir=515;unshare directory
+cm_SpreadSelection=521;select group
+cm_ShrinkSelection=522;unselect group
+cm_SelectAll=523;select all
+cm_ClearAll=524;unselect all
+cm_ExchangeSelection=525;invert selection
+cm_DirectoryHotlist=526;Directory popup menu
+cm_SelectCurrentExtension=527;Sel. all files with same ext.
+cm_UnselectCurrentExtension=528;Unsel. all files with same ext.
+cm_RestoreSelection=529;Selection before last operation
+cm_Exchange=531;swap panels
+cm_MatchSrc=532;target=source
+cm_CompareDirs=533;compare dirs
+cm_DirMatch=534;mark newer
+cm_RereadSource=540;reread source
+cm_FtpConnect=550;Connect to FTP
+cm_FtpNew=551;New FTP connection
+cm_FtpDisconnect=552;Disconnect from FTP
+cm_FtpHiddenFiles=553;Show hidden FTP files
+cm_FtpAbort=554;Abort current FTP command
+cm_FtpResumeDownload=555;Resume aborted download
+cm_FtpSelectTransferMode=556;Select Binary, Ascii or Auto mode
+cm_ftpaddtolist=557;Add selected files to download list
+cm_ftpdownloadlist=558;Download files in download list
+cm_Split=560;Split file into pieces
+cm_Combine=561;Combine partial files
+cm_Encode=562;Encode MIME/UUE/XXE
+cm_Decode=563;Decode MIME/UUE/XXE/BinHex
+
+cm_GotoPreviousDir=570;Go back
+cm_GotoNextDir=571;Go forward
+cm_DirectoryHistory=572;History list
+
+cm_configSaveSettings=580;Save current paths etc.
+
+cm_HelpIndex=610;help index
+cm_Keyboard=620;keyboard help
+cm_Register=630;registration info
+cm_VisitHomepage=640;visit www.ghisler.com
+cm_About=690;help-about
+
+cm_Exit=24340;exit WinCmd
+
+cm_Minimize=2000;minimize Wincmd
+cm_Maximize=2015;maximize Wincmd
+cm_Restore=2016;restore normal size
+cm_GoToRoot=2001;go to root directory
+cm_GoToParent=2002;go to parent directory
+cm_GoToDir=2003;open dir or zip under cursor
+cm_ClearCmdLine=2004;clear command line
+cm_NextCommand=2005;next command line
+cm_PrevCommand=2006;previous command line
+
+cm_List=903;View with Lister
+cm_Edit=904;Edit (Notepad)
+cm_Copy=905;Copy files
+cm_RenMov=906;Rename/Move files
+cm_MkDir=907;Make directory
+cm_Delete=908;Delete files
+cm_50percent=909;Window separator at 50%
+cm_Return=1001;Simulate: return pressed
+cm_RenameOnly=1002;Rename (Shift+F6)
+cm_Properties=1003;Properties dialog
+cm_CreateShortcut=1004;Create a shortcut
+
+cm_CutToClipboard=2007;(32 bit) Cut selected files to clipboard
+cm_CopyToClipboard=2008;(32 bit) Copy selected files to clipboard
+cm_PasteFromClipboard=2009;(32 bit) Paste from clipboard to current dir
+cm_SwitchLongNames=2010;Turn long names on and off (Win95 and NT only)
+cm_SwitchHidSys=2011;Turn hidden/system files on and off
+cm_SwitchDirSort=2012;Turn directory sorting by name on/off
+cm_Switch83Names=2013;Turn 8.3 names lowercase on/off
+cm_countdircontent=2014;Calculate space occupied by subdirs in current dir
+cm_CopyNamesToClip=2017;Copy filenames to clipboard
+cm_CopyFullNamesToClip=2018;Copy names with full path
+cm_AddPathToCmdline=2019;Copy path to command line
+
+cm_FileSync=2020;Synchronize directories
+cm_CompareFilesByContent=2022;File comparison
+
+cm_OpenDesktop=2121;Desktop folder
+cm_OpenDrives=2122;My Computer
+cm_OpenControls=2123;Control Panel
+cm_OpenFonts=2124;Fonts folder
+cm_OpenNetwork=2125;Network Neighborhood
+cm_OpenPrinters=2126;Printers folder
+

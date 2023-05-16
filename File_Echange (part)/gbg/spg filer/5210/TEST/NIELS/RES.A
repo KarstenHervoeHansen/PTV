@@ -1,0 +1,108 @@
+;name res
+$include	(equ.a)
+;********************************************************
+; filename	: res.s					*
+; author	: p.christiansen	931118		*
+; version	: 			950922		*
+; status	: preliminary				*
+; tested by	:					*
+; optimized for	: speed					*
+; specialities	:					*
+;********************************************************
+; HISTORY
+; 950922 RAM-table abandoned for direct ROM-table (#tablestart).
+; 950714 Kommun routine now outside H-interrupt routine.
+; 950710 H-counter (Timer0) replaced by count in HTELHI, HTELLO
+; 931118 VERR (and others) now loaded from variable ERRPRE (speed/noise)
+; 931116	Dummy write to address 03XX
+
+	res segment code
+	rseg res
+	public 	start,wait
+;	extrn code(knap,line7,lock,mode,sch,vint)
+;	extrn code(lineint,vtimerint,tablestart,startf4,kommun)
+;****************
+; entry		: start
+; purpose	: start-up routines (initializing)
+; input		:
+; output	:
+; destroys	:
+; stack used	:
+; uses/calls	:
+;****************
+	org	0
+start:	ljmp	begin		;jump over interrupt addresses
+	reti
+;	ljmp	vint		;interrupt from intr0 (each frame) - addr 3
+	org $+ 	5
+	reti
+;	ljmp	vtimerint	;interrupt from timer 0 (line counter) - addr B
+	org $+ 	5
+	reti
+;	ljmp	lineint		;intrpt from intr1 (each line) - addr 013h
+	org $+ 	21
+	reti
+begin:
+	mov     r1,#0
+ldr0:	mov	r0,#0		;delay start-up
+	djnz	r0,$
+	djnz	r1,ldr0
+
+	mov	sp,#7		;stack starts from addr 8
+
+
+;* set-up counters and interrupts *
+setup:	mov	tmod,#065h	;t1 =8 bit reload; t0 =16 bit count
+	setb	it0		;intr0 edge trig
+	setb	it1		;intr1 edge trig
+
+	setb	et0		;enable intr from timer0
+	setb	ex0		;	-	- intr0
+	setb	ex1		;	-	- intr1
+
+;* preset some internals *
+
+
+;* preset some externals *
+
+;* start timers and enable interrupts *
+sttim:
+;	setb	ea		;enable all interrupts
+	setb	cntenab		;replaces TR0 for line count enable
+	
+;* interrupt waiting loop *
+wait:	
+	mov	dptr,#0B003H
+	mov	a,#040H
+	movx	@dptr,a
+	mov	dptr,#09000H
+	mov	a,#054H
+	movx	@dptr,a
+	mov	dptr,#0D001H
+	mov	a,#013H
+	movx	@dptr,a
+	mov	dptr,#09000H
+	mov	a,#015H
+	movx	@dptr,a
+	mov	dptr,#0D000H
+	mov	a,#096H
+	movx	@dptr,a
+	mov	dptr,#09000H
+	mov	a,#0
+	movx	@dptr,a
+	mov	dptr,#0A000H
+	mov	a,#0A0H
+	movx	@dptr,a
+	sjmp	wait
+
+ramini:	mov	r0,#32	  ;ram start
+;	mov	p2,#0
+	clr	a
+ra1:	mov	@r0,a	  ;fill with zero
+;	movx	@r0,a
+	inc	r0	      ;next addr
+	cjne	r0,#128,ra1     ;loop
+	ret
+
+
+	end

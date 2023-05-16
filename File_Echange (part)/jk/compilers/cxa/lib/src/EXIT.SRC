@@ -1,0 +1,70 @@
+; @(#)exit.src	1.4 7/22/97
+;*****************************************************************************
+;*
+;* MODULE	: exit.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: The exit routine causes normal program termination to occur.
+;*		  First, all functions registered by the atexit function are
+;*		  called in the reverse order of their registration by the
+;*		  routine __doexit. Next, all open streams with unwritten
+;*		  buffered data are flushed, all open streams are closed and 
+;*		  all files created by the tmpfile runction are removed by the
+;*		  routine __cleanup. The status value passed to __exit via 
+;*		  register R0 is returned via R0. Passing status as return
+;*		  is allowed because, return value status succesful termination
+;*		  and status unsuccesful termination is implementation defined
+;*		  in ANSI-C. Finally, control is returned to the "host 
+;*		  environment", by jumping directly to __EXIT in the cstart 
+;*		  routine.
+;*
+;*		  __doexit and __cleanup are clib routines.
+;*
+;* INPUT	: R0
+;*
+;* OUTPUT	: R0
+;*
+;* USES		: R0
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE	'HEAD'
+
+	NAME	EXIT
+
+IF	MODEL_LARGE || MODEL_MEDIUM
+IF	DO_FILE_IO
+	EXTRN	HCODE(__doexit)
+	EXTRN	HCODE(__cleanup)
+ENDIF
+	EXTRN	HCODE(__EXIT)
+LIBC_PR  SEGMENT HCODE
+ELSE
+IF	DO_FILE_IO
+	EXTRN	CODE(__doexit)
+	EXTRN	CODE(__cleanup)
+ENDIF
+	EXTRN	CODE(__EXIT)
+LIBC_PR  SEGMENT CODE
+ENDIF
+
+	RSEG	LIBC_PR
+;
+	PUBLIC	_exit
+
+;*****************************************************************************
+;* exit
+;*****************************************************************************
+_exit:
+IF	DO_FILE_IO
+	PUSH.W	R0		; push return value on the stack
+	GCALL	__doexit	; call registered functions
+	GCALL	__cleanup	; flush open streams and close them and remove
+				; temporay files.
+	POP.W	R0		; pop return value from the stack
+ENDIF
+	GJMP	__EXIT		; jump to exit label in cstart module
+
+	END

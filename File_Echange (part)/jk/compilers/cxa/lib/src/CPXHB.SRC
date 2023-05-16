@@ -1,0 +1,52 @@
+; @(#)cpxhb.src	1.1 11/4/97
+;*****************************************************************************
+;*
+;* MODULE	: cpxhb.asm
+;*
+;* APPLICATION	: run time C library
+;*
+;* DESCRIPTION	: Copy data block from xdat data to huge data. The source and
+;*		  destination address pointers and the number of bytes to
+;*		  copy are passed to this copy routine via registers. The
+;*		  registers used are :
+;*
+;*		  R2    = address source
+;*		  R5:R4 = address destination
+;*		  R6    = number of bytes to copy
+;*
+;* INPUT	: R2,R4-R6
+;*
+;* OUTPUT	: none
+;*
+;* USES		: R1,R2,R4-R6
+;*
+;* COPYRIGHT	: 1996 Copyright TASKING, Inc.
+;* 
+;*****************************************************************************
+INCLUDE 'HEAD'
+
+		NAME _CPXHB
+
+CODE_SEG_DEF
+		RSEG	LIBRT_PR
+
+		PUBLIC	__CPXHB
+__CPXHB:
+IF	MODEL_MEDIUM
+	SETB	SSEL.4		; destination addressed via ES
+ENDIF
+loop:
+	MOV.B	ES,R5L		; destination addressed via ES
+	MOVX.B	R1L,[R2]	; get source data
+	ADDS.W	R2,#01H		; increment destination pointer
+	MOV.B	[R4+],R1L	; copy source to destination
+	SUB.W	R4,#01H		;
+	ADD.W	R4,#01H		; increment destination pointer
+	ADDC.W	R5,#00H		;
+	DJNZ.W	R6,loop		; loop if count not zero
+IF	MODEL_MEDIUM
+	CLR	SSEL.4		; restore source pointer
+ENDIF
+	RET			; and return
+
+	END

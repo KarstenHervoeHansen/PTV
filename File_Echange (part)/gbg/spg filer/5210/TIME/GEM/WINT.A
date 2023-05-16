@@ -1,0 +1,55 @@
+;	PT5210 Timecode Unit
+; File:		hint.c		line-counter interrupt
+; Version:	0.0
+; Author:	PRC
+; HISTORY:
+
+; 960717 translated from PM5655, hint.a
+
+WORDINT	SEGMENT CODE
+
+
+EXTRN DATA	(slice, wordno, readbuf, found)
+;EXTRN XDATA	(port1tab, port2tab)
+;extrn bit	(crc)
+
+crc	equ	P3.0
+window	equ	P3.1
+tenbit	equ	P3.2
+gsys	equ	P3.5
+readport equ	P1
+
+CSEG AT 0003H
+ljmp	int10
+
+
+RSEG	WORDINT
+
+int10:
+	RETI		; TEST
+
+	PUSH    ACC
+	PUSH	0
+	PUSH    PSW
+	
+	mov	a,#readbuf	;point to word buffer
+	add	a,wordno	;add word offset
+	mov	r0,a
+	mov	@r0,readport	;read data port
+	inc	wordno		;next word
+	mov	a,wordno
+	cjne	a,#9,out10	;if 9 times 10 words
+	clr	window		;then stop detecting
+	jnb	crc,goodcrc	;check CRC
+	mov	found,#0	;bad CRC
+	sjmp	out10
+goodcrc:
+	mov	found,#2	;good CRC
+out10:
+
+	POP     PSW
+	POP	0
+	POP     ACC
+	RETI    
+	
+end
